@@ -14,6 +14,9 @@ const departmentRoutes = require('./routes/departmentRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const stationaryRoutes = require('./routes/stationaryRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -22,6 +25,9 @@ app.use('/department', departmentRoutes);
 app.use('/roles', roleRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/attendance', attendanceRoutes);
+app.use('/stationary', stationaryRoutes);
+app.use('/wallet', walletRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

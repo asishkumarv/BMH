@@ -1,0 +1,196 @@
+const pool = require('../db');
+
+exports.getWallet = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    let result = await pool.query('SELECT * FROM employee_wallets WHERE employee_id = $1', [employee_id]);
+    
+    // If no wallet exists, create one with 0 balance
+    if (result.rows.length === 0) {
+      result = await pool.query(
+        'INSERT INTO employee_wallets (employee_id, balance) VALUES ($1, 0) RETURNING *',
+        [employee_id]
+      );
+    }
+    
+    const txResult = await pool.query(
+      'SELECT * FROM wallet_transactions WHERE employee_id = $1 ORDER BY created_at DESC',
+      [employee_id]
+    );
+
+    res.json({ 
+      success: true, 
+      data: {
+        wallet: result.rows[0],
+        transactions: txResult.rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching wallet:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getAllWallets = async (req, res) => {
+  try {
+    const { department } = req.query;
+
+    let walletsQuery = `
+      SELECT w.*, e.full_name, e.department, e.email 
+      FROM employee_wallets w
+      JOIN employees e ON w.employee_id = e.id
+    `;
+    
+    let txQuery = `
+      SELECT wt.*, e.full_name, e.department
+      FROM wallet_transactions wt
+      JOIN employees e ON wt.employee_id = e.id
+    `;
+
+    const params = [];
+    if (department) {
+      walletsQuery += ` WHERE e.department = $1`;
+      txQuery += ` WHERE e.department = $1`;
+      params.push(department);
+    }
+    
+    txQuery += ` ORDER BY wt.created_at DESC`;
+
+    // Admin gets all wallets + transactions (optionally filtered by dept)
+    const result = await pool.query(walletsQuery, params);
+    const txResult = await pool.query(txQuery, params);
+
+    res.json({ 
+      success: true, 
+      data: {
+        wallets: result.rows,
+        transactions: txResult.rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching all wallets:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.requestAllocation = async (req, res) => {
+  try {
+    const { employee_id, amount, note } = req.body;
+    
+    const result = await pool.query(
+      'INSERT INTO wallet_transactions (employee_id, type, amount, note, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [employee_id, 'allocation_request', amount, note, 'pending']
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error requesting allocation:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.allocateMoney = async (req, res) => {
+  try {
+    // Admin directly allocates money to employee
+    const { employee_id, amount, note } = req.body;
+    
+    // Check if wallet exists
+    const wResult = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [employee_id]);
+    if (wResult.rows.length === 0) {
+      await pool.query('INSERT INTO employee_wallets (employee_id, balance) VALUES ($1, 0)', [employee_id]);
+    }
+
+    // Creates an allocation_granted record. Employee must ACCEPT it.
+    const result = await pool.query(
+      'INSERT INTO wallet_transactions (employee_id, type, amount, note, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [employee_id, 'allocation_granted', amount, note, 'pending']
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error allocating money:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.approveTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // status: 'approved' or 'rejected'
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const tx = await client.query('SELECT * FROM wallet_transactions WHERE id = $1 FOR UPDATE', [id]);
+      if (tx.rows.length === 0) throw new Error('Transaction not found');
+      
+      const transaction = tx.rows[0];
+
+      // If it's an admin approving an employee's allocation_request
+      if (transaction.type === 'allocation_request') {
+        await client.query('UPDATE wallet_transactions SET status = $1 WHERE id = $2', [status, id]);
+        
+        if (status === 'approved') {
+          // Add to balance immediately
+          await client.query('UPDATE employee_wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE employee_id = $2', [transaction.amount, transaction.employee_id]);
+        }
+      } 
+      // If it's an employee accepting an admin's allocation_granted
+      else if (transaction.type === 'allocation_granted' && status === 'completed') {
+        await client.query('UPDATE wallet_transactions SET status = $1 WHERE id = $2', [status, id]);
+        // Add to balance
+        await client.query('UPDATE employee_wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE employee_id = $2', [transaction.amount, transaction.employee_id]);
+      } else {
+        await client.query('UPDATE wallet_transactions SET status = $1 WHERE id = $2', [status, id]);
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, message: 'Transaction processed' });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error approving transaction:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+exports.logUsage = async (req, res) => {
+  try {
+    const { employee_id, amount, note } = req.body;
+    
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const wResult = await client.query('SELECT balance FROM employee_wallets WHERE employee_id = $1 FOR UPDATE', [employee_id]);
+      if (wResult.rows.length === 0) throw new Error('Wallet not found');
+      
+      if (Number(wResult.rows[0].balance) < Number(amount)) {
+        throw new Error('Insufficient wallet balance');
+      }
+
+      await client.query('UPDATE employee_wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE employee_id = $2', [amount, employee_id]);
+      
+      const result = await client.query(
+        'INSERT INTO wallet_transactions (employee_id, type, amount, note, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [employee_id, 'usage', amount, note, 'completed']
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json({ success: true, data: result.rows[0] });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error logging usage:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};

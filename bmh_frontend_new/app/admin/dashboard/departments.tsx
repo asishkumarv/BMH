@@ -205,9 +205,9 @@ export default function DepartmentsScreen() {
                   <View style={styles.adminAvatar}>
                     <Text style={styles.adminInitials}>{admin.full_name.charAt(0)}</Text>
                   </View>
-                  <View>
-                    <Text style={styles.adminName}>{admin.full_name}</Text>
-                    <Text style={styles.adminEmail}>{admin.email}</Text>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.adminName} numberOfLines={1}>{admin.full_name}</Text>
+                    <Text style={styles.adminEmail} numberOfLines={1}>{admin.email}</Text>
                   </View>
                   <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <Pressable onPress={() => setSelectedUser({ data: admin, type: 'admin' })}>
@@ -239,9 +239,9 @@ export default function DepartmentsScreen() {
                   <View style={[styles.adminAvatar, { backgroundColor: '#10B981' }]}>
                     <Text style={styles.adminInitials}>{emp.full_name.charAt(0)}</Text>
                   </View>
-                  <View>
-                    <Text style={styles.adminName}>{emp.full_name}</Text>
-                    <Text style={styles.adminEmail}>{emp.email} • {emp.role}</Text>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.adminName} numberOfLines={1}>{emp.full_name}</Text>
+                    <Text style={styles.adminEmail} numberOfLines={1}>{emp.email} • {emp.role}</Text>
                   </View>
                   <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <Pressable onPress={() => setSelectedUser({ data: emp, type: 'employee' })}>
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 14, fontWeight: '700', color: Colors.light.icon, marginBottom: 16, letterSpacing: 0.5, textTransform: 'uppercase' },
   emptyText: { color: Colors.light.icon, fontSize: 14, fontStyle: 'italic' },
   
-  adminRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, marginBottom: 12 },
+  adminRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 12 },
   adminAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.light.primary, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   adminInitials: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   adminName: { fontSize: 15, fontWeight: '700', color: Colors.light.text },

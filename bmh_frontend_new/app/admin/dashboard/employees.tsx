@@ -98,47 +98,79 @@ export default function EmployeesScreen() {
     return departments.find(d => d.id === deptId)?.name || 'Unknown';
   };
 
-  const renderHeader = () => (
-    <View style={[styles.tableRow, styles.tableHeader]}>
-      <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Name</Text>
-      {isDesktop && <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Email</Text>}
-      <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Department</Text>
-      <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Role</Text>
-      <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
-      <View style={{ width: 40 }} />
-    </View>
-  );
-
-  const renderItem = ({ item }: { item: Employee }) => (
-    <View style={styles.tableRow}>
-      <Text style={[styles.cell, { flex: 2, fontWeight: '600' }]}>{item.full_name}</Text>
-      {isDesktop && <Text style={[styles.cell, { flex: 2, color: Colors.light.icon }]}>{item.email}</Text>}
-      <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
-      <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
-      <View style={{ flex: 1, justifyContent: 'center' }}>
-        {item.status === 'pending' ? (
-          <Pressable 
-            style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]}
-            onPress={() => handleApproveEmployee(item.id)}
-          >
-            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Approve</Text>
-          </Pressable>
-        ) : (
-          <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : styles.statusPending]}>
-            <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : styles.textPending]}>
-              {item.status}
-            </Text>
-          </View>
-        )}
+  const renderHeader = () => {
+    if (!isDesktop) return null;
+    return (
+      <View style={[styles.tableRow, styles.tableHeader]}>
+        <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Name</Text>
+        {isDesktop && <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Email</Text>}
+        <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Department</Text>
+        <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Role</Text>
+        <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
+        <View style={{ width: 40 }} />
       </View>
-      <Pressable 
-        style={styles.actionBtn} 
-        onPress={() => { setSelectedEmployee(item); setProfileModalVisible(true); }}
-      >
-        <MoreVertical size={20} color={Colors.light.icon} />
-      </Pressable>
-    </View>
-  );
+    );
+  };
+
+  const renderItem = ({ item }: { item: Employee }) => {
+    if (!isDesktop) {
+      return (
+        <View style={styles.adminRow}>
+          <View style={[styles.adminAvatar, { backgroundColor: '#10B981' }]}>
+            <Text style={styles.adminInitials}>{item.full_name.charAt(0)}</Text>
+          </View>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={styles.adminName} numberOfLines={1}>{item.full_name}</Text>
+            <Text style={styles.adminEmail} numberOfLines={1}>{item.email} • {item.role}</Text>
+          </View>
+          <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : styles.statusPending]}>
+              <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : styles.textPending]}>
+                {item.status}
+              </Text>
+            </View>
+            <Pressable 
+              style={styles.actionBtnMobile} 
+              onPress={() => { setSelectedEmployee(item); setProfileModalVisible(true); }}
+            >
+              <MoreVertical size={20} color={Colors.light.icon} />
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.tableRow}>
+        <Text style={[styles.cell, { flex: 2, fontWeight: '600' }]}>{item.full_name}</Text>
+        {isDesktop && <Text style={[styles.cell, { flex: 2, color: Colors.light.icon }]}>{item.email}</Text>}
+        <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
+        <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          {item.status === 'pending' ? (
+            <Pressable 
+              style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]}
+              onPress={() => handleApproveEmployee(item.id)}
+            >
+              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Approve</Text>
+            </Pressable>
+          ) : (
+            <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : styles.statusPending]}>
+              <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : styles.textPending]}>
+                {item.status}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Pressable 
+          style={styles.actionBtn} 
+          onPress={() => { setSelectedEmployee(item); setProfileModalVisible(true); }}
+        >
+          <MoreVertical size={20} color={Colors.light.icon} />
+        </Pressable>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
@@ -467,5 +499,12 @@ const styles = StyleSheet.create({
 
   profileRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   profileKey: { fontSize: 14, color: Colors.light.icon, fontWeight: '500' },
-  profileVal: { fontSize: 14, color: Colors.light.text, fontWeight: '600' }
+  profileVal: { fontSize: 14, color: Colors.light.text, fontWeight: '600' },
+
+  adminRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 12, marginHorizontal: 16 },
+  adminAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.light.primary, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  adminInitials: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+  adminName: { fontSize: 15, fontWeight: '700', color: Colors.light.text },
+  adminEmail: { fontSize: 13, color: Colors.light.icon, marginTop: 2 },
+  actionBtnMobile: { padding: 4 }
 });

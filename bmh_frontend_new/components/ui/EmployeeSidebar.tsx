@@ -1,14 +1,16 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
-import { LayoutDashboard, Users, LogOut, CheckSquare, Bell } from 'lucide-react-native';
+import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/employee/dashboard' },
   { name: 'Tasks', icon: CheckSquare, route: '/employee/dashboard/tasks' },
+  { name: 'Stationary', icon: Package, route: '/employee/dashboard/stationary' },
+  { name: 'Wallet', icon: Wallet, route: '/employee/dashboard/wallet' },
   { name: 'Notifications', icon: Bell, route: '/employee/dashboard/notifications' },
-  { name: 'Profile', icon: Users, route: '/employee/dashboard/profile' },
+  { name: 'Profile', icon: User, route: '/employee/dashboard/profile' },
 ];
 
 export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
