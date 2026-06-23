@@ -1,0 +1,14 @@
+# Exclude these folders entirely
+hospital-management-system/
+hospitaldatabase/
+
+# Exclude backend environment variables
+bmh_backend_new/.env
+
+# Exclude frontend environment variables if any
+bmh_frontend_new/.env
+
+# Common exclusions
+node_modules/
+.DS_Store
+*.log
