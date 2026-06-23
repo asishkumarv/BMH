@@ -10,6 +10,7 @@ type StationaryItem = {
   name: string;
   stock: number;
   image: string;
+  status: string;
 };
 
 type RequestHistory = {
@@ -56,7 +57,8 @@ export default function EmployeeStationaryScreen() {
 
       const itemsRes = await axios.get('https://bmh-eitu.onrender.com/stationary/items');
       if (itemsRes.data.success) {
-        setItems(itemsRes.data.data);
+        const activeItems = itemsRes.data.data.filter((i: StationaryItem) => i.status !== 'hold');
+        setItems(activeItems);
       }
 
       if (empId) {
@@ -247,7 +249,19 @@ export default function EmployeeStationaryScreen() {
                   return (
                     <View key={itemId} style={styles.cartItemRow}>
                       <Text style={styles.cartItemName}>{item.name}</Text>
-                      <Text style={styles.cartItemQty}>x{cart[itemId]}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 8, padding: 4 }}>
+                        <Pressable style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }} onPress={() => updateCart(item.id, -1)}>
+                          <Minus size={14} color={Colors.light.primary} />
+                        </Pressable>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text, marginHorizontal: 12 }}>{cart[itemId]}</Text>
+                        <Pressable 
+                          style={[{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }, cart[itemId] >= item.stock && { opacity: 0.5 }]} 
+                          onPress={() => updateCart(item.id, 1)}
+                          disabled={cart[itemId] >= item.stock}
+                        >
+                          <Plus size={14} color={Colors.light.primary} />
+                        </Pressable>
+                      </View>
                     </View>
                   );
                 })

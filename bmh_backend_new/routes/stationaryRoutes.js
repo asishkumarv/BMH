@@ -7,6 +7,7 @@ router.get('/items', stationaryController.getItems);
 router.post('/items', stationaryController.addItem);
 router.post('/items/bulk', stationaryController.addBulkItems);
 router.put('/items/:id/stock', stationaryController.updateItemStock);
+router.put('/items/:id', stationaryController.updateItem);
 router.delete('/items/:id', stationaryController.deleteItem);
 
 // Requests

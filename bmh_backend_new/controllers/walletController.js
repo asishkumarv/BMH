@@ -33,10 +33,10 @@ exports.getWallet = async (req, res) => {
 
 exports.getAllWallets = async (req, res) => {
   try {
-    const { department } = req.query;
+    const { department, department_id } = req.query;
 
     let walletsQuery = `
-      SELECT w.*, e.full_name, e.department, e.email 
+      SELECT w.*, e.full_name, e.department, e.email, e.profile_data 
       FROM employee_wallets w
       JOIN employees e ON w.employee_id = e.id
     `;
@@ -48,7 +48,16 @@ exports.getAllWallets = async (req, res) => {
     `;
 
     const params = [];
-    if (department) {
+    if (department_id) {
+      const deptRes = await pool.query('SELECT name FROM departments WHERE id = $1', [department_id]);
+      if (deptRes.rows.length > 0) {
+        walletsQuery += ` WHERE e.department = $1`;
+        txQuery += ` WHERE e.department = $1`;
+        params.push(deptRes.rows[0].name);
+      } else {
+        return res.json({ success: true, data: { wallets: [], transactions: [] } });
+      }
+    } else if (department) {
       walletsQuery += ` WHERE e.department = $1`;
       txQuery += ` WHERE e.department = $1`;
       params.push(department);
@@ -92,7 +101,7 @@ exports.requestAllocation = async (req, res) => {
 exports.allocateMoney = async (req, res) => {
   try {
     // Admin directly allocates money to employee
-    const { employee_id, amount, note } = req.body;
+    const { employee_id, amount, note, payment_mode, payment_txn_id } = req.body;
     
     // Check if wallet exists
     const wResult = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [employee_id]);
@@ -102,8 +111,8 @@ exports.allocateMoney = async (req, res) => {
 
     // Creates an allocation_granted record. Employee must ACCEPT it.
     const result = await pool.query(
-      'INSERT INTO wallet_transactions (employee_id, type, amount, note, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [employee_id, 'allocation_granted', amount, note, 'pending']
+      'INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode, payment_txn_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [employee_id, 'allocation_granted', amount, note, 'pending', payment_mode || null, payment_txn_id || null]
     );
 
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -116,7 +125,7 @@ exports.allocateMoney = async (req, res) => {
 exports.approveTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // status: 'approved' or 'rejected'
+    const { status, approved_by, payment_mode, payment_txn_id } = req.body; // status: 'approved' or 'rejected'
 
     const client = await pool.connect();
     try {
@@ -129,7 +138,9 @@ exports.approveTransaction = async (req, res) => {
 
       // If it's an admin approving an employee's allocation_request
       if (transaction.type === 'allocation_request') {
-        await client.query('UPDATE wallet_transactions SET status = $1 WHERE id = $2', [status, id]);
+        await client.query('UPDATE wallet_transactions SET status = $1, approved_by = $2, payment_mode = $4, payment_txn_id = $5 WHERE id = $3', 
+          [status, approved_by || null, id, payment_mode || null, payment_txn_id || null]
+        );
         
         if (status === 'approved') {
           // Add to balance immediately
@@ -142,7 +153,7 @@ exports.approveTransaction = async (req, res) => {
         // Add to balance
         await client.query('UPDATE employee_wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE employee_id = $2', [transaction.amount, transaction.employee_id]);
       } else {
-        await client.query('UPDATE wallet_transactions SET status = $1 WHERE id = $2', [status, id]);
+        await client.query('UPDATE wallet_transactions SET status = $1, approved_by = $2 WHERE id = $3', [status, approved_by || null, id]);
       }
 
       await client.query('COMMIT');

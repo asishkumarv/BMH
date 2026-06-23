@@ -72,6 +72,50 @@ exports.updateItemStock = async (req, res) => {
   }
 };
 
+exports.updateItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, stock, image, status } = req.body;
+    
+    // Build dynamic update query
+    let updates = [];
+    let values = [];
+    let paramIndex = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (stock !== undefined) {
+      updates.push(`stock = $${paramIndex++}`);
+      values.push(stock);
+    }
+    if (image !== undefined) {
+      updates.push(`image = $${paramIndex++}`);
+      values.push(image);
+    }
+    if (status !== undefined) {
+      updates.push(`status = $${paramIndex++}`);
+      values.push(status);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
+
+    values.push(id);
+    const query = `UPDATE stationary_items SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+    
+    const result = await pool.query(query, values);
+    
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Item not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating item:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.deleteItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -127,7 +171,7 @@ exports.createRequest = async (req, res) => {
 
 exports.getRequests = async (req, res) => {
   try {
-    const { employee_id, department } = req.query; // If provided, filter by employee or department
+    const { employee_id, department, department_id } = req.query; // If provided, filter by employee or department
     
     let query = `
       SELECT 
@@ -159,7 +203,16 @@ exports.getRequests = async (req, res) => {
       paramIndex++;
     }
 
-    if (department) {
+    if (department_id) {
+      const deptRes = await pool.query('SELECT name FROM departments WHERE id = $1', [department_id]);
+      if (deptRes.rows.length > 0) {
+        query += ` AND e.department = $${paramIndex}`;
+        params.push(deptRes.rows[0].name);
+        paramIndex++;
+      } else {
+        return res.json({ success: true, data: [] });
+      }
+    } else if (department) {
       query += ` AND e.department = $${paramIndex}`;
       params.push(department);
       paramIndex++;
@@ -178,7 +231,7 @@ exports.getRequests = async (req, res) => {
 exports.approveRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, approved_items } = req.body; 
+    const { status, approved_items, approved_by } = req.body; 
     // status: 'approved', 'partially_approved', 'rejected'
     // approved_items: array of { item_id, approved_qty } (only needed if approving)
 
@@ -186,10 +239,10 @@ exports.approveRequest = async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // Update request status
+      // Update request status and approved_by
       const reqResult = await client.query(
-        'UPDATE stationary_requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-        [status, id]
+        'UPDATE stationary_requests SET status = $1, approved_by = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        [status, approved_by || null, id]
       );
 
       if (reqResult.rows.length === 0) {

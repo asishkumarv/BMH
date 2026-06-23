@@ -122,6 +122,73 @@ export default function EmployeeWalletScreen() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!employeeId || transactions.length === 0) {
+      Alert.alert('Notice', 'No transactions to export.');
+      return;
+    }
+
+    let user: any = {};
+    if (Platform.OS === 'web') {
+      const userStr = localStorage.getItem('employeeUser');
+      if (userStr) {
+        user = JSON.parse(userStr);
+      }
+    }
+
+    let phone = 'N/A';
+    try {
+      if (user.profile_data) {
+        const pd = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+        phone = pd.mobile || pd.phone || pd.phoneNumber || 'N/A';
+      }
+    } catch(e) {}
+
+    const csvRows = [];
+    csvRows.push(['Employee Name', user.full_name || 'N/A']);
+    csvRows.push(['Employee ID', employeeId]);
+    csvRows.push(['Department', user.department || 'N/A']);
+    csvRows.push(['Email', user.email || 'N/A']);
+    csvRows.push(['Phone', phone]);
+    csvRows.push(['Current Balance', `Rs. ${balance}`]);
+    csvRows.push([]);
+    csvRows.push(['Date', 'Type', 'Amount', 'Status', 'Note']);
+
+    transactions.forEach(tx => {
+      const date = new Date(tx.created_at).toLocaleString().replace(',', '');
+      let typeLabel = tx.type;
+      if (tx.type === 'usage') typeLabel = 'Debit (Usage)';
+      if (tx.type === 'allocation_granted') typeLabel = 'Credit (Allocated)';
+      if (tx.type === 'allocation_request') typeLabel = 'Request';
+      
+      let sign = tx.type === 'usage' ? '-' : (tx.type === 'allocation_granted' && tx.status === 'completed' ? '+' : '');
+      
+      csvRows.push([
+        date, 
+        typeLabel, 
+        `${sign}${tx.amount}`, 
+        tx.status, 
+        `"${tx.note ? tx.note.replace(/"/g, '""') : ''}"`
+      ]);
+    });
+
+    const csvContent = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    if (Platform.OS === 'web') {
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `My_Transactions.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      Alert.alert('Notice', 'CSV Export is only supported on web right now.');
+    }
+  };
+
   const pendingAllocations = transactions.filter(t => t.type === 'allocation_granted' && t.status === 'pending');
 
   return (
@@ -176,7 +243,14 @@ export default function EmployeeWalletScreen() {
             </View>
           )}
 
-          <Text style={[styles.sectionTitle, { marginTop: 32 }]}>Transaction History</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Transaction History</Text>
+            {transactions.length > 0 && (
+              <Pressable onPress={handleExportCSV} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.light.primary, borderRadius: 6 }}>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Export CSV</Text>
+              </Pressable>
+            )}
+          </View>
           {transactions.length === 0 ? (
             <Text style={styles.emptyText}>No transactions found.</Text>
           ) : (

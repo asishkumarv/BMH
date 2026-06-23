@@ -6,9 +6,9 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import * as ImagePicker from 'expo-image-picker';
 
-type StationaryItem = { id: string; name: string; stock: number; image: string; created_at: string; };
+type StationaryItem = { id: string; name: string; stock: number; image: string; status: string; created_at: string; };
 type RequestItem = { id: string; item_id: string; name: string; requested_qty: number; approved_qty: number; };
-type RequestHistory = { id: string; employee_name: string; employee_department: string; status: string; notes: string; created_at: string; items: RequestItem[]; };
+type RequestHistory = { id: string; employee_name: string; employee_department: string; status: string; notes: string; created_at: string; approved_by: string; items: RequestItem[]; };
 
 export default function AdminStationaryScreen() {
   const { isDesktop } = useResponsive();
@@ -24,6 +24,15 @@ export default function AdminStationaryScreen() {
   const [newItemStock, setNewItemStock] = useState('0');
   const [newItemImage, setNewItemImage] = useState('');
   const [adding, setAdding] = useState(false);
+
+  // Edit Item Modal
+  const [editItemModalVisible, setEditItemModalVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<StationaryItem | null>(null);
+  const [editItemName, setEditItemName] = useState('');
+  const [editItemStock, setEditItemStock] = useState('0');
+  const [editItemImage, setEditItemImage] = useState('');
+  const [editItemStatus, setEditItemStatus] = useState('active');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Bulk CSV Paste Modal
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
@@ -118,6 +127,76 @@ export default function AdminStationaryScreen() {
     }
   };
 
+  const openEditModal = (item: StationaryItem) => {
+    setEditingItem(item);
+    setEditItemName(item.name);
+    setEditItemStock(item.stock.toString());
+    setEditItemImage(item.image || '');
+    setEditItemStatus(item.status || 'active');
+    setEditItemModalVisible(true);
+  };
+
+  const handlePickEditImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+      if (!result.canceled && result.assets[0].base64) {
+        setEditItemImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleSaveEditItem = async () => {
+    if (!editingItem || !editItemName) return Alert.alert('Error', 'Name is required');
+    setSavingEdit(true);
+    try {
+      const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`, {
+        name: editItemName,
+        stock: parseInt(editItemStock) || 0,
+        image: editItemImage,
+        status: editItemStatus
+      });
+      if (res.data.success) {
+        setEditItemModalVisible(false);
+        fetchData();
+        Alert.alert('Success', 'Item updated successfully');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to update item');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!editingItem) return;
+    Alert.alert('Delete Item', `Are you sure you want to delete "${editingItem.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setSavingEdit(true);
+        try {
+          const res = await axios.delete(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`);
+          if (res.data.success) {
+            setEditItemModalVisible(false);
+            fetchData();
+            Alert.alert('Success', 'Item deleted');
+          }
+        } catch (error) {
+          Alert.alert('Error', 'Failed to delete item');
+        } finally {
+          setSavingEdit(false);
+        }
+      }}
+    ]);
+  };
+
   const openReviewModal = (req: RequestHistory) => {
     setSelectedRequest(req);
     const initialQty: {[key: string]: string} = {};
@@ -137,9 +216,19 @@ export default function AdminStationaryScreen() {
         approved_qty: parseInt(approvalQuantities[itemId]) || 0
       }));
 
+      let adminStr = 'Super Admin';
+      if (Platform.OS === 'web') {
+        const userStr = localStorage.getItem('adminUser');
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          adminStr = `Super Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
+        }
+      }
+
       const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/requests/${selectedRequest.id}/approve`, {
         status,
-        approved_items
+        approved_items,
+        approved_by: adminStr
       });
 
       if (res.data.success) {
@@ -154,7 +243,12 @@ export default function AdminStationaryScreen() {
   };
 
   const renderInventoryItem = ({ item }: { item: StationaryItem }) => (
-    <View style={[styles.itemCard, !isDesktop && styles.itemCardMobile]}>
+    <Pressable style={[styles.itemCard, !isDesktop && styles.itemCardMobile, item.status === 'hold' && { opacity: 0.6 }]} onPress={() => openEditModal(item)}>
+      {item.status === 'hold' && (
+        <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#FEF08A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, zIndex: 10 }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#854D0E' }}>HOLD</Text>
+        </View>
+      )}
       {item.image ? (
         <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
       ) : (
@@ -164,7 +258,7 @@ export default function AdminStationaryScreen() {
       )}
       <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
       <Text style={styles.itemStock}>Stock: {item.stock}</Text>
-    </View>
+    </Pressable>
   );
 
   const renderRequestItem = ({ item }: { item: RequestHistory }) => (
@@ -182,6 +276,9 @@ export default function AdminStationaryScreen() {
         <View style={[styles.statusBadge, (styles as any)[`status_${item.status}`] || styles.status_pending]}>
           <Text style={[styles.statusText, (styles as any)[`text_${item.status}`] || styles.text_pending]}>{item.status.replace('_', ' ')}</Text>
         </View>
+        {item.approved_by && item.status !== 'pending' && (
+          <Text style={{ fontSize: 10, color: Colors.light.icon, marginTop: 4, textAlign: 'center' }}>By: {item.approved_by.split(':')[0]}</Text>
+        )}
       </View>
       <Pressable style={styles.actionBtn} onPress={() => openReviewModal(item)}>
         <Text style={{ color: Colors.light.primary, fontWeight: '700' }}>Review</Text>
@@ -304,6 +401,60 @@ export default function AdminStationaryScreen() {
         </View>
       </Modal>
 
+      {/* Edit Item Modal */}
+      <Modal visible={editItemModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 400 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <Text style={styles.modalTitle}>Edit Item</Text>
+              <Pressable onPress={handleDeleteItem} style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
+                <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 12 }}>Delete Item</Text>
+              </Pressable>
+            </View>
+            
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <Pressable style={styles.imagePicker} onPress={handlePickEditImage}>
+                {editItemImage ? (
+                  <Image source={{ uri: editItemImage }} style={styles.imagePreview} />
+                ) : (
+                  <>
+                    <Upload size={24} color={Colors.light.icon} />
+                    <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Upload Image</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+
+            <Text style={styles.label}>Item Name</Text>
+            <TextInput style={styles.input} value={editItemName} onChangeText={setEditItemName} />
+            
+            <Text style={styles.label}>Stock</Text>
+            <TextInput style={styles.input} value={editItemStock} onChangeText={setEditItemStock} keyboardType="numeric" />
+
+            <Text style={styles.label}>Status</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+              <Pressable 
+                style={[styles.statusToggleBtn, editItemStatus === 'active' && styles.statusToggleActive]}
+                onPress={() => setEditItemStatus('active')}
+              >
+                <Text style={[styles.statusToggleText, editItemStatus === 'active' && styles.statusToggleActiveText]}>Active</Text>
+              </Pressable>
+              <Pressable 
+                style={[styles.statusToggleBtn, editItemStatus === 'hold' && styles.statusToggleActiveHold]}
+                onPress={() => setEditItemStatus('hold')}
+              >
+                <Text style={[styles.statusToggleText, editItemStatus === 'hold' && styles.statusToggleActiveHoldText]}>Hold</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setEditItemModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleSaveEditItem} disabled={savingEdit}><Text style={styles.submitBtnText}>{savingEdit ? 'Saving...' : 'Save Changes'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Request Review Modal */}
       <Modal visible={reviewModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -314,6 +465,9 @@ export default function AdminStationaryScreen() {
                 <View style={{ marginBottom: 20 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.light.text }}>{selectedRequest.employee_name} ({selectedRequest.employee_department})</Text>
                   {selectedRequest.notes ? <Text style={{ fontSize: 14, color: Colors.light.icon, marginTop: 4, fontStyle: 'italic' }}>Notes: "{selectedRequest.notes}"</Text> : null}
+                  {selectedRequest.approved_by && selectedRequest.status !== 'pending' && (
+                    <Text style={{ fontSize: 13, color: Colors.light.primary, marginTop: 4, fontWeight: '600' }}>Processed by: {selectedRequest.approved_by}</Text>
+                  )}
                 </View>
 
                 <View style={[styles.tableHeader, { flexDirection: 'row', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border }]}>
@@ -422,5 +576,11 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: Colors.light.icon, fontWeight: '700', fontSize: 15 },
   submitBtn: { backgroundColor: Colors.light.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   submitBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
-  tableHeader: {}
+  tableHeader: {},
+  statusToggleBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: Colors.light.border, backgroundColor: '#FFF' },
+  statusToggleText: { fontWeight: '700', color: Colors.light.icon },
+  statusToggleActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  statusToggleActiveText: { color: Colors.light.primary },
+  statusToggleActiveHold: { backgroundColor: '#FEF08A', borderColor: '#FDE047' },
+  statusToggleActiveHoldText: { color: '#854D0E' }
 });
