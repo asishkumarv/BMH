@@ -13,5 +13,7 @@ router.get('/department-admins/:department_id/metrics', adminController.getDepar
 router.put('/department-admins/:id/status', adminController.updateAdminStatus);
 router.put('/super-admins/:id/password', adminController.updateSuperAdminPassword);
 router.put('/department-admins/:id/password', adminController.updateDepartmentAdminPassword);
+router.put('/super-admins/:id/profile', adminController.updateSuperAdminProfile);
+router.put('/department-admins/:id/profile', adminController.updateDepartmentAdminProfile);
 
 module.exports = router;

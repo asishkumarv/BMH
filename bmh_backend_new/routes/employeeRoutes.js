@@ -20,4 +20,7 @@ router.put('/:id/status', employeeController.updateEmployeeStatus);
 // PUT /employees/:id/password
 router.put('/:id/password', employeeController.updateEmployeePassword);
 
+// PUT /employees/:id/profile
+router.put('/:id/profile', employeeController.updateEmployeeProfile);
+
 module.exports = router;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {  View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView , Image } from 'react-native';
-import { Plus, Search, MoreVertical, Shield, Building } from 'lucide-react-native';
+import { Plus, Search, MoreVertical, Shield, Building, User } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -165,10 +165,6 @@ export default function SubAdminEmployeesScreen() {
             <Shield size={20} color={Colors.light.primary} />
             <Text style={styles.manageRolesText}>Manage Roles</Text>
           </Pressable>
-          <Pressable style={styles.addBtn}>
-            <Plus size={20} color="#FFF" />
-            <Text style={styles.addBtnText}>Add Employee</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -256,7 +252,7 @@ export default function SubAdminEmployeesScreen() {
       {/* Profile Viewer Modal */}
       <Modal visible={profileModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 600, maxHeight: '80%' }]}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }, isDesktop && { width: 600 }]}>
             <Text style={styles.modalTitle}>Employee Profile</Text>
             <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 20 }}>
               {selectedEmployee && (() => {
@@ -266,12 +262,20 @@ export default function SubAdminEmployeesScreen() {
                 }
                 return (
                   <View style={{ gap: 12 }}>
-                    {pd.photo && (
-                      <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                    <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                      {pd.photo && pd.photo.length > 5 && pd.photo !== 'null' ? (
                         <Image source={{ uri: pd.photo }} style={{ width: 100, height: 100, borderRadius: 50}} resizeMode="cover" />
-                      </View>
-                    )}
+                      ) : (
+                        <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' }}>
+                          <User size={48} color="#1E40AF" />
+                        </View>
+                      )}
+                      <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 12 }}>{selectedEmployee.full_name}</Text>
+                      <Text style={{ fontSize: 14, color: Colors.light.primary, fontWeight: '600' }}>{selectedEmployee.role}</Text>
+                    </View>
+
                     <Text style={styles.sectionLabel}>Personal & Identification</Text>
+                    <View style={styles.profileRow}><Text style={styles.profileKey}>Email:</Text><Text style={styles.profileVal}>{selectedEmployee.email}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Mobile:</Text><Text style={styles.profileVal}>{pd.mobile || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Age/Blood:</Text><Text style={styles.profileVal}>{pd.age || 'N/A'} yrs / {pd.bloodGroup || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Emergency Contact:</Text><Text style={styles.profileVal}>{pd.emergencyContact || 'N/A'}</Text></View>

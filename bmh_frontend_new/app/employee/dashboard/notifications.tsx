@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from
 import { Colors } from '../../../constants/Colors';
 import axios from 'axios';
 import { Bell, Check, CheckCircle2 } from 'lucide-react-native';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function EmployeeNotificationsScreen() {
+  const { isDesktop } = useResponsive();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

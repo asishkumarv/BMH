@@ -108,3 +108,24 @@ exports.updateEmployeePassword = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error updating password' });
   }
 };
+
+exports.updateEmployeeProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { profile_data } = req.body;
+
+    const result = await pool.query(
+      'UPDATE employees SET profile_data = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(profile_data), id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
+
+    res.json({ success: true, message: 'Profile updated', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating employee profile:', error);
+    res.status(500).json({ success: false, message: 'Server error updating profile' });
+  }
+};

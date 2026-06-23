@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {  View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView , Image } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
-import { ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { ShieldCheck, Lock, Eye, EyeOff, Camera } from 'lucide-react-native';
+import { useResponsive } from '../../../hooks/useResponsive';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function SuperAdminProfileScreen() {
+  const { isDesktop } = useResponsive();
   const [user, setUser] = useState<any>(null);
   const [pd, setPd] = useState<any>({});
   
@@ -59,6 +62,43 @@ export default function SuperAdminProfileScreen() {
     }
   };
 
+  const handlePickImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0].base64) {
+        const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        const newPd = { ...pd, photo: base64Image };
+        
+        setUpdating(true);
+        const res = await axios.put(`https://bmh-eitu.onrender.com/admin/super-admins/${user.id}/profile`, {
+          profile_data: newPd
+        });
+        
+        if (res.data.success) {
+          setPd(newPd);
+          const updatedUser = { ...user, profile_data: JSON.stringify(newPd) };
+          setUser(updatedUser);
+          if (Platform.OS === 'web') {
+            localStorage.setItem('superAdminUser', JSON.stringify(updatedUser));
+          }
+          Alert.alert('Success', 'Profile photo updated successfully!');
+        }
+      }
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to update profile photo');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -69,21 +109,27 @@ export default function SuperAdminProfileScreen() {
       </View>
 
       <View style={[styles.card, !isDesktop && styles.cardMobile]}>
-        <View style={styles.profileHeaderRow}>
-          {pd.photo ? (
+        <Pressable style={styles.profileHeaderRow} onPress={handlePickImage} disabled={updating}>
+          {pd.photo && pd.photo.length > 5 && pd.photo !== 'null' ? (
             <View style={[styles.avatar, { overflow: 'hidden' }]}>
               <Image source={{ uri: pd.photo }} style={{ width: '100%', height: '100%'}} resizeMode="cover" />
+              <View style={styles.editAvatarOverlay}>
+                <Camera size={14} color="#FFF" />
+              </View>
             </View>
           ) : (
             <View style={styles.avatar}>
               <ShieldCheck color="#1E40AF" size={32} />
+              <View style={styles.editAvatarOverlay}>
+                <Camera size={14} color="#FFF" />
+              </View>
             </View>
           )}
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user.email}</Text>
             <Text style={styles.profileRole}>Super Administrator</Text>
           </View>
-        </View>
+        </Pressable>
 
         <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, marginTop: 24 }}>
           {pd.phone && (
@@ -186,7 +232,8 @@ const styles = StyleSheet.create({
   },
   
   profileHeaderRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 20 },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 20, position: 'relative' },
+  editAvatarOverlay: { position: 'absolute', bottom: -2, right: -2, backgroundColor: Colors.light.primary, width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
   profileInfo: { flex: 1 },
   profileName: { fontSize: 20, fontWeight: '700', color: Colors.light.text },
   profileRole: { fontSize: 14, color: Colors.light.primary, fontWeight: '600', marginTop: 4 },

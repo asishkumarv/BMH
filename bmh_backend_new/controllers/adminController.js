@@ -214,3 +214,45 @@ exports.registerSuperAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error creating super admin' });
   }
 };
+
+exports.updateSuperAdminProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { profile_data } = req.body;
+
+    const result = await pool.query(
+      'UPDATE super_admins SET profile_data = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(profile_data), id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    res.json({ success: true, message: 'Profile updated', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating admin profile:', error);
+    res.status(500).json({ success: false, message: 'Server error updating profile' });
+  }
+};
+
+exports.updateDepartmentAdminProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { profile_data } = req.body;
+
+    const result = await pool.query(
+      'UPDATE department_admins SET profile_data = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(profile_data), id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    res.json({ success: true, message: 'Profile updated', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating admin profile:', error);
+    res.status(500).json({ success: false, message: 'Server error updating profile' });
+  }
+};
