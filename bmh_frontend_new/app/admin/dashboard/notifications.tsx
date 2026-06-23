@@ -18,7 +18,7 @@ export default function AdminNotificationsScreen() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/notifications?user_type=super_admin&user_id=${adminUser.id}`);
+      const res = await axios.get(`https://bmh-eitu.onrender.com/notifications?user_type=super_admin&user_id=${adminUser.id}`);
       if (res.data.success) {
         setNotifications(res.data.data);
       }
@@ -31,7 +31,7 @@ export default function AdminNotificationsScreen() {
 
   const markAsRead = async (id: string) => {
     try {
-      await axios.put(`http://localhost:5000/notifications/${id}/read`);
+      await axios.put(`https://bmh-eitu.onrender.com/notifications/${id}/read`);
       fetchNotifications();
     } catch (e) {
       console.error(e);
@@ -40,7 +40,7 @@ export default function AdminNotificationsScreen() {
 
   const markAllAsRead = async () => {
     try {
-      await axios.put(`http://localhost:5000/notifications/mark-all-read`, {
+      await axios.put(`https://bmh-eitu.onrender.com/notifications/mark-all-read`, {
         user_type: 'super_admin',
         user_id: adminUser.id
       });
@@ -52,7 +52,7 @@ export default function AdminNotificationsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>Stay updated on tasks and activities</Text>
@@ -68,7 +68,7 @@ export default function AdminNotificationsScreen() {
       {loading ? (
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 32 }}>
+        <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
           {notifications.length === 0 ? (
             <View style={styles.emptyState}>
               <Bell color={Colors.light.icon} size={48} />
@@ -98,6 +98,7 @@ export default function AdminNotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
   header: { padding: 32, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: 16 },
   title: { fontSize: 24, fontWeight: '800', color: Colors.light.text },
   subtitle: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
   markAllBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.secondary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, gap: 8 },

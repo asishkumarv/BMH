@@ -39,7 +39,7 @@ export default function EmployeeProfileScreen() {
 
     setUpdating(true);
     try {
-      const res = await axios.put(`http://localhost:5000/employees/${user.id}/password`, {
+      const res = await axios.put(`https://bmh-eitu.onrender.com/employees/${user.id}/password`, {
         oldPassword,
         newPassword
       });
@@ -59,16 +59,16 @@ export default function EmployeeProfileScreen() {
   if (!user) return null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={[styles.container, !isDesktop && styles.containerMobile]} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
         <Text style={styles.subtitle}>View your corporate credentials and manage your account.</Text>
       </View>
 
-      <View style={styles.row}>
+      <View style={[styles.row, !isDesktop && styles.rowMobile]}>
         {/* Left Column: Password Management */}
-        <View style={styles.leftCol}>
-          <View style={styles.card}>
+        <View style={[styles.leftCol, !isDesktop && styles.colMobile]}>
+          <View style={[styles.card, !isDesktop && styles.cardMobile]}>
             <View style={styles.profileHeaderRow}>
               {pd.photo ? (
                 <View style={[styles.avatar, { overflow: 'hidden' }]}>
@@ -146,8 +146,8 @@ export default function EmployeeProfileScreen() {
         </View>
 
         {/* Right Column: Profile Metadata */}
-        <View style={styles.rightCol}>
-          <View style={styles.card}>
+        <View style={[styles.rightCol, !isDesktop && styles.colMobile]}>
+          <View style={[styles.card, !isDesktop && styles.cardMobile]}>
             <Text style={[styles.sectionTitle, { marginBottom: 24 }]}>Employee Information</Text>
             
             <View style={styles.infoSection}>
@@ -186,13 +186,16 @@ export default function EmployeeProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background, padding: 32 },
+  containerMobile: { padding: 16 },
   header: { marginBottom: 32 },
   title: { fontSize: 32, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
   
-  row: { flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: 32, alignItems: 'flex-start' },
+  row: { flexDirection: 'row', gap: 32, alignItems: 'flex-start' },
+  rowMobile: { flexDirection: 'column' },
   leftCol: { flex: 1, minWidth: 350 },
   rightCol: { flex: 1, minWidth: 350 },
+  colMobile: { minWidth: '100%' },
 
   card: {
     backgroundColor: Colors.light.card,
@@ -200,6 +203,9 @@ const styles = StyleSheet.create({
     padding: 32,
     width: '100%',
     ...Platform.select({ web: { boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' } })
+  },
+  cardMobile: {
+    padding: 24,
   },
   
   profileHeaderRow: { flexDirection: 'row', alignItems: 'center' },

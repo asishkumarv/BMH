@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { name: 'Profile', icon: Users, route: '/employee/dashboard/profile' },
 ];
 
-export const EmployeeSidebar = () => {
+export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -28,7 +28,12 @@ export const EmployeeSidebar = () => {
           
           return (
             <Link key={item.name} href={item.route as any} asChild>
-              <Pressable style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}>
+              <Pressable 
+                style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}
+                onPress={() => {
+                  if (onClose && !isActive) onClose();
+                }}
+              >
                 <item.icon 
                   color={isActive ? Colors.light.primary : Colors.light.icon} 
                   size={20} 
@@ -44,6 +49,7 @@ export const EmployeeSidebar = () => {
       </View>
 
       <Pressable style={styles.logoutBtn} onPress={() => {
+        if (onClose) onClose();
         if (Platform.OS === 'web') {
           localStorage.removeItem('employeeUser');
         }

@@ -42,7 +42,7 @@ export default function SuperAdminProfileScreen() {
 
     setUpdating(true);
     try {
-      const res = await axios.put(`http://localhost:5000/admin/super-admins/${user.id}/password`, {
+      const res = await axios.put(`https://bmh-eitu.onrender.com/admin/super-admins/${user.id}/password`, {
         oldPassword,
         newPassword
       });
@@ -62,13 +62,13 @@ export default function SuperAdminProfileScreen() {
   if (!user) return null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 32 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
         <Text style={styles.subtitle}>Manage your super admin credentials</Text>
       </View>
 
-      <View style={styles.card}>
+      <View style={[styles.card, !isDesktop && styles.cardMobile]}>
         <View style={styles.profileHeaderRow}>
           {pd.photo ? (
             <View style={[styles.avatar, { overflow: 'hidden' }]}>
@@ -85,7 +85,7 @@ export default function SuperAdminProfileScreen() {
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 16, marginTop: 24 }}>
+        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, marginTop: 24 }}>
           {pd.phone && (
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12 }}>
               <Text style={{ fontWeight: '600', color: Colors.light.icon, marginRight: 8 }}>Phone:</Text>
@@ -180,6 +180,9 @@ const styles = StyleSheet.create({
     padding: 32,
     maxWidth: 600,
     ...Platform.select({ web: { boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' } })
+  },
+  cardMobile: {
+    padding: 24,
   },
   
   profileHeaderRow: { flexDirection: 'row', alignItems: 'center' },

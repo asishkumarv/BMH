@@ -40,7 +40,7 @@ export default function AdminTasksScreen() {
 
   const fetchTasks = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/tasks?user_type=super_admin');
+      const res = await axios.get('https://bmh-eitu.onrender.com/tasks?user_type=super_admin');
       if (res.data.success) {
         setTasks(res.data.data);
       }
@@ -54,10 +54,10 @@ export default function AdminTasksScreen() {
   const fetchUsers = async () => {
     try {
       const [empRes, adminRes, superAdminRes, deptRes] = await Promise.all([
-        axios.get('http://localhost:5000/employees'),
-        axios.get('http://localhost:5000/admin/department-admins'),
-        axios.get('http://localhost:5000/admin/super-admins'),
-        axios.get('http://localhost:5000/department')
+        axios.get('https://bmh-eitu.onrender.com/employees'),
+        axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
+        axios.get('https://bmh-eitu.onrender.com/admin/super-admins'),
+        axios.get('https://bmh-eitu.onrender.com/department')
       ]);
       setUsers({
         emps: empRes.data.success ? empRes.data.data : [],
@@ -98,7 +98,7 @@ export default function AdminTasksScreen() {
     }
 
     try {
-      await axios.post('http://localhost:5000/tasks', {
+      await axios.post('https://bmh-eitu.onrender.com/tasks', {
         title,
         description,
         assigner_type: 'super_admin',
@@ -122,7 +122,7 @@ export default function AdminTasksScreen() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await axios.put(`http://localhost:5000/tasks/${selectedTask.id}/status`, {
+      await axios.put(`https://bmh-eitu.onrender.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
         rejection_reason: rejectionReason,
         notes: statusNotes,
@@ -209,7 +209,7 @@ export default function AdminTasksScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Task Management</Text>
           <Text style={styles.subtitle}>Oversee all tasks across the organization</Text>
@@ -220,7 +220,7 @@ export default function AdminTasksScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.tabsContainer}>
+      <View style={[styles.tabsContainer, !isDesktop && styles.tabsContainerMobile]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[
             { id: 'all', label: 'All Tasks' },
@@ -239,7 +239,7 @@ export default function AdminTasksScreen() {
       {loading ? (
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 32 }}>
+        <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
           {getTasksForTab().length === 0 ? (
             <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
           ) : (
@@ -427,11 +427,13 @@ const getStatusColor = (status: string) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
   header: { padding: 32, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: 16 },
   title: { fontSize: 24, fontWeight: '800', color: Colors.light.text },
   subtitle: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
   createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 8 },
   createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
   tabsContainer: { flexDirection: 'row', paddingHorizontal: 32, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tabsContainerMobile: { paddingHorizontal: 16 },
   tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: Colors.light.primary },
   tabText: { fontSize: 15, fontWeight: '600', color: Colors.light.icon },

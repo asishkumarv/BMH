@@ -22,7 +22,7 @@ export default function EmployeePortal() {
     }
     setLoggingIn(true);
     try {
-      const response = await axios.post('http://localhost:5000/employees/login', {
+      const response = await axios.post('https://bmh-eitu.onrender.com/employees/login', {
         email,
         password
       });

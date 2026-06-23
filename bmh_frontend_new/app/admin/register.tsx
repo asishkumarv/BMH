@@ -61,7 +61,7 @@ export default function AdminRegisterScreen() {
 
     setRegistering(true);
     try {
-      const res = await axios.post('http://localhost:5000/admin/super-admins', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/admin/super-admins', {
         full_name: fullName,
         email,
         password,

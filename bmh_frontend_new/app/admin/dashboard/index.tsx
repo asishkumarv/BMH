@@ -21,9 +21,9 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         const [empRes, adminRes, deptRes] = await Promise.all([
-          axios.get('http://localhost:5000/employees'),
-          axios.get('http://localhost:5000/admin/department-admins'),
-          axios.get('http://localhost:5000/department')
+          axios.get('https://bmh-eitu.onrender.com/employees'),
+          axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
+          axios.get('https://bmh-eitu.onrender.com/department')
         ]);
         
         const emps = empRes.data.success ? empRes.data.data : [];
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, !isDesktop && styles.contentMobile]}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Welcome back, Admin 👋</Text>
         <Text style={styles.subtitle}>Here is what's happening today.</Text>
@@ -78,7 +78,7 @@ export default function AdminDashboard() {
         </View>
       )}
 
-      <View style={styles.chartSection}>
+      <View style={[styles.chartSection, !isDesktop && styles.chartSectionMobile]}>
         <View style={styles.chartCard}>
           <Text style={styles.cardTitle}>Activity Overview</Text>
           <View style={styles.chartPlaceholder}>
@@ -87,19 +87,17 @@ export default function AdminDashboard() {
           </View>
         </View>
         
-        {isDesktop && (
-          <View style={styles.activityCard}>
-             <Text style={styles.cardTitle}>Recent Activity</Text>
-             <View style={styles.activityItem}>
-                <View style={styles.activityDot} />
-                <Text style={styles.activityText}>John Doe requested sick leave.</Text>
-             </View>
-             <View style={styles.activityItem}>
-                <View style={[styles.activityDot, {backgroundColor: '#10B981'}]} />
-                <Text style={styles.activityText}>New department "Neurology" created.</Text>
-             </View>
-          </View>
-        )}
+        <View style={[styles.activityCard, !isDesktop && styles.activityCardMobile]}>
+           <Text style={styles.cardTitle}>Recent Activity</Text>
+           <View style={styles.activityItem}>
+              <View style={styles.activityDot} />
+              <Text style={styles.activityText}>John Doe requested sick leave.</Text>
+           </View>
+           <View style={styles.activityItem}>
+              <View style={[styles.activityDot, {backgroundColor: '#10B981'}]} />
+              <Text style={styles.activityText}>New department "Neurology" created.</Text>
+           </View>
+        </View>
       </View>
 
     </ScrollView>
@@ -113,6 +111,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 32,
+  },
+  contentMobile: {
+    padding: 16,
   },
   header: {
     marginBottom: 32,
@@ -178,6 +179,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 24,
   },
+  chartSectionMobile: {
+    flexDirection: 'column',
+  },
   chartCard: {
     flex: 2,
     backgroundColor: Colors.light.card,
@@ -200,6 +204,9 @@ const styles = StyleSheet.create({
         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05)',
       }
     })
+  },
+  activityCardMobile: {
+    flex: undefined,
   },
   cardTitle: {
     fontSize: 18,

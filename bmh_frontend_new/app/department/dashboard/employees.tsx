@@ -47,8 +47,8 @@ export default function SubAdminEmployeesScreen() {
 
         if (deptId) {
           const [empRes, roleRes] = await Promise.all([
-            axios.get(`http://localhost:5000/employees/by-department-id/${deptId}`),
-            axios.get('http://localhost:5000/roles')
+            axios.get(`https://bmh-eitu.onrender.com/employees/by-department-id/${deptId}`),
+            axios.get('https://bmh-eitu.onrender.com/roles')
           ]);
           
           if (empRes.data.success) setEmployees(empRes.data.data);
@@ -81,7 +81,7 @@ export default function SubAdminEmployeesScreen() {
     
     setAddingRole(true);
     try {
-      const response = await axios.post('http://localhost:5000/roles', {
+      const response = await axios.post('https://bmh-eitu.onrender.com/roles', {
         name: newRoleName,
         departmentId: departmentId.toString()
       });
@@ -99,7 +99,7 @@ export default function SubAdminEmployeesScreen() {
 
   const handleApproveEmployee = async (employeeId: string) => {
     try {
-      const response = await axios.put(`http://localhost:5000/employees/${employeeId}/status`, {
+      const response = await axios.put(`https://bmh-eitu.onrender.com/employees/${employeeId}/status`, {
         status: 'approved'
       });
       if (response.data.success) {

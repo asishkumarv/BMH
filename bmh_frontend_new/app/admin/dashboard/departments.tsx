@@ -33,9 +33,9 @@ export default function DepartmentsScreen() {
     setLoading(true);
     try {
       const [deptRes, adminRes, empRes] = await Promise.all([
-        axios.get('http://localhost:5000/department'),
-        axios.get('http://localhost:5000/admin/department-admins'),
-        axios.get('http://localhost:5000/employees')
+        axios.get('https://bmh-eitu.onrender.com/department'),
+        axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
+        axios.get('https://bmh-eitu.onrender.com/employees')
       ]);
       if (deptRes.data.success) setDepartments(deptRes.data.data);
       if (adminRes.data.success) setAdmins(adminRes.data.data);
@@ -54,7 +54,7 @@ export default function DepartmentsScreen() {
     }
     setAdding(true);
     try {
-      const response = await axios.post('http://localhost:5000/department', {
+      const response = await axios.post('https://bmh-eitu.onrender.com/department', {
         name: newDeptName,
         description: newDeptDesc
       });
@@ -73,7 +73,7 @@ export default function DepartmentsScreen() {
 
   const handleApproveAdmin = async (adminId: string) => {
     try {
-      const response = await axios.put(`http://localhost:5000/admin/department-admins/${adminId}/status`, {
+      const response = await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${adminId}/status`, {
         status: 'approved'
       });
       if (response.data.success) {
@@ -261,8 +261,8 @@ export default function DepartmentsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, !isDesktop && styles.containerMobile]}>
+      <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Departments</Text>
           <Text style={styles.subtitle}>Manage hospital departments and their admins.</Text>
@@ -350,7 +350,9 @@ export default function DepartmentsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background, padding: 32 },
+  containerMobile: { padding: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
+  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 16 },
   title: { fontSize: 32, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },

@@ -26,7 +26,7 @@ export default function EmployeeDashboardScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !isDesktop && styles.containerMobile]}>
       <View style={styles.header}>
         <Text style={styles.title}>Welcome back, {user.full_name}</Text>
         <Text style={styles.subtitle}>{user.role} | {user.department}</Text>
@@ -55,6 +55,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 32,
     backgroundColor: Colors.light.background,
+  },
+  containerMobile: {
+    padding: 16,
   },
   header: {
     marginBottom: 32,

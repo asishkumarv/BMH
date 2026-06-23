@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];
 
-export const SubAdminSidebar = () => {
+export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -29,7 +29,12 @@ export const SubAdminSidebar = () => {
           
           return (
             <Link key={item.name} href={item.route as any} asChild>
-              <Pressable style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}>
+              <Pressable 
+                style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}
+                onPress={() => {
+                  if (onClose && !isActive) onClose();
+                }}
+              >
                 <item.icon 
                   color={isActive ? Colors.light.primary : Colors.light.icon} 
                   size={20} 
@@ -45,6 +50,7 @@ export const SubAdminSidebar = () => {
       </View>
 
       <Pressable style={styles.logoutBtn} onPress={() => {
+        if (onClose) onClose();
         if (Platform.OS === 'web') {
           localStorage.removeItem('subAdminUser');
         }

@@ -38,9 +38,9 @@ export default function EmployeesScreen() {
     const fetchEmployees = async () => {
       try {
         const [empRes, deptRes, roleRes] = await Promise.all([
-          axios.get('http://localhost:5000/employees'),
-          axios.get('http://localhost:5000/department'),
-          axios.get('http://localhost:5000/roles')
+          axios.get('https://bmh-eitu.onrender.com/employees'),
+          axios.get('https://bmh-eitu.onrender.com/department'),
+          axios.get('https://bmh-eitu.onrender.com/roles')
         ]);
         
         if (empRes.data.success) setEmployees(empRes.data.data);
@@ -63,7 +63,7 @@ export default function EmployeesScreen() {
     }
     setAddingRole(true);
     try {
-      const response = await axios.post('http://localhost:5000/roles', {
+      const response = await axios.post('https://bmh-eitu.onrender.com/roles', {
         name: newRoleName,
         departmentId: selectedDeptForRole
       });
@@ -81,7 +81,7 @@ export default function EmployeesScreen() {
 
   const handleApproveEmployee = async (employeeId: string) => {
     try {
-      const response = await axios.put(`http://localhost:5000/employees/${employeeId}/status`, {
+      const response = await axios.put(`https://bmh-eitu.onrender.com/employees/${employeeId}/status`, {
         status: 'approved'
       });
       if (response.data.success) {
@@ -141,13 +141,13 @@ export default function EmployeesScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, !isDesktop && styles.containerMobile]}>
+      <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Employees</Text>
           <Text style={styles.subtitle}>Manage your hospital staff.</Text>
         </View>
-        <View style={styles.headerButtons}>
+        <View style={[styles.headerButtons, !isDesktop && styles.headerButtonsMobile]}>
           <Pressable style={styles.manageRolesBtn} onPress={() => setRolesModalVisible(true)}>
             <Shield size={20} color={Colors.light.primary} />
             <Text style={styles.manageRolesText}>Manage Roles</Text>
@@ -170,13 +170,17 @@ export default function EmployeesScreen() {
         {loading ? (
           <ActivityIndicator size="large" color={Colors.light.primary} style={{ padding: 40 }} />
         ) : (
-          <FlatList
-            data={employees}
-            keyExtractor={(item) => item.id}
-            ListHeaderComponent={renderHeader}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-          />
+          <ScrollView horizontal={true} style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: 800 }}>
+              <FlatList
+                data={employees}
+                keyExtractor={(item) => item.id}
+                ListHeaderComponent={renderHeader}
+                renderItem={renderItem}
+                contentContainerStyle={styles.listContent}
+              />
+            </View>
+          </ScrollView>
         )}
       </View>
 
@@ -322,11 +326,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
     padding: 32,
   },
+  containerMobile: {
+    padding: 16,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 32,
+  },
+  headerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 16,
   },
   title: {
     fontSize: 32,
@@ -340,6 +352,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   headerButtons: { flexDirection: 'row', gap: 16 },
+  headerButtonsMobile: { flexWrap: 'wrap' },
   manageRolesBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE' },
   manageRolesText: { color: Colors.light.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },

@@ -30,7 +30,7 @@ export default function SubAdminRegisterScreen() {
   React.useEffect(() => {
     const fetchDepts = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/department');
+        const res = await axios.get('https://bmh-eitu.onrender.com/department');
         if (res.data.success) {
           setDepartments(res.data.data);
         }
@@ -73,7 +73,7 @@ export default function SubAdminRegisterScreen() {
 
     setRegistering(true);
     try {
-      const res = await axios.post('http://localhost:5000/admin/department-admins', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/admin/department-admins', {
         full_name: fullName,
         email,
         password,

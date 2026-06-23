@@ -23,7 +23,7 @@ export default function SubAdminLoginScreen() {
     
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/admin/department-admins/login', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/admin/department-admins/login', {
         email,
         password
       });

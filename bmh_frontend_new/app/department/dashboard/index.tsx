@@ -23,7 +23,7 @@ export default function SubAdminDashboard() {
           const userStr = localStorage.getItem('subAdminUser');
           if (userStr) {
             const user = JSON.parse(userStr);
-            const res = await axios.get(`http://localhost:5000/admin/department-admins/${user.department_id}/metrics`);
+            const res = await axios.get(`https://bmh-eitu.onrender.com/admin/department-admins/${user.department_id}/metrics`);
             if (res.data.success) {
               setMetrics(res.data.data);
             }
@@ -52,7 +52,7 @@ export default function SubAdminDashboard() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, !isDesktop && styles.contentMobile]}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Department Overview 👋</Text>
         <Text style={styles.subtitle}>Here is what's happening in your department today.</Text>
@@ -70,7 +70,7 @@ export default function SubAdminDashboard() {
         ))}
       </View>
 
-      <View style={styles.chartSection}>
+      <View style={[styles.chartSection, !isDesktop && styles.chartSectionMobile]}>
         <View style={styles.chartCard}>
           <Text style={styles.cardTitle}>Recent Tasks Overview</Text>
           <View style={styles.chartPlaceholder}>
@@ -91,6 +91,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 32,
+  },
+  contentMobile: {
+    padding: 16,
   },
   header: {
     marginBottom: 32,
@@ -155,6 +158,9 @@ const styles = StyleSheet.create({
   chartSection: {
     flexDirection: 'row',
     gap: 24,
+  },
+  chartSectionMobile: {
+    flexDirection: 'column',
   },
   chartCard: {
     flex: 2,

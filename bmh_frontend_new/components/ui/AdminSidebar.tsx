@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { name: 'Profile', icon: Users, route: '/admin/dashboard/profile' },
 ];
 
-export const AdminSidebar = () => {
+export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -30,7 +30,12 @@ export const AdminSidebar = () => {
           
           return (
             <Link key={item.name} href={item.route as any} asChild>
-              <Pressable style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}>
+              <Pressable 
+                style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}
+                onPress={() => {
+                  if (onClose && !isActive) onClose();
+                }}
+              >
                 <item.icon 
                   color={isActive ? Colors.light.primary : Colors.light.icon} 
                   size={20} 
@@ -45,7 +50,10 @@ export const AdminSidebar = () => {
         })}
       </View>
 
-      <Pressable style={styles.logoutBtn} onPress={() => router.replace('/roles')}>
+      <Pressable style={styles.logoutBtn} onPress={() => {
+        if (onClose) onClose();
+        router.replace('/roles');
+      }}>
         <LogOut color={Colors.light.error} size={20} />
         <Text style={styles.logoutText}>Logout</Text>
       </Pressable>

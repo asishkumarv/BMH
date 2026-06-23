@@ -38,8 +38,8 @@ export default function EmployeeTasksScreen() {
   const fetchInitData = async () => {
     try {
       const [taskRes, empRes] = await Promise.all([
-        axios.get(`http://localhost:5000/tasks?user_type=employee&user_id=${empUser.id}`),
-        axios.get('http://localhost:5000/employees')
+        axios.get(`https://bmh-eitu.onrender.com/tasks?user_type=employee&user_id=${empUser.id}`),
+        axios.get('https://bmh-eitu.onrender.com/employees')
       ]);
 
       if (taskRes.data.success) setTasks(taskRes.data.data);
@@ -69,7 +69,7 @@ export default function EmployeeTasksScreen() {
     }
 
     try {
-      await axios.post('http://localhost:5000/tasks', {
+      await axios.post('https://bmh-eitu.onrender.com/tasks', {
         title,
         description,
         assigner_type: 'employee',
@@ -93,7 +93,7 @@ export default function EmployeeTasksScreen() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await axios.put(`http://localhost:5000/tasks/${selectedTask.id}/status`, {
+      await axios.put(`https://bmh-eitu.onrender.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
         rejection_reason: rejectionReason,
         notes: statusNotes,
@@ -115,7 +115,7 @@ export default function EmployeeTasksScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>My Tasks</Text>
           <Text style={styles.subtitle}>Manage your workload and assign tasks to co-workers</Text>
@@ -126,7 +126,7 @@ export default function EmployeeTasksScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.tabsContainer}>
+      <View style={[styles.tabsContainer, !isDesktop && styles.tabsContainerMobile]}>
         <Pressable style={[styles.tab, activeTab === 'assigned_to_me' && styles.activeTab]} onPress={() => setActiveTab('assigned_to_me')}>
           <Text style={[styles.tabText, activeTab === 'assigned_to_me' && styles.activeTabText]}>Assigned to Me</Text>
         </Pressable>
@@ -138,7 +138,7 @@ export default function EmployeeTasksScreen() {
       {loading ? (
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 32 }}>
+        <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
           {filteredTasks.length === 0 ? (
             <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
           ) : (
@@ -346,11 +346,13 @@ const getStatusColor = (status: string) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
   header: { padding: 32, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: 16 },
   title: { fontSize: 24, fontWeight: '800', color: Colors.light.text },
   subtitle: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
   createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 8 },
   createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
   tabsContainer: { flexDirection: 'row', paddingHorizontal: 32, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tabsContainerMobile: { paddingHorizontal: 16 },
   tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: Colors.light.primary },
   tabText: { fontSize: 15, fontWeight: '600', color: Colors.light.icon },

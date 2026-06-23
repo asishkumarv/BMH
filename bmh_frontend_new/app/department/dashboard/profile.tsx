@@ -27,7 +27,7 @@ export default function SubAdminProfileScreen() {
           try { setPd(JSON.parse(parsed.profile_data)); } catch (e) {}
         }
         if (parsed.department_id) {
-          axios.get('http://localhost:5000/department').then(res => {
+          axios.get('https://bmh-eitu.onrender.com/department').then(res => {
             if (res.data.success) {
               const dept = res.data.data.find((d: any) => String(d.id) === String(parsed.department_id));
               if (dept) setDepartmentName(dept.name);
@@ -51,7 +51,7 @@ export default function SubAdminProfileScreen() {
 
     setUpdating(true);
     try {
-      const res = await axios.put(`http://localhost:5000/admin/department-admins/${user.id}/password`, {
+      const res = await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${user.id}/password`, {
         oldPassword,
         newPassword
       });
@@ -71,13 +71,13 @@ export default function SubAdminProfileScreen() {
   if (!user) return null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 32 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
       <View style={styles.header}>
         <Text style={styles.title}>Sub Admin Profile</Text>
         <Text style={styles.subtitle}>Manage your department administration account</Text>
       </View>
 
-      <View style={styles.card}>
+      <View style={[styles.card, !isDesktop && styles.cardMobile]}>
         <View style={styles.profileHeaderRow}>
           {pd.photo ? (
             <View style={[styles.avatar, { overflow: 'hidden' }]}>
@@ -203,6 +203,9 @@ const styles = StyleSheet.create({
     padding: 32,
     maxWidth: 600,
     ...Platform.select({ web: { boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' } })
+  },
+  cardMobile: {
+    padding: 24,
   },
   
   profileHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },

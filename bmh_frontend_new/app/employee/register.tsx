@@ -60,8 +60,8 @@ export default function EmployeeRegisterScreen() {
     const fetchData = async () => {
       try {
         const [deptRes, roleRes] = await Promise.all([
-          axios.get('http://localhost:5000/department'),
-          axios.get('http://localhost:5000/roles')
+          axios.get('https://bmh-eitu.onrender.com/department'),
+          axios.get('https://bmh-eitu.onrender.com/roles')
         ]);
         if (deptRes.data.success) setDepartments(deptRes.data.data);
         if (roleRes.data.success) setRoles(roleRes.data.data);
@@ -114,7 +114,7 @@ export default function EmployeeRegisterScreen() {
         mobile, emergencyContact, age, bloodGroup, aadhaar, pan, esi, manager, salary, empType, jobDesc, shiftIn, shiftOut, breakStart, breakEnd, tempAddr1, tempCity, tempState, permAddr1, permCity, permState, ifsc, bankName, branch, accountNo, photo
       };
 
-      const res = await axios.post('http://localhost:5000/employees', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/employees', {
         full_name: fullName,
         email,
         password,
