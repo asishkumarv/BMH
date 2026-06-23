@@ -23,12 +23,7 @@ export default function LandingPage() {
       <View style={[styles.card, isMobile && styles.cardMobile]}>
         {/* Logo Section */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>BM</Text>
-            <View style={styles.logoIcon}>
-              <Heart color="#FFF" size={14} fill="#FFF" />
-            </View>
-          </View>
+          <Image source={require('../assets/CompanyLogo.jpg')} style={{ width: 250, height: 70 }} resizeMode="contain" />
         </View>
 
         <Text style={styles.title}>

@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { LayoutDashboard, Users, LogOut, CheckSquare } from 'lucide-react-native';
+import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
+import { LayoutDashboard, Users, LogOut, CheckSquare, Bell } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/department/dashboard' },
   { name: 'Employees', icon: Users, route: '/department/dashboard/employees' },
+  { name: 'Tasks', icon: CheckSquare, route: '/department/dashboard/tasks' },
+  { name: 'Notifications', icon: Bell, route: '/department/dashboard/notifications' },
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];
 
@@ -17,9 +19,7 @@ export const SubAdminSidebar = () => {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <View style={styles.logoIcon}>
-          <CheckSquare color="#fff" size={24} />
-        </View>
+        <Image source={require('../../assets/Logo.jpg')} style={{ width: 40, height: 40}} resizeMode="contain" />
         <Text style={styles.logoText}>Sub Admin</Text>
       </View>
 

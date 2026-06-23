@@ -98,7 +98,7 @@ export default function AdminRegisterScreen() {
       {isDesktop && (
         <View style={styles.leftPanel}>
           <View style={styles.logoBox}>
-             <img src={require('../../assets/Logo.jpg')} style={{ width: '80%', height: '80%', objectFit: 'contain' }} alt="Logo" />
+             <Image source={require('../../assets/Logo.jpg')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           </View>
           <Text style={styles.brandTitle}>Welcome Admin</Text>
           <Text style={styles.brandDesc}>
@@ -127,13 +127,14 @@ export default function AdminRegisterScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
             
-            <View style={styles.header}>
-              <Pressable style={styles.backBtn} onPress={() => router.back()}>
+                        <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', marginBottom: 32 }]}>
+              <Pressable style={[styles.backBtn, { marginBottom: 0 }]} onPress={() => router.back()}>
                 <ArrowLeft color="#1E40AF" size={16} />
                 <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
-              <View style={styles.headerLogo}>
-                <img src={require('../../assets/CompanyLogo.jpg')} style={{ height: 40, objectFit: 'contain' }} alt="Company Logo" />
+              
+              <View style={{ flex: 1, alignItems: 'center', marginRight: 60 }}>
+                <Image source={require('../../assets/CompanyLogo.jpg')} style={{ width: 220, height: 60 }} resizeMode="contain" />
               </View>
             </View>
 
@@ -171,7 +172,11 @@ export default function AdminRegisterScreen() {
                 </View>
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Joining Date</Text>
-                  <TextInput style={styles.input} placeholder="19-06-2026" placeholderTextColor="#94A3B8" value={joinDate} onChangeText={setJoinDate} />
+                  {Platform.OS === 'web' ? (
+                    <input type="date" style={styles.webInput} value={joinDate} onChange={(e) => setJoinDate(e.target.value)} />
+                  ) : (
+                    <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor="#94A3B8" value={joinDate} onChangeText={setJoinDate} />
+                  )}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -246,6 +251,7 @@ const styles = StyleSheet.create({
   inputGroup: { width: Platform.OS === 'web' ? '48%' : '100%', minWidth: 200 },
   label: { fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
   input: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1E293B', ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
+  webInput: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1E293B', width: '100%', fontFamily: 'inherit', ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
   
   passwordWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' },
   inputPassword: { flex: 1, padding: 14, fontSize: 14, color: '#1E293B', ...Platform.select({ web: { outlineStyle: 'none' as any } }) },

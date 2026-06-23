@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, ScrollView } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, Platform, ScrollView , Image } from 'react-native';
 import { ArrowLeft, User, Briefcase, Building, ShieldCheck, Stethoscope, Truck } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../constants/Colors';
@@ -12,7 +12,7 @@ export default function RolesScreen() {
   const ROLES = [
     { id: 'patient', icon: User, title: 'Patient Login', desc: 'Book appointments, order medicines', route: '/patient/login' },
     { id: 'employee', icon: Briefcase, title: 'Employee Login', desc: 'Attendance, tasks, payroll', route: '/employee/login' },
-    { id: 'deptadmin', icon: Building, title: 'Dept. Admin Login', desc: 'Department management', route: '/department/register' },
+    { id: 'deptadmin', icon: Building, title: 'Dept. Admin Login', desc: 'Department management', route: '/department/login' },
     { id: 'superadmin', icon: ShieldCheck, title: 'Super Admin Login', desc: 'Full system access', route: '/admin/login' },
     { id: 'doctor', icon: Stethoscope, title: 'Doctor Login', desc: 'Appointments, patients', route: '/doctor/login' },
     { id: 'delivery', icon: Truck, title: 'Delivery Boy Login', desc: 'Order deliveries', route: '/delivery/login' },
@@ -29,18 +29,9 @@ export default function RolesScreen() {
             <ArrowLeft color="#64748B" size={20} />
           </Pressable>
           
-          <View style={styles.logoRow}>
-            <View style={styles.logoIconSmall}>
-              <Text style={styles.logoPlus}>+</Text>
-            </View>
-            <Text style={styles.logoText}>
-              <Text style={{ color: '#1E293B' }}>Bharat </Text>
-              <Text style={{ color: '#3B82F6' }}>Medical</Text>
-            </Text>
+          <View style={{ alignItems: 'center', flex: 1, marginRight: 40 }}>
+            <Image source={require('../assets/CompanyLogo.jpg')} style={{ width: 220, height: 60 }} resizeMode="contain" />
           </View>
-          
-          {/* Spacer to center the logo */}
-          <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.titleContainer}>

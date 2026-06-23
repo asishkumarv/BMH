@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput, KeyboardAvoidingView, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, Platform, TextInput, KeyboardAvoidingView, ScrollView, ActivityIndicator, Alert , Image } from 'react-native';
 import { ArrowLeft, CheckCircle2, Camera, Eye, EyeOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -139,7 +139,7 @@ export default function EmployeeRegisterScreen() {
       {isDesktop && (
         <View style={styles.leftPanel}>
           <View style={styles.logoBox}>
-             <img src={require('../../assets/Logo.jpg')} style={{ width: '80%', height: '80%', objectFit: 'contain' }} alt="Logo" />
+             <Image source={require('../../assets/Logo.jpg')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           </View>
           <Text style={styles.brandTitle}>Staff Registration</Text>
           <Text style={styles.brandDesc}>
@@ -168,13 +168,14 @@ export default function EmployeeRegisterScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             
-            <View style={styles.header}>
-              <Pressable style={styles.backBtn} onPress={() => router.back()}>
+                        <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', marginBottom: 32 }]}>
+              <Pressable style={[styles.backBtn, { marginBottom: 0 }]} onPress={() => router.back()}>
                 <ArrowLeft color="#1E40AF" size={16} />
-                <Text style={styles.backBtnText}>Return to Portal</Text>
+                <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
-              <View style={styles.headerLogo}>
-                <img src={require('../../assets/CompanyLogo.jpg')} style={{ height: 40, objectFit: 'contain' }} alt="Company Logo" />
+              
+              <View style={{ flex: 1, alignItems: 'center', marginRight: 60 }}>
+                <Image source={require('../../assets/CompanyLogo.jpg')} style={{ width: 220, height: 60 }} resizeMode="contain" />
               </View>
             </View>
 
@@ -187,7 +188,7 @@ export default function EmployeeRegisterScreen() {
                 <Pressable style={styles.photoUpload} onPress={handlePickImage}>
                   {photo ? (
                     <View style={{ width: '100%', height: '100%', borderRadius: 35, overflow: 'hidden' }}>
-                      <img src={photo} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Image source={{ uri: photo }} style={{ width: '100%', height: '100%'}} resizeMode="cover" />
                     </View>
                   ) : (
                     <>
@@ -281,10 +282,38 @@ export default function EmployeeRegisterScreen() {
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>4. Shift Architecture & Operational Timings</Text>
                 <View style={styles.gridContainer}>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Shift Clock-In</Text><TextInput style={styles.input} placeholder="09:00" placeholderTextColor="#94A3B8" value={shiftIn} onChangeText={setShiftIn} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Shift Clock-Out</Text><TextInput style={styles.input} placeholder="17:00" placeholderTextColor="#94A3B8" value={shiftOut} onChangeText={setShiftOut} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Break Commences</Text><TextInput style={styles.input} placeholder="13:00" placeholderTextColor="#94A3B8" value={breakStart} onChangeText={setBreakStart} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Break Concludes</Text><TextInput style={styles.input} placeholder="14:00" placeholderTextColor="#94A3B8" value={breakEnd} onChangeText={setBreakEnd} /></View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Shift Clock-In</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="time" style={styles.webInput} value={shiftIn} onChange={(e) => setShiftIn(e.target.value)} />
+                    ) : (
+                      <TextInput style={styles.input} placeholder="09:00" placeholderTextColor="#94A3B8" value={shiftIn} onChangeText={setShiftIn} />
+                    )}
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Shift Clock-Out</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="time" style={styles.webInput} value={shiftOut} onChange={(e) => setShiftOut(e.target.value)} />
+                    ) : (
+                      <TextInput style={styles.input} placeholder="17:00" placeholderTextColor="#94A3B8" value={shiftOut} onChangeText={setShiftOut} />
+                    )}
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Break Commences</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="time" style={styles.webInput} value={breakStart} onChange={(e) => setBreakStart(e.target.value)} />
+                    ) : (
+                      <TextInput style={styles.input} placeholder="13:00" placeholderTextColor="#94A3B8" value={breakStart} onChangeText={setBreakStart} />
+                    )}
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Break Concludes</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="time" style={styles.webInput} value={breakEnd} onChange={(e) => setBreakEnd(e.target.value)} />
+                    ) : (
+                      <TextInput style={styles.input} placeholder="14:00" placeholderTextColor="#94A3B8" value={breakEnd} onChangeText={setBreakEnd} />
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -376,6 +405,7 @@ const styles = StyleSheet.create({
   inputGroup: { width: Platform.OS === 'web' ? '48%' : '100%', minWidth: 200, flexGrow: 1 },
   label: { fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
   input: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1E293B', ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
+  webInput: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1E293B', width: '100%', fontFamily: 'inherit', ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
   
   passwordWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' },
   inputPassword: { flex: 1, padding: 14, fontSize: 14, color: '#1E293B', ...Platform.select({ web: { outlineStyle: 'none' as any } }) },

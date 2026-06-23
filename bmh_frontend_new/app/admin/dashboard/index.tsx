@@ -1,18 +1,59 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
-import { Users, UserPlus, FileText, CheckCircle } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { Users, UserPlus, FileText, CheckCircle, Building, Clock } from 'lucide-react-native';
+import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
-const STATS = [
-  { label: 'Total Employees', value: '142', icon: Users, color: '#3B82F6' },
-  { label: 'New Onboardings', value: '12', icon: UserPlus, color: '#10B981' },
-  { label: 'Pending Leaves', value: '8', icon: FileText, color: '#F59E0B' },
-  { label: 'Tasks Completed', value: '94%', icon: CheckCircle, color: '#8B5CF6' },
-];
+
 
 export default function AdminDashboard() {
   const { isDesktop } = useResponsive();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    employees: 0,
+    subAdmins: 0,
+    departments: 0,
+    pendingApprovals: 0
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [empRes, adminRes, deptRes] = await Promise.all([
+          axios.get('http://localhost:5000/employees'),
+          axios.get('http://localhost:5000/admin/department-admins'),
+          axios.get('http://localhost:5000/department')
+        ]);
+        
+        const emps = empRes.data.success ? empRes.data.data : [];
+        const admins = adminRes.data.success ? adminRes.data.data : [];
+        const depts = deptRes.data.success ? deptRes.data.data : [];
+
+        const pendingEmps = emps.filter((e: any) => e.status === 'pending').length;
+        const pendingAdmins = admins.filter((a: any) => a.status === 'pending').length;
+
+        setStats({
+          employees: emps.length,
+          subAdmins: admins.length,
+          departments: depts.length,
+          pendingApprovals: pendingEmps + pendingAdmins
+        });
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const STATS_DATA = [
+    { label: 'Total Employees', value: stats.employees.toString(), icon: Users, color: '#3B82F6' },
+    { label: 'Total Sub Admins', value: stats.subAdmins.toString(), icon: UserPlus, color: '#10B981' },
+    { label: 'Total Departments', value: stats.departments.toString(), icon: Building, color: '#8B5CF6' },
+    { label: 'Pending Approvals', value: stats.pendingApprovals.toString(), icon: Clock, color: '#F59E0B' },
+  ];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -21,17 +62,21 @@ export default function AdminDashboard() {
         <Text style={styles.subtitle}>Here is what's happening today.</Text>
       </View>
 
-      <View style={[styles.statsGrid, !isDesktop && styles.statsGridMobile]}>
-        {STATS.map((stat, i) => (
-          <View key={i} style={[styles.statCard, !isDesktop && styles.statCardMobile]}>
-            <View style={[styles.iconBox, { backgroundColor: stat.color + '1A' }]}>
-              <stat.icon color={stat.color} size={24} />
+      {loading ? (
+        <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginVertical: 40 }} />
+      ) : (
+        <View style={[styles.statsGrid, !isDesktop && styles.statsGridMobile]}>
+          {STATS_DATA.map((stat, i) => (
+            <View key={i} style={[styles.statCard, !isDesktop && styles.statCardMobile]}>
+              <View style={[styles.iconBox, { backgroundColor: stat.color + '1A' }]}>
+                <stat.icon color={stat.color} size={24} />
+              </View>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.chartSection}>
         <View style={styles.chartCard}>

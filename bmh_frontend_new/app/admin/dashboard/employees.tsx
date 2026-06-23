@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
+import {  View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView , Image } from 'react-native';
 import { Plus, Search, MoreVertical, Shield, Building } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
@@ -276,7 +276,7 @@ export default function EmployeesScreen() {
                   <View style={{ gap: 12 }}>
                     {pd.photo && (
                       <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                        <img src={pd.photo} alt="Profile" style={{ width: 100, height: 100, borderRadius: 50, objectFit: 'cover' }} />
+                        <Image source={{ uri: pd.photo }} style={{ width: 100, height: 100, borderRadius: 50}} resizeMode="cover" />
                       </View>
                     )}
                     <Text style={styles.sectionLabel}>Personal & Identification</Text>

@@ -1,0 +1,388 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, Pressable, TextInput, Modal, Alert } from 'react-native';
+import { Colors } from '../../../constants/Colors';
+import { useResponsive } from '../../../hooks/useResponsive';
+import axios from 'axios';
+import { CheckSquare, Plus, Clock, User } from 'lucide-react-native';
+
+export default function EmployeeTasksScreen() {
+  const { isDesktop } = useResponsive();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'assigned_to_me' | 'assigned_by_me'>('assigned_to_me');
+
+  // Form State
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [assigneeType, setAssigneeType] = useState('employee');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [dueDate, setDueDate] = useState('');
+
+  // Status update state
+  const [statusNotes, setStatusNotes] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const [coEmployees, setCoEmployees] = useState<any[]>([]);
+
+  const empUser = typeof window !== 'undefined' && localStorage.getItem('employeeUser') 
+    ? JSON.parse(localStorage.getItem('employeeUser') || '{}') 
+    : { id: 1, full_name: 'Employee', department: '' };
+
+  useEffect(() => {
+    fetchInitData();
+  }, []);
+
+  const fetchInitData = async () => {
+    try {
+      const [taskRes, empRes] = await Promise.all([
+        axios.get(`http://localhost:5000/tasks?user_type=employee&user_id=${empUser.id}`),
+        axios.get('http://localhost:5000/employees')
+      ]);
+
+      if (taskRes.data.success) setTasks(taskRes.data.data);
+      
+      if (empRes.data.success) {
+        // filter co-workers in the same department
+        const emps = empRes.data.data.filter((e: any) => e.department === empUser.department);
+        setCoEmployees(emps);
+      }
+      
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!title) return Alert.alert('Error', 'Title is required.');
+    
+    let finalAssigneeId = assigneeId;
+    
+    if (assigneeType === 'self') {
+      finalAssigneeId = String(empUser.id);
+    } else {
+      if (!assigneeId) return Alert.alert('Error', 'Assignee is required.');
+    }
+
+    try {
+      await axios.post('http://localhost:5000/tasks', {
+        title,
+        description,
+        assigner_type: 'employee',
+        assigner_id: empUser.id,
+        assignee_type: 'employee',
+        assignee_id: parseInt(finalAssigneeId),
+        department: empUser.department,
+        due_date: dueDate || null
+      });
+      setShowCreateModal(false);
+      fetchInitData();
+      setTitle('');
+      setDescription('');
+      setDueDate('');
+      Alert.alert('Success', 'Task assigned successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to assign task');
+    }
+  };
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    try {
+      await axios.put(`http://localhost:5000/tasks/${selectedTask.id}/status`, {
+        status: newStatus,
+        rejection_reason: rejectionReason,
+        notes: statusNotes,
+        updater_type: 'employee',
+        updater_id: empUser.id
+      });
+      setShowStatusModal(false);
+      fetchInitData();
+      Alert.alert('Success', `Task marked as ${newStatus}`);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to update task status');
+    }
+  };
+
+  const filteredTasks = activeTab === 'assigned_to_me' 
+    ? tasks.filter(t => t.assignee_type === 'employee' && t.assignee_id === empUser.id)
+    : tasks.filter(t => t.assigner_type === 'employee' && t.assigner_id === empUser.id);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>My Tasks</Text>
+          <Text style={styles.subtitle}>Manage your workload and assign tasks to co-workers</Text>
+        </View>
+        <Pressable style={styles.createBtn} onPress={() => setShowCreateModal(true)}>
+          <Plus color="#FFF" size={20} />
+          <Text style={styles.createBtnText}>Assign Task</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.tabsContainer}>
+        <Pressable style={[styles.tab, activeTab === 'assigned_to_me' && styles.activeTab]} onPress={() => setActiveTab('assigned_to_me')}>
+          <Text style={[styles.tabText, activeTab === 'assigned_to_me' && styles.activeTabText]}>Assigned to Me</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'assigned_by_me' && styles.activeTab]} onPress={() => setActiveTab('assigned_by_me')}>
+          <Text style={[styles.tabText, activeTab === 'assigned_by_me' && styles.activeTabText]}>Assigned by Me</Text>
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 32 }}>
+          {filteredTasks.length === 0 ? (
+            <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
+          ) : (
+            filteredTasks.map(task => (
+              <View key={task.id} style={styles.taskCard}>
+                <View style={styles.taskHeader}>
+                  <Text style={styles.taskTitle}>{task.title}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status.toUpperCase()}</Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.taskDesc}>{task.description}</Text>
+                
+                <View style={styles.taskMeta}>
+                  <View style={styles.metaItem}>
+                    <User color={Colors.light.icon} size={16} />
+                    <Text style={styles.metaText}>Assigner: {task.assigner_name || 'Unknown'} ({task.assigner_type.replace('_', ' ')} #{task.assigner_id})</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <User color={Colors.light.icon} size={16} />
+                    <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} ({task.assignee_type.replace('_', ' ')} #{task.assignee_id}) - {task.department || 'N/A'}</Text>
+                  </View>
+                  {task.due_date && (
+                    <View style={styles.metaItem}>
+                      <Clock color={Colors.light.icon} size={16} />
+                      <Text style={styles.metaText}>Due: {new Date(task.due_date).toLocaleString()}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {task.status === 'rejected' && (
+                  <View style={styles.rejectionBox}>
+                    <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
+                    <Text style={styles.rejectionText}>{task.rejection_reason}</Text>
+                  </View>
+                )}
+
+                {task.notes ? (
+                  <View style={styles.notesBox}>
+                    <Text style={styles.notesTitle}>Latest Notes:</Text>
+                    <Text style={styles.notesText}>{task.notes}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.taskActions}>
+                   <Pressable 
+                     style={styles.actionBtn}
+                     onPress={() => {
+                       setSelectedTask(task);
+                       setStatusNotes(task.notes || '');
+                       setRejectionReason(task.rejection_reason || '');
+                       setShowStatusModal(true);
+                     }}
+                   >
+                     <Text style={styles.actionBtnText}>Update Status</Text>
+                   </Pressable>
+                </View>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      {/* Create Task Modal */}
+      <Modal visible={showCreateModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
+            <Text style={styles.modalTitle}>Assign New Task</Text>
+            
+            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+              <View style={{ paddingBottom: 8 }}>
+                <Text style={styles.label}>Title</Text>
+                <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Task Title" />
+                
+                <Text style={styles.label}>Description</Text>
+                <TextInput style={[styles.input, { height: 80 }]} multiline value={description} onChangeText={setDescription} placeholder="Task Details..." />
+
+                <Text style={styles.label}>Assignee Type</Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                  {['employee', 'self'].map(type => (
+                    <Pressable key={type} style={[styles.radioBtn, assigneeType === type && styles.radioActive]} onPress={() => { setAssigneeType(type); setAssigneeId(''); }}>
+                      <Text style={{ color: assigneeType === type ? '#FFF' : Colors.light.text }}>{type.replace('_', ' ')}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {assigneeType !== 'self' && (
+                  <>
+                    <Text style={styles.label}>Select Co-worker</Text>
+                    <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+                      <select 
+                        style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', outline: 'none', boxSizing: 'border-box' }}
+                        value={assigneeId}
+                        onChange={(e) => setAssigneeId(e.target.value)}
+                      >
+                        <option value="">-- Choose Assignee --</option>
+                        {coEmployees.map(e => (
+                          <option key={e.id} value={e.id}>{e.full_name} ({e.email}) {e.id === empUser.id ? '(You)' : ''}</option>
+                        ))}
+                      </select>
+                    </View>
+                  </>
+                )}
+
+                <Text style={styles.label}>Due Date & Time</Text>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: Colors.light.background }}>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="datetime-local"
+                      style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', outline: 'none', color: Colors.light.text, fontFamily: 'inherit', fontSize: '15px', boxSizing: 'border-box' }}
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                    />
+                  ) : (
+                    <TextInput style={{ padding: 14, fontSize: 15, color: Colors.light.text }} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD HH:MM" />
+                  )}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowCreateModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.saveBtn} onPress={handleCreateTask}>
+                <Text style={styles.saveBtnText}>Assign Task</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Status Modal */}
+      <Modal visible={showStatusModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
+            <Text style={styles.modalTitle}>Update Task Status</Text>
+            
+            <Text style={styles.label}>Notes</Text>
+            <TextInput style={[styles.input, { height: 80 }]} multiline value={statusNotes} onChangeText={setStatusNotes} placeholder="Add progress notes..." />
+
+            {selectedTask?.status === 'assigned' && selectedTask?.assignee_type === 'employee' && String(selectedTask?.assignee_id) === String(empUser.id) && (
+              <>
+                <Text style={styles.label}>Rejection Reason (only if rejecting)</Text>
+                <TextInput style={[styles.input, { height: 80 }]} multiline value={rejectionReason} onChangeText={setRejectionReason} placeholder="Reason for rejection..." />
+              </>
+            )}
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+              {selectedTask?.status === 'assigned' && selectedTask?.assignee_type === 'employee' && String(selectedTask?.assignee_id) === String(empUser.id) && (
+                <>
+                  <Pressable style={[styles.saveBtn, { backgroundColor: '#10B981' }]} onPress={() => handleUpdateStatus('accepted')}>
+                    <Text style={styles.saveBtnText}>Accept</Text>
+                  </Pressable>
+                  <Pressable style={[styles.saveBtn, { backgroundColor: '#EF4444' }]} onPress={() => handleUpdateStatus('rejected')}>
+                    <Text style={styles.saveBtnText}>Reject</Text>
+                  </Pressable>
+                </>
+              )}
+              {selectedTask?.assignee_type === 'employee' && String(selectedTask?.assignee_id) === String(empUser.id) && (selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
+                <>
+                  <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus('in_progress')}>
+                    <Text style={styles.saveBtnText}>Mark In Progress</Text>
+                  </Pressable>
+                  <Pressable style={[styles.saveBtn, { backgroundColor: '#8B5CF6' }]} onPress={() => handleUpdateStatus('completed')}>
+                    <Text style={styles.saveBtnText}>Complete</Text>
+                  </Pressable>
+                  <Pressable style={[styles.saveBtn, { backgroundColor: '#64748B' }]} onPress={() => handleUpdateStatus('terminated')}>
+                    <Text style={styles.saveBtnText}>Terminate</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(selectedTask?.status)}>
+                  <Text style={styles.saveBtnText}>Save Notes</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <View style={[styles.modalActions, { marginTop: 24 }]}>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowStatusModal(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+    </View>
+  );
+}
+
+const getStatusColor = (status: string) => {
+  switch(status) {
+    case 'assigned': return '#3B82F6';
+    case 'accepted': return '#06B6D4';
+    case 'in_progress': return '#F59E0B';
+    case 'completed': return '#10B981';
+    case 'rejected': return '#EF4444';
+    case 'terminated': return '#64748B';
+    default: return '#64748B';
+  }
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.light.background },
+  header: { padding: 32, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: '800', color: Colors.light.text },
+  subtitle: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
+  createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 8 },
+  createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  tabsContainer: { flexDirection: 'row', paddingHorizontal: 32, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeTab: { borderBottomColor: Colors.light.primary },
+  tabText: { fontSize: 15, fontWeight: '600', color: Colors.light.icon },
+  activeTabText: { color: Colors.light.primary },
+  taskCard: { backgroundColor: Colors.light.card, borderRadius: 16, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: Colors.light.border },
+  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  taskTitle: { fontSize: 18, fontWeight: '700', color: Colors.light.text, flex: 1, marginRight: 16 },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  statusText: { fontSize: 12, fontWeight: '700' },
+  taskDesc: { fontSize: 15, color: Colors.light.icon, marginBottom: 20, lineHeight: 22 },
+  taskMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, marginBottom: 20 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 14, color: Colors.light.icon, fontWeight: '500' },
+  rejectionBox: { backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#FCA5A5' },
+  rejectionTitle: { fontSize: 13, fontWeight: '700', color: '#B91C1C', marginBottom: 4 },
+  rejectionText: { fontSize: 14, color: '#991B1B' },
+  notesBox: { backgroundColor: Colors.light.secondary, padding: 16, borderRadius: 8, marginBottom: 16 },
+  notesTitle: { fontSize: 13, fontWeight: '700', color: Colors.light.primary, marginBottom: 4 },
+  notesText: { fontSize: 14, color: Colors.light.text },
+  taskActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.light.border },
+  actionBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.light.secondary, borderRadius: 8 },
+  actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  modalContent: { backgroundColor: Colors.light.card, borderRadius: 24, padding: 32, width: '100%', maxHeight: '90%' },
+  modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.light.text, marginBottom: 24 },
+  label: { fontSize: 14, fontWeight: '600', color: Colors.light.text, marginBottom: 8, marginTop: 16 },
+  input: { backgroundColor: Colors.light.background, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 12, padding: 16, fontSize: 15, color: Colors.light.text },
+  radioBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: Colors.light.background, borderWidth: 1, borderColor: Colors.light.border },
+  radioActive: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 32 },
+  cancelBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: Colors.light.background },
+  cancelBtnText: { color: Colors.light.icon, fontWeight: '600', fontSize: 15 },
+  saveBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: Colors.light.primary },
+  saveBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 }
+});

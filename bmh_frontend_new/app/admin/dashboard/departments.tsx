@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, TextInput, Alert, Modal } from 'react-native';
+import {  View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, TextInput, Alert, Modal, ScrollView , Image } from 'react-native';
 import { Plus, Search, Building, User, Mail, ShieldCheck } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 type Department = { id: string; name: string; description: string; created_at: string };
-type DeptAdmin = { id: string; full_name: string; email: string; department_id: string; status: string };
+type DeptAdmin = { id: string; full_name: string; email: string; department_id: string; status: string; profile_data: string };
+type Employee = { id: string; full_name: string; email: string; department: string; role: string; status: string; profile_data: string };
 
 export default function DepartmentsScreen() {
   const { isDesktop } = useResponsive();
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [admins, setAdmins] = useState<DeptAdmin[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   
   const [loading, setLoading] = useState(true);
+  const [expandedDeptId, setExpandedDeptId] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{data: any, type: 'admin' | 'employee'} | null>(null);
   
   const [modalVisible, setModalVisible] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
@@ -28,12 +32,14 @@ export default function DepartmentsScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [deptRes, adminRes] = await Promise.all([
+      const [deptRes, adminRes, empRes] = await Promise.all([
         axios.get('http://localhost:5000/department'),
-        axios.get('http://localhost:5000/admin/department-admins')
+        axios.get('http://localhost:5000/admin/department-admins'),
+        axios.get('http://localhost:5000/employees')
       ]);
       if (deptRes.data.success) setDepartments(deptRes.data.data);
       if (adminRes.data.success) setAdmins(adminRes.data.data);
+      if (empRes.data.success) setEmployees(empRes.data.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -79,53 +85,177 @@ export default function DepartmentsScreen() {
     }
   };
 
+  const DetailField = ({ label, value }: { label: string, value: any }) => {
+    if (!value) return null;
+    return (
+      <View style={{ width: '45%', marginBottom: 12 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.light.icon, textTransform: 'uppercase', marginBottom: 4 }}>{label}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: Colors.light.text }}>{value}</Text>
+      </View>
+    );
+  };
+
+  const renderUserDetails = () => {
+    if (!selectedUser) return null;
+    const { data, type } = selectedUser;
+    
+    let pd: any = {};
+    try {
+      if (data.profile_data) pd = JSON.parse(data.profile_data);
+    } catch (e) {}
+
+    // Resolve department name
+    let resolvedDeptName = '';
+    if (type === 'admin') {
+      resolvedDeptName = departments.find(d => String(d.id) === String(data.department_id))?.name || data.department_id;
+    } else {
+      // For employee, department might be the name or ID depending on how it was saved,
+      // fallback to looking it up just in case it's an ID.
+      resolvedDeptName = departments.find(d => String(d.id) === String(data.department))?.name || data.department;
+    }
+
+    return (
+      <View style={{ gap: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          {pd.photo ? (
+            <Image source={{ uri: pd.photo }} style={{ width: 80, height: 80, borderRadius: 40, marginRight: 16}} resizeMode="cover" />
+          ) : (
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.light.primary, justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+              <Text style={{ fontSize: 32, fontWeight: '700', color: '#FFF' }}>{data.full_name.charAt(0)}</Text>
+            </View>
+          )}
+          <View>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: Colors.light.text }}>{data.full_name}</Text>
+            <Text style={{ fontSize: 16, color: Colors.light.icon }}>{data.email}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.primary, marginTop: 4, textTransform: 'capitalize' }}>Status: {data.status}</Text>
+          </View>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: Colors.light.border, marginVertical: 8 }} />
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          {type === 'employee' && (
+            <>
+              <DetailField label="Department" value={resolvedDeptName} />
+              <DetailField label="Role" value={data.role} />
+              <DetailField label="Mobile" value={pd.mobile} />
+              <DetailField label="Emergency Contact" value={pd.emergencyContact} />
+              <DetailField label="Age" value={pd.age} />
+              <DetailField label="Blood Group" value={pd.bloodGroup} />
+              <DetailField label="Aadhaar" value={pd.aadhaar} />
+              <DetailField label="PAN" value={pd.pan} />
+              <DetailField label="ESI" value={pd.esi} />
+              <DetailField label="Manager" value={pd.manager} />
+              <DetailField label="Salary" value={pd.salary ? `₹${pd.salary}` : ''} />
+              <DetailField label="Emp Type" value={pd.empType} />
+              <DetailField label="Shift In/Out" value={(pd.shiftIn || pd.shiftOut) ? `${pd.shiftIn || '-'} to ${pd.shiftOut || '-'}` : ''} />
+              <DetailField label="Temp Address" value={[pd.tempAddr1, pd.tempCity, pd.tempState].filter(Boolean).join(', ')} />
+              <DetailField label="Perm Address" value={[pd.permAddr1, pd.permCity, pd.permState].filter(Boolean).join(', ')} />
+              <DetailField label="Bank Details" value={pd.accountNo ? `${pd.bankName} - ${pd.accountNo}` : ''} />
+            </>
+          )}
+
+          {type === 'admin' && (
+            <>
+              <DetailField label="Department" value={resolvedDeptName} />
+              <DetailField label="Phone" value={pd.phone} />
+              <DetailField label="Joined" value={pd.joiningDate || pd.joinDate} />
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   const renderItem = ({ item }: { item: Department }) => {
     const deptAdmins = admins.filter(a => a.department_id === item.id);
+    const deptEmployees = employees.filter(e => e.department === item.name);
+    const isExpanded = expandedDeptId === item.id;
     
     return (
       <View style={styles.card}>
-        <View style={styles.cardHeader}>
+        <Pressable 
+          style={styles.cardHeader} 
+          onPress={() => setExpandedDeptId(isExpanded ? null : item.id)}
+        >
           <View style={styles.cardTitleRow}>
             <View style={styles.iconBox}>
               <Building color={Colors.light.primary} size={24} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.cardDesc}>{item.description || 'No description provided.'}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.cardBody}>
-          <Text style={styles.sectionLabel}>Department Admins ({deptAdmins.length})</Text>
-          {deptAdmins.length === 0 ? (
-            <Text style={styles.emptyText}>No admins registered yet.</Text>
-          ) : (
-            deptAdmins.map(admin => (
-              <View key={admin.id} style={styles.adminRow}>
-                <View style={styles.adminAvatar}>
-                  <Text style={styles.adminInitials}>{admin.full_name.charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={styles.adminName}>{admin.full_name}</Text>
-                  <Text style={styles.adminEmail}>{admin.email}</Text>
-                </View>
-                {admin.status === 'pending' ? (
-                  <Pressable 
-                    style={[styles.statusBadge, { backgroundColor: Colors.light.primary, marginLeft: 'auto' }]}
-                    onPress={() => handleApproveAdmin(admin.id)}
-                  >
-                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Approve</Text>
-                  </Pressable>
-                ) : (
-                  <View style={[styles.statusBadge, styles.statusApproved]}>
-                    <Text style={[styles.statusText, styles.textApproved]}>{admin.status}</Text>
-                  </View>
-                )}
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Admins: {deptAdmins.length}</Text>
+                <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Employees: {deptEmployees.length}</Text>
               </View>
-            ))
-          )}
-        </View>
+            </View>
+            <Text style={{ color: Colors.light.icon, fontSize: 24 }}>{isExpanded ? '-' : '+'}</Text>
+          </View>
+        </Pressable>
+
+        {isExpanded && (
+          <View style={styles.cardBody}>
+            <Text style={styles.sectionLabel}>Department Admins ({deptAdmins.length})</Text>
+            {deptAdmins.length === 0 ? (
+              <Text style={styles.emptyText}>No admins registered yet.</Text>
+            ) : (
+              deptAdmins.map(admin => (
+                <View key={admin.id} style={styles.adminRow}>
+                  <View style={styles.adminAvatar}>
+                    <Text style={styles.adminInitials}>{admin.full_name.charAt(0)}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.adminName}>{admin.full_name}</Text>
+                    <Text style={styles.adminEmail}>{admin.email}</Text>
+                  </View>
+                  <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                    <Pressable onPress={() => setSelectedUser({ data: admin, type: 'admin' })}>
+                      <Text style={{ color: Colors.light.primary, fontSize: 13, fontWeight: '700' }}>Details</Text>
+                    </Pressable>
+                    {admin.status === 'pending' ? (
+                      <Pressable 
+                        style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]}
+                        onPress={() => handleApproveAdmin(admin.id)}
+                      >
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Approve</Text>
+                      </Pressable>
+                    ) : (
+                      <View style={[styles.statusBadge, styles.statusApproved]}>
+                        <Text style={[styles.statusText, styles.textApproved]}>{admin.status}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))
+            )}
+
+            <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Employees ({deptEmployees.length})</Text>
+            {deptEmployees.length === 0 ? (
+              <Text style={styles.emptyText}>No employees registered yet.</Text>
+            ) : (
+              deptEmployees.map(emp => (
+                <View key={emp.id} style={styles.adminRow}>
+                  <View style={[styles.adminAvatar, { backgroundColor: '#10B981' }]}>
+                    <Text style={styles.adminInitials}>{emp.full_name.charAt(0)}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.adminName}>{emp.full_name}</Text>
+                    <Text style={styles.adminEmail}>{emp.email} • {emp.role}</Text>
+                  </View>
+                  <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                    <Pressable onPress={() => setSelectedUser({ data: emp, type: 'employee' })}>
+                      <Text style={{ color: Colors.light.primary, fontSize: 13, fontWeight: '700' }}>Details</Text>
+                    </Pressable>
+                    <View style={[styles.statusBadge, emp.status === 'approved' ? styles.statusApproved : {backgroundColor: '#FEF3C7'}]}>
+                      <Text style={[styles.statusText, emp.status === 'approved' ? styles.textApproved : {color: '#D97706'}]}>{emp.status}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
       </View>
     );
   };
@@ -189,6 +319,25 @@ export default function DepartmentsScreen() {
               </Pressable>
               <Pressable style={styles.submitBtn} onPress={handleAddDepartment} disabled={adding}>
                 <Text style={styles.submitBtnText}>{adding ? 'Adding...' : 'Add Department'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Details Modal */}
+      <Modal visible={!!selectedUser} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 600 }, { maxHeight: '90%' }]}>
+            <Text style={styles.modalTitle}>{selectedUser?.type === 'admin' ? 'Sub-Admin Details' : 'Employee Details'}</Text>
+            
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {renderUserDetails()}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.cancelBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setSelectedUser(null)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
               </Pressable>
             </View>
           </View>

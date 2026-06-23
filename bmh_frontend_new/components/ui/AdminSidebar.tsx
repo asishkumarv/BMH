@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { LayoutDashboard, Users, Building, Activity, Settings, LogOut } from 'lucide-react-native';
+import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
+import { LayoutDashboard, Users, Building, Activity, Settings, LogOut, Bell } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 
@@ -8,9 +8,9 @@ const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/admin/dashboard' },
   { name: 'Employees', icon: Users, route: '/admin/dashboard/employees' },
   { name: 'Departments', icon: Building, route: '/admin/dashboard/departments' },
-  { name: 'Analytics', icon: Activity, route: '/admin/dashboard/analytics' },
+  { name: 'Tasks', icon: Activity, route: '/admin/dashboard/tasks' },
+  { name: 'Notifications', icon: Bell, route: '/admin/dashboard/notifications' },
   { name: 'Profile', icon: Users, route: '/admin/dashboard/profile' },
-  { name: 'Settings', icon: Settings, route: '/admin/dashboard/settings' },
 ];
 
 export const AdminSidebar = () => {
@@ -20,9 +20,7 @@ export const AdminSidebar = () => {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <View style={styles.logoIcon}>
-          <Activity color="#fff" size={24} />
-        </View>
+        <Image source={require('../../assets/Logo.jpg')} style={{ width: 40, height: 40}} resizeMode="contain" />
         <Text style={styles.logoText}>BMH Admin</Text>
       </View>
 

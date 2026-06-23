@@ -10,6 +10,16 @@ exports.getAdmins = async (req, res) => {
   }
 };
 
+exports.getSuperAdmins = async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, full_name, email FROM super_admins ORDER BY created_at DESC');
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching super admins:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.addAdmin = async (req, res) => {
   try {
     const { full_name, email, password, department_id, profile_data } = req.body;
@@ -78,7 +88,7 @@ exports.getDepartmentMetrics = async (req, res) => {
     const totalEmployees = parseInt(empResult.rows[0].count, 10);
 
     // 2. Get tasks count
-    const tasksResult = await pool.query('SELECT status, COUNT(*) FROM tasks WHERE department_id = $1 GROUP BY status', [department_id]);
+    const tasksResult = await pool.query('SELECT status, COUNT(*) FROM tasks WHERE department = (SELECT name FROM departments WHERE id = $1) GROUP BY status', [department_id]);
     let pendingTasks = 0;
     let completedTasks = 0;
     tasksResult.rows.forEach(row => {

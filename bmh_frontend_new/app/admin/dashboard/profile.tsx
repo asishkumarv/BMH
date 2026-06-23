@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView } from 'react-native';
+import {  View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView , Image } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react-native';
@@ -72,7 +72,7 @@ export default function SuperAdminProfileScreen() {
         <View style={styles.profileHeaderRow}>
           {pd.photo ? (
             <View style={[styles.avatar, { overflow: 'hidden' }]}>
-              <img src={pd.photo} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image source={{ uri: pd.photo }} style={{ width: '100%', height: '100%'}} resizeMode="cover" />
             </View>
           ) : (
             <View style={styles.avatar}>

@@ -45,7 +45,7 @@ export default function EmployeePortal() {
       {isDesktop && (
         <View style={styles.leftPanel}>
           <View style={styles.logoBox}>
-             <img src={require('../../assets/Logo.jpg')} style={{ width: '80%', height: '80%', objectFit: 'contain' }} alt="Logo" />
+             <Image source={require('../../assets/Logo.jpg')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           </View>
           <Text style={styles.brandTitle}>Bharat Medical Hall</Text>
           <Text style={styles.brandDesc}>
@@ -64,12 +64,14 @@ export default function EmployeePortal() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
             
-            <View style={styles.header}>
-              <Pressable style={styles.backBtn} onPress={() => router.back()}>
-                <ArrowLeft color="#64748B" size={18} />
+                        <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', marginBottom: 32 }]}>
+              <Pressable style={[styles.backBtn, { marginBottom: 0 }]} onPress={() => router.back()}>
+                <ArrowLeft color="#1E40AF" size={16} />
+                <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
-              <View style={styles.headerLogo}>
-                <img src={require('../../assets/CompanyLogo.jpg')} style={{ height: 40, objectFit: 'contain' }} alt="Company Logo" />
+              
+              <View style={{ flex: 1, alignItems: 'center', marginRight: 60 }}>
+                <Image source={require('../../assets/CompanyLogo.jpg')} style={{ width: 220, height: 60 }} resizeMode="contain" />
               </View>
             </View>
 

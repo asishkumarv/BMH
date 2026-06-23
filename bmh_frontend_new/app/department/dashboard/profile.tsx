@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView } from 'react-native';
+import {  View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView , Image } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { Building, Lock, Mail, Phone, Calendar, Eye, EyeOff } from 'lucide-react-native';
@@ -7,6 +7,7 @@ import { Building, Lock, Mail, Phone, Calendar, Eye, EyeOff } from 'lucide-react
 export default function SubAdminProfileScreen() {
   const [user, setUser] = useState<any>(null);
   const [pd, setPd] = useState<any>({});
+  const [departmentName, setDepartmentName] = useState<string>('');
   
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -24,6 +25,14 @@ export default function SubAdminProfileScreen() {
         setUser(parsed);
         if (parsed.profile_data) {
           try { setPd(JSON.parse(parsed.profile_data)); } catch (e) {}
+        }
+        if (parsed.department_id) {
+          axios.get('http://localhost:5000/department').then(res => {
+            if (res.data.success) {
+              const dept = res.data.data.find((d: any) => String(d.id) === String(parsed.department_id));
+              if (dept) setDepartmentName(dept.name);
+            }
+          }).catch(console.error);
         }
       }
     }
@@ -72,7 +81,7 @@ export default function SubAdminProfileScreen() {
         <View style={styles.profileHeaderRow}>
           {pd.photo ? (
             <View style={[styles.avatar, { overflow: 'hidden' }]}>
-              <img src={pd.photo} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image source={{ uri: pd.photo }} style={{ width: '100%', height: '100%'}} resizeMode="cover" />
             </View>
           ) : (
             <View style={styles.avatar}>
@@ -83,7 +92,7 @@ export default function SubAdminProfileScreen() {
             <Text style={styles.profileName}>{user.full_name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
               <Building size={14} color={Colors.light.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.profileRole}>Dept ID: {user.department_id}</Text>
+              <Text style={styles.profileRole}>Dept: {departmentName || user.department_id}</Text>
             </View>
           </View>
         </View>
