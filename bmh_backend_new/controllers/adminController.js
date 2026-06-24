@@ -44,7 +44,12 @@ exports.loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    const result = await pool.query('SELECT * FROM department_admins WHERE email = $1 AND password = $2', [email, password]);
+    const result = await pool.query(`
+      SELECT a.*, d.name as department 
+      FROM department_admins a 
+      LEFT JOIN departments d ON a.department_id = d.id 
+      WHERE a.email = $1 AND a.password = $2
+    `, [email, password]);
     
     if (result.rows.length === 0) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
@@ -98,10 +103,11 @@ exports.getDepartmentMetrics = async (req, res) => {
 
     // 3. Get attendance count for today
     const attendanceResult = await pool.query(`
-      SELECT status, COUNT(*) 
-      FROM attendance 
-      WHERE department_id = $1 AND date = CURRENT_DATE 
-      GROUP BY status
+      SELECT a.status, COUNT(*) 
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.id
+      WHERE e.department = (SELECT name FROM departments WHERE id = $1) AND a.date = CURRENT_DATE 
+      GROUP BY a.status
     `, [department_id]);
     
     let presentCount = 0;

@@ -82,29 +82,33 @@ export default function SubAdminAttendanceDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const userStr = await AsyncStorage.getItem('user');
+      const userStr = Platform.OS === 'web' ? localStorage.getItem('subAdminUser') : await AsyncStorage.getItem('subAdminUser');
       const user = userStr ? JSON.parse(userStr) : null;
       if (!user) return;
       
-      setUserDept(user.department);
-
-      const sumRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/summary?department=${user.department}`);
-      if (sumRes.data.success) {
-        setSummary(sumRes.data.summary);
-      }
+      let deptName = user.department;
       
-      const repRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/reports?department=${user.department}`);
-      if (repRes.data.success) {
-        setReports(repRes.data.data);
-      }
-
       const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
       if (deptRes.data.success) {
-        const dept = deptRes.data.data.find((d: any) => d.name === user.department);
+        const dept = deptRes.data.data.find((d: any) => d.id === user.department_id || d.name === user.department);
         if (dept) {
+           deptName = dept.name;
+           setUserDept(dept.name);
            setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
            setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
            setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '2000');
+        }
+      }
+
+      if (deptName) {
+        const sumRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/summary?department=${deptName}`);
+        if (sumRes.data.success) {
+          setSummary(sumRes.data.summary);
+        }
+        
+        const repRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/reports?department=${deptName}`);
+        if (repRes.data.success) {
+          setReports(repRes.data.data);
         }
       }
     } catch (err) {
