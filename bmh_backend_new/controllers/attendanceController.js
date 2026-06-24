@@ -145,7 +145,7 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
     let status = locationVerified === 'true' || locationVerified === true ? "On Duty" : "Absent";
     
     // For storing in DB, we prefix it so it is directly usable in img tags
-    const storedCapturedUrl = `data:image/jpeg;base64,${base64Image}`;
+    const storedCapturedUrl = base64Image.startsWith('data:image') ? base64Image : `data:image/jpeg;base64,${base64Image}`;
     
     // Check if already marked
     if (action === "login") {
@@ -235,7 +235,7 @@ exports.markBreak = async (req, res) => {
     }
 
     // For storing in DB, we prefix it so it is directly usable in img tags
-    const storedCapturedUrl = base64Image ? `data:image/jpeg;base64,${base64Image}` : null;
+    const storedCapturedUrl = base64Image ? (base64Image.startsWith('data:image') ? base64Image : `data:image/jpeg;base64,${base64Image}`) : null;
 
     await pool.query(
       `INSERT INTO break_logs (employee_id, break_type, timestamp, image_url, status)
