@@ -25,6 +25,11 @@ export default function SubAdminStationaryScreen() {
   const [newItemStock, setNewItemStock] = useState('0');
   const [newItemImage, setNewItemImage] = useState('');
   const [adding, setAdding] = useState(false);
+  const [newDynamicFields, setNewDynamicFields] = useState<{key: string, value: string}[]>([]);
+
+  // Filters
+  const [filterRole, setFilterRole] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
 
   // Edit Item Modal
   const [editItemModalVisible, setEditItemModalVisible] = useState(false);
@@ -34,6 +39,7 @@ export default function SubAdminStationaryScreen() {
   const [editItemImage, setEditItemImage] = useState('');
   const [editItemStatus, setEditItemStatus] = useState('active');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editDynamicFields, setEditDynamicFields] = useState<{key: string, value: string}[]>([]);
 
   // Bulk CSV Paste Modal
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
@@ -86,7 +92,7 @@ export default function SubAdminStationaryScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.1,
         base64: true,
       });
       if (!result.canceled && result.assets[0].base64) {
@@ -101,15 +107,19 @@ export default function SubAdminStationaryScreen() {
     if (!newItemName) return Alert.alert('Error', 'Name is required');
     setAdding(true);
     try {
+      const finalName = newDynamicFields.length > 0 
+        ? `${newItemName} | ${newDynamicFields.map(f => `${f.key}: ${f.value}`).join(' | ')}`
+        : newItemName;
+
       const res = await axios.post('https://bmh-eitu.onrender.com/stationary/items', {
-        name: newItemName,
+        name: finalName,
         stock: parseInt(newItemStock) || 0,
         image: newItemImage
       });
       if (res.data.success) {
         setItems([res.data.data, ...items]);
         setAddItemModalVisible(false);
-        setNewItemName(''); setNewItemStock('0'); setNewItemImage('');
+        setNewItemName(''); setNewItemStock('0'); setNewItemImage(''); setNewDynamicFields([]);
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to add item');
@@ -144,7 +154,21 @@ export default function SubAdminStationaryScreen() {
 
   const openEditModal = (item: StationaryItem) => {
     setEditingItem(item);
-    setEditItemName(item.name);
+    
+    if (item.name.includes(' | ')) {
+      const parts = item.name.split(' | ');
+      setEditItemName(parts[0]);
+      const parsedFields = parts.slice(1).map(p => {
+        const idx = p.indexOf(': ');
+        if (idx !== -1) return { key: p.substring(0, idx), value: p.substring(idx + 2) };
+        return { key: p, value: '' };
+      });
+      setEditDynamicFields(parsedFields);
+    } else {
+      setEditItemName(item.name);
+      setEditDynamicFields([]);
+    }
+
     setEditItemStock(item.stock.toString());
     setEditItemImage(item.image || '');
     setEditItemStatus(item.status || 'active');
@@ -157,7 +181,7 @@ export default function SubAdminStationaryScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.1,
         base64: true,
       });
       if (!result.canceled && result.assets[0].base64) {
@@ -172,8 +196,12 @@ export default function SubAdminStationaryScreen() {
     if (!editingItem || !editItemName) return Alert.alert('Error', 'Name is required');
     setSavingEdit(true);
     try {
+      const finalName = editDynamicFields.length > 0 
+        ? `${editItemName} | ${editDynamicFields.map(f => `${f.key}: ${f.value}`).join(' | ')}`
+        : editItemName;
+
       const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`, {
-        name: editItemName,
+        name: finalName,
         stock: parseInt(editItemStock) || 0,
         image: editItemImage,
         status: editItemStatus
@@ -192,30 +220,39 @@ export default function SubAdminStationaryScreen() {
 
   const handleDeleteItem = async () => {
     if (!editingItem) return;
-    Alert.alert('Delete Item', `Are you sure you want to delete "${editingItem.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        setSavingEdit(true);
-        try {
-          const res = await axios.delete(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`);
-          if (res.data.success) {
-            setEditItemModalVisible(false);
-            fetchData();
-            Alert.alert('Success', 'Item deleted');
-          }
-        } catch (error) {
-          Alert.alert('Error', 'Failed to delete item');
-        } finally {
-          setSavingEdit(false);
+
+    const executeDelete = async () => {
+      setSavingEdit(true);
+      try {
+        const res = await axios.delete(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`);
+        if (res.data.success) {
+          setEditItemModalVisible(false);
+          fetchData();
+          Alert.alert('Success', 'Item deleted');
         }
-      }}
-    ]);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to delete item');
+      } finally {
+        setSavingEdit(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to delete "${editingItem.name}"?`)) {
+        executeDelete();
+      }
+    } else {
+      Alert.alert('Delete Item', `Are you sure you want to delete "${editingItem.name}"?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: executeDelete }
+      ]);
+    }
   };
 
   const openReviewModal = (req: RequestHistory) => {
     setSelectedRequest(req);
     const initialQty: {[key: string]: string} = {};
-    req.items.forEach(i => {
+    (req.items || []).forEach(i => {
       initialQty[i.item_id] = i.requested_qty.toString();
     });
     setApprovalQuantities(initialQty);
@@ -271,7 +308,7 @@ export default function SubAdminStationaryScreen() {
           <Package size={32} color={Colors.light.icon} />
         </View>
       )}
-      <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.itemName} numberOfLines={1}>{item.name.split(' | ')[0]}</Text>
       <Text style={styles.itemStock}>Stock: {item.stock}</Text>
     </Pressable>
   );
@@ -300,6 +337,49 @@ export default function SubAdminStationaryScreen() {
       </Pressable>
     </View>
   );
+
+  const filteredRequests = requests.filter(req => {
+    if (filterStatus !== 'All' && req.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
+    if (filterRole !== 'All') {
+      const isSuper = req.approved_by?.startsWith('Super Admin');
+      const isSub = req.approved_by?.startsWith('Sub Admin');
+      if (filterRole === 'Super Admin' && !isSuper) return false;
+      if (filterRole === 'Sub Admin' && !isSub) return false;
+    }
+    return true;
+  });
+
+  const handleExportHistoryCSV = () => {
+    if (Platform.OS === 'web') {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "ID,Date,Employee Name,Status,Approved By,Notes,Items\n";
+
+      filteredRequests.forEach(req => {
+        const date = new Date(req.created_at).toLocaleDateString();
+        const itemsStr = (req.items || []).map(i => `${i.name} (Req: ${i.requested_qty}, Appr: ${i.approved_qty})`).join('; ');
+        const row = [
+          req.id,
+          date,
+          `"${req.employee_name}"`,
+          req.status,
+          `"${req.approved_by || ''}"`,
+          `"${req.notes || ''}"`,
+          `"${itemsStr}"`
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `stationary_requests_export.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      Alert.alert('Notice', 'CSV Export is only supported on web right now.');
+    }
+  };
 
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
@@ -352,13 +432,48 @@ export default function SubAdminStationaryScreen() {
             ListEmptyComponent={<Text style={styles.emptyText}>No stationary items found.</Text>}
           />
         ) : (
-          <FlatList
-            data={requests}
-            keyExtractor={item => item.id}
-            renderItem={renderRequestItem}
-            contentContainerStyle={{ gap: 12 }}
-            ListEmptyComponent={<Text style={styles.emptyText}>No requests found.</Text>}
-          />
+          <>
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'flex-start', marginBottom: 16, gap: 12 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Approver Role</Text>
+                  <select 
+                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
+                  >
+                    <option value="All">All</option>
+                    <option value="Super Admin">Super Admin</option>
+                    <option value="Sub Admin">Sub Admin</option>
+                  </select>
+                </View>
+
+                <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Status</Text>
+                  <select 
+                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <option value="All">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </View>
+              </View>
+
+              <Pressable onPress={handleExportHistoryCSV} style={{ backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8 }}>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Export CSV</Text>
+              </Pressable>
+            </View>
+
+            <FlatList
+              data={filteredRequests}
+              keyExtractor={item => item.id}
+              renderItem={renderRequestItem}
+              contentContainerStyle={{ gap: 12 }}
+              ListEmptyComponent={<Text style={styles.emptyText}>No requests found.</Text>}
+            />
+          </>
         )}
       </View>
 
@@ -384,7 +499,23 @@ export default function SubAdminStationaryScreen() {
             <Text style={styles.label}>Item Name</Text>
             <TextInput style={styles.input} value={newItemName} onChangeText={setNewItemName} placeholder="e.g. A4 Paper Rim" />
             
-            <Text style={styles.label}>Initial Stock</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
+              <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
+              <Pressable onPress={() => setNewDynamicFields([...newDynamicFields, {key: '', value: ''}])} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
+                <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Field</Text>
+              </Pressable>
+            </View>
+            {newDynamicFields.map((field, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.key} onChangeText={(val) => { const newF = [...newDynamicFields]; newF[idx].key = val; setNewDynamicFields(newF); }} placeholder="e.g. Size" />
+                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.value} onChangeText={(val) => { const newF = [...newDynamicFields]; newF[idx].value = val; setNewDynamicFields(newF); }} placeholder="e.g. XL" />
+                <Pressable onPress={() => { const newF = [...newDynamicFields]; newF.splice(idx, 1); setNewDynamicFields(newF); }} style={{ justifyContent: 'center', paddingHorizontal: 8 }}>
+                  <X size={20} color={Colors.light.error} />
+                </Pressable>
+              </View>
+            ))}
+
+            <Text style={[styles.label, { marginTop: 12 }]}>Initial Stock</Text>
             <TextInput style={styles.input} value={newItemStock} onChangeText={setNewItemStock} keyboardType="numeric" />
 
             <View style={styles.modalActions}>
@@ -443,7 +574,23 @@ export default function SubAdminStationaryScreen() {
             <Text style={styles.label}>Item Name</Text>
             <TextInput style={styles.input} value={editItemName} onChangeText={setEditItemName} />
             
-            <Text style={styles.label}>Stock</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
+              <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
+              <Pressable onPress={() => setEditDynamicFields([...editDynamicFields, {key: '', value: ''}])} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
+                <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Field</Text>
+              </Pressable>
+            </View>
+            {editDynamicFields.map((field, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.key} onChangeText={(val) => { const newF = [...editDynamicFields]; newF[idx].key = val; setEditDynamicFields(newF); }} placeholder="e.g. Size" />
+                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.value} onChangeText={(val) => { const newF = [...editDynamicFields]; newF[idx].value = val; setEditDynamicFields(newF); }} placeholder="e.g. XL" />
+                <Pressable onPress={() => { const newF = [...editDynamicFields]; newF.splice(idx, 1); setEditDynamicFields(newF); }} style={{ justifyContent: 'center', paddingHorizontal: 8 }}>
+                  <X size={20} color={Colors.light.error} />
+                </Pressable>
+              </View>
+            ))}
+
+            <Text style={[styles.label, { marginTop: 12 }]}>Stock</Text>
             <TextInput style={styles.input} value={editItemStock} onChangeText={setEditItemStock} keyboardType="numeric" />
 
             <Text style={styles.label}>Status</Text>
@@ -491,24 +638,30 @@ export default function SubAdminStationaryScreen() {
                   <Text style={{ flex: 1, fontWeight: '700', color: Colors.light.icon, textAlign: 'center' }}>Approve Qty</Text>
                 </View>
 
-                {selectedRequest.items.map(item => (
-                  <View key={item.item_id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                    <Text style={{ flex: 2, fontSize: 15, fontWeight: '600', color: Colors.light.text }}>{item.name}</Text>
-                    <Text style={{ flex: 1, fontSize: 15, color: Colors.light.text, textAlign: 'center' }}>{item.requested_qty}</Text>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                      {selectedRequest.status === 'pending' ? (
-                        <TextInput 
-                          style={[styles.input, { marginBottom: 0, paddingVertical: 6, textAlign: 'center', width: 60 }]}
-                          value={approvalQuantities[item.item_id] || ''}
-                          onChangeText={(val) => setApprovalQuantities(prev => ({ ...prev, [item.item_id]: val }))}
-                          keyboardType="numeric"
-                        />
-                      ) : (
-                        <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '700' }}>{item.approved_qty}</Text>
-                      )}
+                {(!selectedRequest.items || selectedRequest.items.length === 0) ? (
+                  <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 20, fontStyle: 'italic', fontSize: 13 }}>
+                    The items in this request have been removed from the inventory system.
+                  </Text>
+                ) : (
+                  selectedRequest.items.map(item => (
+                    <View key={item.item_id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                      <Text style={{ flex: 2, fontSize: 15, fontWeight: '600', color: Colors.light.text }}>{item.name}</Text>
+                      <Text style={{ flex: 1, fontSize: 15, color: Colors.light.text, textAlign: 'center' }}>{item.requested_qty}</Text>
+                      <View style={{ flex: 1, alignItems: 'center' }}>
+                        {selectedRequest.status === 'pending' ? (
+                          <TextInput 
+                            style={[styles.input, { marginBottom: 0, paddingVertical: 6, textAlign: 'center', width: 60 }]}
+                            value={approvalQuantities[item.item_id] || ''}
+                            onChangeText={(val) => setApprovalQuantities(prev => ({ ...prev, [item.item_id]: val }))}
+                            keyboardType="numeric"
+                          />
+                        ) : (
+                          <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '700' }}>{item.approved_qty}</Text>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ))
+                )}
 
                 {selectedRequest.status === 'pending' && (
                   <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 32 }}>

@@ -18,6 +18,7 @@ type RequestHistory = {
   status: string;
   notes: string;
   created_at: string;
+  approved_by?: string;
   items: {
     id: string;
     item_id: string;
@@ -125,6 +126,10 @@ export default function EmployeeStationaryScreen() {
 
   const renderItemCard = ({ item }: { item: StationaryItem }) => {
     const qtyInCart = cart[item.id] || 0;
+    const parts = item.name.split(' | ');
+    const baseName = parts[0];
+    const details = parts.slice(1);
+
     return (
       <View style={[styles.itemCard, !isDesktop && styles.itemCardMobile]}>
         {item.image ? (
@@ -135,7 +140,16 @@ export default function EmployeeStationaryScreen() {
           </View>
         )}
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.itemName} numberOfLines={1}>{baseName}</Text>
+          {details.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, marginBottom: 4 }}>
+              {details.map((d, i) => (
+                <View key={i} style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 10, color: Colors.light.icon, fontWeight: '600' }}>{d}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           <Text style={styles.itemStock}>Available: {item.stock}</Text>
           
           <View style={styles.qtyContainer}>
@@ -158,6 +172,37 @@ export default function EmployeeStationaryScreen() {
         </View>
       </View>
     );
+  };
+
+  const handleExportHistoryCSV = () => {
+    if (Platform.OS === 'web') {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "ID,Date,Status,Approved By,Notes,Items\n";
+
+      requests.forEach(req => {
+        const date = new Date(req.created_at).toLocaleDateString();
+        const itemsStr = (req.items || []).map(i => `${i.name} (Req: ${i.requested_qty}, Appr: ${i.approved_qty})`).join('; ');
+        const row = [
+          req.id,
+          date,
+          req.status,
+          `"${req.approved_by || ''}"`,
+          `"${req.notes || ''}"`,
+          `"${itemsStr}"`
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `my_stationary_requests.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      Alert.alert('Notice', 'CSV Export is only supported on web right now.');
+    }
   };
 
   return (
@@ -195,7 +240,14 @@ export default function EmployeeStationaryScreen() {
             </View>
           )}
 
-          <Text style={[styles.sectionTitle, { marginTop: 40 }]}>Your Request History</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 40, marginBottom: 16 }}>
+            <Text style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Your Request History</Text>
+            {requests.length > 0 && (
+              <Pressable onPress={handleExportHistoryCSV} style={{ backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Export CSV</Text>
+              </Pressable>
+            )}
+          </View>
           {requests.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyDesc}>You haven't made any requests yet.</Text>
@@ -214,18 +266,27 @@ export default function EmployeeStationaryScreen() {
                     </View>
                   </View>
                   
+                  {req.approved_by && req.status !== 'pending' && (
+                    <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 8, fontWeight: '600' }}>Processed By: {req.approved_by.split(':')[0]}</Text>
+                  )}
                   {req.notes ? <Text style={styles.historyNotes}>Notes: {req.notes}</Text> : null}
                   
-                  <View style={styles.historyItemsList}>
-                    {req.items.map(i => (
-                      <View key={i.id} style={styles.historyItemRow}>
-                        <Text style={styles.historyItemName}>{i.name}</Text>
-                        <Text style={styles.historyItemQty}>
-                          Req: {i.requested_qty} {req.status !== 'pending' && req.status !== 'rejected' && `| Appr: ${i.approved_qty}`}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  {(!req.items || req.items.length === 0) ? (
+                    <Text style={{ fontStyle: 'italic', color: Colors.light.icon, fontSize: 13 }}>
+                      Items have been removed from inventory.
+                    </Text>
+                  ) : (
+                    <View style={styles.historyItemsList}>
+                      {req.items.map(i => (
+                        <View key={i.id} style={styles.historyItemRow}>
+                          <Text style={styles.historyItemName}>{i.name}</Text>
+                          <Text style={styles.historyItemQty}>
+                            Req: {i.requested_qty} {req.status !== 'pending' && req.status !== 'rejected' && `| Appr: ${i.approved_qty}`}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -244,11 +305,18 @@ export default function EmployeeStationaryScreen() {
                 <Text style={styles.emptyDesc}>Your cart is empty.</Text>
               ) : (
                 Object.keys(cart).map(itemId => {
-                  const item = items.find(i => i.id === itemId);
+                  const item = items.find(i => String(i.id) === String(itemId));
                   if (!item) return null;
                   return (
                     <View key={itemId} style={styles.cartItemRow}>
-                      <Text style={styles.cartItemName}>{item.name}</Text>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text style={styles.cartItemName}>{item.name.split(' | ')[0]}</Text>
+                        {item.name.includes(' | ') && (
+                          <Text style={{ fontSize: 11, color: Colors.light.icon, marginTop: 2 }}>
+                            {item.name.split(' | ').slice(1).join(', ')}
+                          </Text>
+                        )}
+                      </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 8, padding: 4 }}>
                         <Pressable style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }} onPress={() => updateCart(item.id, -1)}>
                           <Minus size={14} color={Colors.light.primary} />
@@ -279,7 +347,7 @@ export default function EmployeeStationaryScreen() {
 
             <View style={styles.modalActions}>
               <Pressable style={[styles.cancelBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setCartModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Close</Text>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
               {Object.keys(cart).length > 0 && (
                 <Pressable style={styles.submitBtn} onPress={submitRequest} disabled={submitting}>

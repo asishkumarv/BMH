@@ -39,6 +39,7 @@ export default function AdminAllowancesScreen() {
   const [reviewingTx, setReviewingTx] = useState<{id: string, status: 'approved' | 'rejected'} | null>(null);
   const [reviewPaymentMode, setReviewPaymentMode] = useState<'Cash'|'Online'>('Cash');
   const [reviewTxnId, setReviewTxnId] = useState('');
+  const [processingReview, setProcessingReview] = useState(false);
 
   // History Filters
   const [historySearchName, setHistorySearchName] = useState('');
