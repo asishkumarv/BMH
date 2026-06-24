@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
+import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 
 const MapPicker = ({ lat, lng }: any) => {
   if (Platform.OS === 'web') {
@@ -49,6 +50,9 @@ export default function SubAdminAttendanceDashboard() {
   const [radius, setRadius] = useState('2000');
   const [showConfig, setShowConfig] = useState(false);
   const [userDept, setUserDept] = useState('');
+  
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -126,14 +130,17 @@ export default function SubAdminAttendanceDashboard() {
   };
 
   const handleExportCSV = () => {
-    if (reports.length === 0) return;
-    const headers = ["ID", "Employee ID", "Name", "Date", "Check In", "Check Out", "Status", "Late Duration"];
-    const csvRows = [headers.join(',')];
-    reports.forEach(r => {
-      csvRows.push([r.id, r.employee_id, r.full_name, r.date, r.check_in, r.check_out, r.status, r.late_duration].join(','));
+    if (!reports || reports.length === 0) return;
+    
+    let csvContent = "Name,Check In,Check Out,Status,Breaks\n";
+    reports.forEach((r) => {
+      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
+      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
+      const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
+      
+      csvContent += `${r.full_name},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
-    const csvString = csvRows.join('\\n');
-    const blob = new Blob([csvString], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.setAttribute('href', url);
@@ -228,19 +235,49 @@ export default function SubAdminAttendanceDashboard() {
         
         <View style={styles.table}>
           <View style={styles.tableRowHeader}>
+            <Text style={[styles.tableCellHeader, {flex: 0.5}]}>In</Text>
             <Text style={styles.tableCellHeader}>Name</Text>
             <Text style={styles.tableCellHeader}>Check In</Text>
+            <Text style={styles.tableCellHeader}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
           </View>
-          {reports.slice(0, 10).map((r, i) => (
-            <View key={i} style={styles.tableRow}>
-              <Text style={styles.tableCell}>{r.full_name}</Text>
-              <Text style={styles.tableCell}>{new Date(r.check_in).toLocaleTimeString()}</Text>
+          {reports.map((r, i) => (
+            <TouchableOpacity 
+              key={i} 
+              style={styles.tableRow}
+              onPress={() => {
+                setSelectedEmployeeId(r.employee_id);
+                setModalVisible(true);
+              }}
+            >
+              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+              </View>
+              <Text style={[styles.tableCell, {fontWeight: '500'}]}>{r.full_name}</Text>
+              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+              <View style={[styles.tableCell, {flex: 1.5}]}>
+                {r.breaks && r.breaks.length > 0 ? (
+                  r.breaks.map((b: any, bi: number) => (
+                    <Text key={bi} style={{fontSize: 11, color: '#6b7280'}}>
+                      {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
+                  ))
+                ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
+              </View>
               <Text style={styles.tableCell}>{r.status}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </View>
+
+      <EmployeeAnalyticsModal 
+        visible={modalVisible} 
+        onClose={() => setModalVisible(false)} 
+        employeeId={selectedEmployeeId} 
+      />
     </ScrollView>
   );
 }
@@ -264,5 +301,7 @@ const styles = StyleSheet.create({
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
   tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
   tableCellHeader: { flex: 1, fontWeight: 'bold', color: '#374151' },
-  tableCell: { flex: 1, color: '#4b5563' }
+  tableCell: { flex: 1, color: '#4b5563', justifyContent: 'center' },
+  thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
 });

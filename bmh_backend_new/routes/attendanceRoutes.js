@@ -11,5 +11,6 @@ router.post('/break', attendanceController.markBreak);
 // Analytics
 router.get('/summary', analyticsController.getAttendanceSummary);
 router.get('/reports', analyticsController.getAdvancedReports);
+router.get('/employee-analytics', analyticsController.getEmployeeAnalytics);
 
 module.exports = router;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image } from 'react-native';
 import axios from 'axios';
 import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
+import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 
 const Dropdown = ({ options, value, onChange }: any) => {
   const [open, setOpen] = useState(false);
@@ -90,6 +91,11 @@ export default function AdminAttendanceDashboard() {
   const [radius, setRadius] = useState('2000');
   const [showConfig, setShowConfig] = useState(false);
 
+  // New states for Reports
+  const [selectedReportDept, setSelectedReportDept] = useState('All');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
   useEffect(() => {
     fetchData();
 
@@ -108,29 +114,44 @@ export default function AdminAttendanceDashboard() {
     }
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchReports = async (dept: string) => {
     try {
+      const url = dept === 'All' 
+        ? `https://bmh-eitu.onrender.com/attendance/reports?date=${new Date().toISOString().split('T')[0]}`
+        : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}&date=${new Date().toISOString().split('T')[0]}`;
+      const res = await axios.get(url);
+      if (res.data.success) {
+        setReports(res.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
       const sumRes = await axios.get('https://bmh-eitu.onrender.com/attendance/summary');
       if (sumRes.data.success) {
         setSummary(sumRes.data.summary);
       }
-      
-      const repRes = await axios.get('https://bmh-eitu.onrender.com/attendance/reports');
-      if (repRes.data.success) {
-        setReports(repRes.data.data);
-      }
 
-      const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+      await fetchReports(selectedReportDept);
+
+      const deptRes = await axios.get('https://bmh-eitu.onrender.com/departments');
       if (deptRes.data.success) {
         setDepartments(deptRes.data.data);
       }
-    } catch (err) {
-      console.log('Error fetching admin attendance data', err);
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchReports(selectedReportDept);
+  }, [selectedReportDept]);
 
   const handleUpdateConfig = async () => {
     if (!deptName || !lat || !lng || !radius) {
@@ -160,23 +181,15 @@ export default function AdminAttendanceDashboard() {
   };
 
   const handleExportCSV = () => {
-    if (reports.length === 0) return;
+    if (!reports || reports.length === 0) return;
     
-    const headers = ["ID", "Employee ID", "Name", "Department", "Date", "Check In", "Check Out", "Status", "Late Duration"];
-    const csvRows = [headers.join(',')];
-    
-    reports.forEach(r => {
-      csvRows.push([
-        r.id,
-        r.employee_id,
-        r.full_name,
-        r.department,
-        r.date,
-        r.check_in,
-        r.check_out,
-        r.status,
-        r.late_duration
-      ].join(','));
+    let csvContent = "Name,Department,Check In,Check Out,Status,Breaks\n";
+    reports.forEach((r) => {
+      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
+      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
+      const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
+      
+      csvContent += `${r.full_name},${r.department},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
     
     const csvString = csvRows.join('\\n');
@@ -287,23 +300,67 @@ export default function AdminAttendanceDashboard() {
           </TouchableOpacity>
         </View>
         
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flex: 1, marginRight: 15}}>
+            {['All', ...departments.map(d => d.name)].map((dept) => (
+              <TouchableOpacity 
+                key={dept} 
+                style={[styles.tab, selectedReportDept === dept && styles.activeTab]}
+                onPress={() => setSelectedReportDept(dept)}
+              >
+                <Text style={[styles.tabText, selectedReportDept === dept && styles.activeTabText]}>{dept}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         <View style={styles.table}>
           <View style={styles.tableRowHeader}>
+            <Text style={[styles.tableCellHeader, {flex: 0.5}]}>In</Text>
             <Text style={styles.tableCellHeader}>Name</Text>
             <Text style={styles.tableCellHeader}>Dept</Text>
             <Text style={styles.tableCellHeader}>Check In</Text>
+            <Text style={styles.tableCellHeader}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
           </View>
-          {reports.slice(0, 10).map((r, i) => (
-            <View key={i} style={styles.tableRow}>
-              <Text style={styles.tableCell}>{r.full_name}</Text>
+          {reports.map((r, i) => (
+            <TouchableOpacity 
+              key={i} 
+              style={styles.tableRow}
+              onPress={() => {
+                setSelectedEmployeeId(r.employee_id);
+                setModalVisible(true);
+              }}
+            >
+              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+              </View>
+              <Text style={[styles.tableCell, {fontWeight: '500'}]}>{r.full_name}</Text>
               <Text style={styles.tableCell}>{r.department}</Text>
-              <Text style={styles.tableCell}>{new Date(r.check_in).toLocaleTimeString()}</Text>
+              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+              <View style={[styles.tableCell, {flex: 1.5}]}>
+                {r.breaks && r.breaks.length > 0 ? (
+                  r.breaks.map((b: any, bi: number) => (
+                    <Text key={bi} style={{fontSize: 11, color: '#6b7280'}}>
+                      {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
+                  ))
+                ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
+              </View>
               <Text style={styles.tableCell}>{r.status}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </View>
+
+      <EmployeeAnalyticsModal 
+        visible={modalVisible} 
+        onClose={() => setModalVisible(false)} 
+        employeeId={selectedEmployeeId} 
+      />
     </ScrollView>
   );
 }
@@ -327,5 +384,11 @@ const styles = StyleSheet.create({
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
   tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
   tableCellHeader: { flex: 1, fontWeight: 'bold', color: '#374151' },
-  tableCell: { flex: 1, color: '#4b5563' }
+  tableCell: { flex: 1, color: '#4b5563', justifyContent: 'center' },
+  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f3f4f6', marginRight: 10 },
+  activeTab: { backgroundColor: '#3b82f6' },
+  tabText: { color: '#4b5563', fontWeight: '500' },
+  activeTabText: { color: 'white' },
+  thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
 });

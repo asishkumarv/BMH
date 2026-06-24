@@ -195,10 +195,10 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
 
       const updateResult = await pool.query(
         `UPDATE attendance 
-         SET checkout_timestamp = CURRENT_TIMESTAMP
+         SET checkout_timestamp = CURRENT_TIMESTAMP, checkout_image_url = $2
          WHERE employee_id = $1 AND date = CURRENT_DATE
          RETURNING id, checkout_timestamp`,
-        [employeeId]
+        [employeeId, storedCapturedUrl]
       );
 
       return res.json({

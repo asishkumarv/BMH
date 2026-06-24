@@ -81,7 +81,16 @@ exports.getAdvancedReports = async (req, res) => {
     const { department, status, startDate, endDate, employeeId } = req.query;
 
     let query = `
-      SELECT a.id, a.employee_id, e.full_name, e.department, a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status, a.late_duration
+      SELECT 
+        a.id, a.employee_id, e.full_name, e.department, a.date, 
+        a.timestamp as check_in, a.checkout_timestamp as check_out, 
+        a.image_url as check_in_image, a.checkout_image_url as check_out_image,
+        a.status, a.late_duration,
+        (
+          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp, 'status', bl.status))
+          FROM break_logs bl
+          WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
+        ) as breaks
       FROM attendance a
       JOIN employees e ON a.employee_id = e.id
       WHERE 1=1
@@ -113,6 +122,102 @@ exports.getAdvancedReports = async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error("Advanced reports error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getEmployeeAnalytics = async (req, res) => {
+  try {
+    const { employeeId } = req.query;
+    if (!employeeId) return res.status(400).json({ success: false, message: "Missing employeeId" });
+
+    // Fetch employee details
+    const empResult = await pool.query('SELECT full_name, department, schedule_in, schedule_out FROM employees WHERE id = $1', [employeeId]);
+    if (empResult.rowCount === 0) return res.status(404).json({ success: false, message: "Employee not found" });
+    const emp = empResult.rows[0];
+
+    // Fetch all attendance records with breaks
+    const attendanceQuery = `
+      SELECT 
+        a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status,
+        (
+          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp))
+          FROM break_logs bl
+          WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
+        ) as breaks
+      FROM attendance a
+      WHERE a.employee_id = $1
+      ORDER BY a.date DESC
+    `;
+    const attResult = await pool.query(attendanceQuery, [employeeId]);
+    const history = attResult.rows;
+
+    let totalWorkMs = 0;
+    let validWorkDays = 0;
+    let earlyCheckInCount = 0;
+    let lateCheckInCount = 0;
+
+    history.forEach(row => {
+      // Calculate work hours
+      if (row.check_in && row.check_out) {
+        const inDate = new Date(row.check_in);
+        const outDate = new Date(row.check_out);
+        let workMs = outDate.getTime() - inDate.getTime();
+        
+        // Subtract break times
+        if (row.breaks && row.breaks.length > 0) {
+          // Sort breaks chronologically
+          row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          let currentBreakIn = null;
+          row.breaks.forEach(b => {
+            if (b.break_type === 'Break In') {
+              currentBreakIn = new Date(b.timestamp);
+            } else if (b.break_type === 'Break Out' && currentBreakIn) {
+              const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+              workMs -= breakDuration;
+              currentBreakIn = null;
+            }
+          });
+        }
+        totalWorkMs += workMs;
+        validWorkDays++;
+      }
+
+      // Early / Late check in
+      if (row.check_in && emp.schedule_in) {
+        // Parse schedule_in (e.g. "09:00" or "09:00:00")
+        const [schedHour, schedMin] = emp.schedule_in.split(':').map(Number);
+        const inDate = new Date(row.check_in);
+        const schedTime = new Date(inDate);
+        schedTime.setHours(schedHour, schedMin, 0, 0);
+
+        if (inDate.getTime() < schedTime.getTime()) {
+          earlyCheckInCount++;
+        } else if (inDate.getTime() > schedTime.getTime() + (15 * 60 * 1000)) { // 15 min grace period
+          lateCheckInCount++;
+        }
+      }
+    });
+
+    const avgWorkMs = validWorkDays > 0 ? (totalWorkMs / validWorkDays) : 0;
+    const avgWorkHours = avgWorkMs / (1000 * 60 * 60);
+
+    const earlyPercent = history.length > 0 ? ((earlyCheckInCount / history.length) * 100).toFixed(1) : 0;
+    const latePercent = history.length > 0 ? ((lateCheckInCount / history.length) * 100).toFixed(1) : 0;
+
+    res.json({
+      success: true,
+      employee: emp,
+      analytics: {
+        avgWorkHours: avgWorkHours.toFixed(1),
+        earlyCheckInPercent: earlyPercent,
+        lateCheckInPercent: latePercent,
+        totalDaysPresent: history.length
+      },
+      history
+    });
+  } catch (error) {
+    console.error("Employee analytics error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
