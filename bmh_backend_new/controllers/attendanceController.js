@@ -253,3 +253,68 @@ exports.markBreak = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+exports.getEmployeeDashboardStatus = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+
+    // 1. Get today's attendance
+    const attResult = await pool.query(
+      `SELECT id, timestamp as check_in, checkout_timestamp as check_out, status 
+       FROM attendance WHERE employee_id = $1 AND date = CURRENT_DATE LIMIT 1`,
+      [employeeId]
+    );
+
+    // 2. Get last break log today
+    const breakResult = await pool.query(
+      `SELECT break_type, timestamp FROM break_logs 
+       WHERE employee_id = $1 AND DATE(timestamp) = CURRENT_DATE 
+       ORDER BY timestamp DESC LIMIT 1`,
+      [employeeId]
+    );
+
+    // 3. Get pending task counts
+    const taskResult = await pool.query(
+      `SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status IN ('pending', 'in_progress')`,
+      [employeeId]
+    );
+
+    let att = attResult.rowCount > 0 ? attResult.rows[0] : null;
+    let lastBreak = breakResult.rowCount > 0 ? breakResult.rows[0] : null;
+    
+    let state = {
+      status_string: "Off Duty",
+      can_check_in: false,
+      can_break_in: false,
+      can_break_out: false,
+      can_check_out: false,
+      check_in_time: null,
+      check_out_time: null,
+      pending_tasks: parseInt(taskResult.rows[0].count, 10) || 0
+    };
+
+    if (!att) {
+      state.status_string = "Off Duty";
+      state.can_check_in = true;
+    } else if (att.check_out) {
+      state.status_string = "Off Duty";
+      state.check_in_time = att.check_in;
+      state.check_out_time = att.check_out;
+    } else {
+      state.check_in_time = att.check_in;
+      if (lastBreak && lastBreak.break_type === "Break In") {
+        state.status_string = "On Break";
+        state.can_break_out = true;
+      } else {
+        state.status_string = "On Duty";
+        state.can_break_in = true;
+        state.can_check_out = true;
+      }
+    }
+
+    res.json({ success: true, data: state });
+  } catch (error) {
+    console.error("Dashboard status error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};

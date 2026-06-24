@@ -82,7 +82,7 @@ exports.getAdvancedReports = async (req, res) => {
 
     let query = `
       SELECT 
-        a.id, a.employee_id, e.full_name, e.department, e.email, e.mobile, a.date, 
+        a.id, a.employee_id, e.full_name, e.department, e.email, e.mobile, e.profile_data, a.date, 
         a.timestamp as check_in, a.checkout_timestamp as check_out, 
         a.image_url as check_in_image, a.checkout_image_url as check_out_image,
         a.status, a.late_duration,
@@ -119,7 +119,71 @@ exports.getAdvancedReports = async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    res.json({ success: true, data: result.rows });
+    const processedData = result.rows.map(row => {
+      let late_checkin_mins = 0, early_checkin_mins = 0;
+      let late_checkout_mins = 0, early_checkout_mins = 0;
+      let extra_break_mins = 0;
+
+      let shiftIn = null, shiftOut = null, breakStart = null, breakEnd = null;
+      if (row.profile_data) {
+        let pdata = typeof row.profile_data === 'string' ? JSON.parse(row.profile_data) : row.profile_data;
+        shiftIn = pdata.shiftIn;
+        shiftOut = pdata.shiftOut;
+        breakStart = pdata.breakStart;
+        breakEnd = pdata.breakEnd;
+      }
+
+      const parseTime = (timeStr, baseDate) => {
+        if (!timeStr) return null;
+        const [h, m] = timeStr.split(':').map(Number);
+        const d = new Date(baseDate);
+        d.setHours(h, m, 0, 0);
+        return d.getTime();
+      };
+
+      if (row.check_in && shiftIn) {
+        const inTime = new Date(row.check_in).getTime();
+        const schedTime = parseTime(shiftIn, row.check_in);
+        const diffMins = (inTime - schedTime) / 60000;
+        if (diffMins > 0) late_checkin_mins = Math.round(diffMins);
+        else if (diffMins < 0) early_checkin_mins = Math.round(Math.abs(diffMins));
+      }
+
+      if (row.check_out && shiftOut) {
+        const outTime = new Date(row.check_out).getTime();
+        const schedTime = parseTime(shiftOut, row.check_out);
+        const diffMins = (outTime - schedTime) / 60000;
+        if (diffMins > 0) late_checkout_mins = Math.round(diffMins);
+        else if (diffMins < 0) early_checkout_mins = Math.round(Math.abs(diffMins));
+      }
+
+      // Calculate break overstay
+      if (row.breaks && row.breaks.length > 0 && breakStart && breakEnd) {
+        const schedBreakMins = (parseTime(breakEnd, row.date) - parseTime(breakStart, row.date)) / 60000;
+        
+        let totalBreakMins = 0;
+        row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        let currentBreakIn = null;
+        row.breaks.forEach(b => {
+          if (b.break_type === 'Break In') {
+            currentBreakIn = new Date(b.timestamp);
+          } else if (b.break_type === 'Break Out' && currentBreakIn) {
+            const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+            totalBreakMins += breakDuration / 60000;
+            currentBreakIn = null;
+          }
+        });
+        
+        if (totalBreakMins > schedBreakMins && schedBreakMins > 0) {
+          extra_break_mins = Math.round(totalBreakMins - schedBreakMins);
+        }
+      }
+
+      const { profile_data, ...rest } = row; // remove raw profile data
+      return { ...rest, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
+    });
+
+    res.json({ success: true, data: processedData });
   } catch (error) {
     console.error("Advanced reports error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -132,9 +196,18 @@ exports.getEmployeeAnalytics = async (req, res) => {
     if (!employeeId) return res.status(400).json({ success: false, message: "Missing employeeId" });
 
     // Fetch employee details
-    const empResult = await pool.query('SELECT full_name, email, mobile, department, schedule_in, schedule_out FROM employees WHERE id = $1', [employeeId]);
+    const empResult = await pool.query('SELECT full_name, email, mobile, department, profile_data FROM employees WHERE id = $1', [employeeId]);
     if (empResult.rowCount === 0) return res.status(404).json({ success: false, message: "Employee not found" });
     const emp = empResult.rows[0];
+    
+    let shiftIn = null, shiftOut = null, breakStart = null, breakEnd = null;
+    if (emp.profile_data) {
+      let pdata = typeof emp.profile_data === 'string' ? JSON.parse(emp.profile_data) : emp.profile_data;
+      shiftIn = pdata.shiftIn;
+      shiftOut = pdata.shiftOut;
+      breakStart = pdata.breakStart;
+      breakEnd = pdata.breakEnd;
+    }
 
     // Fetch all attendance records with breaks
     const attendanceQuery = `
@@ -185,9 +258,8 @@ exports.getEmployeeAnalytics = async (req, res) => {
       }
 
       // Early / Late check in
-      if (row.check_in && emp.schedule_in) {
-        // Parse schedule_in (e.g. "09:00" or "09:00:00")
-        const [schedHour, schedMin] = emp.schedule_in.split(':').map(Number);
+      if (row.check_in && shiftIn) {
+        const [schedHour, schedMin] = shiftIn.split(':').map(Number);
         const inDate = new Date(row.check_in);
         const schedTime = new Date(inDate);
         schedTime.setHours(schedHour, schedMin, 0, 0);

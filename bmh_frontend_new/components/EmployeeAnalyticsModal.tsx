@@ -122,6 +122,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                       <Text style={styles.tableCellHeader}>Date</Text>
                       <Text style={styles.tableCellHeader}>Check In</Text>
                       <Text style={styles.tableCellHeader}>Check Out</Text>
+                      <Text style={styles.tableCellHeader}>Deviation</Text>
                       <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
                     </View>
                     {data.history.map((row: any, idx: number) => (
@@ -133,6 +134,12 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                         <Text style={styles.tableCell}>{new Date(row.date).toLocaleDateString()}</Text>
                         <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                         <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+                        <View style={[styles.tableCell, { justifyContent: 'center' }]}>
+                          {row.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {row.late_checkin_mins}m</Text> : null}
+                          {row.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {row.early_checkout_mins}m</Text> : null}
+                          {row.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {row.extra_break_mins}m</Text> : null}
+                          {(!row.late_checkin_mins && !row.early_checkout_mins && !row.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+                        </View>
                         <View style={[styles.tableCell, { flex: 2 }]}>
                           <ScrollView>
                             {row.breaks && row.breaks.length > 0 ? (

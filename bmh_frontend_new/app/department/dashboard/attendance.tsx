@@ -240,6 +240,7 @@ export default function SubAdminAttendanceDashboard() {
             <Text style={styles.tableCellHeader}>Name</Text>
             <Text style={styles.tableCellHeader}>Check In</Text>
             <Text style={styles.tableCellHeader}>Check Out</Text>
+            <Text style={styles.tableCellHeader}>Deviation</Text>
             <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
           </View>
@@ -263,6 +264,12 @@ export default function SubAdminAttendanceDashboard() {
               </View>
               <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
               <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+              <View style={[styles.tableCell, { justifyContent: 'center' }]}>
+                {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {r.late_checkin_mins}m</Text> : null}
+                {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {r.early_checkout_mins}m</Text> : null}
+                {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {r.extra_break_mins}m</Text> : null}
+                {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+              </View>
               <View style={[styles.tableCell, {flex: 1.5}]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (

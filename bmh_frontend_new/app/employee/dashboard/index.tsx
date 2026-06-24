@@ -36,10 +36,9 @@ export default function EmployeeDashboardScreen() {
 
   const fetchSummary = async (empId: number) => {
     try {
-      const res = await axios.get('https://bmh-eitu.onrender.com/attendance/reports?employeeId=' + empId);
-      if (res.data.success && res.data.data.length > 0) {
-        const todayRecord = res.data.data.find((r: any) => new Date(r.date).toDateString() === new Date().toDateString());
-        setSummary(todayRecord || null);
+      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/employee-dashboard/${empId}`);
+      if (res.data.success) {
+        setSummary(res.data.data);
       } else {
         setSummary(null);
       }
@@ -175,30 +174,47 @@ export default function EmployeeDashboardScreen() {
         <View style={[styles.card, { flex: 2, minWidth: 300 }]}>
           <Text style={styles.cardTitle}>Quick Actions</Text>
           <View style={styles.actionGrid}>
-            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => animateButton(() => handleAction('login'))}>
-                <PlayCircle color="white" size={24} style={{marginBottom: 8}} />
-                <Text style={styles.actionText}>Check In</Text>
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#ef4444' }]} onPress={() => animateButton(() => handleAction('logout'))}>
-                <StopCircle color="white" size={24} style={{marginBottom: 8}} />
-                <Text style={styles.actionText}>Check Out</Text>
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => animateButton(() => handleAction('Break In'))}>
-                <Coffee color="white" size={24} style={{marginBottom: 8}} />
-                <Text style={styles.actionText}>Break In</Text>
-              </TouchableOpacity>
-            </Animated.View>
-            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={() => animateButton(() => handleAction('Break Out'))}>
-                <Coffee color="white" size={24} style={{marginBottom: 8}} />
-                <Text style={styles.actionText}>Break Out</Text>
-              </TouchableOpacity>
-            </Animated.View>
+            {!summary || summary.can_check_in ? (
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => animateButton(() => handleAction('login'))}>
+                  <PlayCircle color="white" size={24} style={{marginBottom: 8}} />
+                  <Text style={styles.actionText}>Check In</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
+
+            {summary && summary.can_check_out ? (
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#ef4444' }]} onPress={() => animateButton(() => handleAction('logout'))}>
+                  <StopCircle color="white" size={24} style={{marginBottom: 8}} />
+                  <Text style={styles.actionText}>Check Out</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
+
+            {summary && summary.can_break_in ? (
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => animateButton(() => handleAction('Break In'))}>
+                  <Coffee color="white" size={24} style={{marginBottom: 8}} />
+                  <Text style={styles.actionText}>Break In</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
+
+            {summary && summary.can_break_out ? (
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={() => animateButton(() => handleAction('Break Out'))}>
+                  <Coffee color="white" size={24} style={{marginBottom: 8}} />
+                  <Text style={styles.actionText}>Break Out</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
+            
+            {summary && !summary.can_check_in && !summary.can_check_out && !summary.can_break_in && !summary.can_break_out ? (
+              <View style={{ width: '100%', alignItems: 'center', padding: 20 }}>
+                <Text style={{ color: Colors.light.icon, fontSize: 16 }}>Your attendance for today is completed.</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -206,19 +222,19 @@ export default function EmployeeDashboardScreen() {
         <View style={styles.card}>
           <Clock color={Colors.light.primary} size={32} style={{ marginBottom: 16 }} />
           <Text style={styles.cardTitle}>Attendance Status</Text>
-          <Text style={styles.cardValue}>{summary ? summary.status : "Pending"}</Text>
+          <Text style={styles.cardValue}>{summary ? summary.status_string : "Off Duty"}</Text>
           <Text style={styles.cardSub}>
             {summary 
-              ? (summary.check_out 
-                  ? `Checked out at ${new Date(summary.check_out).toLocaleTimeString()}` 
-                  : `Checked in at ${new Date(summary.check_in).toLocaleTimeString()}`) 
+              ? (summary.check_out_time 
+                  ? `Checked out at ${new Date(summary.check_out_time).toLocaleTimeString()}` 
+                  : (summary.check_in_time ? `Checked in at ${new Date(summary.check_in_time).toLocaleTimeString()}` : "Mark your attendance for today.")) 
               : "Mark your attendance for today."}
           </Text>
         </View>
         <View style={styles.card}>
           <Users color={Colors.light.secondary} size={32} style={{ marginBottom: 16 }} />
           <Text style={styles.cardTitle}>Assigned Tasks</Text>
-          <Text style={styles.cardValue}>0</Text>
+          <Text style={styles.cardValue}>{summary ? summary.pending_tasks : 0}</Text>
           <Text style={styles.cardSub}>Tasks pending completion.</Text>
         </View>
       </View>
