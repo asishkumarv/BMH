@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { Users, Clock, PlayCircle, StopCircle, Coffee } from 'lucide-react-native';
+import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks } from 'lucide-react-native';
 
 export default function EmployeeDashboardScreen() {
   const { isDesktop } = useResponsive();
@@ -22,6 +22,16 @@ export default function EmployeeDashboardScreen() {
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.03, duration: 1500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -36,7 +46,7 @@ export default function EmployeeDashboardScreen() {
 
   const fetchSummary = async (empId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/employee-dashboard/${empId}`);
+      const res = await axios.get(`http://localhost:5000/attendance/employee-dashboard/${empId}`);
       if (res.data.success) {
         setSummary(res.data.data);
       } else {
@@ -169,73 +179,104 @@ export default function EmployeeDashboardScreen() {
         <Text style={styles.subtitle}>{user.role} | {user.department}</Text>
       </View>
 
-      <View style={styles.grid}>
-        {/* Attendance Action Card */}
-        <View style={[styles.card, { flex: 2, minWidth: 300 }]}>
-          <Text style={styles.cardTitle}>Quick Actions</Text>
-          <View style={styles.actionGrid}>
+      <View style={{ gap: 24 }}>
+        {/* Row 1: Status & Tasks */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' }]}>
+            <Clock color="#4f46e5" size={28} style={{ marginBottom: 12 }} />
+            <Text style={[styles.statTitle, { color: '#4f46e5' }]}>Attendance</Text>
+            <Text style={[styles.statValue, { color: '#3730a3' }]}>{summary ? summary.status_string : "Off Duty"}</Text>
+            <Text style={styles.statSub}>
+              {summary 
+                ? (summary.check_out_time 
+                    ? `Checked out: ${new Date(summary.check_out_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` 
+                    : (summary.check_in_time ? `Checked in: ${new Date(summary.check_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : "Start your day!")) 
+                : "Start your day!"}
+            </Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: '#f3e8ff', borderColor: '#e9d5ff' }]}>
+            <ListTodo color="#9333ea" size={28} style={{ marginBottom: 12 }} />
+            <Text style={[styles.statTitle, { color: '#9333ea' }]}>Total Tasks</Text>
+            <Text style={[styles.statValue, { color: '#6b21a8' }]}>{summary ? summary.total_tasks : 0}</Text>
+            <Text style={styles.statSub}>Assigned to you</Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
+            <Clock color="#d97706" size={28} style={{ marginBottom: 12 }} />
+            <Text style={[styles.statTitle, { color: '#d97706' }]}>Pending</Text>
+            <Text style={[styles.statValue, { color: '#b45309' }]}>{summary ? summary.pending_tasks : 0}</Text>
+            <Text style={styles.statSub}>Needs attention</Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: '#d1fae5', borderColor: '#a7f3d0' }]}>
+            <ListChecks color="#059669" size={28} style={{ marginBottom: 12 }} />
+            <Text style={[styles.statTitle, { color: '#059669' }]}>Completed</Text>
+            <Text style={[styles.statValue, { color: '#047857' }]}>{summary ? summary.completed_tasks : 0}</Text>
+            <Text style={styles.statSub}>Great job!</Text>
+          </View>
+        </View>
+
+        {/* Row 2: Actions */}
+        <View style={styles.actionSection}>
+          <Text style={styles.sectionTitle}>What would you like to do?</Text>
+          <View style={styles.cuteActionGrid}>
             {!summary || summary.can_check_in ? (
-              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => animateButton(() => handleAction('login'))}>
-                  <PlayCircle color="white" size={24} style={{marginBottom: 8}} />
-                  <Text style={styles.actionText}>Check In</Text>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
+                <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#10b981', borderColor: '#34d399' }]} onPress={() => animateButton(() => handleAction('login'))}>
+                  <View style={styles.iconCircle}>
+                    <Sun color="#10b981" size={32} />
+                  </View>
+                  <Text style={styles.cuteActionText}>Morning Check In</Text>
+                  <Text style={styles.cuteActionSub}>Start your shift</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
 
             {summary && summary.can_check_out ? (
-              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#ef4444' }]} onPress={() => animateButton(() => handleAction('logout'))}>
-                  <StopCircle color="white" size={24} style={{marginBottom: 8}} />
-                  <Text style={styles.actionText}>Check Out</Text>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
+                <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#f43f5e', borderColor: '#fb7185' }]} onPress={() => animateButton(() => handleAction('logout'))}>
+                  <View style={styles.iconCircle}>
+                    <Moon color="#f43f5e" size={32} />
+                  </View>
+                  <Text style={styles.cuteActionText}>Evening Check Out</Text>
+                  <Text style={styles.cuteActionSub}>End your day</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
 
             {summary && summary.can_break_in ? (
-              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => animateButton(() => handleAction('Break In'))}>
-                  <Coffee color="white" size={24} style={{marginBottom: 8}} />
-                  <Text style={styles.actionText}>Break In</Text>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
+                <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#f59e0b', borderColor: '#fbbf24' }]} onPress={() => animateButton(() => handleAction('Break In'))}>
+                  <View style={styles.iconCircle}>
+                    <Utensils color="#f59e0b" size={32} />
+                  </View>
+                  <Text style={styles.cuteActionText}>Take a Break</Text>
+                  <Text style={styles.cuteActionSub}>Grab some food</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
 
             {summary && summary.can_break_out ? (
-              <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={() => animateButton(() => handleAction('Break Out'))}>
-                  <Coffee color="white" size={24} style={{marginBottom: 8}} />
-                  <Text style={styles.actionText}>Break Out</Text>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
+                <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#3b82f6', borderColor: '#60a5fa' }]} onPress={() => animateButton(() => handleAction('Break Out'))}>
+                  <View style={styles.iconCircle}>
+                    <CheckCircle2 color="#3b82f6" size={32} />
+                  </View>
+                  <Text style={styles.cuteActionText}>Back to Work</Text>
+                  <Text style={styles.cuteActionSub}>Resume your shift</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
             
             {summary && !summary.can_check_in && !summary.can_check_out && !summary.can_break_in && !summary.can_break_out ? (
-              <View style={{ width: '100%', alignItems: 'center', padding: 20 }}>
-                <Text style={{ color: Colors.light.icon, fontSize: 16 }}>Your attendance for today is completed.</Text>
+              <View style={styles.allDoneBox}>
+                <CheckCircle2 color="#10b981" size={48} style={{ marginBottom: 12 }} />
+                <Text style={styles.allDoneText}>You're all done for today!</Text>
+                <Text style={styles.allDoneSub}>Have a wonderful rest of your day.</Text>
               </View>
             ) : null}
           </View>
-        </View>
-
-        {/* Existing Status Cards */}
-        <View style={styles.card}>
-          <Clock color={Colors.light.primary} size={32} style={{ marginBottom: 16 }} />
-          <Text style={styles.cardTitle}>Attendance Status</Text>
-          <Text style={styles.cardValue}>{summary ? summary.status_string : "Off Duty"}</Text>
-          <Text style={styles.cardSub}>
-            {summary 
-              ? (summary.check_out_time 
-                  ? `Checked out at ${new Date(summary.check_out_time).toLocaleTimeString()}` 
-                  : (summary.check_in_time ? `Checked in at ${new Date(summary.check_in_time).toLocaleTimeString()}` : "Mark your attendance for today.")) 
-              : "Mark your attendance for today."}
-          </Text>
-        </View>
-        <View style={styles.card}>
-          <Users color={Colors.light.secondary} size={32} style={{ marginBottom: 16 }} />
-          <Text style={styles.cardTitle}>Assigned Tasks</Text>
-          <Text style={styles.cardValue}>{summary ? summary.pending_tasks : 0}</Text>
-          <Text style={styles.cardSub}>Tasks pending completion.</Text>
         </View>
       </View>
     </View>
@@ -243,19 +284,26 @@ export default function EmployeeDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 32, backgroundColor: Colors.light.background },
+  container: { flex: 1, padding: 32, backgroundColor: '#f8fafc' },
   containerMobile: { padding: 16 },
   header: { marginBottom: 32 },
   title: { fontSize: 32, fontWeight: '800', color: Colors.light.text },
   subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
-  card: { flex: 1, minWidth: 250, backgroundColor: '#fff', padding: 24, borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 16 },
-  cardValue: { fontSize: 32, fontWeight: '800', color: Colors.light.primary, marginBottom: 8 },
-  cardSub: { fontSize: 13, color: Colors.light.icon },
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
-  actionBtn: { padding: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: {width: 0, height: 2} },
-  actionText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  statCard: { flex: 1, minWidth: 160, padding: 24, borderRadius: 20, borderWidth: 2 },
+  statTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontSize: 36, fontWeight: '900', marginBottom: 8 },
+  statSub: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  actionSection: { marginTop: 16, backgroundColor: '#ffffff', padding: 32, borderRadius: 24, shadowColor: '#cbd5e1', shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: {width: 0, height: 10}, elevation: 5 },
+  sectionTitle: { fontSize: 22, fontWeight: '800', color: '#1e293b', marginBottom: 24 },
+  cuteActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, justifyContent: 'center' },
+  cuteActionBtn: { padding: 24, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 3 },
+  iconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  cuteActionText: { color: 'white', fontWeight: '900', fontSize: 18, marginBottom: 4 },
+  cuteActionSub: { color: 'rgba(255,255,255,0.8)', fontWeight: '600', fontSize: 14 },
+  allDoneBox: { alignItems: 'center', justifyContent: 'center', padding: 40, width: '100%' },
+  allDoneText: { fontSize: 24, fontWeight: '800', color: '#10b981' },
+  allDoneSub: { fontSize: 16, color: '#6b7280', marginTop: 8 },
   cameraOverlay: { position: 'absolute', bottom: 40, width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20 },
   captureBtn: { backgroundColor: Colors.light.primary, paddingVertical: 15, paddingHorizontal: 30, borderRadius: 30, elevation: 5 },
   captureBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 }

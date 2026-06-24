@@ -275,7 +275,11 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
 
     // 3. Get pending task counts
     const taskResult = await pool.query(
-      `SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status IN ('pending', 'in_progress')`,
+      `SELECT 
+         COUNT(*) as total_tasks,
+         SUM(CASE WHEN status IN ('pending', 'in_progress') THEN 1 ELSE 0 END) as pending_tasks,
+         SUM(CASE WHEN status IN ('completed', 'resolved') THEN 1 ELSE 0 END) as completed_tasks
+       FROM tasks WHERE assignee_id = $1`,
       [employeeId]
     );
 
@@ -290,7 +294,9 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
       can_check_out: false,
       check_in_time: null,
       check_out_time: null,
-      pending_tasks: parseInt(taskResult.rows[0].count, 10) || 0
+      total_tasks: parseInt(taskResult.rows[0].total_tasks, 10) || 0,
+      pending_tasks: parseInt(taskResult.rows[0].pending_tasks, 10) || 0,
+      completed_tasks: parseInt(taskResult.rows[0].completed_tasks, 10) || 0
     };
 
     if (!att) {
