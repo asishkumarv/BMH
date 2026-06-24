@@ -193,7 +193,7 @@ exports.getAdvancedReports = async (req, res) => {
 
 exports.getEmployeeAnalytics = async (req, res) => {
   try {
-    const { employeeId } = req.query;
+    const { employeeId, startDate, endDate } = req.query;
     if (!employeeId) return res.status(400).json({ success: false, message: "Missing employeeId" });
 
     // Fetch employee details
@@ -211,7 +211,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
     }
 
     // Fetch all attendance records with breaks
-    const attendanceQuery = `
+    let attendanceQuery = `
       SELECT 
         a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status,
         a.image_url as check_in_image, a.checkout_image_url as check_out_image,
@@ -222,12 +222,23 @@ exports.getEmployeeAnalytics = async (req, res) => {
         ) as breaks
       FROM attendance a
       WHERE a.employee_id = $1
-      ORDER BY a.date DESC
     `;
-    const attResult = await pool.query(attendanceQuery, [employeeId]);
+    
+    const params = [employeeId];
+    let paramIndex = 2;
+
+    if (startDate && endDate) {
+      attendanceQuery += ` AND a.date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(startDate, endDate);
+    }
+
+    attendanceQuery += ` ORDER BY a.date DESC`;
+    
+    const attResult = await pool.query(attendanceQuery, params);
     const history = attResult.rows;
 
     let totalWorkMs = 0;
+    let totalBreakMs = 0;
     let validWorkDays = 0;
     let earlyCheckInCount = 0;
     let lateCheckInCount = 0;
@@ -279,6 +290,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
             } else if (b.break_type === 'Break Out' && currentBreakIn) {
               const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
               workMs -= breakDuration;
+              totalBreakMs += breakDuration;
               currentBreakIn = null;
             }
           });
@@ -293,6 +305,9 @@ exports.getEmployeeAnalytics = async (req, res) => {
     const avgWorkMs = validWorkDays > 0 ? (totalWorkMs / validWorkDays) : 0;
     const avgWorkHours = avgWorkMs / (1000 * 60 * 60);
 
+    const avgBreakMs = validWorkDays > 0 ? (totalBreakMs / validWorkDays) : 0;
+    const avgBreakMins = avgBreakMs / (1000 * 60);
+
     const earlyPercent = history.length > 0 ? ((earlyCheckInCount / history.length) * 100).toFixed(1) : 0;
     const latePercent = history.length > 0 ? ((lateCheckInCount / history.length) * 100).toFixed(1) : 0;
 
@@ -301,6 +316,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
       employee: emp,
       analytics: {
         avgWorkHours: avgWorkHours.toFixed(1),
+        avgBreakMins: Math.round(avgBreakMins),
         earlyCheckInPercent: earlyPercent,
         lateCheckInPercent: latePercent,
         totalDaysPresent: history.length

@@ -105,6 +105,8 @@ export default function AdminAttendanceScreen() {
   // New states for Reports
   const [selectedReportDept, setSelectedReportDept] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -128,9 +130,15 @@ export default function AdminAttendanceScreen() {
 
   const fetchReports = async (dept: string) => {
     try {
-      const url = dept === 'All' 
-        ? `https://bmh-eitu.onrender.com/attendance/reports?date=${new Date().toISOString().split('T')[0]}`
-        : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}&date=${new Date().toISOString().split('T')[0]}`;
+      let url = dept === 'All' 
+        ? `https://bmh-eitu.onrender.com/attendance/reports?1=1`
+        : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}`;
+      
+      if (startDate && endDate) {
+        url += `&startDate=${startDate}&endDate=${endDate}`;
+      } else {
+        url += `&date=${new Date().toISOString().split('T')[0]}`;
+      }
       const res = await axios.get(url);
       if (res.data.success) {
         setReports(res.data.data);
@@ -319,6 +327,38 @@ export default function AdminAttendanceScreen() {
             <Download size={20} color="white" />
             <Text style={styles.buttonText}> Export CSV</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
+          {Platform.OS === 'web' ? (
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f3f4f6', padding: 4, borderRadius: 8}}>
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={(e) => setStartDate(e.target.value)} 
+                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none'}}
+              />
+              <Text style={{color: '#6b7280', fontWeight: '500'}}>to</Text>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)} 
+                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none'}}
+              />
+              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6}} onPress={() => fetchReports(selectedReportDept)}>
+                <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8}]} placeholder="YYYY-MM-DD" value={startDate} onChangeText={setStartDate} />
+              <Text style={{color: '#6b7280'}}>to</Text>
+              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
+              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6}} onPress={() => fetchReports(selectedReportDept)}>
+                <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
         
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
