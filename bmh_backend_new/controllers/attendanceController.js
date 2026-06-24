@@ -279,7 +279,7 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
          COUNT(*) as total_tasks,
          SUM(CASE WHEN status IN ('pending', 'in_progress') THEN 1 ELSE 0 END) as pending_tasks,
          SUM(CASE WHEN status IN ('completed', 'resolved') THEN 1 ELSE 0 END) as completed_tasks
-       FROM tasks WHERE assignee_id = $1`,
+       FROM tasks WHERE assignee_id = $1 AND assignee_type = 'employee'`,
       [employeeId]
     );
 
