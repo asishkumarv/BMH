@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
 import axios from 'axios';
 import { X, Clock, AlertTriangle, CheckCircle, Download } from 'lucide-react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { Platform, Alert } from 'react-native';
 
 interface Props {
   visible: boolean;
@@ -47,7 +46,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
     });
 
     try {
-      if (typeof document !== 'undefined') {
+      if (Platform.OS === 'web') {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -58,11 +57,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
         link.click();
         document.body.removeChild(link);
       } else {
-        const fileUri = FileSystem.documentDirectory + `${data.employee.full_name.replace(/\s+/g, '_')}_Analytics.csv`;
-        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri);
-        }
+        Alert.alert('Notice', 'CSV Export is only supported on web right now.');
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -119,38 +114,43 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.table}>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
-                  <Text style={styles.tableCellHeader}>Date</Text>
-                  <Text style={styles.tableCellHeader}>Check In</Text>
-                  <Text style={styles.tableCellHeader}>Check Out</Text>
-                  <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
-                </View>
-                {data.history.map((row: any, idx: number) => (
-                  <View key={idx} style={styles.tableRow}>
-                    <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
-                       {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
-                       {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+              <View style={{ padding: 20, paddingTop: 0 }}>
+                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                  <View style={{ minWidth: 600, width: '100%' }}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
+                      <Text style={styles.tableCellHeader}>Date</Text>
+                      <Text style={styles.tableCellHeader}>Check In</Text>
+                      <Text style={styles.tableCellHeader}>Check Out</Text>
+                      <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
                     </View>
-                    <Text style={styles.tableCell}>{new Date(row.date).toLocaleDateString()}</Text>
-                    <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-                    <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-                    <View style={[styles.tableCell, { flex: 2 }]}>
-                      {row.breaks && row.breaks.length > 0 ? (
-                        row.breaks.map((b: any, bi: number) => (
-                          <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
-                            {b.break_type}: {new Date(b.timestamp).toLocaleTimeString()}
-                          </Text>
-                        ))
-                      ) : (
-                        <Text style={{ fontSize: 12, color: '#9ca3af' }}>No breaks</Text>
-                      )}
-                    </View>
+                    {data.history.map((row: any, idx: number) => (
+                      <View key={idx} style={styles.tableRow}>
+                        <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                          {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                          {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+                        </View>
+                        <Text style={styles.tableCell}>{new Date(row.date).toLocaleDateString()}</Text>
+                        <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+                        <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+                        <View style={[styles.tableCell, { flex: 2 }]}>
+                          <ScrollView>
+                            {row.breaks && row.breaks.length > 0 ? (
+                              row.breaks.map((b: any, bi: number) => (
+                                <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
+                                  {b.break_type}: {new Date(b.timestamp).toLocaleTimeString()}
+                                </Text>
+                              ))
+                            ) : (
+                              <Text style={{ fontSize: 12, color: '#9ca3af' }}>No breaks</Text>
+                            )}
+                          </ScrollView>
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                ))}
+                </ScrollView>
               </View>
-
             </ScrollView>
           ) : (
             <View style={{ padding: 40, alignItems: 'center' }}>

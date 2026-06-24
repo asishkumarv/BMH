@@ -332,8 +332,9 @@ export default function AdminAttendanceDashboard() {
           </View>
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.tableRowHeader}>
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+          <View style={[styles.table, { minWidth: 800 }]}>
+            <View style={styles.tableRowHeader}>
             <Text style={[styles.tableCellHeader, {flex: 0.5}]}>In</Text>
             <Text style={styles.tableCellHeader}>Name</Text>
             <Text style={styles.tableCellHeader}>Dept</Text>
@@ -355,7 +356,11 @@ export default function AdminAttendanceDashboard() {
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
               </View>
-              <Text style={[styles.tableCell, {fontWeight: '500'}]}>{r.full_name}</Text>
+              <View style={[styles.tableCell, { justifyContent: 'center' }]}>
+                <Text style={{fontWeight: '500', color: '#1f2937'}}>{r.full_name}</Text>
+                <Text style={{fontSize: 12, color: '#6b7280'}}>{r.email || 'N/A'}</Text>
+                <Text style={{fontSize: 12, color: '#6b7280'}}>{r.mobile || 'N/A'}</Text>
+              </View>
               <Text style={styles.tableCell}>{r.department}</Text>
               <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
               <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
@@ -371,7 +376,8 @@ export default function AdminAttendanceDashboard() {
               <Text style={styles.tableCell}>{r.status}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+          </View>
+        </ScrollView>
       </View>
 
       <EmployeeAnalyticsModal 

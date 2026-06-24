@@ -466,13 +466,17 @@ export default function AdminStationaryScreen() {
               </Pressable>
             </View>
 
-            <FlatList
-              data={filteredRequests}
-              keyExtractor={item => item.id}
-              renderItem={renderRequestItem}
-              contentContainerStyle={{ gap: 12 }}
-              ListEmptyComponent={<Text style={styles.emptyText}>No requests found.</Text>}
-            />
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+              <View style={{ minWidth: 800, width: '100%' }}>
+                <FlatList
+                  data={filteredRequests}
+                  keyExtractor={item => item.id}
+                  renderItem={renderRequestItem}
+                  contentContainerStyle={{ gap: 12 }}
+                  ListEmptyComponent={<Text style={styles.emptyText}>No requests found.</Text>}
+                />
+              </View>
+            </ScrollView>
           </>
         )}
       </View>

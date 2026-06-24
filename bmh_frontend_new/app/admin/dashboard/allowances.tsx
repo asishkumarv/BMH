@@ -412,13 +412,17 @@ export default function AdminAllowancesScreen() {
                 <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Export CSV</Text>
               </Pressable>
             </View>
-            <FlatList
-              data={filteredHistoryTxs}
-              keyExtractor={item => item.id}
-              renderItem={renderTransactionItem}
-              contentContainerStyle={{ gap: 12, paddingBottom: 24 }}
-              ListEmptyComponent={<Text style={styles.emptyText}>No transactions match your filters.</Text>}
-            />
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+              <View style={{ minWidth: 800, width: '100%' }}>
+                <FlatList
+                  data={filteredHistoryTxs}
+                  keyExtractor={item => item.id}
+                  renderItem={renderTransactionItem}
+                  contentContainerStyle={{ gap: 12, paddingBottom: 24 }}
+                  ListEmptyComponent={<Text style={styles.emptyText}>No transactions match your filters.</Text>}
+                />
+              </View>
+            </ScrollView>
           </View>
         )}
       </View>

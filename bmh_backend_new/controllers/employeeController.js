@@ -25,9 +25,17 @@ exports.addEmployee = async (req, res) => {
   try {
     const { full_name, email, password, department, role, profile_data } = req.body;
 
+    const mobile = profile_data && profile_data.mobile ? profile_data.mobile : null;
+    
+    // Remove mobile from profile_data so it isn't stored twice (since it has its own column)
+    const storedProfileData = profile_data ? { ...profile_data } : null;
+    if (storedProfileData && storedProfileData.mobile) {
+      delete storedProfileData.mobile;
+    }
+
     const insertResult = await pool.query(
-      'INSERT INTO employees (full_name, email, password, department, role, status, profile_data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [full_name, email, password, department, role, 'pending', profile_data ? JSON.stringify(profile_data) : null]
+      'INSERT INTO employees (full_name, email, password, department, role, status, profile_data, mobile) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [full_name, email, password, department, role, 'pending', storedProfileData ? JSON.stringify(storedProfileData) : null, mobile]
     );
 
     res.status(201).json({ success: true, data: insertResult.rows[0] });
