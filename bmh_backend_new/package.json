@@ -11,9 +11,16 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "aws-sdk": "^2.1693.0",
+    "axios": "^1.18.1",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "json2csv": "^6.0.0-alpha.2",
+    "multer": "^2.2.0",
+    "multer-storage-cloudinary": "^4.0.0",
     "pg": "^8.22.0"
   }
 }
