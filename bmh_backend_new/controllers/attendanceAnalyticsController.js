@@ -301,8 +301,8 @@ exports.getEmployeeAnalytics = async (req, res) => {
       employee: emp,
       analytics: {
         avgWorkHours: avgWorkHours.toFixed(1),
-        earlyCheckIn: earlyPercent,
-        lateCheckIn: latePercent,
+        earlyCheckInPercent: earlyPercent,
+        lateCheckInPercent: latePercent,
         totalDaysPresent: history.length
       },
       history: processedHistory
