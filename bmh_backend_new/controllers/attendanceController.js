@@ -59,7 +59,7 @@ exports.verifyLocation = async (req, res) => {
       success: true,
       locationVerified: isVerified,
       distance: distance.toFixed(2),
-      message: isVerified ? "Location verified" : "You are outside the allowed location bounds"
+      message: isVerified ? "Location verified" : `You are outside the allowed location bounds. Distance: ${distance.toFixed(0)}m (Radius: ${radius}m)`
     });
   } catch (error) {
     console.error("Verify location error:", error);
@@ -110,7 +110,8 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
     const { schedule_in, schedule_out } = empRes.rows[0];
 
     // Prepare buffer for comparison
-    const capturedImgBuffer = Buffer.from(base64Image, 'base64');
+    const cleanCapturedBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    const capturedImgBuffer = Buffer.from(cleanCapturedBase64, 'base64');
     
     // Check if registered image has a data:image prefix and strip it
     const cleanRegisteredBase64 = registeredImgBase64.replace(/^data:image\/\w+;base64,/, "");
