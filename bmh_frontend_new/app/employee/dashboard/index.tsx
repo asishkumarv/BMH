@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Platform, ActivityIndicator, TouchableOpacity, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, Platform, ActivityIndicator, TouchableOpacity, Alert, Animated, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import axios from 'axios';
@@ -145,7 +145,7 @@ export default function EmployeeDashboardScreen() {
   }
 
   return (
-    <View style={[styles.container, !isDesktop && styles.containerMobile]}>
+    <View style={{flex: 1}}>
       {cameraVisible && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 400, backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', padding: 20 }}>
@@ -173,6 +173,9 @@ export default function EmployeeDashboardScreen() {
           </View>
         </View>
       )}
+
+      <ScrollView style={[styles.container, !isDesktop && styles.containerMobile]} contentContainerStyle={{ paddingBottom: 50 }}>
+
 
       <View style={styles.header}>
         <Text style={styles.title}>Welcome back, {user.full_name}</Text>
@@ -279,6 +282,7 @@ export default function EmployeeDashboardScreen() {
           </View>
         </View>
       </View>
+      </ScrollView>
     </View>
   );
 }

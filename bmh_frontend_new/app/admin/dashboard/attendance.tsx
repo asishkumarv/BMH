@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { Colors } from '../../../constants/Colors';
 
 const Dropdown = ({ options, value, onChange }: any) => {
   const [open, setOpen] = useState(false);
@@ -128,13 +129,13 @@ export default function AdminAttendanceScreen() {
     }
   }, []);
 
-  const fetchReports = async (dept: string) => {
+  const fetchReports = async (dept: string, forceClear = false) => {
     try {
       let url = dept === 'All' 
         ? `https://bmh-eitu.onrender.com/attendance/reports?1=1`
         : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}`;
       
-      if (startDate && endDate) {
+      if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       } else {
         url += `&date=${new Date().toISOString().split('T')[0]}`;
@@ -331,32 +332,42 @@ export default function AdminAttendanceScreen() {
 
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
           {Platform.OS === 'web' ? (
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f3f4f6', padding: 4, borderRadius: 8}}>
+            <View style={{flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, backgroundColor: '#f3f4f6', padding: 8, borderRadius: 8, width: isDesktop ? 'auto' : '100%'}}>
               <input 
                 type="date" 
                 value={startDate} 
                 onChange={(e) => setStartDate(e.target.value)} 
-                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none'}}
+                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
               />
-              <Text style={{color: '#6b7280', fontWeight: '500'}}>to</Text>
+              <Text style={{color: '#6b7280', fontWeight: '500', textAlign: 'center'}}>to</Text>
               <input 
                 type="date" 
                 value={endDate} 
                 onChange={(e) => setEndDate(e.target.value)} 
-                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none'}}
+                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
               />
-              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6}} onPress={() => fetchReports(selectedReportDept)}>
-                <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
-              </TouchableOpacity>
+              <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
+                <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchReports(selectedReportDept)}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, true); }}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8}]} placeholder="YYYY-MM-DD" value={startDate} onChangeText={setStartDate} />
-              <Text style={{color: '#6b7280'}}>to</Text>
-              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
-              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6}} onPress={() => fetchReports(selectedReportDept)}>
-                <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
-              </TouchableOpacity>
+            <View style={{flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, width: isDesktop ? 'auto' : '100%'}}>
+              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8, width: '100%'}]} placeholder="YYYY-MM-DD" value={startDate} onChangeText={setStartDate} />
+              <Text style={{color: '#6b7280', textAlign: 'center'}}>to</Text>
+              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8, width: '100%'}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
+              <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
+                <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchReports(selectedReportDept)}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, true); }}>
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>

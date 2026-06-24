@@ -187,7 +187,7 @@ export default function SubAdminEmployeesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, !isDesktop && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
         <View>
           <Text style={styles.title}>Department Employees</Text>
           <Text style={styles.subtitle}>Manage staff in your department.</Text>
@@ -202,7 +202,7 @@ export default function SubAdminEmployeesScreen() {
 
       <View style={styles.card}>
         <View style={styles.toolbar}>
-           <View style={styles.searchBox}>
+           <View style={[styles.searchBox, !isDesktop && { width: '100%' }]}>
               <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
               <Text style={styles.searchPlaceholder}>Search employees...</Text>
            </View>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Image, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 import { Clock, CheckCircle, AlertTriangle, Coffee, Download } from 'lucide-react-native';
 
@@ -26,6 +27,7 @@ const Dropdown = ({ options, value, onChange }: any) => {
 };
 
 export default function EmployeeAttendanceHistory() {
+  const { isDesktop } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -38,7 +40,7 @@ export default function EmployeeAttendanceHistory() {
     fetchHistory();
   }, []);
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (forceClear = false) => {
     setLoading(true);
     try {
       let userStr = null;
@@ -51,7 +53,7 @@ export default function EmployeeAttendanceHistory() {
       if (!user || !user.id) return;
 
       let url = `https://bmh-eitu.onrender.com/attendance/employee-analytics?employeeId=${user.id}`;
-      if (startDate && endDate) {
+      if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       }
 
@@ -130,23 +132,28 @@ export default function EmployeeAttendanceHistory() {
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: '#f3f4f6', flexWrap: 'wrap', gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap'}}>
             {Platform.OS === 'web' ? (
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f3f4f6', padding: 4, borderRadius: 8}}>
+              <View style={{flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, backgroundColor: '#f3f4f6', padding: 8, borderRadius: 8, width: isDesktop ? 'auto' : '100%'}}>
                 <input 
                   type="date" 
                   value={startDate} 
                   onChange={(e) => setStartDate(e.target.value)} 
-                  style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none'}}
+                  style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
                 />
-                <Text style={{color: '#6b7280', fontWeight: '500'}}>to</Text>
+                <Text style={{color: '#6b7280', fontWeight: '500', textAlign: 'center'}}>to</Text>
                 <input 
                   type="date" 
                   value={endDate} 
                   onChange={(e) => setEndDate(e.target.value)} 
-                  style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none'}}
+                  style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
                 />
-                <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6}} onPress={fetchHistory}>
-                  <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
-                </TouchableOpacity>
+                <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
+                  <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchHistory(false)}>
+                    <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchHistory(true); }}>
+                    <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : null}
 
@@ -162,16 +169,16 @@ export default function EmployeeAttendanceHistory() {
             <Text style={{color: 'white', fontWeight: 'bold'}}>Export CSV</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.table}>
-          <View style={styles.tableRowHeader}>
-            <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
-            <Text style={styles.tableCellHeader}>Date</Text>
-            <Text style={styles.tableCellHeader}>Check In</Text>
-            <Text style={styles.tableCellHeader}>Check Out</Text>
-            <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
-            <Text style={styles.tableCellHeader}>Status</Text>
-          </View>
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+          <View style={[styles.table, { minWidth: 800, width: '100%' }]}>
+            <View style={styles.tableRowHeader}>
+              <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
+              <Text style={styles.tableCellHeader}>Date</Text>
+              <Text style={styles.tableCellHeader}>Check In</Text>
+              <Text style={styles.tableCellHeader}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
+              <Text style={styles.tableCellHeader}>Status</Text>
+            </View>
           {filteredReports.length === 0 ? (
             <View style={{ padding: 20, alignItems: 'center' }}>
               <Text style={{ color: Colors.light.icon }}>No attendance records found.</Text>
@@ -200,6 +207,7 @@ export default function EmployeeAttendanceHistory() {
             </View>
           ))}
         </View>
+        </ScrollView>
       </View>
     </ScrollView>
   );

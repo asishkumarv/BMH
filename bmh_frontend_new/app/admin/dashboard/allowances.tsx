@@ -346,7 +346,7 @@ export default function AdminAllowancesScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.tabsContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ borderBottomWidth: 1, borderBottomColor: Colors.light.border, marginBottom: 24, flexGrow: 0 }} contentContainerStyle={{ flexDirection: 'row' }}>
         <Pressable 
           style={[styles.tab, activeTab === 'wallets' && styles.activeTab]} 
           onPress={() => setActiveTab('wallets')}
@@ -365,7 +365,7 @@ export default function AdminAllowancesScreen() {
         >
           <Text style={[styles.tabText, activeTab === 'transactions' && styles.activeTabText]}>Transaction History</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       <View style={styles.contentArea}>
         {loading ? (
@@ -430,7 +430,8 @@ export default function AdminAllowancesScreen() {
       {/* Allocate Funds Modal */}
       <Modal visible={allocationModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
+          <ScrollView contentContainerStyle={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20}} style={{width: '100%'}}>
+            <View style={[styles.modalContent, !isDesktop && { padding: 20 }, isDesktop && { width: 500 }]}>
             <Text style={styles.modalTitle}>Allocate Funds</Text>
             
             <Text style={styles.label}>Select Department</Text>
@@ -505,13 +506,15 @@ export default function AdminAllowancesScreen() {
               <Pressable style={styles.submitBtn} onPress={handleAllocate} disabled={allocating}><Text style={styles.submitBtnText}>{allocating ? 'Processing...' : 'Allocate'}</Text></Pressable>
             </View>
           </View>
+          </ScrollView>
         </View>
       </Modal>
 
       {/* Review Request Modal */}
       <Modal visible={reviewModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 400 }]}>
+          <ScrollView contentContainerStyle={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20}} style={{width: '100%'}}>
+            <View style={[styles.modalContent, !isDesktop && { padding: 20 }, isDesktop && { width: 400 }]}>
             <Text style={styles.modalTitle}>{reviewingTx?.status === 'approved' ? 'Approve Request' : 'Reject Request'}</Text>
             
             {reviewingTx?.status === 'approved' && (
@@ -544,13 +547,15 @@ export default function AdminAllowancesScreen() {
               <Pressable style={[styles.submitBtn, reviewingTx?.status === 'rejected' && { backgroundColor: Colors.light.error }]} onPress={submitReviewRequest} disabled={processingReview}><Text style={styles.submitBtnText}>{processingReview ? 'Processing...' : 'Confirm'}</Text></Pressable>
             </View>
           </View>
+          </ScrollView>
         </View>
       </Modal>
 
       {/* Usage Logs Modal */}
       <Modal visible={usageLogsModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 600, maxHeight: '80%' }]}>
+          <ScrollView contentContainerStyle={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20}} style={{width: '100%'}}>
+            <View style={[styles.modalContent, !isDesktop && { padding: 20 }, isDesktop && { width: 600, maxHeight: '80%' }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Text style={styles.modalTitle}>
                 {selectedWalletForLogs ? `Employee Details & Logs` : 'Logs'}
@@ -644,6 +649,7 @@ export default function AdminAllowancesScreen() {
               ) : null}
             </ScrollView>
           </View>
+          </ScrollView>
         </View>
       </Modal>
 
