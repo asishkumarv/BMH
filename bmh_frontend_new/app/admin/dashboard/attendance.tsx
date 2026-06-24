@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Activi
 import axios from 'axios';
 import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 const Dropdown = ({ options, value, onChange }: any) => {
   const [open, setOpen] = useState(false);
@@ -78,9 +79,19 @@ const MapPicker = ({ lat, lng }: any) => {
   return <Text style={{marginTop: 10, color: '#6b7280'}}>Map selection not supported on native without extra packages. Please enter coordinates manually.</Text>;
 };
 
-export default function AdminAttendanceDashboard() {
-  const [summary, setSummary] = useState<any>(null);
+export default function AdminAttendanceScreen() {
+  const { isDesktop } = useResponsive();
+  const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const formatMins = (mins: number) => {
+    if (!mins) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const [summary, setSummary] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   
@@ -366,9 +377,9 @@ export default function AdminAttendanceDashboard() {
               <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
               <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
               <View style={[styles.tableCell, { justifyContent: 'center' }]}>
-                {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {r.late_checkin_mins}m</Text> : null}
-                {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {r.early_checkout_mins}m</Text> : null}
-                {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {r.extra_break_mins}m</Text> : null}
+                {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
+                {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
+                {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
               <View style={[styles.tableCell, {flex: 1.5}]}>

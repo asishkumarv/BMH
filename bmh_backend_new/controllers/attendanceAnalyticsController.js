@@ -133,17 +133,18 @@ exports.getAdvancedReports = async (req, res) => {
         breakEnd = pdata.breakEnd;
       }
 
-      const parseTime = (timeStr, baseDate) => {
-        if (!timeStr) return null;
-        const [h, m] = timeStr.split(':').map(Number);
-        const d = new Date(baseDate);
-        d.setHours(h, m, 0, 0);
-        return d.getTime();
+      const parseTime = (timeStr, rowDate) => {
+        if (!timeStr || !rowDate) return null;
+        const d = new Date(rowDate);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return new Date(`${yyyy}-${mm}-${dd}T${timeStr}:00+05:30`).getTime();
       };
 
       if (row.check_in && shiftIn) {
         const inTime = new Date(row.check_in).getTime();
-        const schedTime = parseTime(shiftIn, row.check_in);
+        const schedTime = parseTime(shiftIn, row.date);
         const diffMins = (inTime - schedTime) / 60000;
         if (diffMins > 0) late_checkin_mins = Math.round(diffMins);
         else if (diffMins < 0) early_checkin_mins = Math.round(Math.abs(diffMins));
@@ -151,7 +152,7 @@ exports.getAdvancedReports = async (req, res) => {
 
       if (row.check_out && shiftOut) {
         const outTime = new Date(row.check_out).getTime();
-        const schedTime = parseTime(shiftOut, row.check_out);
+        const schedTime = parseTime(shiftOut, row.date);
         const diffMins = (outTime - schedTime) / 60000;
         if (diffMins > 0) late_checkout_mins = Math.round(diffMins);
         else if (diffMins < 0) early_checkout_mins = Math.round(Math.abs(diffMins));
@@ -231,16 +232,45 @@ exports.getEmployeeAnalytics = async (req, res) => {
     let earlyCheckInCount = 0;
     let lateCheckInCount = 0;
 
-    history.forEach(row => {
-      // Calculate work hours
+    const processedHistory = history.map(row => {
+      let late_checkin_mins = 0, early_checkin_mins = 0;
+      let late_checkout_mins = 0, early_checkout_mins = 0;
+      let extra_break_mins = 0;
+
+      const parseTime = (timeStr, rowDate) => {
+        if (!timeStr || !rowDate) return null;
+        const d = new Date(rowDate);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return new Date(`${yyyy}-${mm}-${dd}T${timeStr}:00+05:30`).getTime();
+      };
+
+      if (row.check_in && shiftIn) {
+        const inTime = new Date(row.check_in).getTime();
+        const schedTime = parseTime(shiftIn, row.date);
+        const diffMins = (inTime - schedTime) / 60000;
+        if (diffMins > 0) late_checkin_mins = Math.round(diffMins);
+        else if (diffMins < 0) early_checkin_mins = Math.round(Math.abs(diffMins));
+        
+        if (diffMins > 15) lateCheckInCount++;
+        else if (diffMins < 0) earlyCheckInCount++;
+      }
+
+      if (row.check_out && shiftOut) {
+        const outTime = new Date(row.check_out).getTime();
+        const schedTime = parseTime(shiftOut, row.date);
+        const diffMins = (outTime - schedTime) / 60000;
+        if (diffMins > 0) late_checkout_mins = Math.round(diffMins);
+        else if (diffMins < 0) early_checkout_mins = Math.round(Math.abs(diffMins));
+      }
+
       if (row.check_in && row.check_out) {
         const inDate = new Date(row.check_in);
         const outDate = new Date(row.check_out);
         let workMs = outDate.getTime() - inDate.getTime();
         
-        // Subtract break times
         if (row.breaks && row.breaks.length > 0) {
-          // Sort breaks chronologically
           row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
           let currentBreakIn = null;
           row.breaks.forEach(b => {
@@ -256,20 +286,8 @@ exports.getEmployeeAnalytics = async (req, res) => {
         totalWorkMs += workMs;
         validWorkDays++;
       }
-
-      // Early / Late check in
-      if (row.check_in && shiftIn) {
-        const [schedHour, schedMin] = shiftIn.split(':').map(Number);
-        const inDate = new Date(row.check_in);
-        const schedTime = new Date(inDate);
-        schedTime.setHours(schedHour, schedMin, 0, 0);
-
-        if (inDate.getTime() < schedTime.getTime()) {
-          earlyCheckInCount++;
-        } else if (inDate.getTime() > schedTime.getTime() + (15 * 60 * 1000)) { // 15 min grace period
-          lateCheckInCount++;
-        }
-      }
+      
+      return { ...row, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
     });
 
     const avgWorkMs = validWorkDays > 0 ? (totalWorkMs / validWorkDays) : 0;
@@ -283,11 +301,11 @@ exports.getEmployeeAnalytics = async (req, res) => {
       employee: emp,
       analytics: {
         avgWorkHours: avgWorkHours.toFixed(1),
-        earlyCheckInPercent: earlyPercent,
-        lateCheckInPercent: latePercent,
+        earlyCheckIn: earlyPercent,
+        lateCheckIn: latePercent,
         totalDaysPresent: history.length
       },
-      history
+      history: processedHistory
     });
   } catch (error) {
     console.error("Employee analytics error:", error);

@@ -11,8 +11,15 @@ interface Props {
 }
 
 export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }: Props) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+
+  const formatMins = (mins: number) => {
+    if (!mins) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
 
   useEffect(() => {
     if (visible && employeeId) {
@@ -135,9 +142,9 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                         <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                         <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                         <View style={[styles.tableCell, { justifyContent: 'center' }]}>
-                          {row.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {row.late_checkin_mins}m</Text> : null}
-                          {row.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {row.early_checkout_mins}m</Text> : null}
-                          {row.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {row.extra_break_mins}m</Text> : null}
+                          {row.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(row.late_checkin_mins)}</Text> : null}
+                          {row.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(row.early_checkout_mins)}</Text> : null}
+                          {row.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(row.extra_break_mins)}</Text> : null}
                           {(!row.late_checkin_mins && !row.early_checkout_mins && !row.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
                         </View>
                         <View style={[styles.tableCell, { flex: 2 }]}>

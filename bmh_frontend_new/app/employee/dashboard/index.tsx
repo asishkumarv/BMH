@@ -46,7 +46,7 @@ export default function EmployeeDashboardScreen() {
 
   const fetchSummary = async (empId: number) => {
     try {
-      const res = await axios.get(`http://localhost:5000/attendance/employee-dashboard/${empId}`);
+      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/employee-dashboard/${empId}`);
       if (res.data.success) {
         setSummary(res.data.data);
       } else {
