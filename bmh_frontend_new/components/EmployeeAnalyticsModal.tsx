@@ -37,13 +37,13 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
   const exportEmployeeData = async () => {
     if (!data || !data.history) return;
     
-    let csvContent = "Date,Check In,Check Out,Status,Breaks\n";
+    let csvContent = "Name,Email,Mobile,Department,Date,Check In,Check Out,Status,Breaks\n";
     data.history.forEach((r: any) => {
       const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
       const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
       const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
       
-      csvContent += `${new Date(r.date).toLocaleDateString()},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
+      csvContent += `${data.employee.full_name},${data.employee.email || 'N/A'},${data.employee.mobile || 'N/A'},${data.employee.department},${new Date(r.date).toLocaleDateString()},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
 
     try {

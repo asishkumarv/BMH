@@ -82,7 +82,7 @@ exports.getAdvancedReports = async (req, res) => {
 
     let query = `
       SELECT 
-        a.id, a.employee_id, e.full_name, e.department, a.date, 
+        a.id, a.employee_id, e.full_name, e.department, e.email, e.mobile, a.date, 
         a.timestamp as check_in, a.checkout_timestamp as check_out, 
         a.image_url as check_in_image, a.checkout_image_url as check_out_image,
         a.status, a.late_duration,
@@ -132,7 +132,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
     if (!employeeId) return res.status(400).json({ success: false, message: "Missing employeeId" });
 
     // Fetch employee details
-    const empResult = await pool.query('SELECT full_name, department, schedule_in, schedule_out FROM employees WHERE id = $1', [employeeId]);
+    const empResult = await pool.query('SELECT full_name, email, mobile, department, schedule_in, schedule_out FROM employees WHERE id = $1', [employeeId]);
     if (empResult.rowCount === 0) return res.status(404).json({ success: false, message: "Employee not found" });
     const emp = empResult.rows[0];
 

@@ -93,6 +93,7 @@ export default function AdminAttendanceDashboard() {
 
   // New states for Reports
   const [selectedReportDept, setSelectedReportDept] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -138,7 +139,7 @@ export default function AdminAttendanceDashboard() {
 
       await fetchReports(selectedReportDept);
 
-      const deptRes = await axios.get('https://bmh-eitu.onrender.com/departments');
+      const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
       if (deptRes.data.success) {
         setDepartments(deptRes.data.data);
       }
@@ -192,8 +193,7 @@ export default function AdminAttendanceDashboard() {
       csvContent += `${r.full_name},${r.department},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
     
-    const csvString = csvRows.join('\\n');
-    const blob = new Blob([csvString], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.setAttribute('href', url);
@@ -204,6 +204,16 @@ export default function AdminAttendanceDashboard() {
   if (loading) {
     return <View style={{flex: 1, justifyContent: 'center', alignItems:'center'}}><ActivityIndicator size="large" color="#3b82f6" /></View>;
   }
+
+  const filteredReports = reports.filter(r => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (r.full_name && r.full_name.toLowerCase().includes(q)) ||
+      (r.email && r.email.toLowerCase().includes(q)) ||
+      (r.mobile && r.mobile.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <ScrollView style={styles.container}>
@@ -300,8 +310,8 @@ export default function AdminAttendanceDashboard() {
           </TouchableOpacity>
         </View>
         
-        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flex: 1, marginRight: 15}}>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flex: 1, marginRight: 15, minWidth: 200}}>
             {['All', ...departments.map(d => d.name)].map((dept) => (
               <TouchableOpacity 
                 key={dept} 
@@ -312,6 +322,14 @@ export default function AdminAttendanceDashboard() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          <View style={[styles.input, { flex: 0.5, minWidth: 200, margin: 0, padding: 8 }]}>
+             <TextInput 
+               style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
+               placeholder="Search Name, Email, Phone..." 
+               value={searchQuery} 
+               onChangeText={setSearchQuery} 
+             />
+          </View>
         </View>
 
         <View style={styles.table}>
@@ -324,7 +342,7 @@ export default function AdminAttendanceDashboard() {
             <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
           </View>
-          {reports.map((r, i) => (
+          {filteredReports.map((r, i) => (
             <TouchableOpacity 
               key={i} 
               style={styles.tableRow}
