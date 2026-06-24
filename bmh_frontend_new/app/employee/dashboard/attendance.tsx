@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
@@ -15,9 +15,14 @@ export default function EmployeeAttendanceHistory() {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const userStr = await AsyncStorage.getItem('user');
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
       const user = userStr ? JSON.parse(userStr) : null;
-      if (!user) return;
+      if (!user || !user.id) return;
 
       const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/reports?employeeId=${user.id}`);
       if (res.data.success) {
@@ -41,9 +46,11 @@ export default function EmployeeAttendanceHistory() {
       <View style={styles.section}>
         <View style={styles.table}>
           <View style={styles.tableRowHeader}>
+            <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
             <Text style={styles.tableCellHeader}>Date</Text>
             <Text style={styles.tableCellHeader}>Check In</Text>
             <Text style={styles.tableCellHeader}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
           </View>
           {reports.length === 0 ? (
@@ -52,9 +59,24 @@ export default function EmployeeAttendanceHistory() {
             </View>
           ) : reports.map((r, i) => (
             <View key={i} style={styles.tableRow}>
+              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+              </View>
               <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
-              <Text style={styles.tableCell}>{new Date(r.check_in).toLocaleTimeString()}</Text>
-              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString() : '-'}</Text>
+              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCell, { flex: 2 }]}>
+                {r.breaks && r.breaks.length > 0 ? (
+                  r.breaks.map((b: any, bi: number) => (
+                    <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
+                      {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ fontSize: 12, color: Colors.light.icon }}>-</Text>
+                )}
+              </View>
               <Text style={styles.tableCell}>{r.status}</Text>
             </View>
           ))}
@@ -70,7 +92,9 @@ const styles = StyleSheet.create({
   section: { backgroundColor: 'white', borderRadius: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, overflow: 'hidden' },
   table: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, overflow: 'hidden' },
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', padding: 16, borderBottomWidth: 1, borderColor: Colors.light.border },
-  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: Colors.light.border },
+  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: Colors.light.border, alignItems: 'center' },
   tableCellHeader: { flex: 1, fontWeight: 'bold', color: Colors.light.text },
-  tableCell: { flex: 1, color: Colors.light.icon }
+  tableCell: { flex: 1, color: Colors.light.icon, justifyContent: 'center' },
+  thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
 });

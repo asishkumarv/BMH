@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
 import axios from 'axios';
 import { X, Clock, AlertTriangle, CheckCircle, Download } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
@@ -121,6 +121,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
 
               <View style={styles.table}>
                 <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
                   <Text style={styles.tableCellHeader}>Date</Text>
                   <Text style={styles.tableCellHeader}>Check In</Text>
                   <Text style={styles.tableCellHeader}>Check Out</Text>
@@ -128,9 +129,13 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                 </View>
                 {data.history.map((row: any, idx: number) => (
                   <View key={idx} style={styles.tableRow}>
+                    <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                       {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                       {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+                    </View>
                     <Text style={styles.tableCell}>{new Date(row.date).toLocaleDateString()}</Text>
-                    <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString() : '--'}</Text>
-                    <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString() : '--'}</Text>
+                    <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+                    <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                     <View style={[styles.tableCell, { flex: 2 }]}>
                       {row.breaks && row.breaks.length > 0 ? (
                         row.breaks.map((b: any, bi: number) => (
@@ -240,5 +245,7 @@ const styles = StyleSheet.create({
     borderColor: '#f3f4f6',
     alignItems: 'center'
   },
-  tableCell: { flex: 1, color: '#1f2937', fontSize: 14 }
+  tableCell: { flex: 1, color: '#1f2937', fontSize: 14, justifyContent: 'center' },
+  thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
 });

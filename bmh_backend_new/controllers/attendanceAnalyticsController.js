@@ -87,7 +87,7 @@ exports.getAdvancedReports = async (req, res) => {
         a.image_url as check_in_image, a.checkout_image_url as check_out_image,
         a.status, a.late_duration,
         (
-          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp, 'status', bl.status))
+          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
           FROM break_logs bl
           WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
         ) as breaks
@@ -140,8 +140,9 @@ exports.getEmployeeAnalytics = async (req, res) => {
     const attendanceQuery = `
       SELECT 
         a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status,
+        a.image_url as check_in_image, a.checkout_image_url as check_out_image,
         (
-          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp))
+          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC'))
           FROM break_logs bl
           WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
         ) as breaks
