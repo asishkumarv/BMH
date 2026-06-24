@@ -76,14 +76,24 @@ export default function SubAdminAttendanceDashboard() {
       
       setUserDept(user.department);
 
-      const sumRes = await axios.get(`http://localhost:5000/attendance/summary?department=${user.department}`);
+      const sumRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/summary?department=${user.department}`);
       if (sumRes.data.success) {
         setSummary(sumRes.data.summary);
       }
       
-      const repRes = await axios.get(`http://localhost:5000/attendance/reports?department=${user.department}`);
+      const repRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/reports?department=${user.department}`);
       if (repRes.data.success) {
         setReports(repRes.data.data);
+      }
+
+      const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+      if (deptRes.data.success) {
+        const dept = deptRes.data.data.find((d: any) => d.name === user.department);
+        if (dept) {
+           setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
+           setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
+           setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '2000');
+        }
       }
     } catch (err) {
       console.log('Error fetching subadmin attendance data', err);
@@ -98,7 +108,7 @@ export default function SubAdminAttendanceDashboard() {
       return;
     }
     try {
-      const res = await axios.post('http://localhost:5000/api/departments/location', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/department/location', {
         name: userDept,
         lat,
         lng,

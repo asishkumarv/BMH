@@ -110,17 +110,17 @@ export default function AdminAttendanceDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const sumRes = await axios.get('http://localhost:5000/attendance/summary');
+      const sumRes = await axios.get('https://bmh-eitu.onrender.com/attendance/summary');
       if (sumRes.data.success) {
         setSummary(sumRes.data.summary);
       }
       
-      const repRes = await axios.get('http://localhost:5000/attendance/reports');
+      const repRes = await axios.get('https://bmh-eitu.onrender.com/attendance/reports');
       if (repRes.data.success) {
         setReports(repRes.data.data);
       }
 
-      const deptRes = await axios.get('http://localhost:5000/api/departments');
+      const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
       if (deptRes.data.success) {
         setDepartments(deptRes.data.data);
       }
@@ -137,7 +137,7 @@ export default function AdminAttendanceDashboard() {
       return;
     }
     try {
-      const res = await axios.post('http://localhost:5000/api/departments/location', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/department/location', {
         name: deptName,
         lat,
         lng,
@@ -145,6 +145,11 @@ export default function AdminAttendanceDashboard() {
       });
       if (res.data.success) {
         Alert.alert("Success", `Department ${deptName} location updated to Lat: ${lat}, Lng: ${lng}, Radius: ${radius}m`);
+        // Refresh departments list so the new coordinates are stored in state
+        const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+        if (deptRes.data.success) {
+          setDepartments(deptRes.data.data);
+        }
       } else {
         Alert.alert("Error", "Failed to update location.");
       }
@@ -216,7 +221,19 @@ export default function AdminAttendanceDashboard() {
         <Text style={{color: '#6b7280', marginBottom: 15}}>Select a department and tap on the map to set its geofence boundaries.</Text>
         
         <View style={styles.inputRow}>
-          <Dropdown options={departments} value={deptName} onChange={setDeptName} />
+          <Dropdown 
+            options={departments} 
+            value={deptName} 
+            onChange={(name: string) => {
+              setDeptName(name);
+              const dept = departments.find(d => d.name === name);
+              if (dept) {
+                setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
+                setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
+                setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '200');
+              }
+            }} 
+          />
           
           <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
             <TextInput 

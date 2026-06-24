@@ -17,6 +17,7 @@ export default function EmployeeDashboardScreen() {
   const [actionType, setActionType] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
   const [summary, setSummary] = useState<any>(null);
+  const [cameraMessage, setCameraMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
   const cameraRef = useRef<any>(null);
 
   // Animation values
@@ -35,12 +36,15 @@ export default function EmployeeDashboardScreen() {
 
   const fetchSummary = async (empId: number) => {
     try {
-      const res = await axios.get('http://localhost:5000/attendance/summary?employeeId=' + empId);
-      if (res.data.success) {
-        setSummary(res.data.summary);
+      const res = await axios.get('https://bmh-eitu.onrender.com/attendance/reports?employeeId=' + empId);
+      if (res.data.success && res.data.data.length > 0) {
+        const todayRecord = res.data.data.find((r: any) => new Date(r.date).toDateString() === new Date().toDateString());
+        setSummary(todayRecord || null);
+      } else {
+        setSummary(null);
       }
     } catch (err) {
-      console.log("Error fetching summary", err);
+      console.log("Error fetching personal attendance", err);
     }
   };
 
@@ -55,6 +59,7 @@ export default function EmployeeDashboardScreen() {
     }
 
     setActionType(type);
+    setCameraMessage(null);
     setCameraVisible(true);
   };
 
@@ -66,7 +71,7 @@ export default function EmployeeDashboardScreen() {
       const location = await Location.getCurrentPositionAsync({});
 
       // Verify Location first
-      const locRes = await axios.post('http://localhost:5000/attendance/verify-location', {
+      const locRes = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-location', {
         employeeId: user.id,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -75,8 +80,7 @@ export default function EmployeeDashboardScreen() {
       const isLocationVerified = locRes.data.success && locRes.data.locationVerified;
       
       if (!isLocationVerified && (actionType === 'login' || actionType === 'logout')) {
-         Alert.alert("Location Error", locRes.data.message || "Outside allowed area.");
-         setCameraVisible(false);
+         setCameraMessage({ text: locRes.data.message || "Outside allowed area.", type: 'error' });
          setLoadingAction(false);
          return;
       }
@@ -89,26 +93,28 @@ export default function EmployeeDashboardScreen() {
 
       if (actionType === 'login' || actionType === 'logout') {
         payload.action = actionType;
-        const res = await axios.post('http://localhost:5000/attendance/verify-face', payload);
+        const res = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-face', payload);
         if (res.data.success) {
-          Alert.alert("Success", res.data.message);
+          setCameraMessage({ text: res.data.message, type: 'success' });
+          setTimeout(() => setCameraVisible(false), 2000);
         } else {
-          Alert.alert("Error", res.data.message);
+          setCameraMessage({ text: res.data.message, type: 'error' });
         }
       } else {
         payload.breakType = actionType;
-        const breakRes = await axios.post('http://localhost:5000/attendance/break', payload);
+        const breakRes = await axios.post('https://bmh-eitu.onrender.com/attendance/break', payload);
         if (breakRes.data.success) {
-           Alert.alert("Success", breakRes.data.message);
+           setCameraMessage({ text: breakRes.data.message, type: 'success' });
+           setTimeout(() => setCameraVisible(false), 2000);
+        } else {
+           setCameraMessage({ text: breakRes.data.message, type: 'error' });
         }
       }
 
-      setCameraVisible(false);
       fetchSummary(user.id);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert("Error", "Something went wrong.");
-      setCameraVisible(false);
+      setCameraMessage({ text: error.response?.data?.message || "Something went wrong.", type: 'error' });
     } finally {
       setLoadingAction(false);
     }
@@ -129,24 +135,36 @@ export default function EmployeeDashboardScreen() {
     );
   }
 
-  if (cameraVisible) {
-    return (
-      <View style={{ flex: 1 }}>
-        <CameraView style={{ flex: 1 }} ref={cameraRef} facing="front" />
-        <View style={styles.cameraOverlay}>
-          <TouchableOpacity style={styles.captureBtn} onPress={takePictureAndSubmit} disabled={loadingAction}>
-            {loadingAction ? <ActivityIndicator color="#fff" /> : <Text style={styles.captureBtnText}>Confirm {actionType}</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.captureBtn, {backgroundColor: Colors.light.error}]} onPress={() => setCameraVisible(false)}>
-             <Text style={styles.captureBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
+      {cameraVisible && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 400, backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' }}>Confirm {actionType}</Text>
+            <View style={{ width: '100%', height: 300, borderRadius: 12, overflow: 'hidden', marginBottom: 15 }}>
+              <CameraView style={{ flex: 1 }} ref={cameraRef} facing="front" />
+            </View>
+            
+            {cameraMessage && (
+              <View style={{ padding: 12, backgroundColor: cameraMessage.type === 'error' ? '#FEE2E2' : '#D1FAE5', borderRadius: 8, marginBottom: 15 }}>
+                <Text style={{ color: cameraMessage.type === 'error' ? '#DC2626' : '#059669', textAlign: 'center', fontWeight: '500' }}>
+                  {cameraMessage.text}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={[styles.captureBtn, { flex: 1 }]} onPress={takePictureAndSubmit} disabled={loadingAction}>
+                {loadingAction ? <ActivityIndicator color="#fff" /> : <Text style={styles.captureBtnText}>Capture & Submit</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.captureBtn, { flex: 1, backgroundColor: '#ef4444' }]} onPress={() => setCameraVisible(false)}>
+                <Text style={styles.captureBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.title}>Welcome back, {user.full_name}</Text>
         <Text style={styles.subtitle}>{user.role} | {user.department}</Text>
@@ -188,8 +206,14 @@ export default function EmployeeDashboardScreen() {
         <View style={styles.card}>
           <Clock color={Colors.light.primary} size={32} style={{ marginBottom: 16 }} />
           <Text style={styles.cardTitle}>Attendance Status</Text>
-          <Text style={styles.cardValue}>{summary ? "Active" : "Pending"}</Text>
-          <Text style={styles.cardSub}>Mark your attendance for today.</Text>
+          <Text style={styles.cardValue}>{summary ? summary.status : "Pending"}</Text>
+          <Text style={styles.cardSub}>
+            {summary 
+              ? (summary.check_out 
+                  ? `Checked out at ${new Date(summary.check_out).toLocaleTimeString()}` 
+                  : `Checked in at ${new Date(summary.check_in).toLocaleTimeString()}`) 
+              : "Mark your attendance for today."}
+          </Text>
         </View>
         <View style={styles.card}>
           <Users color={Colors.light.secondary} size={32} style={{ marginBottom: 16 }} />

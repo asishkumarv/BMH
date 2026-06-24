@@ -137,7 +137,7 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
         'INSERT INTO attendance_audit_logs (employee_id, action_type, details) VALUES ($1, $2, $3)',
         [employeeId, 'FAILED_FACE_RECOGNITION', 'Face did not match registered profile photo']
       );
-      return res.json({ success: true, faceVerified: false, message: "Face not verified" });
+      return res.json({ success: false, faceVerified: false, message: "Face verification failed. Please try again." });
     }
 
     // Determine status

@@ -19,7 +19,7 @@ export default function EmployeeAttendanceHistory() {
       const user = userStr ? JSON.parse(userStr) : null;
       if (!user) return;
 
-      const res = await axios.get(`http://localhost:5000/attendance/reports?employeeId=${user.id}`);
+      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/reports?employeeId=${user.id}`);
       if (res.data.success) {
         setReports(res.data.data);
       }
