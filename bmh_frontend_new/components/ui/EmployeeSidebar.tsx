@@ -6,6 +6,7 @@ import { Colors } from '../../constants/Colors';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/employee/dashboard' },
+  { name: 'Attendance', icon: CheckSquare, route: '/employee/dashboard/attendance' },
   { name: 'Tasks', icon: CheckSquare, route: '/employee/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/employee/dashboard/stationary' },
   { name: 'Wallet', icon: Wallet, route: '/employee/dashboard/wallet' },

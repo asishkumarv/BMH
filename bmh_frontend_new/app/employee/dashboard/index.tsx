@@ -1,26 +1,146 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Platform, ActivityIndicator, TouchableOpacity, Alert, Animated } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Location from 'expo-location';
+import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { Users, Clock } from 'lucide-react-native';
+import { Users, Clock, PlayCircle, StopCircle, Coffee } from 'lucide-react-native';
 
 export default function EmployeeDashboardScreen() {
   const { isDesktop } = useResponsive();
   const [user, setUser] = useState<any>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
   
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [actionType, setActionType] = useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [summary, setSummary] = useState<any>(null);
+  const cameraRef = useRef<any>(null);
+
+  // Animation values
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     if (Platform.OS === 'web') {
       const userStr = localStorage.getItem('employeeUser');
       if (userStr) {
-        setUser(JSON.parse(userStr));
+        const parsedUser = JSON.parse(userStr);
+        setUser(parsedUser);
+        fetchSummary(parsedUser.id);
       }
     }
   }, []);
+
+  const fetchSummary = async (empId: number) => {
+    try {
+      const res = await axios.get('http://localhost:5000/attendance/summary?employeeId=' + empId);
+      if (res.data.success) {
+        setSummary(res.data.summary);
+      }
+    } catch (err) {
+      console.log("Error fetching summary", err);
+    }
+  };
+
+  const handleAction = async (type: string) => {
+    if (!permission?.granted) {
+      const { status } = await requestPermission();
+      if (status !== 'granted') return Alert.alert('Camera permission required.');
+    }
+    if (!locationPermission?.granted) {
+      const { status } = await requestLocationPermission();
+      if (status !== 'granted') return Alert.alert('Location permission required.');
+    }
+
+    setActionType(type);
+    setCameraVisible(true);
+  };
+
+  const takePictureAndSubmit = async () => {
+    if (!cameraRef.current) return;
+    setLoadingAction(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, base64: true });
+      const location = await Location.getCurrentPositionAsync({});
+
+      // Verify Location first
+      const locRes = await axios.post('http://localhost:5000/attendance/verify-location', {
+        employeeId: user.id,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+
+      const isLocationVerified = locRes.data.success && locRes.data.locationVerified;
+      
+      if (!isLocationVerified && (actionType === 'login' || actionType === 'logout')) {
+         Alert.alert("Location Error", locRes.data.message || "Outside allowed area.");
+         setCameraVisible(false);
+         setLoadingAction(false);
+         return;
+      }
+
+      const payload: any = {
+        base64Image: photo.base64,
+        employeeId: user.id,
+        locationVerified: isLocationVerified
+      };
+
+      if (actionType === 'login' || actionType === 'logout') {
+        payload.action = actionType;
+        const res = await axios.post('http://localhost:5000/attendance/verify-face', payload);
+        if (res.data.success) {
+          Alert.alert("Success", res.data.message);
+        } else {
+          Alert.alert("Error", res.data.message);
+        }
+      } else {
+        payload.breakType = actionType;
+        const breakRes = await axios.post('http://localhost:5000/attendance/break', payload);
+        if (breakRes.data.success) {
+           Alert.alert("Success", breakRes.data.message);
+        }
+      }
+
+      setCameraVisible(false);
+      fetchSummary(user.id);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Something went wrong.");
+      setCameraVisible(false);
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const animateButton = (action: () => void) => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true })
+    ]).start(() => action());
+  };
 
   if (!user) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={Colors.light.primary} />
+      </View>
+    );
+  }
+
+  if (cameraVisible) {
+    return (
+      <View style={{ flex: 1 }}>
+        <CameraView style={{ flex: 1 }} ref={cameraRef} facing="front" />
+        <View style={styles.cameraOverlay}>
+          <TouchableOpacity style={styles.captureBtn} onPress={takePictureAndSubmit} disabled={loadingAction}>
+            {loadingAction ? <ActivityIndicator color="#fff" /> : <Text style={styles.captureBtnText}>Confirm {actionType}</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.captureBtn, {backgroundColor: Colors.light.error}]} onPress={() => setCameraVisible(false)}>
+             <Text style={styles.captureBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -33,10 +153,42 @@ export default function EmployeeDashboardScreen() {
       </View>
 
       <View style={styles.grid}>
+        {/* Attendance Action Card */}
+        <View style={[styles.card, { flex: 2, minWidth: 300 }]}>
+          <Text style={styles.cardTitle}>Quick Actions</Text>
+          <View style={styles.actionGrid}>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => animateButton(() => handleAction('login'))}>
+                <PlayCircle color="white" size={24} style={{marginBottom: 8}} />
+                <Text style={styles.actionText}>Check In</Text>
+              </TouchableOpacity>
+            </Animated.View>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#ef4444' }]} onPress={() => animateButton(() => handleAction('logout'))}>
+                <StopCircle color="white" size={24} style={{marginBottom: 8}} />
+                <Text style={styles.actionText}>Check Out</Text>
+              </TouchableOpacity>
+            </Animated.View>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => animateButton(() => handleAction('Break In'))}>
+                <Coffee color="white" size={24} style={{marginBottom: 8}} />
+                <Text style={styles.actionText}>Break In</Text>
+              </TouchableOpacity>
+            </Animated.View>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '48%' }}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={() => animateButton(() => handleAction('Break Out'))}>
+                <Coffee color="white" size={24} style={{marginBottom: 8}} />
+                <Text style={styles.actionText}>Break Out</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Existing Status Cards */}
         <View style={styles.card}>
           <Clock color={Colors.light.primary} size={32} style={{ marginBottom: 16 }} />
           <Text style={styles.cardTitle}>Attendance Status</Text>
-          <Text style={styles.cardValue}>Pending</Text>
+          <Text style={styles.cardValue}>{summary ? "Active" : "Pending"}</Text>
           <Text style={styles.cardSub}>Mark your attendance for today.</Text>
         </View>
         <View style={styles.card}>
@@ -51,55 +203,20 @@ export default function EmployeeDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 32,
-    backgroundColor: Colors.light.background,
-  },
-  containerMobile: {
-    padding: 16,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: Colors.light.text,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.light.icon,
-    marginTop: 8,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 24,
-  },
-  card: {
-    flex: 1,
-    minWidth: 250,
-    backgroundColor: '#fff',
-    padding: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 8,
-  },
-  cardValue: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: Colors.light.primary,
-    marginBottom: 8,
-  },
-  cardSub: {
-    fontSize: 13,
-    color: Colors.light.icon,
-  }
+  container: { flex: 1, padding: 32, backgroundColor: Colors.light.background },
+  containerMobile: { padding: 16 },
+  header: { marginBottom: 32 },
+  title: { fontSize: 32, fontWeight: '800', color: Colors.light.text },
+  subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+  card: { flex: 1, minWidth: 250, backgroundColor: '#fff', padding: 24, borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 16 },
+  cardValue: { fontSize: 32, fontWeight: '800', color: Colors.light.primary, marginBottom: 8 },
+  cardSub: { fontSize: 13, color: Colors.light.icon },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
+  actionBtn: { padding: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: {width: 0, height: 2} },
+  actionText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  cameraOverlay: { position: 'absolute', bottom: 40, width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20 },
+  captureBtn: { backgroundColor: Colors.light.primary, paddingVertical: 15, paddingHorizontal: 30, borderRadius: 30, elevation: 5 },
+  captureBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });

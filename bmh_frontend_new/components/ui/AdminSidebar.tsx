@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/admin/dashboard' },
   { name: 'Employees', icon: Users, route: '/admin/dashboard/employees' },
   { name: 'Departments', icon: Building, route: '/admin/dashboard/departments' },
+  { name: 'Attendance', icon: Activity, route: '/admin/dashboard/attendance' },
   { name: 'Tasks', icon: Activity, route: '/admin/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/admin/dashboard/stationary' },
   { name: 'Allowances', icon: Wallet, route: '/admin/dashboard/allowances' },
