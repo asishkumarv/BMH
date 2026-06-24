@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import axios from 'axios';
-import { Download, MapPin } from 'lucide-react-native';
+import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 const Dropdown = ({ options, value, onChange }: any) => {
   const [open, setOpen] = useState(false);
@@ -88,6 +88,7 @@ export default function AdminAttendanceDashboard() {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [radius, setRadius] = useState('2000');
+  const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -217,52 +218,63 @@ export default function AdminAttendanceDashboard() {
 
       {/* Config Section */}
       <View style={[styles.section, {zIndex: 1000}]}>
-        <Text style={styles.sectionTitle}>Configure Department Location</Text>
-        <Text style={{color: '#6b7280', marginBottom: 15}}>Select a department and tap on the map to set its geofence boundaries.</Text>
-        
-        <View style={styles.inputRow}>
-          <Dropdown 
-            options={departments} 
-            value={deptName} 
-            onChange={(name: string) => {
-              setDeptName(name);
-              const dept = departments.find(d => d.name === name);
-              if (dept) {
-                setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
-                setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
-                setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '200');
-              }
-            }} 
-          />
-          
-          <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
-            <TextInput 
-              style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
-              placeholder="Radius" 
-              value={radius} 
-              onChangeText={setRadius} 
-              keyboardType="numeric" 
-            />
-            <Text style={{color: '#6b7280', marginLeft: 8, fontWeight: '500'}}>meters</Text>
-          </View>
-        </View>
-        
-        <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
-          <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
-             <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
-             <Text style={{color: '#6b7280'}}>{lat ? `Lat: ${Number(lat).toFixed(6)}` : 'Latitude'}</Text>
-          </View>
-          <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
-             <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
-             <Text style={{color: '#6b7280'}}>{lng ? `Lng: ${Number(lng).toFixed(6)}` : 'Longitude'}</Text>
-          </View>
-        </View>
-
-        <MapPicker lat={lat} lng={lng} />
-
-        <TouchableOpacity style={styles.button} onPress={handleUpdateConfig}>
-          <Text style={styles.buttonText}>Save Configuration</Text>
+        <TouchableOpacity 
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} 
+          onPress={() => setShowConfig(!showConfig)}
+        >
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Configure Department Location</Text>
+          {showConfig ? <ChevronUp size={24} color="#374151" /> : <ChevronDown size={24} color="#374151" />}
         </TouchableOpacity>
+        
+        {showConfig && (
+          <View style={{ marginTop: 15 }}>
+            <Text style={{color: '#6b7280', marginBottom: 15}}>Select a department and tap on the map to set its geofence boundaries.</Text>
+            
+            <View style={styles.inputRow}>
+              <Dropdown 
+                options={departments} 
+                value={deptName} 
+                onChange={(name: string) => {
+                  setDeptName(name);
+                  const dept = departments.find(d => d.name === name);
+                  if (dept) {
+                    setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
+                    setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
+                    setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '200');
+                  }
+                }} 
+              />
+              
+              <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
+                <TextInput 
+                  style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
+                  placeholder="Radius" 
+                  value={radius} 
+                  onChangeText={setRadius} 
+                  keyboardType="numeric" 
+                />
+                <Text style={{color: '#6b7280', marginLeft: 8, fontWeight: '500'}}>meters</Text>
+              </View>
+            </View>
+            
+            <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
+              <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
+                 <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
+                 <Text style={{color: '#6b7280'}}>{lat ? `Lat: ${Number(lat).toFixed(6)}` : 'Latitude'}</Text>
+              </View>
+              <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
+                 <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
+                 <Text style={{color: '#6b7280'}}>{lng ? `Lng: ${Number(lng).toFixed(6)}` : 'Longitude'}</Text>
+              </View>
+            </View>
+
+            <MapPicker lat={lat} lng={lng} />
+
+            <TouchableOpacity style={styles.button} onPress={handleUpdateConfig}>
+              <Text style={styles.buttonText}>Save Configuration</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Reports Section */}

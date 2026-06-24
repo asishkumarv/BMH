@@ -166,7 +166,7 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
 
       const insertResult = await pool.query(
         `INSERT INTO attendance (employee_id, department, timestamp, image_url, status)
-         VALUES ($1, (SELECT department FROM employees WHERE id = $1), (NOW() AT TIME ZONE 'Asia/Kolkata'), $2, $3)
+         VALUES ($1, (SELECT department FROM employees WHERE id = $1), CURRENT_TIMESTAMP, $2, $3)
          RETURNING id, timestamp, status`,
         [employeeId, storedCapturedUrl, status]
       );
@@ -195,7 +195,7 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
 
       const updateResult = await pool.query(
         `UPDATE attendance 
-         SET checkout_timestamp = (NOW() AT TIME ZONE 'Asia/Kolkata')
+         SET checkout_timestamp = CURRENT_TIMESTAMP
          WHERE employee_id = $1 AND date = CURRENT_DATE
          RETURNING id, checkout_timestamp`,
         [employeeId]
@@ -239,7 +239,7 @@ exports.markBreak = async (req, res) => {
 
     await pool.query(
       `INSERT INTO break_logs (employee_id, break_type, timestamp, image_url, status)
-       VALUES ($1, $2, (NOW() AT TIME ZONE 'Asia/Kolkata'), $3, $4)`,
+       VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4)`,
       [employeeId, breakType, storedCapturedUrl, status]
     );
 
