@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { name: 'Tasks', icon: CheckSquare, route: '/employee/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/employee/dashboard/stationary' },
   { name: 'Wallet', icon: Wallet, route: '/employee/dashboard/wallet' },
+  { name: 'Patient History', icon: User, route: '/employee/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/employee/dashboard/notifications' },
   { name: 'Payslips', icon: FileText, route: '/employee/dashboard/payslips' },
   { name: 'Profile', icon: User, route: '/employee/dashboard/profile' },

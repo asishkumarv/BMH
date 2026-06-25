@@ -19,17 +19,21 @@ export default function AdminDashboard() {
     totalOnline: 0,
     totalCash: 0,
     totalCashInWallets: 0,
+    adminVaultAmount: 0,
     totalPendingHandovers: 0
   });
+  
+  const [walletBalances, setWalletBalances] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [empRes, adminRes, deptRes, revRes] = await Promise.all([
+        const [empRes, adminRes, deptRes, revRes, balRes] = await Promise.all([
           axios.get('https://bmh-eitu.onrender.com/employees'),
           axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
           axios.get('https://bmh-eitu.onrender.com/department'),
-          axios.get('https://bmh-eitu.onrender.com/admin/revenue-stats')
+          axios.get('https://bmh-eitu.onrender.com/admin/revenue-stats'),
+          axios.get('https://bmh-eitu.onrender.com/admin/wallet-balances')
         ]);
         
         const emps = empRes.data.success ? empRes.data.data : [];
@@ -48,11 +52,16 @@ export default function AdminDashboard() {
 
         if (revRes.data.success) {
           setRevStats({
-            totalOnline: revRes.data.data.totalOnline,
-            totalCash: revRes.data.data.totalCash,
-            totalCashInWallets: revRes.data.data.totalCashInWallets,
-            totalPendingHandovers: revRes.data.data.totalPendingHandovers
+            totalOnline: revRes.data.data.totalOnline || 0,
+            totalCash: revRes.data.data.totalCash || 0,
+            totalCashInWallets: revRes.data.data.totalCashInWallets || 0,
+            adminVaultAmount: revRes.data.data.adminVaultAmount || 0,
+            totalPendingHandovers: revRes.data.data.totalPendingHandovers || 0
           });
+        }
+        
+        if (balRes.data.success) {
+          setWalletBalances(balRes.data.data || []);
         }
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -73,6 +82,7 @@ export default function AdminDashboard() {
   const FINANCE_STATS = [
     { label: 'Total Online Revenue', value: `₹${revStats.totalOnline}`, icon: CreditCard, color: Colors.light.primary },
     { label: 'Total Cash Revenue', value: `₹${revStats.totalCash}`, icon: IndianRupee, color: '#16a34a' },
+    { label: 'Admin Vault Amount', value: `₹${revStats.adminVaultAmount}`, icon: Banknote, color: '#8b5cf6' },
     { label: 'Cash in Employee Wallets', value: `₹${revStats.totalCashInWallets}`, icon: Banknote, color: '#ca8a04' },
     { label: 'Pending Cash Handovers', value: `₹${revStats.totalPendingHandovers}`, icon: HandCoins, color: '#ea580c' },
   ];
@@ -118,10 +128,26 @@ export default function AdminDashboard() {
 
       <View style={[styles.chartSection, !isDesktop && styles.chartSectionMobile]}>
         <View style={styles.chartCard}>
-          <Text style={styles.cardTitle}>Activity Overview</Text>
-          <View style={styles.chartPlaceholder}>
-            <Text style={styles.placeholderText}>Chart Visualization Space</Text>
-            {/* In a real app, react-native-chart-kit or recharts would go here */}
+          <Text style={styles.cardTitle}>Employee Wallet Balances</Text>
+          <View style={{ marginTop: 16, overflow: 'hidden', borderRadius: 8, borderWidth: 1, borderColor: Colors.light.border }}>
+            <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border }}>
+              <Text style={{ flex: 1, fontWeight: '600', color: '#64748b', fontSize: 13 }}>ID</Text>
+              <Text style={{ flex: 2, fontWeight: '600', color: '#64748b', fontSize: 13 }}>Name</Text>
+              <Text style={{ flex: 1, fontWeight: '600', color: '#64748b', fontSize: 13 }}>Role</Text>
+              <Text style={{ flex: 1, fontWeight: '600', color: '#64748b', fontSize: 13, textAlign: 'right' }}>Cash in Hand</Text>
+            </View>
+            {walletBalances.length === 0 ? (
+              <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No wallet data found.</Text>
+            ) : (
+              walletBalances.map((w: any, idx: number) => (
+                <View key={idx} style={{ flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border, backgroundColor: '#fff' }}>
+                  <Text style={{ flex: 1, color: Colors.light.text, fontSize: 14 }}>{w.employee_id}</Text>
+                  <Text style={{ flex: 2, color: Colors.light.text, fontSize: 14, fontWeight: '500' }}>{w.full_name}</Text>
+                  <Text style={{ flex: 1, color: '#64748b', fontSize: 13 }}>{w.role}</Text>
+                  <Text style={{ flex: 1, color: '#16a34a', fontSize: 14, fontWeight: '600', textAlign: 'right' }}>₹{w.cash_in_hand}</Text>
+                </View>
+              ))
+            )}
           </View>
         </View>
         

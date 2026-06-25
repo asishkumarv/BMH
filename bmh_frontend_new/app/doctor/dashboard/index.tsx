@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import axios from 'axios';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { Calendar, User, Stethoscope, Save } from 'lucide-react-native';
+import { Calendar, User, Users, Stethoscope, Save } from 'lucide-react-native';
 
 export default function DoctorDashboard() {
   const { isMobile } = useResponsive();

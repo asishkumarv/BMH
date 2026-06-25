@@ -273,11 +273,15 @@ exports.getRevenueStats = async (req, res) => {
     const cashRes = await pool.query("SELECT SUM(ds.fee) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Cash'");
     const totalCash = cashRes.rows[0].total || 0;
 
-    // 3. Employee Wallet Cash Balances
-    const wRes = await pool.query("SELECT SUM(cash_in_hand) as total FROM employee_wallets");
+    // 3. Employee Wallet Cash Balances (Excluding Admins)
+    const wRes = await pool.query("SELECT SUM(cash_in_hand) as total FROM employee_wallets WHERE employee_id NOT LIKE 'ADMIN-%'");
     const totalCashInWallets = wRes.rows[0].total || 0;
 
-    // 4. Pending Cash Handovers
+    // 4. Admin Vault Cash (Only Admins)
+    const adminVaultRes = await pool.query("SELECT SUM(cash_in_hand) as total FROM employee_wallets WHERE employee_id LIKE 'ADMIN-%'");
+    const adminVaultAmount = adminVaultRes.rows[0].total || 0;
+
+    // 5. Pending Cash Handovers
     const pRes = await pool.query("SELECT SUM(amount) as total FROM cash_handovers WHERE status = 'Pending'");
     const totalPendingHandovers = pRes.rows[0].total || 0;
 
@@ -287,11 +291,59 @@ exports.getRevenueStats = async (req, res) => {
         totalOnline,
         totalCash,
         totalCashInWallets,
+        adminVaultAmount,
         totalPendingHandovers
       }
     });
   } catch (error) {
     console.error('Error getting revenue stats:', error);
     res.status(500).json({ success: false, message: 'Server error fetching revenue stats' });
+  }
+};
+
+exports.getAllWalletBalances = async (req, res) => {
+  try {
+    const query = `
+      SELECT ew.employee_id, ew.balance, ew.cash_in_hand,
+        COALESCE(e.full_name, sa.full_name, a.full_name) as full_name,
+        COALESCE(e.role, 'Sub Admin') as role
+      FROM employee_wallets ew
+      LEFT JOIN employees e ON ew.employee_id = 'EMP-' || e.id
+      LEFT JOIN department_admins sa ON ew.employee_id = 'SA-' || sa.id
+      LEFT JOIN super_admins a ON ew.employee_id = 'ADMIN-' || a.id
+      WHERE ew.employee_id NOT LIKE 'ADMIN-%'
+      ORDER BY ew.cash_in_hand DESC
+    `;
+    const result = await pool.query(query);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching wallet balances' });
+  }
+};
+
+exports.getDepartmentWalletBalances = async (req, res) => {
+  try {
+    const { department_id } = req.params;
+    
+    // First, get the department name based on ID
+    const deptResult = await pool.query('SELECT name FROM departments WHERE id = $1', [department_id]);
+    if (deptResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Department not found' });
+    }
+    const departmentName = deptResult.rows[0].name;
+
+    const query = `
+      SELECT ew.employee_id, ew.balance, ew.cash_in_hand,
+        e.full_name, e.role
+      FROM employee_wallets ew
+      JOIN employees e ON ew.employee_id = 'EMP-' || e.id
+      WHERE e.department = $1
+      ORDER BY ew.cash_in_hand DESC
+    `;
+    const result = await pool.query(query, [departmentName]);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error getting department wallet balances:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching department wallet balances' });
   }
 };

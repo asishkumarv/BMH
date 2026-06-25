@@ -16,5 +16,7 @@ router.put('/department-admins/:id/password', adminController.updateDepartmentAd
 router.put('/super-admins/:id/profile', adminController.updateSuperAdminProfile);
 router.put('/department-admins/:id/profile', adminController.updateDepartmentAdminProfile);
 router.get('/revenue-stats', adminController.getRevenueStats);
+router.get('/wallet-balances', adminController.getAllWalletBalances);
+router.get('/department-admins/:department_id/wallet-balances', adminController.getDepartmentWalletBalances);
 
 module.exports = router;

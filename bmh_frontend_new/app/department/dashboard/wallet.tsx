@@ -26,6 +26,7 @@ export default function SubAdminWalletScreen() {
 
   const [loading, setLoading] = useState(true);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
 
   // Modals
   const [usageModalVisible, setUsageModalVisible] = useState(false);
@@ -40,16 +41,19 @@ export default function SubAdminWalletScreen() {
 
   useEffect(() => {
     let empId = null;
+    let deptId = null;
     if (Platform.OS === 'web') {
       const userStr = localStorage.getItem('subAdminUser');
       if (userStr) {
         const user = JSON.parse(userStr);
         empId = `SA-${user.id}`;
+        deptId = user.department_id;
         setEmployeeId(empId);
+        setDepartmentId(deptId);
       }
     }
     if (empId) {
-      fetchData(empId);
+      fetchData(empId, deptId);
       fetchPeers(empId);
       fetchBookings(empId);
     } else {
@@ -57,13 +61,23 @@ export default function SubAdminWalletScreen() {
     }
   }, []);
 
-  const fetchData = async (id: string) => {
+  const [walletBalances, setWalletBalances] = useState<any[]>([]);
+
+  const fetchData = async (id: string, deptId: any) => {
     setLoading(true);
     try {
-      const [walletRes, handoversRes] = await Promise.all([
+      const reqs = [
         axios.get(`https://bmh-eitu.onrender.com/wallet/${id}`),
         axios.get(`https://bmh-eitu.onrender.com/wallet/handovers/${id}`)
-      ]);
+      ];
+      if (deptId) {
+        reqs.push(axios.get(`https://bmh-eitu.onrender.com/admin/department-admins/${deptId}/wallet-balances`));
+      }
+
+      const results = await Promise.all(reqs);
+      const walletRes = results[0];
+      const handoversRes = results[1];
+      const balancesRes = results[2];
       
       if (walletRes.data.success) {
         setBalance(walletRes.data.data.wallet?.balance || '0.00');
@@ -72,6 +86,9 @@ export default function SubAdminWalletScreen() {
       }
       if (handoversRes.data.success) {
         setHandovers(handoversRes.data.data || []);
+      }
+      if (balancesRes && balancesRes.data.success) {
+        setWalletBalances(balancesRes.data.data || []);
       }
     } catch (error) {
       console.error('Error fetching wallet:', error);
@@ -115,7 +132,7 @@ export default function SubAdminWalletScreen() {
         Alert.alert('Success', 'Usage logged successfully');
         setUsageModalVisible(false);
         setAmount(''); setNote('');
-        fetchData(employeeId);
+        fetchData(employeeId, departmentId);
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to log usage');
@@ -135,7 +152,7 @@ export default function SubAdminWalletScreen() {
         Alert.alert('Success', 'Allocation request sent');
         setRequestModalVisible(false);
         setAmount(''); setNote('');
-        fetchData(employeeId);
+        fetchData(employeeId, departmentId);
       }
     } catch (error: any) {
       Alert.alert('Error', 'Failed to request allocation');
@@ -148,7 +165,7 @@ export default function SubAdminWalletScreen() {
     if (!employeeId) return;
     try {
       const res = await axios.put(`https://bmh-eitu.onrender.com/wallet/transaction/${txId}`, { status: 'completed' });
-      if (res.data.success) fetchData(employeeId);
+      if (res.data.success) fetchData(employeeId, departmentId);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to accept allocation');
     }
@@ -171,7 +188,7 @@ export default function SubAdminWalletScreen() {
         Alert.alert('Success', 'Handover requested successfully');
         setHandoverModalVisible(false);
         setAmount(''); setSelectedPeerId('');
-        fetchData(employeeId);
+        fetchData(employeeId, departmentId);
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to request handover');
@@ -185,7 +202,7 @@ export default function SubAdminWalletScreen() {
       const res = await axios.post('https://bmh-eitu.onrender.com/wallet/handover/accept', { id, action });
       if (res.data.success) {
         Alert.alert('Success', `Handover ${action.toLowerCase()}`);
-        if(employeeId) fetchData(employeeId);
+        if(employeeId) fetchData(employeeId, departmentId);
       }
     } catch (error) {
       Alert.alert('Error', `Failed to ${action.toLowerCase()}`);
@@ -383,6 +400,30 @@ export default function SubAdminWalletScreen() {
                   </View>
                 </View>
               ))}
+
+              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>Department Cash Holdings</Text>
+              <View style={styles.table}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Name / ID</Text>
+                  <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>Role</Text>
+                  <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Cash in Hand</Text>
+                </View>
+                {walletBalances.map((item, idx) => (
+                  <View key={idx} style={styles.tableRow}>
+                    <View style={{ flex: 2 }}>
+                      <Text style={{ fontWeight: '500', color: Colors.light.text }}>{item.full_name}</Text>
+                      <Text style={{ fontSize: 12, color: Colors.light.icon }}>{item.employee_id}</Text>
+                    </View>
+                    <Text style={[styles.tableCell, { flex: 1 }]}>{item.role}</Text>
+                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#059669' }]}>
+                      ₹{item.cash_in_hand}
+                    </Text>
+                  </View>
+                ))}
+                {walletBalances.length === 0 && (
+                  <Text style={{ padding: 16, textAlign: 'center', color: Colors.light.icon }}>No balances found.</Text>
+                )}
+              </View>
             </>
           )}
 
@@ -488,6 +529,11 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: 12 },
   tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: '#e2e8f0' },
   tabBtnActive: { backgroundColor: Colors.light.primary },
+  closeModalBtnText: { color: Colors.light.text, fontWeight: '600' },
+  table: { backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: Colors.light.border, overflow: 'hidden' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border, alignItems: 'center' },
+  tableCell: { color: Colors.light.text, fontSize: 14 },
   tabBtnText: { color: Colors.light.primary, fontWeight: '600' },
   tabBtnTextActive: { color: '#FFF' },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },

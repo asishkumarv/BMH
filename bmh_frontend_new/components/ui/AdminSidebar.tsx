@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { name: 'Allowances', icon: Wallet, route: '/admin/dashboard/allowances' },
   { name: 'Cash Handovers', icon: Wallet, route: '/admin/dashboard/wallet' },
   { name: 'Doctors', icon: Users, route: '/admin/dashboard/doctors' },
+  { name: 'Patient History', icon: Users, route: '/admin/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/admin/dashboard/notifications' },
   { name: 'Settings', icon: Settings, route: '/admin/dashboard/settings' },
   { name: 'Profile', icon: Users, route: '/admin/dashboard/profile' },

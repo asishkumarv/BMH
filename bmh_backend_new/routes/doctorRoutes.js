@@ -11,5 +11,8 @@ router.post('/slots', doctorController.createSlot);
 router.get('/slots', doctorController.getSlots);
 router.get('/peons', doctorController.getAvailablePeons);
 router.post('/consultation', doctorController.saveConsultation);
+router.put('/consultation/:id', doctorController.updateConsultation);
+router.get('/:id/patients', doctorController.getDoctorPatients);
+router.get('/patient-history', doctorController.getAllPatientHistory);
 
 module.exports = router;

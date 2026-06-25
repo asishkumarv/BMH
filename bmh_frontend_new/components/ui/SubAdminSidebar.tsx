@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { name: 'Stationary', icon: Package, route: '/department/dashboard/stationary' },
   { name: 'Allowances', icon: Wallet, route: '/department/dashboard/allowances' },
   { name: 'My Wallet', icon: Wallet, route: '/department/dashboard/wallet' },
+  { name: 'Patient History', icon: Users, route: '/department/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/department/dashboard/notifications' },
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];

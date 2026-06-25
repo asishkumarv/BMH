@@ -215,7 +215,7 @@ exports.saveConsultation = async (req, res) => {
     await pool.query(
       `INSERT INTO consultations (booking_id, doctor_id, patient_id, notes, next_consultation_date)
        VALUES ($1, $2, $3, $4, $5)`,
-      [booking_id, doctor_id, patient_id, notes, next_consultation_date]
+      [booking_id, doctor_id, patient_id, notes, next_consultation_date || null]
     );
 
     // Optionally mark booking as Completed if not already
@@ -224,6 +224,89 @@ exports.saveConsultation = async (req, res) => {
     res.json({ success: true, message: 'Consultation notes saved successfully' });
   } catch (error) {
     console.error('Save Consultation Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Update Consultation
+exports.updateConsultation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes, next_consultation_date } = req.body;
+    await pool.query(
+      `UPDATE consultations SET notes = $1, next_consultation_date = $2 WHERE id = $3`,
+      [notes, next_consultation_date || null, id]
+    );
+    res.json({ success: true, message: 'Consultation updated successfully' });
+  } catch (error) {
+    console.error('Update Consultation Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Get Doctor Patients
+exports.getDoctorPatients = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = `
+      SELECT p.id, p.name, p.mobile, p.email, p.age, p.gender, c.id as consultation_id, c.notes, c.next_consultation_date, c.created_at as consultation_date
+      FROM consultations c
+      JOIN patients p ON c.patient_id = p.id
+      WHERE c.doctor_id = $1
+      ORDER BY c.created_at DESC
+    `;
+    const result = await pool.query(query, [id]);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Doctor Patients Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Get All Patient History
+exports.getAllPatientHistory = async (req, res) => {
+  try {
+    const { role, name, email, phone, start_date, end_date, department } = req.query;
+    
+    let query = `
+      SELECT p.id, p.name, p.mobile, p.email, p.age, p.gender, 
+             c.id as consultation_id, c.next_consultation_date, c.created_at as consultation_date,
+             d.full_name as doctor_name, d.department as doctor_department
+             ${role !== 'Employee' ? ', c.notes' : ''}
+      FROM consultations c
+      JOIN patients p ON c.patient_id = p.id
+      JOIN doctors d ON c.doctor_id = d.id
+      WHERE 1=1
+    `;
+    let params = [];
+
+    if (name) {
+      params.push(`%${name}%`);
+      query += ` AND p.name ILIKE $${params.length}`;
+    }
+    if (email) {
+      params.push(`%${email}%`);
+      query += ` AND p.email ILIKE $${params.length}`;
+    }
+    if (phone) {
+      params.push(`%${phone}%`);
+      query += ` AND p.mobile ILIKE $${params.length}`;
+    }
+    if (department) {
+      params.push(department);
+      query += ` AND d.department = $${params.length}`;
+    }
+    if (start_date && end_date) {
+      params.push(start_date, end_date);
+      query += ` AND DATE(c.created_at) BETWEEN $${params.length - 1} AND $${params.length}`;
+    }
+
+    query += ' ORDER BY c.created_at DESC';
+
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get All Patient History Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

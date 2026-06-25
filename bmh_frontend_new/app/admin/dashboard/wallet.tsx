@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Alert, ScrollView } from 'react-native';
-import { Banknote, CheckCircle2 } from 'lucide-react-native';
+import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -11,6 +11,8 @@ export default function AdminWalletScreen() {
   const { isDesktop } = useResponsive();
 
   const [cashInHand, setCashInHand] = useState('0.00');
+  const [stats, setStats] = useState<any>({});
+  const [walletBalances, setWalletBalances] = useState<any[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminId, setAdminId] = useState<string | null>(null);
@@ -35,9 +37,11 @@ export default function AdminWalletScreen() {
   const fetchData = async (id: string) => {
     setLoading(true);
     try {
-      const [walletRes, handoversRes] = await Promise.all([
+      const [walletRes, handoversRes, statsRes, balancesRes] = await Promise.all([
         axios.get(`https://bmh-eitu.onrender.com/wallet/${id}`),
-        axios.get(`https://bmh-eitu.onrender.com/wallet/handovers/${id}`)
+        axios.get(`https://bmh-eitu.onrender.com/wallet/handovers/${id}`),
+        axios.get(`https://bmh-eitu.onrender.com/admin/revenue-stats`),
+        axios.get(`https://bmh-eitu.onrender.com/admin/wallet-balances`)
       ]);
       
       if (walletRes.data.success) {
@@ -45,6 +49,12 @@ export default function AdminWalletScreen() {
       }
       if (handoversRes.data.success) {
         setHandovers(handoversRes.data.data || []);
+      }
+      if (statsRes.data.success) {
+        setStats(statsRes.data.data);
+      }
+      if (balancesRes.data.success) {
+        setWalletBalances(balancesRes.data.data);
       }
     } catch (error) {
       console.error('Error fetching admin wallet:', error);
@@ -73,7 +83,7 @@ export default function AdminWalletScreen() {
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Super Admin Vault</Text>
-          <Text style={styles.subtitle}>Manage cash handed over from departments.</Text>
+          <Text style={styles.subtitle}>Manage cash handed over from departments and track revenue.</Text>
         </View>
       </View>
 
@@ -82,14 +92,32 @@ export default function AdminWalletScreen() {
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           
-          <View style={styles.cashCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
               <View style={[styles.iconBox, { backgroundColor: '#10B9811A' }]}>
                 <Banknote size={24} color="#10B981" />
               </View>
-              <Text style={{ fontSize: 16, color: '#059669', fontWeight: '600', marginLeft: 12 }}>Vault Cash Balance</Text>
+              <Text style={{ fontSize: 16, color: '#059669', fontWeight: '600', marginTop: 12 }}>Vault Cash Balance</Text>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: '#064E3B' }}>₹{cashInHand}</Text>
             </View>
-            <Text style={{ fontSize: 40, fontWeight: '800', color: '#064E3B' }}>₹{cashInHand}</Text>
+
+            <View style={[styles.statCard, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
+              <View style={[styles.iconBox, { backgroundColor: '#3B82F61A' }]}>
+                <CreditCard size={24} color="#3B82F6" />
+              </View>
+              <Text style={{ fontSize: 16, color: '#2563EB', fontWeight: '600', marginTop: 12 }}>Online Cash</Text>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: '#1E3A8A' }}>₹{stats.totalOnline || '0.00'}</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: '#FDF4FF', borderColor: '#FAE8FF' }]}>
+              <View style={[styles.iconBox, { backgroundColor: '#D946EF1A' }]}>
+                <TrendingUp size={24} color="#D946EF" />
+              </View>
+              <Text style={{ fontSize: 16, color: '#C026D3', fontWeight: '600', marginTop: 12 }}>Total Revenue</Text>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: '#701A75' }}>
+                ₹{((parseFloat(stats.totalCash || '0') + parseFloat(stats.totalOnline || '0'))).toFixed(2)}
+              </Text>
+            </View>
           </View>
 
           {incomingHandovers.length > 0 && (
@@ -115,6 +143,35 @@ export default function AdminWalletScreen() {
               ))}
             </View>
           )}
+
+          <View style={styles.balancesSection}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Users size={20} color={Colors.light.text} />
+              <Text style={[styles.sectionTitle, { marginBottom: 0, marginLeft: 8 }]}>Sub-Admin & Employee Cash Holdings</Text>
+            </View>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Name / ID</Text>
+                <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>Role</Text>
+                <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Cash in Hand</Text>
+              </View>
+              {walletBalances.map((item, idx) => (
+                <View key={idx} style={styles.tableRow}>
+                  <View style={{ flex: 2 }}>
+                    <Text style={{ fontWeight: '500', color: Colors.light.text }}>{item.full_name}</Text>
+                    <Text style={{ fontSize: 12, color: Colors.light.icon }}>{item.employee_id}</Text>
+                  </View>
+                  <Text style={[styles.tableCell, { flex: 1 }]}>{item.role}</Text>
+                  <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#059669' }]}>
+                    ₹{item.cash_in_hand}
+                  </Text>
+                </View>
+              ))}
+              {walletBalances.length === 0 && (
+                <Text style={{ padding: 16, textAlign: 'center', color: Colors.light.icon }}>No balances found.</Text>
+              )}
+            </View>
+          </View>
 
           <View style={{ marginTop: 32 }}>
             <Text style={styles.sectionTitle}>Handover History</Text>
@@ -152,7 +209,8 @@ const styles = StyleSheet.create({
   headerMobile: { flexDirection: 'column', gap: 16 },
   title: { fontSize: 32, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
-  cashCard: { backgroundColor: '#ECFDF5', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#D1FAE5' },
+  statsGrid: { flexDirection: 'row', gap: 16, marginBottom: 32, flexWrap: 'wrap' },
+  statCard: { flex: 1, minWidth: 250, padding: 24, borderRadius: 24, borderWidth: 1 },
   iconBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   pendingSection: { marginBottom: 32, backgroundColor: '#FFFBEB', padding: 20, borderRadius: 24, borderWidth: 1, borderColor: '#FEF3C7' },
   sectionTitle: { fontSize: 20, fontWeight: '700', color: Colors.light.text, marginBottom: 16 },
@@ -162,6 +220,11 @@ const styles = StyleSheet.create({
   txDate: { fontSize: 12, color: Colors.light.icon, marginTop: 4 },
   acceptBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, gap: 8 },
   acceptBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
+  balancesSection: { marginBottom: 32, backgroundColor: '#FFF', padding: 24, borderRadius: 24, borderWidth: 1, borderColor: Colors.light.border },
+  table: { backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: Colors.light.border, overflow: 'hidden' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border, alignItems: 'center' },
+  tableCell: { color: Colors.light.text, fontSize: 14 },
   historyCard: { backgroundColor: Colors.light.card, padding: 20, borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   historyPeer: { fontSize: 16, fontWeight: '600', color: Colors.light.text },
   historyDate: { fontSize: 12, color: Colors.light.icon, marginTop: 4 },
