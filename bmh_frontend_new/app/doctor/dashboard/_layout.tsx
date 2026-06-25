@@ -3,13 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from '
 import { Slot, router, usePathname } from 'expo-router';
 import { LayoutDashboard, Users, LogOut, Activity, Calendar } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function DoctorLayout() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
-  const isWeb = Platform.OS === 'web';
-  const screenWidth = Dimensions.get('window').width;
-  const isMobile = screenWidth < 768;
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -43,8 +42,8 @@ export default function DoctorLayout() {
   ];
 
   return (
-    <View style={styles.container}>
-      {(!isMobile || isWeb) && (
+    <View style={[styles.container, isMobile && { flexDirection: 'column' }]}>
+      {!isMobile && (
         <View style={styles.sidebar}>
           <View style={styles.logoContainer}>
             <Activity color="#3b82f6" size={32} />

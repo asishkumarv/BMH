@@ -44,6 +44,7 @@ export function TopHeader({ userType }: TopHeaderProps) {
   }, [userType]);
 
   const fetchAttendanceStatus = async (userId: string | number) => {
+    try {
       const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/today/${userId}`);
         if (res.data.success && res.data.data) {
            const color = res.data.data.color;

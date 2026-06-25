@@ -276,7 +276,8 @@ exports.getAllPatientHistory = async (req, res) => {
       FROM patient_bookings pb
       LEFT JOIN consultations c ON c.booking_id = pb.id
       JOIN patients p ON pb.patient_id = p.id
-      JOIN doctors d ON pb.doctor_id = d.id
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
       WHERE pb.status = 'Completed'
     `;
     let params = [];
