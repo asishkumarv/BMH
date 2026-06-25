@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
-import { API_URL } from '../../../config';
+import { API_URL } from '@/config';
 import { Settings, Users, CalendarDays, CheckCircle2, XCircle, Clock, Save } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -11,12 +12,14 @@ export default function SubAdminLeaveManagement() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [departmentId, setDepartmentId] = useState<string>('');
+  const [deptNumId, setDeptNumId] = useState<string>('');
 
   // Settings State
   const [roleSettings, setRoleSettings] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   
   // Settings Form State
-  const [rRole, setRRole] = useState('');
+  const [rRole, setRRole] = useState('All');
   const [rLeaves, setRLeaves] = useState('1');
   const [rExtraPen, setRExtraPen] = useState('0');
   const [rLateLim, setRLateLim] = useState('3');
@@ -26,18 +29,20 @@ export default function SubAdminLeaveManagement() {
 
   useEffect(() => {
     const init = async () => {
-      let deptId = '';
+      let deptName = '';
+      let numId = '';
       if (Platform.OS === 'web') {
         const userStr = localStorage.getItem('subAdminUser');
         if (userStr) {
           const user = JSON.parse(userStr);
-          deptId = user.department_id;
+          numId = user.department_id;
+          setDeptNumId(numId);
           try {
-            const res = await fetch(`https://bmh-eitu.onrender.com/department/${deptId}`);
+            const res = await fetch(`${API_URL}/department/${numId}`);
             if (res.ok) {
                const data = await res.json();
-               deptId = data.data.name; 
-               setDepartmentId(deptId);
+               deptName = data.data.name; 
+               setDepartmentId(deptName);
             }
           } catch (e) {
             console.error(e);
@@ -45,15 +50,25 @@ export default function SubAdminLeaveManagement() {
         }
       }
       
-      if (deptId) {
-        fetchRequests(deptId);
-        fetchSettings(deptId);
+      if (deptName) {
+        fetchRequests(deptName);
+        fetchSettings(deptName);
+        fetchRoles();
       } else {
         setLoading(false);
       }
     };
     init();
   }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const res = await axios.get(`https://bmh-eitu.onrender.com/roles`);
+      if (res.data && res.data.success) {
+        setRoles(res.data.data);
+      }
+    } catch (e) { console.error("Dropdown fetch error:", e); }
+  };
 
   const fetchRequests = async (dept: string) => {
     try {
@@ -190,7 +205,20 @@ export default function SubAdminLeaveManagement() {
               <Text style={styles.helperText}>Configure how many leaves are free per month, and set penalties for late check-ins or extra leaves.</Text>
               
               <Text style={styles.label}>Role (Use 'All' for all roles in dept)</Text>
-              <TextInput style={styles.input} value={rRole} onChangeText={setRRole} placeholder="e.g. All or Senior Surgeon" />
+              {Platform.OS === 'web' ? (
+                <select 
+                  value={rRole} 
+                  onChange={(e: any) => setRRole(e.target.value)} 
+                  style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                >
+                  <option value="All">All Roles</option>
+                  {roles.filter(r => !deptNumId || r.departmentId == deptNumId).map(r => (
+                    <option key={r.id} value={r.name}>{r.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <TextInput style={styles.input} value={rRole} onChangeText={setRRole} placeholder="e.g. All or Senior Surgeon" />
+              )}
               
               <View style={{ flexDirection: 'row', gap: 16 }}>
                 <View style={{ flex: 1 }}>

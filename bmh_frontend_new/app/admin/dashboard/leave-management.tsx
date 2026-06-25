@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
-import { API_URL } from '../../../config';
+import { API_URL } from '@/config';
 import { Settings, Users, CalendarDays, CheckCircle2, XCircle, Clock, Save, Building } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -14,13 +15,15 @@ export default function AdminLeaveManagement() {
   // Settings State
   const [deptSettings, setDeptSettings] = useState<any[]>([]);
   const [roleSettings, setRoleSettings] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   
   // Forms State
-  const [dDept, setDDept] = useState('');
+  const [dDept, setDDept] = useState('All');
   const [dLimit, setDLimit] = useState('2');
   
-  const [rDept, setRDept] = useState('');
-  const [rRole, setRRole] = useState('');
+  const [rDept, setRDept] = useState('All');
+  const [rRole, setRRole] = useState('All');
   const [rLeaves, setRLeaves] = useState('1');
   const [rExtraPen, setRExtraPen] = useState('0');
   const [rLateLim, setRLateLim] = useState('3');
@@ -31,7 +34,25 @@ export default function AdminLeaveManagement() {
   useEffect(() => {
     fetchRequests();
     fetchSettings();
+    fetchDropdownData();
   }, []);
+
+  const fetchDropdownData = async () => {
+    try {
+      const [deptRes, roleRes] = await Promise.all([
+        axios.get(`https://bmh-eitu.onrender.com/department`),
+        axios.get(`https://bmh-eitu.onrender.com/roles`)
+      ]);
+      if (deptRes.data && deptRes.data.success) {
+        setDepartments(deptRes.data.data);
+      }
+      if (roleRes.data && roleRes.data.success) {
+        setRoles(roleRes.data.data);
+      }
+    } catch (error) {
+      console.error("Dropdown fetch error:", error);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -183,7 +204,19 @@ export default function AdminLeaveManagement() {
               <Text style={styles.helperText}>Maximum number of employees allowed to take leave on the same day in a department.</Text>
               
               <Text style={styles.label}>Department</Text>
-              <TextInput style={styles.input} value={dDept} onChangeText={setDDept} placeholder="e.g. Cardiology or All" />
+              {Platform.OS === 'web' ? (
+                <select 
+                  value={dDept} 
+                  onChange={(e: any) => setDDept(e.target.value)} 
+                  style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                >
+                  <option value="All">All Departments</option>
+                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                </select>
+              ) : (
+                <TextInput style={styles.input} value={dDept} onChangeText={setDDept} placeholder="e.g. Cardiology or All" />
+              )}
+              
               <Text style={styles.label}>Max Concurrent Leaves</Text>
               <TextInput style={styles.input} value={dLimit} onChangeText={setDLimit} keyboardType="numeric" />
               
@@ -215,11 +248,35 @@ export default function AdminLeaveManagement() {
               <View style={{ flexDirection: 'row', gap: 16 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Department</Text>
-                  <TextInput style={styles.input} value={rDept} onChangeText={setRDept} placeholder="e.g. Cardiology" />
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      value={rDept} 
+                      onChange={(e: any) => { setRDept(e.target.value); setRRole('All'); }} 
+                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                    >
+                      <option value="All">All Departments</option>
+                      {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} value={rDept} onChangeText={setRDept} placeholder="e.g. Cardiology" />
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Role (or 'All')</Text>
-                  <TextInput style={styles.input} value={rRole} onChangeText={setRRole} placeholder="e.g. Senior Surgeon" />
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      value={rRole} 
+                      onChange={(e: any) => setRRole(e.target.value)} 
+                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                    >
+                      <option value="All">All Roles</option>
+                      {roles.filter(r => rDept === 'All' || r.departmentId === departments.find(d => d.name === rDept)?.id).map(r => (
+                        <option key={r.id} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput style={styles.input} value={rRole} onChangeText={setRRole} placeholder="e.g. Senior Surgeon" />
+                  )}
                 </View>
               </View>
 

@@ -304,3 +304,70 @@ exports.getPayslips = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+exports.getEmployeeLeaveSummary = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // 1. Get employee data
+    const empRes = await pool.query('SELECT * FROM employees WHERE id = $1', [employee_id]);
+    if (empRes.rows.length === 0) return res.status(404).json({ message: 'Employee not found' });
+    const emp = empRes.rows[0];
+
+    // 2. Get role settings
+    let roleQuery = `SELECT * FROM role_leave_settings WHERE (department = $1 OR department = 'All') AND (role = $2 OR role = 'All') ORDER BY department DESC, role DESC LIMIT 1`;
+    const roleSetRes = await pool.query(roleQuery, [emp.department, emp.role]);
+    
+    let settings = {
+      leaves_per_month: 0,
+      late_checkin_limit: 0,
+      early_checkout_limit: 0,
+    };
+    if (roleSetRes.rows.length > 0) settings = roleSetRes.rows[0];
+
+    // 3. Calculate actual leaves taken in this month
+    const leavesRes = await pool.query(`
+      SELECT SUM(end_date - start_date + 1) as total_leave_days
+      FROM leave_requests 
+      WHERE employee_id = $1 AND status = 'approved' 
+      AND TO_CHAR(start_date, 'YYYY-MM') = $2
+    `, [employee_id, month]);
+    const actual_leaves = parseInt(leavesRes.rows[0].total_leave_days || 0);
+
+    // 4. Calculate late checkins & early checkouts from attendance
+    const attendanceRes = await pool.query(`
+      SELECT late_duration, early_checkout_duration 
+      FROM attendance 
+      WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2
+    `, [employee_id, month]);
+
+    let late_count = 0;
+    let early_count = 0;
+    attendanceRes.rows.forEach(att => {
+      if (att.late_duration && att.late_duration !== '0h 0m' && att.late_duration !== '') {
+         late_count++;
+      }
+      if (att.early_checkout_duration && att.early_checkout_duration !== '0h 0m' && att.early_checkout_duration !== '') {
+         early_count++;
+      }
+    });
+
+    res.status(200).json({
+      limits: {
+        leaves: settings.leaves_per_month,
+        late_checkins: settings.late_checkin_limit,
+        early_checkouts: settings.early_checkout_limit
+      },
+      usage: {
+        leaves: actual_leaves,
+        late_checkins: late_count,
+        early_checkouts: early_count
+      }
+    });
+  } catch (error) {
+    console.error('Error getting leave summary:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

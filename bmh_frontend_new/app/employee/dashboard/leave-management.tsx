@@ -8,6 +8,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 export default function LeaveManagement() {
   const { isMobile, isDesktop } = useResponsive();
   const [employee, setEmployee] = useState<any>(null);
+  const [summary, setSummary] = useState<any>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -29,10 +30,17 @@ export default function LeaveManagement() {
       const emp = JSON.parse(empData);
       setEmployee(emp);
 
-      const res = await fetch(`${API_URL}/leave/requests?employee_id=${emp.id}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [reqRes, sumRes] = await Promise.all([
+        fetch(`${API_URL}/leave/requests?employee_id=${emp.id}`),
+        fetch(`${API_URL}/leave/summary/${emp.id}`)
+      ]);
+      if (reqRes.ok) {
+        const data = await reqRes.json();
         setRequests(data);
+      }
+      if (sumRes.ok) {
+        const data = await sumRes.json();
+        setSummary(data);
       }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
@@ -99,6 +107,23 @@ export default function LeaveManagement() {
           <Text style={styles.subtitle}>Apply for leaves and track your requests</Text>
         </View>
       </View>
+
+      {summary && (
+        <View style={[styles.summaryRow, isMobile && { flexDirection: 'column' }]}>
+          <View style={styles.summaryCard}>
+             <Text style={styles.summaryVal}>{summary.usage.leaves} <Text style={styles.summaryLimit}>/ {summary.limits.leaves}</Text></Text>
+             <Text style={styles.summaryLabel}>Leaves This Month</Text>
+          </View>
+          <View style={styles.summaryCard}>
+             <Text style={styles.summaryVal}>{summary.usage.late_checkins} <Text style={styles.summaryLimit}>/ {summary.limits.late_checkins}</Text></Text>
+             <Text style={styles.summaryLabel}>Late Check-ins</Text>
+          </View>
+          <View style={styles.summaryCard}>
+             <Text style={styles.summaryVal}>{summary.usage.early_checkouts} <Text style={styles.summaryLimit}>/ {summary.limits.early_checkouts}</Text></Text>
+             <Text style={styles.summaryLabel}>Early Check-outs</Text>
+          </View>
+        </View>
+      )}
 
       <View style={[styles.layout, !isMobile && { flexDirection: 'row', gap: 24 }]}>
         {/* Form Section */}
@@ -206,6 +231,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 15, color: Colors.light.icon, marginTop: 4 },
   layout: { gap: 24 },
+  summaryRow: { flexDirection: 'row', gap: 16, marginBottom: 24 },
+  summaryCard: { flex: 1, backgroundColor: Colors.light.card, padding: 20, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2, alignItems: 'center' },
+  summaryVal: { fontSize: 32, fontWeight: '800', color: Colors.light.primary },
+  summaryLimit: { fontSize: 18, color: Colors.light.icon, fontWeight: '600' },
+  summaryLabel: { fontSize: 14, color: Colors.light.textMuted, fontWeight: '600', marginTop: 4 },
   section: { flex: 1 },
   sectionHeading: { fontSize: 20, fontWeight: '700', color: Colors.light.text, marginBottom: 16 },
   card: { backgroundColor: Colors.light.card, padding: 24, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
