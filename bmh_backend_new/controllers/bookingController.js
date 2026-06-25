@@ -116,7 +116,30 @@ exports.updateBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body; // 'Current', 'Completed', 'Cancelled'
+    
     await pool.query('UPDATE patient_bookings SET status = $1 WHERE id = $2', [status, id]);
+    
+    // Automatically create a blank consultation record if Completed and it doesn't exist
+    if (status === 'Completed') {
+      const bRes = await pool.query(`
+        SELECT pb.patient_id, ds.doctor_id 
+        FROM patient_bookings pb
+        JOIN doctor_slots ds ON pb.slot_id = ds.id
+        WHERE pb.id = $1
+      `, [id]);
+      
+      if (bRes.rowCount > 0) {
+        const { patient_id, doctor_id } = bRes.rows[0];
+        const cRes = await pool.query('SELECT id FROM consultations WHERE booking_id = $1', [id]);
+        if (cRes.rowCount === 0) {
+          await pool.query(`
+            INSERT INTO consultations (booking_id, doctor_id, patient_id, notes, next_consultation_date)
+            VALUES ($1, $2, $3, '', NULL)
+          `, [id, doctor_id, patient_id]);
+        }
+      }
+    }
+
     res.json({ success: true, message: `Booking status updated to ${status}` });
   } catch (error) {
     console.error('Update Booking Status Error:', error);
