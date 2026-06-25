@@ -205,3 +205,105 @@ exports.logUsage = async (req, res) => {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
+
+// --- CASH HANDOVERS ---
+
+exports.requestHandover = async (req, res) => {
+  try {
+    const { from_employee_id, to_employee_id, amount } = req.body;
+    
+    // Check if sender has enough cash_in_hand
+    const wCheck = await pool.query('SELECT cash_in_hand FROM employee_wallets WHERE employee_id = $1', [from_employee_id]);
+    if (wCheck.rowCount === 0 || parseFloat(wCheck.rows[0].cash_in_hand) < parseFloat(amount)) {
+      return res.status(400).json({ success: false, message: 'Insufficient cash in hand' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, status) VALUES ($1, $2, $3, $4) RETURNING *',
+      [from_employee_id, to_employee_id, amount, 'Pending']
+    );
+
+    // Deduct immediately so they can't double-handover
+    await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2', [amount, from_employee_id]);
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Request Handover Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.acceptHandover = async (req, res) => {
+  try {
+    const { id, action } = req.body; // action: 'Accepted' or 'Rejected'
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const tx = await client.query('SELECT * FROM cash_handovers WHERE id = $1 FOR UPDATE', [id]);
+      if (tx.rowCount === 0) throw new Error('Handover not found');
+      const handover = tx.rows[0];
+
+      if (handover.status !== 'Pending') throw new Error('Handover already processed');
+
+      await client.query('UPDATE cash_handovers SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [action, id]);
+
+      if (action === 'Accepted') {
+        // Add cash to receiver
+        const wCheck = await client.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [handover.to_employee_id]);
+        if (wCheck.rowCount === 0) {
+          await client.query('INSERT INTO employee_wallets (employee_id, cash_in_hand, balance) VALUES ($1, $2, 0)', [handover.to_employee_id, handover.amount]);
+        } else {
+          await client.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [handover.amount, handover.to_employee_id]);
+        }
+      } else {
+        // Return cash to sender
+        await client.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [handover.amount, handover.from_employee_id]);
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, message: `Handover ${action}` });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Accept Handover Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getHandovers = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    const result = await pool.query(`
+      SELECT ch.*, f.full_name as from_name, t.full_name as to_name
+      FROM cash_handovers ch
+      JOIN employees f ON ch.from_employee_id = f.id
+      JOIN employees t ON ch.to_employee_id = t.id
+      WHERE ch.from_employee_id = $1 OR ch.to_employee_id = $1
+      ORDER BY ch.created_at DESC
+    `, [employee_id]);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Handovers Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getAllHandovers = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT ch.*, f.full_name as from_name, t.full_name as to_name
+      FROM cash_handovers ch
+      JOIN employees f ON ch.from_employee_id = f.id
+      JOIN employees t ON ch.to_employee_id = t.id
+      ORDER BY ch.created_at DESC
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get All Handovers Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

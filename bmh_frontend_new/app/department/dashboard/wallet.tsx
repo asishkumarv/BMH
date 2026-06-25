@@ -10,9 +10,9 @@ type Handover = { id: string; from_name: string; to_name: string; from_employee_
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
 type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
 
-export default function EmployeeWalletScreen() {
+export default function SubAdminWalletScreen() {
   const { isDesktop } = useResponsive();
-  const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Allowance');
+  const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Cash');
 
   // Allowances
   const [balance, setBalance] = useState('0.00');
@@ -41,7 +41,7 @@ export default function EmployeeWalletScreen() {
   useEffect(() => {
     let empId = null;
     if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('employeeUser');
+      const userStr = localStorage.getItem('deptUser');
       if (userStr) {
         const user = JSON.parse(userStr);
         empId = user.id;

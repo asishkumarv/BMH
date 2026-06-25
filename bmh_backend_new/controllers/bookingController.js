@@ -21,9 +21,10 @@ exports.createBooking = async (req, res) => {
     }
 
     // 2. Check slot token availability and explicitly validate token_number
-    const slotRes = await pool.query('SELECT total_tokens FROM doctor_slots WHERE id = $1', [slot_id]);
+    const slotRes = await pool.query('SELECT total_tokens, fee FROM doctor_slots WHERE id = $1', [slot_id]);
     if (slotRes.rowCount === 0) throw new Error('Slot not found');
     const total_tokens = slotRes.rows[0].total_tokens;
+    const fee = slotRes.rows[0].fee;
 
     if (!token_number || token_number < 1 || token_number > total_tokens) {
       await pool.query('ROLLBACK');
@@ -44,6 +45,16 @@ exports.createBooking = async (req, res) => {
       [slot_id, patient_id, token_number, booked_by, payment_mode]
     );
 
+    // 4. Update cash_in_hand if Cash payment
+    if (payment_mode === 'Cash') {
+      const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [booked_by]);
+      if (wCheck.rowCount === 0) {
+        await pool.query('INSERT INTO employee_wallets (employee_id, cash_in_hand, balance) VALUES ($1, $2, 0)', [booked_by, fee]);
+      } else {
+        await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [fee, booked_by]);
+      }
+    }
+
     await pool.query('COMMIT');
     res.json({ success: true, message: 'Booking successful', token_number });
   } catch (error) {
@@ -56,12 +67,12 @@ exports.createBooking = async (req, res) => {
 // Get bookings (Sub-admin view - no revenue, or Employee view)
 exports.getBookings = async (req, res) => {
   try {
-    const { date, department, slot_id } = req.query;
+    const { date, department, slot_id, booked_by } = req.query;
     
     let query = `
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode,
              p.name as patient_name, p.mobile,
-             ds.date, ds.start_time, ds.end_time,
+             ds.date, ds.start_time, ds.end_time, ds.fee,
              d.full_name as doctor_name, d.department,
              e.full_name as booked_by_name
       FROM patient_bookings pb
@@ -84,6 +95,10 @@ exports.getBookings = async (req, res) => {
     if (slot_id) {
       params.push(slot_id);
       query += ` AND pb.slot_id = $${params.length}`;
+    }
+    if (booked_by) {
+      params.push(booked_by);
+      query += ` AND pb.booked_by = $${params.length}`;
     }
 
     query += ' ORDER BY ds.date DESC, ds.start_time ASC, pb.token_number ASC';

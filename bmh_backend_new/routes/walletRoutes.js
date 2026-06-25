@@ -12,4 +12,10 @@ router.put('/transaction/:id', walletController.approveTransaction); // Admin ap
 
 router.post('/usage', walletController.logUsage); // Employee logs usage
 
+// Cash Handovers
+router.post('/handover/request', walletController.requestHandover);
+router.post('/handover/accept', walletController.acceptHandover);
+router.get('/handovers/all', walletController.getAllHandovers);
+router.get('/handovers/:employee_id', walletController.getHandovers);
+
 module.exports = router;

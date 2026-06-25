@@ -262,3 +262,36 @@ exports.updateDepartmentAdminProfile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error updating profile' });
   }
 };
+
+exports.getRevenueStats = async (req, res) => {
+  try {
+    // 1. Total Online Revenue
+    const onlineRes = await pool.query("SELECT SUM(ds.fee) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Online'");
+    const totalOnline = onlineRes.rows[0].total || 0;
+
+    // 2. Total Cash Revenue
+    const cashRes = await pool.query("SELECT SUM(ds.fee) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Cash'");
+    const totalCash = cashRes.rows[0].total || 0;
+
+    // 3. Employee Wallet Cash Balances
+    const wRes = await pool.query("SELECT SUM(cash_in_hand) as total FROM employee_wallets");
+    const totalCashInWallets = wRes.rows[0].total || 0;
+
+    // 4. Pending Cash Handovers
+    const pRes = await pool.query("SELECT SUM(amount) as total FROM cash_handovers WHERE status = 'Pending'");
+    const totalPendingHandovers = pRes.rows[0].total || 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalOnline,
+        totalCash,
+        totalCashInWallets,
+        totalPendingHandovers
+      }
+    });
+  } catch (error) {
+    console.error('Error getting revenue stats:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching revenue stats' });
+  }
+};

@@ -143,7 +143,7 @@ export default function PatientBooking() {
             </div>
             <div class="detail-item">
               <div class="detail-label">Doctor</div>
-              <div class="detail-value">Dr. ${selectedSlot.doctor_name}</div>
+              <div class="detail-value">Dr. ${selectedSlot.doctor_name} <br/><span style="font-size: 13px; color: #64748b; font-weight: normal">${selectedSlot.doctor_department || 'General'}</span></div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Date & Time</div>
@@ -162,7 +162,18 @@ export default function PatientBooking() {
     `;
     try {
       if (Platform.OS === 'web') {
-        await Print.printAsync({ html });
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.write(html);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 250);
       } else {
         const { uri } = await Print.printToFileAsync({ html });
         await Sharing.shareAsync(uri);
