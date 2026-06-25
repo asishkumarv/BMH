@@ -400,6 +400,7 @@ export default function AdminAttendanceScreen() {
             <Text style={[styles.tableCellHeader, {flex: 0.5}]}>In</Text>
             <Text style={styles.tableCellHeader}>Name</Text>
             <Text style={styles.tableCellHeader}>Dept</Text>
+            <Text style={styles.tableCellHeader}>Date</Text>
             <Text style={styles.tableCellHeader}>Check In</Text>
             <Text style={styles.tableCellHeader}>Check Out</Text>
             <Text style={styles.tableCellHeader}>Deviation</Text>
@@ -425,6 +426,7 @@ export default function AdminAttendanceScreen() {
                 <Text style={{fontSize: 12, color: '#6b7280'}}>{r.mobile || 'N/A'}</Text>
               </View>
               <Text style={styles.tableCell}>{r.department}</Text>
+              <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
               <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
               <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
               <View style={[styles.tableCell, { justifyContent: 'center' }]}>
