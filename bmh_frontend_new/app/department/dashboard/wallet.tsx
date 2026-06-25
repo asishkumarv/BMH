@@ -44,7 +44,7 @@ export default function SubAdminWalletScreen() {
       const userStr = localStorage.getItem('deptUser');
       if (userStr) {
         const user = JSON.parse(userStr);
-        empId = user.id;
+        empId = `SA-${user.id}`;
         setEmployeeId(empId);
       }
     }

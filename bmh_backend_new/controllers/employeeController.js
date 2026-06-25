@@ -144,14 +144,27 @@ exports.getDepartmentPeers = async (req, res) => {
     const eRes = await pool.query('SELECT department FROM employees WHERE id = $1', [id]);
     if (eRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Employee not found' });
     
-    const department = eRes.rows[0].department;
+    const departmentName = eRes.rows[0].department;
 
-    const result = await pool.query(
-      "SELECT id, full_name, email, role, department FROM employees WHERE department = $1 AND id != $2 AND status = 'approved'",
-      [department, id]
+    // 1. Fetch employees in this department (keep id as string)
+    const empResult = await pool.query(
+      "SELECT id::text, full_name, email, role, department FROM employees WHERE department = $1 AND id != $2 AND status = 'approved'",
+      [departmentName, id]
     );
 
-    res.json({ success: true, data: result.rows });
+    // 2. Fetch department admins in this department (prefix id with SA-)
+    const adminResult = await pool.query(
+      `SELECT 'SA-' || da.id as id, da.full_name, da.email, 'subadmin' as role, d.name as department 
+       FROM department_admins da
+       JOIN departments d ON da.department_id = d.id
+       WHERE d.name = $1 AND da.status = 'approved'`,
+       [departmentName]
+    );
+
+    // Merge both
+    const peers = [...empResult.rows, ...adminResult.rows];
+
+    res.json({ success: true, data: peers });
   } catch (error) {
     console.error('Error fetching peers:', error);
     res.status(500).json({ success: false, message: 'Server error fetching peers' });
