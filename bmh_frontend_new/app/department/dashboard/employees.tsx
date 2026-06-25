@@ -4,6 +4,7 @@ import { Plus, Search, MoreVertical, Shield, Building, User } from 'lucide-react
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { API_URL } from '../../../config';
 
 type Employee = {
   id: string;
@@ -31,6 +32,17 @@ export default function SubAdminEmployeesScreen() {
 
   const [newRoleName, setNewRoleName] = useState('');
   const [addingRole, setAddingRole] = useState(false);
+  const [employeePayslips, setEmployeePayslips] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (selectedEmployee) {
+      axios.get(`${API_URL}/leave/payslips?employee_id=${selectedEmployee.id}`)
+        .then(res => setEmployeePayslips(res.data))
+        .catch(err => console.error(err));
+    } else {
+      setEmployeePayslips([]);
+    }
+  }, [selectedEmployee]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -322,6 +334,24 @@ export default function SubAdminEmployeesScreen() {
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Bank Name:</Text><Text style={styles.profileVal}>{pd.bankName || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Account No:</Text><Text style={styles.profileVal}>{pd.accountNo || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>IFSC / Branch:</Text><Text style={styles.profileVal}>{pd.ifsc || 'N/A'} / {pd.branch || 'N/A'}</Text></View>
+
+                    {employeePayslips && employeePayslips.length > 0 && (
+                      <View>
+                        <Text style={[styles.sectionLabel, {marginTop: 16}]}>Recent Payslips</Text>
+                        {employeePayslips.slice(0, 3).map((ps, i) => (
+                          <View key={i} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 8 }}>
+                            <Text style={{ fontWeight: '700', marginBottom: 4 }}>{ps.month}</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                              <Text style={{ color: Colors.light.icon }}>Base: ₹{ps.base_salary}</Text>
+                              <Text style={{ color: Colors.light.error }}>Deductions: ₹{parseFloat(ps.extra_leave_deduction) + parseFloat(ps.late_checkin_deduction) + parseFloat(ps.early_checkout_deduction)}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={{ fontWeight: '700', color: Colors.light.primary }}>Net Pay: ₹{ps.net_salary}</Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
 
                     <Text style={[styles.sectionLabel, {marginTop: 16}]}>Operations & Shifts</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Manager:</Text><Text style={styles.profileVal}>{pd.manager || 'N/A'}</Text></View>

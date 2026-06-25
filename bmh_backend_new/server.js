@@ -28,6 +28,7 @@ app.use('/notifications', notificationRoutes);
 app.use('/stationary', stationaryRoutes);
 app.use('/wallet', walletRoutes);
 app.use('/attendance', attendanceRoutes);
+app.use('/leave', require('./routes/leaveRoutes'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

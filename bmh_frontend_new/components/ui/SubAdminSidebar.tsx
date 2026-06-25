@@ -1,6 +1,6 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
-import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet } from 'lucide-react-native';
+import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/department/dashboard' },
   { name: 'Employees', icon: Users, route: '/department/dashboard/employees' },
   { name: 'Attendance', icon: Activity, route: '/department/dashboard/attendance' },
+  { name: 'Leave', icon: CalendarDays, route: '/department/dashboard/leave-management' },
   { name: 'Tasks', icon: Activity, route: '/department/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/department/dashboard/stationary' },
   { name: 'Allowances', icon: Wallet, route: '/department/dashboard/allowances' },

@@ -1,16 +1,18 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
-import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User } from 'lucide-react-native';
+import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User, CalendarDays, FileText } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/employee/dashboard' },
   { name: 'Attendance', icon: CheckSquare, route: '/employee/dashboard/attendance' },
+  { name: 'Leave', icon: CalendarDays, route: '/employee/dashboard/leave-management' },
   { name: 'Tasks', icon: CheckSquare, route: '/employee/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/employee/dashboard/stationary' },
   { name: 'Wallet', icon: Wallet, route: '/employee/dashboard/wallet' },
   { name: 'Notifications', icon: Bell, route: '/employee/dashboard/notifications' },
+  { name: 'Payslips', icon: FileText, route: '/employee/dashboard/payslips' },
   { name: 'Profile', icon: User, route: '/employee/dashboard/profile' },
 ];
 
