@@ -1,19 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image } from 'react-native';
-import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle } from 'lucide-react-native';
+import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../../constants/Colors';
+import { useResponsive } from '../../../../hooks/useResponsive';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Platform } from 'react-native';
 
 const TABS = ['Doctors', 'Slots', 'Bookings']; // No Revenue tab
 
+const TIME_SLOTS: string[] = [];
+for (let h = 8; h <= 20; h++) {
+  const hr = h.toString().padStart(2, '0');
+  TIME_SLOTS.push(`${hr}:00`);
+  TIME_SLOTS.push(`${hr}:30`);
+}
+
 export default function DepartmentDoctorManagement() {
+  const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState('Doctors');
   const [doctors, setDoctors] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+
+  // Add Doctor Form State
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newDoctor, setNewDoctor] = useState({
+    full_name: '', email: '', mobile: '', password: '', 
+    department: '', role: 'Doctor', experience: '', gender: 'Male', description: ''
+  });
+  const [adding, setAdding] = useState(false);
+
+  // Add Slot Form State
+  const [showAddSlotForm, setShowAddSlotForm] = useState(false);
+  const [newSlot, setNewSlot] = useState({
+    doctor_id: '', date: '', start_time: '', end_time: '', total_tokens: '', fee: '', assigned_peon_id: ''
+  });
+  const [addingSlot, setAddingSlot] = useState(false);
+  const [peons, setPeons] = useState<any[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -38,13 +67,13 @@ export default function DepartmentDoctorManagement() {
         const res = await axios.get(`https://bmh-eitu.onrender.com/doctors?department=${user.department}`);
         setDoctors(res.data.data);
       } else if (activeTab === 'Slots') {
-        // Here we could filter slots by doctors in the department, but we'll fetch all slots for doctors in this dept
-        // We'll need a new endpoint or pass department to the slots endpoint
-        // For now, let's fetch all and filter client side (hacky) or assume backend handles it if we pass department
-        const res = await axios.get(`https://bmh-eitu.onrender.com/doctors/slots`);
-        const deptSlots = res.data.data.filter((s: any) => s.doctor_name && doctors.some(d => d.full_name === s.doctor_name));
-        // Wait, we need department in the slots response. Let's just pass department to bookings
-        setSlots(res.data.data); // backend might need to return department for filtering
+        const [resSlots, resPeons] = await Promise.all([
+          axios.get('https://bmh-eitu.onrender.com/doctors/slots'),
+          axios.get('https://bmh-eitu.onrender.com/doctors/peons')
+        ]);
+        const deptSlots = resSlots.data.data.filter((s: any) => s.doctor_name && doctors.some(d => d.full_name === s.doctor_name));
+        setSlots(deptSlots.length > 0 ? deptSlots : resSlots.data.data);
+        setPeons(resPeons.data.data);
       } else if (activeTab === 'Bookings') {
         const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?department=${user.department}`);
         setBookings(res.data.data);
@@ -65,11 +94,250 @@ export default function DepartmentDoctorManagement() {
     }
   };
 
+  const handleAddDoctor = async () => {
+    if(!newDoctor.full_name || !newDoctor.email || !newDoctor.password) {
+      alert("Please fill all required fields");
+      return;
+    }
+    setAdding(true);
+    try {
+      await axios.post('https://bmh-eitu.onrender.com/doctors/create', {
+        ...newDoctor,
+        department: user.department // Lock to sub-admin's department
+      });
+      alert('Doctor added successfully!');
+      setShowAddForm(false);
+      setNewDoctor({
+        full_name: '', email: '', mobile: '', password: '', 
+        department: '', role: 'Doctor', experience: '', gender: 'Male', description: ''
+      });
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error adding doctor');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleAddSlot = async () => {
+    if(!newSlot.doctor_id || !newSlot.date || !newSlot.start_time || !newSlot.end_time || !newSlot.total_tokens || !newSlot.fee) {
+      alert("Please fill all required fields");
+      return;
+    }
+    setAddingSlot(true);
+    try {
+      await axios.post('https://bmh-eitu.onrender.com/doctors/slots', newSlot);
+      alert('Slot created successfully!');
+      setShowAddSlotForm(false);
+      setNewSlot({ doctor_id: '', date: '', start_time: '', end_time: '', total_tokens: '', fee: '', assigned_peon_id: '' });
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error creating slot');
+    } finally {
+      setAddingSlot(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Department Doctors</Text>
+      <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
+        <Text style={styles.header}>Department Doctors</Text>
+        {!showAddForm && !showAddSlotForm && activeTab === 'Doctors' && (
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddForm(true)}>
+            <Plus color="white" size={20} />
+            <Text style={styles.addBtnText}>Add Doctor</Text>
+          </TouchableOpacity>
+        )}
+        {!showAddForm && !showAddSlotForm && activeTab === 'Slots' && (
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddSlotForm(true)}>
+            <Plus color="white" size={20} />
+            <Text style={styles.addBtnText}>Create Slot</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
-      <View style={styles.tabContainer}>
+      {showAddForm ? (
+        <ScrollView style={styles.card}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setShowAddForm(false)}>
+            <Text style={styles.backBtnText}>← Back to List</Text>
+          </TouchableOpacity>
+          <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Create New Doctor Profile</Text>
+          
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Full Name *</Text>
+              <TextInput style={styles.input} value={newDoctor.full_name} onChangeText={(t) => setNewDoctor({...newDoctor, full_name: t})} placeholder="Dr. John Doe" />
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Email *</Text>
+              <TextInput style={styles.input} value={newDoctor.email} onChangeText={(t) => setNewDoctor({...newDoctor, email: t})} placeholder="doctor@bmh.com" keyboardType="email-address" autoCapitalize="none" />
+            </View>
+          </View>
+
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Mobile</Text>
+              <TextInput style={styles.input} value={newDoctor.mobile} onChangeText={(t) => setNewDoctor({...newDoctor, mobile: t})} placeholder="10-digit number" keyboardType="phone-pad" />
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Password *</Text>
+              <TextInput style={styles.input} value={newDoctor.password} onChangeText={(t) => setNewDoctor({...newDoctor, password: t})} placeholder="Auto-gen or type" />
+            </View>
+          </View>
+
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Department</Text>
+              <TextInput style={[styles.input, {backgroundColor: '#e2e8f0', color: '#64748b'}]} value={user?.department} editable={false} placeholder="Locked to your dept" />
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Role</Text>
+              <TextInput style={styles.input} value={newDoctor.role} onChangeText={(t) => setNewDoctor({...newDoctor, role: t})} placeholder="Doctor / Head of Dept" />
+            </View>
+          </View>
+
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Experience (Years)</Text>
+              <TextInput style={styles.input} value={newDoctor.experience} onChangeText={(t) => setNewDoctor({...newDoctor, experience: t})} placeholder="e.g. 5" keyboardType="numeric" />
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Gender</Text>
+              <TextInput style={styles.input} value={newDoctor.gender} onChangeText={(t) => setNewDoctor({...newDoctor, gender: t})} placeholder="Male / Female" />
+            </View>
+          </View>
+
+          <Text style={styles.label}>Description / Bio</Text>
+          <TextInput style={[styles.input, {height: 80, textAlignVertical: 'top'}]} multiline value={newDoctor.description} onChangeText={(t) => setNewDoctor({...newDoctor, description: t})} placeholder="Brief bio..." />
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleAddDoctor} disabled={adding}>
+            {adding ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Create Doctor</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      ) : showAddSlotForm ? (
+        <ScrollView style={styles.card}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setShowAddSlotForm(false)}>
+            <Text style={styles.backBtnText}>← Back to List</Text>
+          </TouchableOpacity>
+          <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Configure Doctor Slot</Text>
+          
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Select Doctor *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={newSlot.doctor_id}
+                  onValueChange={(val) => setNewSlot({...newSlot, doctor_id: val})}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Doctor" value="" />
+                  {doctors.filter(d => d.status === 'Approved').map((d: any) => (
+                    <Picker.Item key={d.id} label={`${d.full_name} (${d.department})`} value={d.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Date (YYYY-MM-DD) *</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  value={newSlot.date}
+                  onChange={(e) => setNewSlot({...newSlot, date: e.target.value})}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1e293b', outline: 'none' } as any}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                    <TextInput style={styles.input} value={newSlot.date} editable={false} placeholder="Select Date" />
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={newSlot.date ? new Date(newSlot.date) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowDatePicker(false);
+                        if (selectedDate) {
+                          setNewSlot({...newSlot, date: selectedDate.toISOString().split('T')[0]});
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Assigned Peon (Optional)</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={newSlot.assigned_peon_id}
+                  onValueChange={(val) => setNewSlot({...newSlot, assigned_peon_id: val})}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="None" value="" />
+                  {peons.map((p: any) => (
+                    <Picker.Item key={p.id} label={p.full_name} value={p.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Start Time *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={newSlot.start_time}
+                  onValueChange={(val) => setNewSlot({...newSlot, start_time: val})}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Time" value="" />
+                  {TIME_SLOTS.map((t, i) => (
+                    <Picker.Item key={i} label={t} value={t} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>End Time *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={newSlot.end_time}
+                  onValueChange={(val) => setNewSlot({...newSlot, end_time: val})}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Time" value="" />
+                  {TIME_SLOTS.map((t, i) => (
+                    <Picker.Item key={i} label={t} value={t} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Total Tokens (Token Range) *</Text>
+              <TextInput style={styles.input} value={newSlot.total_tokens} onChangeText={(t) => setNewSlot({...newSlot, total_tokens: t})} placeholder="e.g. 20" keyboardType="numeric" />
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.label}>Consultation Fee (₹) *</Text>
+              <TextInput style={styles.input} value={newSlot.fee} onChangeText={(t) => setNewSlot({...newSlot, fee: t})} placeholder="e.g. 500" keyboardType="numeric" />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleAddSlot} disabled={addingSlot}>
+            {addingSlot ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Create Slot</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        <>
+          <View style={styles.tabContainer}>
         {TABS.map(tab => (
           <TouchableOpacity 
             key={tab} 
@@ -85,9 +353,10 @@ export default function DepartmentDoctorManagement() {
         {loading ? (
           <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 50 }} />
         ) : (
-          <View>
-            {activeTab === 'Doctors' && (
-              <View style={styles.card}>
+          <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: isMobile ? 800 : '100%' }}>
+              {activeTab === 'Doctors' && (
+                <View style={styles.card}>
                 <View style={styles.tableRowHeader}>
                   <Text style={[styles.tableCellHeader, {flex: 0.5}]}>ID</Text>
                   <Text style={styles.tableCellHeader}>Name</Text>
@@ -178,16 +447,22 @@ export default function DepartmentDoctorManagement() {
                 {bookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found in your department.</Text>}
               </View>
             )}
-          </View>
+            </View>
+          </ScrollView>
         )}
       </ScrollView>
+      </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: '#f8fafc' },
-  header: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 24 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  header: { fontSize: 28, fontWeight: 'bold', color: '#0f172a' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, gap: 8 },
+  addBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
   tabContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', padding: 4, borderRadius: 12, marginBottom: 24 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
   activeTab: { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
@@ -199,4 +474,20 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
   tableCellHeader: { flex: 1, fontSize: 13, fontWeight: 'bold', color: '#475569' },
   tableCell: { flex: 1, fontSize: 14, color: '#334155' },
+
+  // Form Styles
+  backBtn: { marginBottom: 16 },
+  backBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 16 },
+  formRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
+  formCol: { flex: 1 },
+  label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
+  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1e293b' },
+  pickerContainer: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden' },
+  picker: { padding: 14, fontSize: 14, color: '#1e293b', ...Platform.select({ web: { outlineStyle: 'none' as any, border: 'none', backgroundColor: 'transparent' } }) },
+  pickerItem: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#f1f5f9', marginRight: 10 },
+  pickerItemActive: { backgroundColor: Colors.light.primary },
+  pickerItemText: { color: '#64748b', fontWeight: '500' },
+  pickerItemTextActive: { color: 'white', fontWeight: 'bold' },
+  saveBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+  saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
 });

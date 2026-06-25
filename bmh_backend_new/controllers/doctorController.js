@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 // Register Doctor (Pending Approval)
 exports.registerDoctor = async (req, res) => {
   try {
-    const { id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    const { full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
     
     // Check if email exists
     const existing = await pool.query('SELECT id FROM doctors WHERE email = $1', [email]);
@@ -13,13 +13,19 @@ exports.registerDoctor = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     
+    // Auto generate ID: e.g. CARDIOD101
+    const deptPrefix = department ? department.substring(0, 3).toUpperCase() : 'DOC';
+    const countRes = await pool.query("SELECT COUNT(*) FROM doctors WHERE id LIKE $1", [`${deptPrefix}D%`]);
+    const nextNum = parseInt(countRes.rows[0].count) + 1;
+    const newId = `${deptPrefix}D${nextNum.toString().padStart(3, '0')}`;
+
     await pool.query(
       `INSERT INTO doctors (id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pending')`,
-      [id, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo]
+      [newId, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo]
     );
 
-    res.json({ success: true, message: 'Registration successful. Waiting for Admin approval.' });
+    res.json({ success: true, message: 'Registration successful. Waiting for Admin approval.', id: newId });
   } catch (error) {
     console.error('Register Doctor Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });

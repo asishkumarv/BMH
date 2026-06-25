@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
+import { useResponsive } from '../../../hooks/useResponsive';
 import { ArrowRight, CheckCircle } from 'lucide-react-native';
 
 export default function PeonQueue({ user }: { user: any }) {
+  const { isMobile } = useResponsive();
   const [slot, setSlot] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,7 @@ export default function PeonQueue({ user }: { user: any }) {
         </Animated.View>
       </View>
 
-      <View style={styles.queueContainer}>
+      <View style={[styles.queueContainer, isMobile && { flexDirection: 'column' }]}>
         <View style={styles.queueColumn}>
           <Text style={styles.columnTitle}>Waiting Queue ({waiting.length})</Text>
           <ScrollView style={styles.list}>

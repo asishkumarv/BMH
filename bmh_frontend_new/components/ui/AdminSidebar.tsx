@@ -1,5 +1,5 @@
 import React from 'react';
-import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
 import { LayoutDashboard, Users, Building, Activity, Settings, LogOut, Bell, Package, Wallet, CalendarDays } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
@@ -30,7 +30,7 @@ export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         <Text style={styles.logoText}>BMH Admin</Text>
       </View>
 
-      <View style={styles.navContainer}>
+      <ScrollView style={styles.navContainer} showsVerticalScrollIndicator={false}>
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.route || (item.route !== '/admin/dashboard' && pathname.startsWith(item.route));
           
@@ -54,7 +54,7 @@ export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
             </Link>
           );
         })}
-      </View>
+      </ScrollView>
 
       <Pressable style={styles.logoutBtn} onPress={() => {
         if (onClose) onClose();

@@ -4,8 +4,10 @@ import { Users, Calendar, Clock, HeartPulse, CreditCard } from 'lucide-react-nat
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function PatientBooking() {
+  const { isMobile } = useResponsive();
   const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -99,7 +101,7 @@ export default function PatientBooking() {
   if (successToken) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={styles.successCard}>
+        <View style={[styles.successCard, isMobile && { width: '100%' }]}>
           <View style={styles.successIconWrapper}>
             <CheckCircle size={48} color="#10b981" />
           </View>
@@ -130,7 +132,7 @@ export default function PatientBooking() {
           <Text style={styles.sectionTitle}>Select an Available Slot</Text>
           <View style={styles.grid}>
             {slots.map((s, i) => (
-              <TouchableOpacity key={i} style={styles.slotCard} onPress={() => setSelectedSlot(s)}>
+              <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => setSelectedSlot(s)}>
                 <View style={styles.slotHeader}>
                   <Text style={styles.doctorName}>{s.doctor_name}</Text>
                   <Text style={styles.feeText}>₹{s.fee}</Text>
@@ -172,8 +174,8 @@ export default function PatientBooking() {
           <Text style={styles.formLabel}>Patient Full Name *</Text>
           <TextInput style={styles.input} value={patientName} onChangeText={setPatientName} placeholder="Enter patient name" />
           
-          <View style={styles.row}>
-            <View style={{flex: 1, marginRight: 10}}>
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+            <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>Mobile Number *</Text>
               <TextInput style={styles.input} value={mobile} onChangeText={setMobile} placeholder="Enter mobile" keyboardType="phone-pad" />
             </View>
@@ -186,8 +188,8 @@ export default function PatientBooking() {
           <Text style={styles.formLabel}>Email Address (Optional)</Text>
           <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" />
           
-          <View style={styles.row}>
-            <View style={{flex: 1, marginRight: 10}}>
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+            <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>Gender</Text>
               <View style={styles.toggleRow}>
                 <TouchableOpacity style={[styles.toggleBtn, gender === 'Male' && styles.toggleBtnActive]} onPress={() => setGender('Male')}>

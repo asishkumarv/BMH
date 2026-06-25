@@ -1,5 +1,5 @@
 import React from 'react';
-import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
 import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User, CalendarDays, FileText } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
@@ -29,7 +29,11 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (res.data.success && res.data.settings.doctor_management_access) {
           let value = res.data.settings.doctor_management_access;
           if (typeof value === 'string') value = JSON.parse(value);
-          if (value.employee) {
+          
+          // Check if any department has employee: true OR the legacy value.employee === true
+          const hasAccess = value.employee === true || Object.values(value).some((dept: any) => dept && dept.employee === true);
+          
+          if (hasAccess) {
             setNavItems([...NAV_ITEMS, { name: 'Patient Booking', icon: FileText, route: '/employee/dashboard/patient-booking' }]);
           }
         }
@@ -47,7 +51,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
         <Text style={styles.logoText}>Employee Portal</Text>
       </View>
 
-      <View style={styles.navContainer}>
+      <ScrollView style={styles.navContainer} showsVerticalScrollIndicator={false}>
         {navItems.map((item) => {
           const isActive = pathname === item.route || (item.route !== '/employee/dashboard' && pathname.startsWith(item.route));
           
@@ -71,7 +75,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
             </Link>
           );
         })}
-      </View>
+      </ScrollView>
 
       <Pressable style={styles.logoutBtn} onPress={() => {
         if (onClose) onClose();

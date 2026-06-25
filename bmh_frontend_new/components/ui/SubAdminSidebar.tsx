@@ -1,9 +1,10 @@
 import React from 'react';
-import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
 import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/department/dashboard' },
@@ -29,8 +30,15 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (res.data.success && res.data.settings.doctor_management_access) {
           let value = res.data.settings.doctor_management_access;
           if (typeof value === 'string') value = JSON.parse(value);
-          if (value.sub_admin) {
-            setNavItems([...NAV_ITEMS.slice(0, 7), { name: 'Doctors', icon: Users, route: '/department/dashboard/doctors' }, ...NAV_ITEMS.slice(7)]);
+          
+          const userStr = Platform.OS === 'web' ? localStorage.getItem('subAdminUser') : await AsyncStorage.getItem('subAdminUser');
+          if (userStr) {
+            const user = JSON.parse(userStr);
+            const deptSettings = value[user.department];
+            
+            if ((deptSettings && deptSettings.sub_admin) || value.sub_admin === true) {
+              setNavItems([...NAV_ITEMS.slice(0, 7), { name: 'Doctors', icon: Users, route: '/department/dashboard/doctors' }, ...NAV_ITEMS.slice(7)]);
+            }
           }
         }
       } catch (err) {
@@ -47,7 +55,7 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         <Text style={styles.logoText}>Sub Admin</Text>
       </View>
 
-      <View style={styles.navContainer}>
+      <ScrollView style={styles.navContainer} showsVerticalScrollIndicator={false}>
         {navItems.map((item) => {
           const isActive = pathname === item.route || (item.route !== '/department/dashboard' && pathname.startsWith(item.route));
           
@@ -71,7 +79,7 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
             </Link>
           );
         })}
-      </View>
+      </ScrollView>
 
       <Pressable style={styles.logoutBtn} onPress={() => {
         if (onClose) onClose();

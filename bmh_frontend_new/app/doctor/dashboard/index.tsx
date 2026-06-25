@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Activi
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import axios from 'axios';
+import { useResponsive } from '../../../hooks/useResponsive';
 import { Calendar, User, Stethoscope, Save } from 'lucide-react-native';
 
 export default function DoctorDashboard() {
+  const { isMobile } = useResponsive();
   const [user, setUser] = useState<any>(null);
   const [currentPatient, setCurrentPatient] = useState<any>(null);
   const [waitingPatients, setWaitingPatients] = useState<any[]>([]);
@@ -107,11 +109,11 @@ export default function DoctorDashboard() {
         <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
       </View>
 
-      <View style={styles.grid}>
-        <View style={styles.mainColumn}>
+      <View style={[styles.grid, isMobile && { flexDirection: 'column' }]}>
+        <View style={[styles.mainColumn, isMobile && { minWidth: '100%' }]}>
           {currentPatient ? (
             <View style={styles.consultationCard}>
-              <View style={styles.cardHeader}>
+              <View style={[styles.cardHeader, isMobile && { flexDirection: 'column', gap: 16 }]}>
                 <View>
                   <Text style={styles.sectionTitle}>Current Consultation</Text>
                   <Text style={styles.patientToken}>Token #{currentPatient.token_number}</Text>
@@ -158,7 +160,7 @@ export default function DoctorDashboard() {
           )}
         </View>
 
-        <View style={styles.sideColumn}>
+        <View style={[styles.sideColumn, isMobile && { minWidth: '100%' }]}>
           <View style={styles.queueCard}>
             <View style={styles.queueHeader}>
               <Text style={styles.queueTitle}>Up Next</Text>

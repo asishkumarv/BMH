@@ -1,28 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { ShieldCheck } from 'lucide-react-native';
 
 export default function AdminSettings() {
-  const [settings, setSettings] = useState<any>({ sub_admin: false, employee: false });
+  const [settings, setSettings] = useState<Record<string, { sub_admin: boolean, employee: boolean }>>({});
+  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
+    fetchData();
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchData = async () => {
     try {
-      const res = await axios.get('https://bmh-eitu.onrender.com/settings');
-      if (res.data.success && res.data.settings.doctor_management_access) {
-        let value = res.data.settings.doctor_management_access;
+      const [settingsRes, deptRes] = await Promise.all([
+        axios.get('https://bmh-eitu.onrender.com/settings'),
+        axios.get('https://bmh-eitu.onrender.com/department')
+      ]);
+
+      const depts = deptRes.data.data || [];
+      setDepartments(depts);
+
+      let currentSettings = {};
+      if (settingsRes.data.success && settingsRes.data.settings.doctor_management_access) {
+        let value = settingsRes.data.settings.doctor_management_access;
         if (typeof value === 'string') value = JSON.parse(value);
-        setSettings(value);
+        currentSettings = value;
       }
+
+      // Initialize missing departments in settings
+      const initSettings: Record<string, { sub_admin: boolean, employee: boolean }> = { ...currentSettings };
+      depts.forEach((dept: any) => {
+        if (!initSettings[dept.name]) {
+          // Default to old global setting if it was boolean, otherwise false
+          const legacySubAdmin = typeof currentSettings.sub_admin === 'boolean' ? currentSettings.sub_admin : false;
+          const legacyEmployee = typeof currentSettings.employee === 'boolean' ? currentSettings.employee : false;
+          initSettings[dept.name] = { sub_admin: legacySubAdmin, employee: legacyEmployee };
+        }
+      });
+      // Remove legacy top-level keys if they exist
+      delete initSettings.sub_admin;
+      delete initSettings.employee;
+      
+      setSettings(initSettings);
+
     } catch (err) {
-      console.error('Failed to fetch settings', err);
+      console.error('Failed to fetch settings or departments', err);
     } finally {
       setLoading(false);
     }
@@ -44,6 +70,16 @@ export default function AdminSettings() {
     }
   };
 
+  const toggleSetting = (deptName: string, field: 'sub_admin' | 'employee', value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      [deptName]: {
+        ...prev[deptName],
+        [field]: value
+      }
+    }));
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -53,62 +89,77 @@ export default function AdminSettings() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.header}>System Settings</Text>
 
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <ShieldCheck size={24} color={Colors.light.primary} />
-          <Text style={styles.cardTitle}>Doctor Management Access Controls</Text>
+          <Text style={styles.cardTitle}>Granular Doctor Management Access</Text>
         </View>
         <Text style={styles.description}>
-          Control which roles have access to the Doctor Management features (e.g. creating doctors, managing slots, and booking patients).
+          Control which departments allow their Sub-Admins to manage doctors, and which departments allow Employees to book patients.
         </Text>
 
-        <View style={styles.settingRow}>
-          <View>
-            <Text style={styles.settingTitle}>Sub-Admin Access</Text>
-            <Text style={styles.settingDesc}>Allow Sub-Admins to manage doctors in their department</Text>
-          </View>
-          <Switch 
-            value={settings.sub_admin} 
-            onValueChange={(v) => setSettings({...settings, sub_admin: v})} 
-            trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
-            thumbColor={settings.sub_admin ? Colors.light.primary : '#f8fafc'}
-          />
-        </View>
+        {departments.map((dept, index) => (
+          <View key={dept.name || index} style={styles.deptCard}>
+            <Text style={styles.deptName}>{dept.name}</Text>
+            
+            <View style={styles.settingRow}>
+              <View style={{flex: 1}}>
+                <Text style={styles.settingTitle}>Sub-Admin Access</Text>
+                <Text style={styles.settingDesc}>Allow {dept.name} Sub-Admins to manage doctors & slots</Text>
+              </View>
+              <Switch 
+                value={settings[dept.name]?.sub_admin || false} 
+                onValueChange={(v) => toggleSetting(dept.name, 'sub_admin', v)} 
+                trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
+                thumbColor={settings[dept.name]?.sub_admin ? Colors.light.primary : '#f8fafc'}
+              />
+            </View>
 
-        <View style={styles.settingRow}>
-          <View>
-            <Text style={styles.settingTitle}>Employee Booking Access</Text>
-            <Text style={styles.settingDesc}>Allow all employees to book patients for doctors</Text>
+            <View style={styles.settingRow}>
+              <View style={{flex: 1}}>
+                <Text style={styles.settingTitle}>Employee Booking Access</Text>
+                <Text style={styles.settingDesc}>Allow Receptionists to book patients for {dept.name} doctors</Text>
+              </View>
+              <Switch 
+                value={settings[dept.name]?.employee || false} 
+                onValueChange={(v) => toggleSetting(dept.name, 'employee', v)} 
+                trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
+                thumbColor={settings[dept.name]?.employee ? Colors.light.primary : '#f8fafc'}
+              />
+            </View>
           </View>
-          <Switch 
-            value={settings.employee} 
-            onValueChange={(v) => setSettings({...settings, employee: v})} 
-            trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
-            thumbColor={settings.employee ? Colors.light.primary : '#f8fafc'}
-          />
-        </View>
+        ))}
+
+        {departments.length === 0 && (
+          <Text style={{textAlign: 'center', padding: 20, color: '#64748b'}}>No departments found.</Text>
+        )}
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
           {saving ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Save Configuration</Text>}
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: '#f8fafc' },
   header: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 24 },
-  card: { backgroundColor: 'white', padding: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  card: { backgroundColor: 'white', padding: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, marginBottom: 40 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginLeft: 12 },
   description: { fontSize: 14, color: '#64748b', marginBottom: 24, lineHeight: 20 },
-  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderTopWidth: 1, borderColor: '#f1f5f9' },
-  settingTitle: { fontSize: 16, fontWeight: '600', color: '#334155', marginBottom: 4 },
+  
+  deptCard: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 16, marginBottom: 16 },
+  deptName: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
+  
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderColor: '#e2e8f0' },
+  settingTitle: { fontSize: 15, fontWeight: '600', color: '#334155', marginBottom: 4 },
   settingDesc: { fontSize: 13, color: '#94a3b8' },
-  saveBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
+  
+  saveBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
 });
