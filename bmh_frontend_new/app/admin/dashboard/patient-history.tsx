@@ -4,8 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { Search, Filter, Calendar } from 'lucide-react-native';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function PatientHistoryAdmin() {
+  const { isMobile } = useResponsive();
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -113,9 +115,9 @@ const styles = StyleSheet.create({
   searchBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
   emptyText: { textAlign: 'center', color: '#64748b', marginTop: 40, fontSize: 16 },
   recordCard: { backgroundColor: '#fff', borderRadius: 12, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: Colors.light.border },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 },
   patientName: { fontSize: 18, fontWeight: '700', color: Colors.light.text },
-  patientInfo: { fontSize: 14, color: '#64748b', marginTop: 4 },
+  patientInfo: { fontSize: 14, color: '#64748b', marginTop: 4, flexWrap: 'wrap' },
   dateBox: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   dateText: { fontSize: 12, fontWeight: '600', color: '#475569' },
   doctorInfo: { backgroundColor: '#eff6ff', padding: 12, borderRadius: 8, marginBottom: 16 },

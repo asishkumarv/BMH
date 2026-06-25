@@ -33,9 +33,15 @@ exports.addEmployee = async (req, res) => {
       delete storedProfileData.mobile;
     }
 
+    // Generate Employee ID
+    const deptCode = department ? department.substring(0, 4).toUpperCase() : 'GEN';
+    const countResult = await pool.query("SELECT COUNT(*) FROM employees WHERE department = $1", [department]);
+    const num = String(parseInt(countResult.rows[0].count) + 1).padStart(3, '0');
+    const employee_id = `EMP-${deptCode}-${num}`;
+
     const insertResult = await pool.query(
-      'INSERT INTO employees (full_name, email, password, department, role, status, profile_data, mobile) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [full_name, email, password, department, role, 'pending', storedProfileData ? JSON.stringify(storedProfileData) : null, mobile]
+      'INSERT INTO employees (full_name, email, password, department, role, status, profile_data, mobile, employee_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [full_name, email, password, department, role, 'pending', storedProfileData ? JSON.stringify(storedProfileData) : null, mobile, employee_id]
     );
 
     res.status(201).json({ success: true, data: insertResult.rows[0] });

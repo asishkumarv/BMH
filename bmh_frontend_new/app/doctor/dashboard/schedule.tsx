@@ -4,8 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { Calendar, Users, Clock } from 'lucide-react-native';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function DoctorSchedule() {
+  const { isMobile } = useResponsive();
   const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -101,7 +103,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: Colors.light.background },
   title: { fontSize: 24, fontWeight: '700', marginBottom: 20, color: Colors.light.text },
   slotCard: { backgroundColor: '#fff', borderRadius: 8, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.light.border },
-  slotHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12 },
+  slotHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12, flexWrap: 'wrap', gap: 8 },
   slotDateBox: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   slotDate: { fontSize: 18, fontWeight: '600', color: Colors.light.text },
   slotTimeBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f8fafc', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },

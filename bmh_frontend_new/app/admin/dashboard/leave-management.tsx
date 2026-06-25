@@ -179,7 +179,7 @@ export default function AdminLeaveManagement() {
   );
 
   return (
-    <ScrollView style={[styles.container, isMobile && { padding: 16 }]}>
+    <ScrollView style={[styles.container, !isDesktop && { padding: 16 }]}>
       <View style={styles.headerRow}>
         <View style={styles.iconContainer}>
           <Settings size={28} color={Colors.light.primary} />
@@ -213,9 +213,9 @@ export default function AdminLeaveManagement() {
               <Text style={styles.emptyStateText}>No pending leave requests.</Text>
             </View>
           ) : null}
-          <View style={[styles.grid, isMobile && { flexDirection: 'column' }]}>
+          <View style={[styles.grid, !isDesktop && { flexDirection: 'column' }]}>
             {requests.map(req => (
-              <View key={req.id} style={[styles.card, isMobile ? { width: '100%' } : { width: '48%' }]}>
+              <View key={req.id} style={[styles.card, !isDesktop ? { width: '100%' } : { width: '48%' }]}>
                 <View style={styles.reqHeader}>
                   <View>
                     <Text style={styles.reqName}>{req.full_name}</Text>
@@ -250,9 +250,9 @@ export default function AdminLeaveManagement() {
       )}
 
       {activeTab === 'settings' && (
-        <View style={[styles.layout, !isMobile && { flexDirection: 'row', gap: 24 }]}>
+        <View style={[styles.layout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
           {/* Department Concurrency Settings */}
-          <View style={[styles.section, !isMobile && { flex: 1 }]}>
+          <View style={[styles.section, isDesktop && { flex: 1 }]}>
             <View style={styles.card}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                 <Building size={20} color={Colors.light.primary} style={{ marginRight: 8 }} />
@@ -294,14 +294,14 @@ export default function AdminLeaveManagement() {
           </View>
 
           {/* Role Deductions Settings */}
-          <View style={[styles.section, !isMobile && { flex: 1.5 }]}>
+          <View style={[styles.section, isDesktop && { flex: 1.5 }]}>
             <View style={styles.card}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                 <Clock size={20} color={Colors.light.primary} style={{ marginRight: 8 }} />
                 <Text style={styles.cardTitle}>Monthly Allowances & Penalties</Text>
               </View>
               
-              <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={[{ flexDirection: 'row', gap: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Department</Text>
                   {Platform.OS === 'web' ? (
@@ -339,7 +339,7 @@ export default function AdminLeaveManagement() {
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={[{ flexDirection: 'row', gap: 16, marginTop: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Free Leaves / Month</Text>
                   <TextInput style={styles.input} value={rLeaves} onChangeText={setRLeaves} keyboardType="numeric" />
@@ -350,7 +350,7 @@ export default function AdminLeaveManagement() {
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={[{ flexDirection: 'row', gap: 16, marginTop: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Late Limits / Month</Text>
                   <TextInput style={styles.input} value={rLateLim} onChangeText={setRLateLim} keyboardType="numeric" />
@@ -361,7 +361,7 @@ export default function AdminLeaveManagement() {
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={[{ flexDirection: 'row', gap: 16, marginTop: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Early Check-out Limits</Text>
                   <TextInput style={styles.input} value={rEarlyLim} onChangeText={setREarlyLim} keyboardType="numeric" />

@@ -131,6 +131,9 @@ export default function EmployeeProfileScreen() {
                   <Building size={14} color={Colors.light.primary} style={{ marginRight: 6 }} />
                   <Text style={styles.profileRole}>{user.role} - {user.department}</Text>
                 </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.light.primary, backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' }}>ID: {user.employee_id || 'PENDING'}</Text>
+                </View>
               </View>
             </Pressable>
 

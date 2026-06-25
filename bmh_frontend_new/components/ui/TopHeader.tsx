@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react
 import { useRouter } from 'expo-router';
 import { Wallet, User, LogOut } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '../../../constants/Colors';
+import { Colors } from '../../constants/Colors';
 import axios from 'axios';
 
 type TopHeaderProps = {
@@ -15,23 +15,40 @@ export function TopHeader({ userType }: TopHeaderProps) {
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [ringColor, setRingColor] = useState<string>('transparent');
 
-  useEffect(() => {
-    if (userType === 'employee') {
-      fetchAttendanceStatus();
-    }
-  }, [userType]);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
-  const fetchAttendanceStatus = async () => {
-    try {
-      const dataStr = await AsyncStorage.getItem('user_data');
+  useEffect(() => {
+    const loadUser = async () => {
+      let dataStr = null;
+      if (Platform.OS === 'web') {
+        if (userType === 'super_admin') dataStr = localStorage.getItem('superAdminUser');
+        else if (userType === 'department_admin') dataStr = localStorage.getItem('subAdminUser');
+        else if (userType === 'employee') dataStr = localStorage.getItem('empUser');
+      } else {
+        if (userType === 'super_admin') dataStr = await AsyncStorage.getItem('superAdminUser');
+        else if (userType === 'department_admin') dataStr = await AsyncStorage.getItem('subAdminUser');
+        else if (userType === 'employee') dataStr = await AsyncStorage.getItem('empUser');
+      }
+
       if (dataStr) {
         const user = JSON.parse(dataStr);
-        const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/today/${user.id}`);
+        if (user.profile_photo) {
+          setProfilePhoto(user.profile_photo);
+        }
+        if (userType === 'employee' && user.id) {
+          fetchAttendanceStatus(user.id);
+        }
+      }
+    };
+    loadUser();
+  }, [userType]);
+
+  const fetchAttendanceStatus = async (userId: string | number) => {
+      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/today/${userId}`);
         if (res.data.success && res.data.data) {
            const color = res.data.data.color;
            setRingColor(color === 'green' ? '#22c55e' : color === 'yellow' ? '#eab308' : '#ef4444');
         }
-      }
     } catch (e) {
       console.log('Error fetching attendance status', e);
     }
@@ -39,7 +56,7 @@ export function TopHeader({ userType }: TopHeaderProps) {
 
   const handleWalletClick = () => {
     if (userType === 'super_admin') {
-      router.push('/admin/dashboard/cash_handover');
+      router.push('/admin/dashboard/wallet');
     } else if (userType === 'department_admin') {
       router.push('/department/dashboard/wallet');
     } else if (userType === 'employee') {
@@ -72,10 +89,14 @@ export function TopHeader({ userType }: TopHeaderProps) {
 
         <View style={styles.profileContainer}>
           <TouchableOpacity 
-            style={[styles.profileButton, userType === 'employee' && { borderColor: ringColor, borderWidth: 2 }]}
+            style={[styles.profileButton, userType === 'employee' && { borderColor: ringColor, borderWidth: 3 }]}
             onPress={() => setDropdownVisible(!dropdownVisible)}
           >
-            <User size={24} color={Colors.light.text} />
+            {profilePhoto ? (
+              <Image source={{ uri: `https://bmh-eitu.onrender.com${profilePhoto}` }} style={styles.profileImage} />
+            ) : (
+              <User size={24} color={Colors.light.text} />
+            )}
           </TouchableOpacity>
 
           {dropdownVisible && (
@@ -129,6 +150,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
     justifyContent: 'center',
     alignItems: 'center',
+    width: 40,
+    height: 40,
+  },
+  profileImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   dropdown: {
     position: 'absolute',

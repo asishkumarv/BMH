@@ -266,19 +266,19 @@ export default function SubAdminWalletScreen() {
 
           {activeTab === 'Allowance' ? (
             <>
-              <View style={styles.balanceCard}>
+              <View style={[styles.balanceCard, !isDesktop && { flexDirection: 'column', alignItems: 'center', textAlign: 'center' }]}>
                 <View style={styles.balanceIconWrapper}>
                   <Wallet size={32} color={Colors.light.primary} />
                 </View>
-                <View style={{flex: 1}}>
+                <View style={[{flex: 1}, !isDesktop && { alignItems: 'center' }]}>
                   <Text style={styles.balanceLabel}>Current Allowance Balance</Text>
                   <Text style={styles.balanceAmount}>₹{balance}</Text>
                 </View>
-                <View style={{flexDirection: 'row', gap: 8}}>
-                   <Pressable style={styles.secondaryBtn} onPress={() => setRequestModalVisible(true)}>
+                <View style={[{flexDirection: 'row', gap: 8}, !isDesktop && { width: '100%', justifyContent: 'center' }]}>
+                   <Pressable style={[styles.secondaryBtn, !isDesktop && {flex: 1, justifyContent: 'center'}]} onPress={() => setRequestModalVisible(true)}>
                      <Text style={styles.secondaryBtnText}>Request Funds</Text>
                    </Pressable>
-                   <Pressable style={styles.primaryBtn} onPress={() => setUsageModalVisible(true)}>
+                   <Pressable style={[styles.primaryBtn, !isDesktop && {flex: 1, justifyContent: 'center'}]} onPress={() => setUsageModalVisible(true)}>
                      <Text style={styles.primaryBtnText}>Log Usage</Text>
                    </Pressable>
                 </View>
@@ -332,21 +332,21 @@ export default function SubAdminWalletScreen() {
             </>
           ) : (
             <>
-              <View style={[styles.balanceCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+              <View style={[styles.balanceCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }, !isDesktop && { flexDirection: 'column', alignItems: 'center' }]}>
                 <View style={[styles.balanceIconWrapper, { backgroundColor: '#dcfce7' }]}>
                   <Banknote size={32} color="#16a34a" />
                 </View>
-                <View style={{flex: 1}}>
+                <View style={[{flex: 1}, !isDesktop && { alignItems: 'center' }]}>
                   <Text style={styles.balanceLabel}>Cash In Hand (To Handover)</Text>
                   <Text style={[styles.balanceAmount, {color: '#166534'}]}>₹{cashInHand}</Text>
                 </View>
-                <Pressable style={[styles.primaryBtn, {backgroundColor: '#16a34a'}]} onPress={() => {setAmount(cashInHand); setHandoverModalVisible(true)}}>
+                <Pressable style={[styles.primaryBtn, {backgroundColor: '#16a34a'}, !isDesktop && { width: '100%', justifyContent: 'center' }]} onPress={() => {setAmount(cashInHand); setHandoverModalVisible(true)}}>
                   <HandCoins size={18} color="#FFF" />
                   <Text style={styles.primaryBtnText}>Handover Cash</Text>
                 </Pressable>
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={[{ flexDirection: 'row', gap: 16, marginTop: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={[styles.statsBox, { flex: 1 }]}>
                   <Text style={styles.statsLabel}>Total Cash Booked</Text>
                   <Text style={[styles.statsValue, { color: '#16a34a' }]}>₹{totalCashBooked}</Text>

@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   chartSectionMobile: { flexDirection: 'column' },
   chartCard: { flex: 2, backgroundColor: Colors.light.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, minHeight: 400 },
   activityCard: { flex: 1, backgroundColor: Colors.light.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, minHeight: 400 },
-  activityCardMobile: { flex: 'none', width: '100%' },
+  activityCardMobile: { width: '100%' },
   cardTitle: { fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 24 },
   chartPlaceholder: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed' },
   placeholderText: { color: Colors.light.icon, fontWeight: '500' },

@@ -218,7 +218,7 @@ export default function Payslips() {
   }
 
   return (
-    <ScrollView style={[styles.container, isMobile && { padding: 16 }]}>
+    <ScrollView style={[styles.container, !isDesktop && { padding: 16 }]}>
       <View style={styles.headerRow}>
         <View style={styles.iconContainer}>
           <FileText size={28} color={Colors.light.primary} />
@@ -229,15 +229,15 @@ export default function Payslips() {
         </View>
       </View>
 
-      <View style={[styles.layout, !isMobile && { flexDirection: 'row', gap: 24 }]}>
-        <View style={[styles.section, !isMobile && { flex: 1 }]}>
+      <View style={[styles.layout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
+        <View style={[styles.section, isDesktop && { flex: 1 }]}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Generate / Fetch Payslip</Text>
             <View style={styles.formGroup}>
               <Text style={styles.label}>Month (YYYY-MM)</Text>
-              <View style={styles.row}>
+              <View style={[styles.row, !isDesktop && { flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
                 <TextInput
-                  style={[styles.input, { flex: 1, marginRight: 12 }]}
+                  style={[styles.input, isDesktop && { flex: 1, marginRight: 12 }]}
                   value={selectedMonth}
                   onChangeText={setSelectedMonth}
                   placeholder="e.g. 2026-06"
@@ -255,7 +255,7 @@ export default function Payslips() {
           </View>
         </View>
 
-        <View style={[styles.section, !isMobile && { flex: 1.5 }]}>
+        <View style={[styles.section, isDesktop && { flex: 1.5 }]}>
           <Text style={styles.sectionHeading}>Your Payslips</Text>
           {payslips.length === 0 ? (
             <View style={styles.emptyState}>

@@ -185,7 +185,7 @@ export default function LeaveManagement() {
   }
 
   return (
-    <ScrollView style={[styles.container, isMobile && { padding: 16 }]}>
+    <ScrollView style={[styles.container, !isDesktop && { padding: 16 }]}>
       <View style={styles.headerRow}>
         <View style={styles.iconContainer}>
           <CalendarDays size={28} color={Colors.light.primary} />
@@ -197,7 +197,7 @@ export default function LeaveManagement() {
       </View>
 
       {summary && (
-        <View style={[styles.summaryRow, isMobile && { flexDirection: 'column' }]}>
+        <View style={[styles.summaryRow, !isDesktop && { flexDirection: 'column' }]}>
           <View style={styles.summaryCard}>
              <Text style={styles.summaryVal}>{summary.usage.leaves} <Text style={styles.summaryLimit}>/ {summary.limits.leaves}</Text></Text>
              <Text style={styles.summaryLabel}>Leaves This Month</Text>
@@ -213,9 +213,9 @@ export default function LeaveManagement() {
         </View>
       )}
 
-      <View style={[styles.layout, !isMobile && { flexDirection: 'row', gap: 24 }]}>
+      <View style={[styles.layout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
         {/* Form Section */}
-        <View style={[styles.section, !isMobile && { flex: 1 }]}>
+        <View style={[styles.section, isDesktop && { flex: 1 }]}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>New Leave Application</Text>
             <View style={styles.alertBox}>
@@ -223,7 +223,7 @@ export default function LeaveManagement() {
                <Text style={styles.alertText}>Your department limits concurrent leaves. Apply early to secure your dates.</Text>
             </View>
 
-            <View style={[styles.formRow, isMobile && { flexDirection: 'column', gap: 16 }]}>
+            <View style={[styles.formRow, !isDesktop && { flexDirection: 'column', gap: 16 }]}>
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Start Date</Text>
                 {Platform.OS === 'web' ? (
@@ -322,7 +322,7 @@ export default function LeaveManagement() {
         </View>
 
         {/* List Section */}
-        <View style={[styles.section, !isMobile && { flex: 1.5 }]}>
+        <View style={[styles.section, isDesktop && { flex: 1.5 }]}>
           <Text style={styles.sectionHeading}>History</Text>
           {requests.length === 0 ? (
             <View style={styles.emptyState}>
