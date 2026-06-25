@@ -335,11 +335,11 @@ exports.generatePayslip = async (req, res) => {
     // Detailed breakdown
     const details = {
       base_salary,
-      per_day_salary: perDaySalary.toFixed(2),
+      per_day_salary: salary_per_day.toFixed(2),
       leaves: {
-        total_taken: total_leaves,
+        total_taken: actual_leaves,
         free_limit: settings.leaves_per_month,
-        penalized: Math.max(0, total_leaves - settings.leaves_per_month),
+        penalized: extra_leaves,
         penalty_per_day: settings.extra_leave_penalty,
         total_deduction: extra_leave_deduction
       },
