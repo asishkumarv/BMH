@@ -17,6 +17,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const stationaryRoutes = require('./routes/stationaryRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
+const holidayRoutes = require('./routes/holidayRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -29,6 +30,7 @@ app.use('/stationary', stationaryRoutes);
 app.use('/wallet', walletRoutes);
 app.use('/attendance', attendanceRoutes);
 app.use('/leave', require('./routes/leaveRoutes'));
+app.use('/holidays', holidayRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

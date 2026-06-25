@@ -8,8 +8,9 @@ import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function AdminLeaveManagement() {
   const { isMobile, isDesktop } = useResponsive();
-  const [activeTab, setActiveTab] = useState<'requests' | 'settings'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'settings' | 'holidays'>('requests');
   const [requests, setRequests] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Settings State
@@ -19,11 +20,16 @@ export default function AdminLeaveManagement() {
   const [roles, setRoles] = useState<any[]>([]);
   
   // Forms State
-  const [dDept, setDDept] = useState('All');
+  const [dDept, setDDept] = useState('');
   const [dLimit, setDLimit] = useState('2');
   
-  const [rDept, setRDept] = useState('All');
-  const [rRole, setRRole] = useState('All');
+  // Holiday Form State
+  const [hDept, setHDept] = useState('All');
+  const [hDate, setHDate] = useState('');
+  const [hDesc, setHDesc] = useState('');
+  
+  const [rDept, setRDept] = useState('');
+  const [rRole, setRRole] = useState('');
   const [rLeaves, setRLeaves] = useState('1');
   const [rExtraPen, setRExtraPen] = useState('0');
   const [rLateLim, setRLateLim] = useState('3');
@@ -35,6 +41,7 @@ export default function AdminLeaveManagement() {
     fetchRequests();
     fetchSettings();
     fetchDropdownData();
+    fetchHolidays();
   }, []);
 
   const fetchDropdownData = async () => {
@@ -44,10 +51,16 @@ export default function AdminLeaveManagement() {
         axios.get(`https://bmh-eitu.onrender.com/roles`)
       ]);
       if (deptRes.data && deptRes.data.success) {
-        setDepartments(deptRes.data.data);
+        const depts = deptRes.data.data;
+        setDepartments(depts);
+        if (depts.length > 0) {
+          setDDept(depts[0].name);
+          setRDept(depts[0].name);
+        }
       }
       if (roleRes.data && roleRes.data.success) {
-        setRoles(roleRes.data.data);
+        const rls = roleRes.data.data;
+        setRoles(rls);
       }
     } catch (error) {
       console.error("Dropdown fetch error:", error);
@@ -59,6 +72,13 @@ export default function AdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/requests`);
       if (res.ok) setRequests(await res.json());
     } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetch(`${API_URL}/holidays`);
+      if (res.ok) setHolidays(await res.json());
+    } catch (e) { console.error(e); }
   };
 
   const fetchSettings = async () => {
@@ -91,7 +111,7 @@ export default function AdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/settings/department`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ department: dDept, max_concurrent_leaves: parseInt(dLimit) })
+        body: JSON.stringify({ department: dDept, max_employees_leave_per_day: parseInt(dLimit) })
       });
       if (res.ok) {
         Alert.alert('Success', 'Department setting saved');
@@ -115,6 +135,39 @@ export default function AdminLeaveManagement() {
       if (res.ok) {
         Alert.alert('Success', 'Role setting saved');
         fetchSettings();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const saveHoliday = async () => {
+    try {
+      if (!hDate || !hDesc) {
+        Alert.alert('Error', 'Please fill all fields');
+        return;
+      }
+      const res = await fetch(`${API_URL}/holidays`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department: hDept, date: hDate, description: hDesc })
+      });
+      if (res.ok) {
+        Alert.alert('Success', 'Holiday saved');
+        fetchHolidays();
+        setHDate('');
+        setHDesc('');
+      } else {
+        const data = await res.json();
+        Alert.alert('Error', data.message || 'Failed to save holiday');
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteHoliday = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/holidays/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        Alert.alert('Success', 'Holiday deleted');
+        fetchHolidays();
       }
     } catch (e) { console.error(e); }
   };
@@ -145,6 +198,10 @@ export default function AdminLeaveManagement() {
         <Pressable style={[styles.tab, activeTab === 'settings' && styles.activeTab]} onPress={() => setActiveTab('settings')}>
           <Settings size={18} color={activeTab === 'settings' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'settings' && styles.activeTabText]}>Rule Configuration</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'holidays' && styles.activeTab]} onPress={() => setActiveTab('holidays')}>
+          <CalendarDays size={18} color={activeTab === 'holidays' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+          <Text style={[styles.tabText, activeTab === 'holidays' && styles.activeTabText]}>Holidays</Text>
         </Pressable>
       </View>
 
@@ -210,11 +267,10 @@ export default function AdminLeaveManagement() {
                   onChange={(e: any) => setDDept(e.target.value)} 
                   style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
                 >
-                  <option value="All">All Departments</option>
                   {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
               ) : (
-                <TextInput style={styles.input} value={dDept} onChangeText={setDDept} placeholder="e.g. Cardiology or All" />
+                <TextInput style={styles.input} value={dDept} onChangeText={setDDept} placeholder="e.g. Cardiology" />
               )}
               
               <Text style={styles.label}>Max Concurrent Leaves</Text>
@@ -227,10 +283,10 @@ export default function AdminLeaveManagement() {
 
               <View style={styles.existingRules}>
                 <Text style={styles.rulesHeading}>Active Department Rules</Text>
-                {deptSettings.map((ds, i) => (
+                {deptSettings.filter(ds => ds.department !== 'All').map((ds, i) => (
                   <View key={i} style={styles.ruleItem}>
                     <Text style={styles.ruleName}>{ds.department}</Text>
-                    <Text style={styles.ruleVal}>{ds.max_concurrent_leaves} leaves/day</Text>
+                    <Text style={styles.ruleVal}>{ds.max_employees_leave_per_day} leaves/day</Text>
                   </View>
                 ))}
               </View>
@@ -251,10 +307,14 @@ export default function AdminLeaveManagement() {
                   {Platform.OS === 'web' ? (
                     <select 
                       value={rDept} 
-                      onChange={(e: any) => { setRDept(e.target.value); setRRole('All'); }} 
+                      onChange={(e: any) => { 
+                        setRDept(e.target.value); 
+                        const deptId = departments.find(d => d.name === e.target.value)?.id;
+                        const deptRoles = roles.filter(r => r.departmentId == deptId);
+                        setRRole(deptRoles.length > 0 ? deptRoles[0].name : '');
+                      }} 
                       style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
                     >
-                      <option value="All">All Departments</option>
                       {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                     </select>
                   ) : (
@@ -262,15 +322,14 @@ export default function AdminLeaveManagement() {
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Role (or 'All')</Text>
+                  <Text style={styles.label}>Role</Text>
                   {Platform.OS === 'web' ? (
                     <select 
                       value={rRole} 
                       onChange={(e: any) => setRRole(e.target.value)} 
                       style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
                     >
-                      <option value="All">All Roles</option>
-                      {roles.filter(r => rDept === 'All' || r.departmentId === departments.find(d => d.name === rDept)?.id).map(r => (
+                      {roles.filter(r => r.departmentId == departments.find(d => d.name === rDept)?.id).map(r => (
                         <option key={r.id} value={r.name}>{r.name}</option>
                       ))}
                     </select>
@@ -317,6 +376,74 @@ export default function AdminLeaveManagement() {
                 <Save size={18} color="white" style={{ marginRight: 8 }} />
                 <Text style={styles.saveBtnText}>Save Policy</Text>
               </Pressable>
+
+              <View style={styles.existingRules}>
+                <Text style={styles.rulesHeading}>Active Role Policies</Text>
+                {roleSettings.filter(rs => rs.role !== 'All' && rs.department !== 'All').map((rs, i) => (
+                  <View key={i} style={styles.ruleItem}>
+                    <View>
+                      <Text style={styles.ruleName}>{rs.role} ({rs.department})</Text>
+                      <Text style={[styles.ruleVal, { fontSize: 13, marginTop: 4 }]}>
+                        {rs.leaves_per_month} free | ₹{rs.extra_leave_penalty} extra | {rs.late_checkin_limit} late/₹{rs.late_checkin_penalty} | {rs.early_checkout_limit} early/₹{rs.early_checkout_penalty}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {activeTab === 'holidays' && (
+        <View style={[styles.layout, isDesktop && { flexDirection: 'row' }]}>
+          <View style={styles.section}>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Add Holiday</Text>
+              <Text style={styles.helperText}>Declare holidays. Use "All" to apply to all departments.</Text>
+              
+              <Text style={styles.label}>Department</Text>
+              <View style={styles.pickerContainer}>
+                <select style={styles.webSelect} value={hDept} onChange={(e) => setHDept(e.target.value)}>
+                  <option value="All">All Departments</option>
+                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                </select>
+              </View>
+
+              <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
+              <TextInput style={styles.input} value={hDate} onChangeText={setHDate} placeholder="e.g. 2026-12-25" />
+
+              <Text style={styles.label}>Description</Text>
+              <TextInput style={styles.input} value={hDesc} onChangeText={setHDesc} placeholder="e.g. Christmas Day" />
+
+              <Pressable style={styles.saveBtn} onPress={saveHoliday}>
+                <Save size={18} color="white" style={{ marginRight: 8 }} />
+                <Text style={styles.saveBtnText}>Save Holiday</Text>
+              </Pressable>
+            </View>
+          </View>
+          
+          <View style={styles.section}>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Declared Holidays</Text>
+              <Text style={styles.helperText}>List of all upcoming holidays</Text>
+              
+              <View style={styles.existingRules}>
+                {holidays.map((h, i) => (
+                  <View key={i} style={styles.ruleItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.ruleName}>{new Date(h.date).toLocaleDateString()} - {h.description}</Text>
+                      <Text style={[styles.ruleVal, { fontSize: 13, marginTop: 4 }]}>Department: {h.department}</Text>
+                    </View>
+                    <Pressable onPress={() => deleteHoliday(h.id)} style={{ padding: 8 }}>
+                      <XCircle size={20} color="#EF4444" />
+                    </Pressable>
+                  </View>
+                ))}
+                {holidays.length === 0 && (
+                  <Text style={styles.emptyStateText}>No holidays declared.</Text>
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -358,6 +485,8 @@ const styles = StyleSheet.create({
   actionBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, padding: 14, backgroundColor: Colors.light.background, fontSize: 15, marginBottom: 16 },
+  pickerContainer: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, backgroundColor: Colors.light.background, marginBottom: 16, overflow: 'hidden' },
+  webSelect: { width: '100%', padding: 14, fontSize: 15, backgroundColor: 'transparent', border: 'none', outline: 'none' } as any,
   saveBtn: { flexDirection: 'row', backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   saveBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
   emptyState: { alignItems: 'center', justifyContent: 'center', padding: 48, backgroundColor: Colors.light.card, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, borderStyle: 'dashed' },

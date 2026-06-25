@@ -10,6 +10,8 @@ export default function LeaveManagement() {
   const [employee, setEmployee] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [requests, setRequests] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [projection, setProjection] = useState<{days: number, penalty: number} | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -30,9 +32,10 @@ export default function LeaveManagement() {
       const emp = JSON.parse(empData);
       setEmployee(emp);
 
-      const [reqRes, sumRes] = await Promise.all([
+      const [reqRes, sumRes, holRes] = await Promise.all([
         fetch(`${API_URL}/leave/requests?employee_id=${emp.id}`),
-        fetch(`${API_URL}/leave/summary/${emp.id}`)
+        fetch(`${API_URL}/leave/summary/${emp.id}`),
+        fetch(`${API_URL}/holidays?department=${emp.department}`)
       ]);
       if (reqRes.ok) {
         const data = await reqRes.json();
@@ -42,6 +45,10 @@ export default function LeaveManagement() {
         const data = await sumRes.json();
         setSummary(data);
       }
+      if (holRes.ok) {
+        const data = await holRes.json();
+        setHolidays(data);
+      }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
     } finally {
@@ -49,9 +56,67 @@ export default function LeaveManagement() {
     }
   };
 
+  const getTomorrowString = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
+  const minDateStr = getTomorrowString();
+
+  useEffect(() => {
+    if (startDate && endDate && summary) {
+      if (startDate > endDate) {
+         setProjection(null);
+         return;
+      }
+      let days = 0;
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]));
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() !== 0) { // Not Sunday
+          const dStr = d.toISOString().split('T')[0];
+          if (!holidayDates.has(dStr)) {
+            days++;
+          }
+        }
+      }
+
+      const used = summary.usage.leaves;
+      const limit = summary.limits.leaves;
+      const penaltyRate = parseFloat(summary.penalties?.extra_leave || 0);
+      
+      let penalizedDays = 0;
+      if (used + days > limit) {
+        penalizedDays = (used + days) - Math.max(used, limit);
+      }
+
+      setProjection({
+        days,
+        penalty: penalizedDays * penaltyRate
+      });
+    } else {
+      setProjection(null);
+    }
+  }, [startDate, endDate, summary, holidays]);
+
   const submitRequest = async () => {
     if (!startDate || !endDate || !reason) {
       Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+
+    if (startDate < minDateStr || endDate < minDateStr) {
+      Alert.alert('Error', 'Leaves can only be applied from tomorrow onwards');
+      if (Platform.OS === 'web') window.alert('Leaves can only be applied from tomorrow onwards');
+      return;
+    }
+
+    if (endDate < startDate) {
+      Alert.alert('Error', 'End date must be after or equal to start date');
+      if (Platform.OS === 'web') window.alert('End date must be after or equal to start date');
       return;
     }
 
@@ -138,23 +203,43 @@ export default function LeaveManagement() {
             <View style={[styles.formRow, isMobile && { flexDirection: 'column', gap: 16 }]}>
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Start Date</Text>
-                <TextInput
-                  style={styles.input}
-                  value={startDate}
-                  onChangeText={setStartDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={Colors.light.icon}
-                />
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    min={minDateStr}
+                    value={startDate}
+                    onChange={(e: any) => setStartDate(e.target.value)}
+                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
+                  />
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    value={startDate}
+                    onChangeText={setStartDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={Colors.light.icon}
+                  />
+                )}
               </View>
               <View style={styles.formGroup}>
                 <Text style={styles.label}>End Date</Text>
-                <TextInput
-                  style={styles.input}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={Colors.light.icon}
-                />
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    min={startDate || minDateStr}
+                    value={endDate}
+                    onChange={(e: any) => setEndDate(e.target.value)}
+                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
+                  />
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    value={endDate}
+                    onChangeText={setEndDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={Colors.light.icon}
+                  />
+                )}
               </View>
             </View>
             <View style={styles.formGroup}>
@@ -168,6 +253,18 @@ export default function LeaveManagement() {
                 multiline
               />
             </View>
+
+            {projection && projection.days > 0 && (
+              <View style={{ backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 }}>Cost Projection</Text>
+                <Text style={{ fontSize: 14, color: Colors.light.text, marginBottom: 4 }}>Total Working Days Requested: {projection.days}</Text>
+                {projection.penalty > 0 ? (
+                   <Text style={{ fontSize: 14, color: '#EF4444', fontWeight: '600' }}>Estimated Penalty Deduction: ₹{projection.penalty}</Text>
+                ) : (
+                   <Text style={{ fontSize: 14, color: '#10B981', fontWeight: '600' }}>Within Free Limits. No Penalty.</Text>
+                )}
+              </View>
+            )}
             <Pressable 
               style={[styles.submitButton, submitting && { opacity: 0.7 }]} 
               onPress={submitRequest}

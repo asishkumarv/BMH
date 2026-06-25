@@ -219,39 +219,75 @@ exports.generatePayslip = async (req, res) => {
     };
     if (roleSetRes.rows.length > 0) settings = roleSetRes.rows[0];
 
-    // 3. Calculate actual leaves taken in this month
-    const leavesRes = await pool.query(`
-      SELECT SUM(end_date - start_date + 1) as total_leave_days
-      FROM leave_requests 
-      WHERE employee_id = $1 AND status = 'approved' 
-      AND TO_CHAR(start_date, 'YYYY-MM') = $2
-    `, [employee_id, month]);
-    const actual_leaves = parseInt(leavesRes.rows[0].total_leave_days || 0);
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr);
+    const m = parseInt(monthStr) - 1;
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
 
-    // 4. Calculate extra leaves
-    const extra_leaves = Math.max(0, actual_leaves - settings.leaves_per_month);
-    const salary_per_day = base_salary / 30; // Approximating month as 30 days
-    const extra_leave_deduction = extra_leaves * (salary_per_day + parseFloat(settings.extra_leave_penalty || 0));
+    // Fetch holidays
+    const holidaysRes = await pool.query(
+      `SELECT date FROM holidays WHERE (department = $1 OR department = 'All') AND TO_CHAR(date, 'YYYY-MM') = $2`,
+      [emp.department, month]
+    );
+    const holidaySet = new Set(holidaysRes.rows.map(r => new Date(r.date).getDate()));
 
-    // 5. Calculate late checkins & early checkouts from attendance
+    // Fetch attendance
     const attendanceRes = await pool.query(`
-      SELECT late_duration, early_checkout_duration 
+      SELECT date, late_duration, early_checkout_duration 
       FROM attendance 
       WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2
     `, [employee_id, month]);
 
+    const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
+
+    // Calculate late checkins & early checkouts
     let late_count = 0;
     let early_count = 0;
     attendanceRes.rows.forEach(att => {
-      // If late_duration exists and > 0, count as late
       if (att.late_duration && att.late_duration !== '0h 0m' && att.late_duration !== '') {
-         // Could parse further, but if it has a non-zero string, it's late.
          late_count++;
       }
       if (att.early_checkout_duration && att.early_checkout_duration !== '0h 0m' && att.early_checkout_duration !== '') {
          early_count++;
       }
     });
+
+    // Fetch approved leaves
+    const leavesListRes = await pool.query(`
+      SELECT start_date, end_date FROM leave_requests
+      WHERE employee_id = $1 AND status = 'approved'
+      AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
+    `, [employee_id, month]);
+
+    const approvedLeaveDays = new Set();
+    leavesListRes.rows.forEach(lr => {
+        const start = new Date(lr.start_date);
+        const end = new Date(lr.end_date);
+        for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            if (d.getMonth() === m && d.getFullYear() === year) {
+                approvedLeaveDays.add(d.getDate());
+            }
+        }
+    });
+
+    // Calculate missing days
+    let missingDays = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(year, m, day);
+        const isSunday = dateObj.getDay() === 0;
+        if (!isSunday && !holidaySet.has(day)) {
+            if (!attendedDays.has(day) && !approvedLeaveDays.has(day)) {
+                missingDays++;
+            }
+        }
+    }
+
+    const actual_leaves = approvedLeaveDays.size + missingDays;
+
+    // 4. Calculate extra leaves
+    const extra_leaves = Math.max(0, actual_leaves - settings.leaves_per_month);
+    const salary_per_day = base_salary / 30; // Approximating month as 30 days
+    const extra_leave_deduction = extra_leaves * (salary_per_day + parseFloat(settings.extra_leave_penalty || 0));
 
     const extra_late = Math.max(0, late_count - settings.late_checkin_limit);
     const late_checkin_deduction = extra_late * settings.late_checkin_penalty;
@@ -324,6 +360,9 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
       leaves_per_month: 0,
       late_checkin_limit: 0,
       early_checkout_limit: 0,
+      extra_leave_penalty: 0,
+      late_checkin_penalty: 0,
+      early_checkout_penalty: 0,
     };
     if (roleSetRes.rows.length > 0) settings = roleSetRes.rows[0];
 
@@ -359,6 +398,11 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
         leaves: settings.leaves_per_month,
         late_checkins: settings.late_checkin_limit,
         early_checkouts: settings.early_checkout_limit
+      },
+      penalties: {
+        extra_leave: settings.extra_leave_penalty,
+        late_checkin: settings.late_checkin_penalty,
+        early_checkout: settings.early_checkout_penalty
       },
       usage: {
         leaves: actual_leaves,

@@ -164,11 +164,32 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
         });
       }
 
+      // Compute late duration based on shiftIn
+      const empRes = await pool.query('SELECT profile_data FROM employees WHERE id = $1', [employeeId]);
+      let late_duration = '0h 0m';
+      if (empRes.rows.length > 0 && empRes.rows[0].profile_data) {
+        try {
+          const profileData = JSON.parse(empRes.rows[0].profile_data);
+          if (profileData.shiftIn) {
+            const [shiftHour, shiftMin] = profileData.shiftIn.split(':').map(Number);
+            const now = new Date();
+            const shiftTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), shiftHour, shiftMin, 0);
+            const diffMs = now - shiftTime;
+            if (diffMs > 0) {
+              const diffMins = Math.floor(diffMs / 60000);
+              const h = Math.floor(diffMins / 60);
+              const m = diffMins % 60;
+              late_duration = `${h}h ${m}m`;
+            }
+          }
+        } catch (e) { console.error('Error parsing profile_data for late checkin', e); }
+      }
+
       const insertResult = await pool.query(
-        `INSERT INTO attendance (employee_id, department, timestamp, image_url, status)
-         VALUES ($1, (SELECT department FROM employees WHERE id = $1), CURRENT_TIMESTAMP, $2, $3)
+        `INSERT INTO attendance (employee_id, department, timestamp, image_url, status, late_duration)
+         VALUES ($1, (SELECT department FROM employees WHERE id = $1), CURRENT_TIMESTAMP, $2, $3, $4)
          RETURNING id, timestamp, status`,
-        [employeeId, storedCapturedUrl, status]
+        [employeeId, storedCapturedUrl, status, late_duration]
       );
 
       return res.json({
@@ -193,12 +214,33 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
         });
       }
 
+      // Compute early checkout duration based on shiftOut
+      const empRes = await pool.query('SELECT profile_data FROM employees WHERE id = $1', [employeeId]);
+      let early_checkout_duration = '0h 0m';
+      if (empRes.rows.length > 0 && empRes.rows[0].profile_data) {
+        try {
+          const profileData = JSON.parse(empRes.rows[0].profile_data);
+          if (profileData.shiftOut) {
+            const [shiftHour, shiftMin] = profileData.shiftOut.split(':').map(Number);
+            const now = new Date();
+            const shiftTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), shiftHour, shiftMin, 0);
+            const diffMs = shiftTime - now; // time left early
+            if (diffMs > 0) {
+              const diffMins = Math.floor(diffMs / 60000);
+              const h = Math.floor(diffMins / 60);
+              const m = diffMins % 60;
+              early_checkout_duration = `${h}h ${m}m`;
+            }
+          }
+        } catch (e) { console.error('Error parsing profile_data for early checkout', e); }
+      }
+
       const updateResult = await pool.query(
         `UPDATE attendance 
-         SET checkout_timestamp = CURRENT_TIMESTAMP, checkout_image_url = $2
+         SET checkout_timestamp = CURRENT_TIMESTAMP, checkout_image_url = $2, early_checkout_duration = $3
          WHERE employee_id = $1 AND date = CURRENT_DATE
          RETURNING id, checkout_timestamp`,
-        [employeeId, storedCapturedUrl]
+        [employeeId, storedCapturedUrl, early_checkout_duration]
       );
 
       return res.json({
