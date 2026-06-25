@@ -304,11 +304,13 @@ exports.getRevenueStats = async (req, res) => {
 exports.getAllWalletBalances = async (req, res) => {
   try {
     const query = `
-      SELECT ew.employee_id, ew.balance, ew.cash_in_hand,
+      SELECT 
+        CASE WHEN ew.employee_id = e.id::text THEN 'EMP-' || e.id ELSE ew.employee_id END as employee_id,
+        ew.balance, ew.cash_in_hand,
         COALESCE(e.full_name, sa.full_name, a.full_name) as full_name,
         COALESCE(e.role, 'Sub Admin') as role
       FROM employee_wallets ew
-      LEFT JOIN employees e ON ew.employee_id = 'EMP-' || e.id
+      LEFT JOIN employees e ON ew.employee_id = 'EMP-' || e.id OR ew.employee_id = e.id::text
       LEFT JOIN department_admins sa ON ew.employee_id = 'SA-' || sa.id
       LEFT JOIN super_admins a ON ew.employee_id = 'ADMIN-' || a.id
       WHERE ew.employee_id NOT LIKE 'ADMIN-%'
@@ -333,10 +335,12 @@ exports.getDepartmentWalletBalances = async (req, res) => {
     const departmentName = deptResult.rows[0].name;
 
     const query = `
-      SELECT ew.employee_id, ew.balance, ew.cash_in_hand,
+      SELECT 
+        CASE WHEN ew.employee_id = e.id::text THEN 'EMP-' || e.id ELSE ew.employee_id END as employee_id,
+        ew.balance, ew.cash_in_hand,
         e.full_name, e.role
       FROM employee_wallets ew
-      JOIN employees e ON ew.employee_id = 'EMP-' || e.id
+      JOIN employees e ON ew.employee_id = 'EMP-' || e.id OR ew.employee_id = e.id::text
       WHERE e.department = $1
       ORDER BY ew.cash_in_hand DESC
     `;
