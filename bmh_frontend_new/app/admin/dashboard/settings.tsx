@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Switch, TouchableOpacity, ActivityIndicator } from 'react-native';
 import axios from 'axios';
-import { Colors } from '../../../../constants/Colors';
+import { Colors } from '../../../constants/Colors';
 import { ShieldCheck } from 'lucide-react-native';
 
 export default function AdminSettings() {
