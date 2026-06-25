@@ -4,6 +4,8 @@ import { Colors } from '../../../constants/Colors';
 import { API_URL } from '../../../config';
 import { Download, FileText, CheckCircle } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 export default function Payslips() {
   const { isMobile, isDesktop } = useResponsive();
@@ -69,17 +71,141 @@ export default function Payslips() {
     }
   };
 
-  const downloadPayslip = (payslip: any) => {
-    if (Platform.OS === 'web') {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payslip, null, 2));
-      const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", `payslip_${payslip.month}.json`);
-      document.body.appendChild(downloadAnchorNode);
-      downloadAnchorNode.click();
-      downloadAnchorNode.remove();
-    } else {
-      Alert.alert('Payslip Data', JSON.stringify(payslip, null, 2));
+  const downloadPayslip = async (payslip: any) => {
+    let d = payslip.details;
+    if (typeof d === 'string') {
+      try { d = JSON.parse(d); } catch(e){}
+    }
+
+    const htmlContent = `
+    <html>
+      <head>
+        <style>
+          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
+          h1 { text-align: center; color: #2563EB; margin-bottom: 5px; }
+          h3 { text-align: center; color: #64748B; margin-top: 0; }
+          .header { border-bottom: 2px solid #E2E8F0; padding-bottom: 20px; margin-bottom: 30px; }
+          .info-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
+          .info-box { background: #F8FAFC; padding: 15px; border-radius: 8px; width: 45%; line-height: 1.6; }
+          .table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          .table th, .table td { padding: 12px; border-bottom: 1px solid #E2E8F0; text-align: left; }
+          .table th { background: #F1F5F9; color: #475569; }
+          .amount { text-align: right !important; font-family: monospace; font-size: 1.1em; }
+          .total-row { font-weight: bold; font-size: 1.2em; background: #EFF6FF; }
+          .total-row td { border-top: 2px solid #2563EB; }
+          .deduction { color: #EF4444; }
+          .details { font-size: 0.85em; color: #64748B; display: block; margin-top: 4px; }
+          .footer { text-align: center; margin-top: 50px; font-size: 0.9em; color: #94A3B8; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>BMH Employee Portal</h1>
+          <h3>Payslip for Month: ${payslip.month}</h3>
+        </div>
+        
+        <div class="info-grid">
+          <div class="info-box">
+            <strong>Employee Name:</strong> ${employee?.full_name || 'N/A'}<br/>
+            <strong>Employee ID:</strong> ${employee?.employee_id || employee?.id || 'N/A'}<br/>
+            <strong>Department:</strong> ${employee?.department || 'N/A'}
+          </div>
+          <div class="info-box">
+            <strong>Role:</strong> ${employee?.role || 'N/A'}<br/>
+            <strong>Base Salary:</strong> ₹${payslip.base_salary}<br/>
+            <strong>Net Salary:</strong> ₹${payslip.net_salary}
+          </div>
+        </div>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="amount">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Base Salary</strong></td>
+              <td class="amount">${payslip.base_salary}</td>
+            </tr>
+            ${d ? `
+            <tr>
+              <td>
+                <strong>Extra Leave Deduction</strong>
+                <span class="details">${d.leaves?.total_taken} taken, ${d.leaves?.free_limit} free, ${d.leaves?.penalized} penalized @ ₹${d.leaves?.penalty_per_day}/day</span>
+              </td>
+              <td class="amount deduction">- ${d.leaves?.total_deduction || 0}</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Late Check-in Deduction</strong>
+                <span class="details">${d.late_checkins?.total_occurrences} late, ${d.late_checkins?.free_limit} free, ${d.late_checkins?.penalized} penalized @ ₹${d.late_checkins?.penalty_per_instance}/instance</span>
+              </td>
+              <td class="amount deduction">- ${d.late_checkins?.total_deduction || 0}</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Early Check-out Deduction</strong>
+                <span class="details">${d.early_checkouts?.total_occurrences} early, ${d.early_checkouts?.free_limit} free, ${d.early_checkouts?.penalized} penalized @ ₹${d.early_checkouts?.penalty_per_instance}/instance</span>
+              </td>
+              <td class="amount deduction">- ${d.early_checkouts?.total_deduction || 0}</td>
+            </tr>
+            ` : `
+            <tr>
+              <td><strong>Extra Leave Deduction</strong></td>
+              <td class="amount deduction">- ${payslip.extra_leave_deduction}</td>
+            </tr>
+            <tr>
+              <td><strong>Late Check-in Deduction</strong></td>
+              <td class="amount deduction">- ${payslip.late_checkin_deduction}</td>
+            </tr>
+            <tr>
+              <td><strong>Early Check-out Deduction</strong></td>
+              <td class="amount deduction">- ${payslip.early_checkout_deduction}</td>
+            </tr>
+            `}
+            <tr class="total-row">
+              <td>NET SALARY</td>
+              <td class="amount">₹${payslip.net_salary}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer">
+          This is a computer generated payslip and does not require a signature.
+        </div>
+      </body>
+    </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        // On web, open a new window to print just the payslip HTML
+        const printWindow = window.open('', '', 'width=800,height=600');
+        if (printWindow) {
+          printWindow.document.write(htmlContent);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+          }, 250);
+        } else {
+          window.alert('Please allow pop-ups to print payslips');
+        }
+      } else {
+        // On mobile, create the PDF file and then share it so the user can save/download it
+        const { uri } = await Print.printToFileAsync({ html: htmlContent });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: `Payslip_${payslip.month}` });
+        } else {
+          Alert.alert("Success", "PDF generated at: " + uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      Alert.alert('Error', 'Failed to generate PDF');
     }
   };
 

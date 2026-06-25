@@ -10,13 +10,13 @@ import { Clock, CheckCircle, AlertTriangle, Coffee, Download } from 'lucide-reac
 const Dropdown = ({ options, value, onChange }: any) => {
   if (Platform.OS === 'web') {
     return (
-      <View style={{ padding: 0, justifyContent: 'center', minWidth: 150, backgroundColor: '#f3f4f6', borderRadius: 8 }}>
+      <View style={{ padding: 0, justifyContent: 'center', minWidth: 140, backgroundColor: '#f9fafb', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb' }}>
         {React.createElement(
           'select',
           {
             value: value,
             onChange: (e: any) => onChange(e.target.value),
-            style: { width: '100%', height: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent', padding: '10px', fontSize: '14px', color: '#111827' }
+            style: { width: '100%', height: '40px', border: 'none', outline: 'none', backgroundColor: 'transparent', padding: '0 12px', fontSize: '14px', color: '#374151', cursor: 'pointer' }
           },
           ...options.map((o: any) => React.createElement('option', { key: o, value: o }, o))
         )}
@@ -130,38 +130,41 @@ export default function EmployeeAttendanceHistory() {
 
       <View style={[styles.section, {marginBottom: 20}]}>
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: '#f3f4f6', flexWrap: 'wrap', gap: 12}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap'}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap'}}>
             {Platform.OS === 'web' ? (
-              <View style={{flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, backgroundColor: '#f3f4f6', padding: 8, borderRadius: 8, width: isDesktop ? 'auto' : '100%'}}>
-                <input 
-                  type="date" 
-                  value={startDate} 
-                  onChange={(e) => setStartDate(e.target.value)} 
-                  style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap'}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={(e) => setStartDate(e.target.value)} 
+                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', outline: 'none', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
+                  />
+                  <Text style={{color: '#9ca3af', fontWeight: '500'}}>-</Text>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={(e) => setEndDate(e.target.value)} 
+                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', outline: 'none', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
+                  />
+                </View>
+                
+                <Dropdown 
+                  options={['All', 'Late In', 'Early Out']} 
+                  value={statusFilter} 
+                  onChange={setStatusFilter} 
                 />
-                <Text style={{color: '#6b7280', fontWeight: '500', textAlign: 'center'}}>to</Text>
-                <input 
-                  type="date" 
-                  value={endDate} 
-                  onChange={(e) => setEndDate(e.target.value)} 
-                  style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
-                />
-                <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
-                  <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchHistory(false)}>
-                    <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
+
+                <View style={{flexDirection: 'row', gap: 8}}>
+                  <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center'}} onPress={() => fetchHistory(false)}>
+                    <Text style={{color: 'white', fontWeight: '600', fontSize: 14}}>Apply</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchHistory(true); }}>
-                    <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
+                  <TouchableOpacity style={{backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchHistory(true); }}>
+                    <Text style={{color: '#4b5563', fontWeight: '600', fontSize: 14}}>Clear</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : null}
-
-            <Dropdown 
-              options={['All', 'Late In', 'Early Out']} 
-              value={statusFilter} 
-              onChange={setStatusFilter} 
-            />
           </View>
 
           <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8}} onPress={handleExportCSV}>

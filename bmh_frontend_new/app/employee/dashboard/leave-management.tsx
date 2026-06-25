@@ -11,7 +11,15 @@ export default function LeaveManagement() {
   const [summary, setSummary] = useState<any>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
-  const [projection, setProjection] = useState<{days: number, penaltyRate: number, penalizedDays: number, penalty: number} | null>(null);
+  const [projection, setProjection] = useState<{
+    days: number,
+    salaryPerDay: number,
+    penaltyRate: number,
+    penalizedDays: number,
+    salaryDeduction: number,
+    penaltyDeduction: number,
+    totalDeduction: number
+  } | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -87,6 +95,16 @@ export default function LeaveManagement() {
       const used = summary.usage.leaves;
       const limit = summary.limits.leaves;
       const penaltyRate = parseFloat(summary.penalties?.extra_leave || 0);
+
+      let baseSalary = 0;
+      try {
+        let pd = employee.profile_data;
+        if (typeof pd === 'string') pd = JSON.parse(pd);
+        if (pd && pd.salary) {
+          baseSalary = parseFloat(pd.salary);
+        }
+      } catch (e) {}
+      const salaryPerDay = baseSalary / 30;
       
       let penalizedDays = 0;
       if (used + days > limit) {
@@ -95,9 +113,12 @@ export default function LeaveManagement() {
 
       setProjection({
         days,
+        salaryPerDay,
         penaltyRate,
         penalizedDays,
-        penalty: penalizedDays * penaltyRate
+        salaryDeduction: penalizedDays * salaryPerDay,
+        penaltyDeduction: penalizedDays * penaltyRate,
+        totalDeduction: penalizedDays * (salaryPerDay + penaltyRate)
       });
     } else {
       setProjection(null);
@@ -261,16 +282,27 @@ export default function LeaveManagement() {
                 <Text style={styles.projectionTitle}>Cost Projection</Text>
                 <Text style={styles.projectionText}>Total Working Days Requested: {projection.days}</Text>
                 
-                {projection.penaltyRate > 0 && (
-                  <Text style={styles.projectionText}>
-                    Per Day Cutting: ₹{projection.penaltyRate}
-                  </Text>
-                )}
-
                 {projection.penalizedDays > 0 ? (
-                  <Text style={[styles.projectionText, { color: Colors.light.error, fontWeight: '700', marginTop: 4 }]}>
-                    Penalty applied for {projection.penalizedDays} extra day(s): ₹{projection.penalty}
-                  </Text>
+                  <>
+                    <View style={{ marginTop: 8, marginBottom: 8, padding: 8, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 8 }}>
+                      <Text style={[styles.projectionText, { marginBottom: 2 }]}>
+                        Unpaid Days: {projection.penalizedDays}
+                      </Text>
+                      {projection.salaryPerDay > 0 && (
+                        <Text style={[styles.projectionText, { marginBottom: 2 }]}>
+                          Salary Deduction: {projection.penalizedDays} × ₹{(projection.salaryPerDay || 0).toFixed(2)} = ₹{(projection.salaryDeduction || 0).toFixed(2)}
+                        </Text>
+                      )}
+                      {projection.penaltyRate > 0 && (
+                        <Text style={[styles.projectionText, { marginBottom: 2 }]}>
+                          Extra Penalty: {projection.penalizedDays} × ₹{(projection.penaltyRate || 0).toFixed(2)} = ₹{(projection.penaltyDeduction || 0).toFixed(2)}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.projectionText, { color: Colors.light.error, fontWeight: '700', fontSize: 16 }]}>
+                      Total Deduction: ₹{(projection.totalDeduction || 0).toFixed(2)}
+                    </Text>
+                  </>
                 ) : (
                   <Text style={[styles.projectionText, { color: Colors.light.primary, fontWeight: '700', marginTop: 4 }]}>
                     Within free limit. No deduction.

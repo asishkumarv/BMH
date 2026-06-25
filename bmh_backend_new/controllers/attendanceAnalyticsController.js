@@ -180,8 +180,22 @@ exports.getAdvancedReports = async (req, res) => {
         }
       }
 
+      let dynamic_status = row.status;
+      const rowDateStr = new Date(row.date).toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      if (row.check_out || rowDateStr < todayStr) {
+        dynamic_status = 'Checked Out';
+      } else if (row.breaks && row.breaks.length > 0) {
+        row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const lastBreak = row.breaks[row.breaks.length - 1];
+        if (lastBreak.break_type === 'Break In') {
+          dynamic_status = 'On Break';
+        }
+      }
+
       const { profile_data, ...rest } = row; // remove raw profile data
-      return { ...rest, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
+      return { ...rest, status: dynamic_status, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
     });
 
     res.json({ success: true, data: processedData });
@@ -298,8 +312,21 @@ exports.getEmployeeAnalytics = async (req, res) => {
         totalWorkMs += workMs;
         validWorkDays++;
       }
+      let dynamic_status = row.status;
+      const rowDateStr = new Date(row.date).toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      if (row.check_out || rowDateStr < todayStr) {
+        dynamic_status = 'Checked Out';
+      } else if (row.breaks && row.breaks.length > 0) {
+        row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const lastBreak = row.breaks[row.breaks.length - 1];
+        if (lastBreak.break_type === 'Break In') {
+          dynamic_status = 'On Break';
+        }
+      }
       
-      return { ...row, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
+      return { ...row, status: dynamic_status, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
     });
 
     const avgWorkMs = validWorkDays > 0 ? (totalWorkMs / validWorkDays) : 0;
