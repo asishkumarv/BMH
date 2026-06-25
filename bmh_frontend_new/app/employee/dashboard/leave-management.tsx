@@ -11,7 +11,7 @@ export default function LeaveManagement() {
   const [summary, setSummary] = useState<any>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
-  const [projection, setProjection] = useState<{days: number, penalty: number} | null>(null);
+  const [projection, setProjection] = useState<{days: number, penaltyRate: number, penalizedDays: number, penalty: number} | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -95,6 +95,8 @@ export default function LeaveManagement() {
 
       setProjection({
         days,
+        penaltyRate,
+        penalizedDays,
         penalty: penalizedDays * penaltyRate
       });
     } else {
@@ -254,14 +256,25 @@ export default function LeaveManagement() {
               />
             </View>
 
-            {projection && projection.days > 0 && (
-              <View style={{ backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 }}>Cost Projection</Text>
-                <Text style={{ fontSize: 14, color: Colors.light.text, marginBottom: 4 }}>Total Working Days Requested: {projection.days}</Text>
-                {projection.penalty > 0 ? (
-                   <Text style={{ fontSize: 14, color: '#EF4444', fontWeight: '600' }}>Estimated Penalty Deduction: ₹{projection.penalty}</Text>
+            {projection && (
+              <View style={styles.projectionBox}>
+                <Text style={styles.projectionTitle}>Cost Projection</Text>
+                <Text style={styles.projectionText}>Total Working Days Requested: {projection.days}</Text>
+                
+                {projection.penaltyRate > 0 && (
+                  <Text style={styles.projectionText}>
+                    Per Day Cutting: ₹{projection.penaltyRate}
+                  </Text>
+                )}
+
+                {projection.penalizedDays > 0 ? (
+                  <Text style={[styles.projectionText, { color: Colors.light.error, fontWeight: '700', marginTop: 4 }]}>
+                    Penalty applied for {projection.penalizedDays} extra day(s): ₹{projection.penalty}
+                  </Text>
                 ) : (
-                   <Text style={{ fontSize: 14, color: '#10B981', fontWeight: '600' }}>Within Free Limits. No Penalty.</Text>
+                  <Text style={[styles.projectionText, { color: Colors.light.primary, fontWeight: '700', marginTop: 4 }]}>
+                    Within free limit. No deduction.
+                  </Text>
                 )}
               </View>
             )}
@@ -357,4 +370,7 @@ const styles = StyleSheet.create({
   statusRejected: { backgroundColor: '#FEE2E2' },
   statusPending: { backgroundColor: '#FEF3C7' },
   statusText: { fontSize: 12, fontWeight: '700' },
+  projectionBox: { backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' },
+  projectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 },
+  projectionText: { fontSize: 14, color: Colors.light.text, marginBottom: 4 },
 });

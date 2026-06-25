@@ -233,23 +233,57 @@ exports.generatePayslip = async (req, res) => {
 
     // Fetch attendance
     const attendanceRes = await pool.query(`
-      SELECT date, late_duration, early_checkout_duration 
+      SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
       FROM attendance 
       WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2
     `, [employee_id, month]);
 
     const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
 
+    // Parse shift times
+    let shiftInMin = null;
+    let shiftOutMin = null;
+    try {
+      if (emp.profile_data) {
+        const pd = JSON.parse(emp.profile_data);
+        if (pd.shiftIn) {
+          const [h, m] = pd.shiftIn.split(':').map(Number);
+          shiftInMin = h * 60 + m;
+        }
+        if (pd.shiftOut) {
+          const [h, m] = pd.shiftOut.split(':').map(Number);
+          shiftOutMin = h * 60 + m;
+        }
+      }
+    } catch(e) {}
+
     // Calculate late checkins & early checkouts
     let late_count = 0;
     let early_count = 0;
     attendanceRes.rows.forEach(att => {
+      let isLate = false;
+      let isEarly = false;
+      
       if (att.late_duration && att.late_duration !== '0h 0m' && att.late_duration !== '') {
-         late_count++;
+         isLate = true;
+      } else if (shiftInMin !== null && att.timestamp) {
+         const t = new Date(att.timestamp);
+         const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+         const [h, m] = tStr.split(':').map(Number);
+         if ((h * 60 + m) > shiftInMin) isLate = true;
       }
+      
       if (att.early_checkout_duration && att.early_checkout_duration !== '0h 0m' && att.early_checkout_duration !== '') {
-         early_count++;
+         isEarly = true;
+      } else if (shiftOutMin !== null && att.checkout_timestamp) {
+         const t = new Date(att.checkout_timestamp);
+         const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+         const [h, m] = tStr.split(':').map(Number);
+         if ((h * 60 + m) < shiftOutMin) isEarly = true;
       }
+      
+      if (isLate) late_count++;
+      if (isEarly) early_count++;
     });
 
     // Fetch approved leaves
@@ -295,21 +329,50 @@ exports.generatePayslip = async (req, res) => {
     const extra_early = Math.max(0, early_count - settings.early_checkout_limit);
     const early_checkout_deduction = extra_early * settings.early_checkout_penalty;
 
-    const net_salary = base_salary - extra_leave_deduction - late_checkin_deduction - early_checkout_deduction;
+    let net_salary = base_salary - (extra_leave_deduction + late_checkin_deduction + early_checkout_deduction);
+    if (net_salary < 0) net_salary = 0;
+
+    // Detailed breakdown
+    const details = {
+      base_salary,
+      per_day_salary: perDaySalary.toFixed(2),
+      leaves: {
+        total_taken: total_leaves,
+        free_limit: settings.leaves_per_month,
+        penalized: Math.max(0, total_leaves - settings.leaves_per_month),
+        penalty_per_day: settings.extra_leave_penalty,
+        total_deduction: extra_leave_deduction
+      },
+      late_checkins: {
+        total_occurrences: late_count,
+        free_limit: settings.late_checkin_limit,
+        penalized: Math.max(0, late_count - settings.late_checkin_limit),
+        penalty_per_instance: settings.late_checkin_penalty,
+        total_deduction: late_checkin_deduction
+      },
+      early_checkouts: {
+        total_occurrences: early_count,
+        free_limit: settings.early_checkout_limit,
+        penalized: Math.max(0, early_count - settings.early_checkout_limit),
+        penalty_per_instance: settings.early_checkout_penalty,
+        total_deduction: early_checkout_deduction
+      }
+    };
 
     // 6. Save or update payslip
     const psQuery = `
-      INSERT INTO payslips (employee_id, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, net_salary)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO payslips (employee_id, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, net_salary, details)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (employee_id, month) DO UPDATE
       SET base_salary = EXCLUDED.base_salary,
           extra_leave_deduction = EXCLUDED.extra_leave_deduction,
           late_checkin_deduction = EXCLUDED.late_checkin_deduction,
           early_checkout_deduction = EXCLUDED.early_checkout_deduction,
-          net_salary = EXCLUDED.net_salary
+          net_salary = EXCLUDED.net_salary,
+          details = EXCLUDED.details
       RETURNING *;
     `;
-    const psResult = await pool.query(psQuery, [employee_id, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, net_salary]);
+    const psResult = await pool.query(psQuery, [employee_id, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, net_salary, JSON.stringify(details)]);
     
     res.status(200).json(psResult.rows[0]);
   } catch (error) {
@@ -375,22 +438,55 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
     `, [employee_id, month]);
     const actual_leaves = parseInt(leavesRes.rows[0].total_leave_days || 0);
 
-    // 4. Calculate late checkins & early checkouts from attendance
     const attendanceRes = await pool.query(`
-      SELECT late_duration, early_checkout_duration 
+      SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
       FROM attendance 
       WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2
     `, [employee_id, month]);
 
+    // Parse shift times
+    let shiftInMin = null;
+    let shiftOutMin = null;
+    try {
+      if (emp.profile_data) {
+        const pd = JSON.parse(emp.profile_data);
+        if (pd.shiftIn) {
+          const [h, m] = pd.shiftIn.split(':').map(Number);
+          shiftInMin = h * 60 + m;
+        }
+        if (pd.shiftOut) {
+          const [h, m] = pd.shiftOut.split(':').map(Number);
+          shiftOutMin = h * 60 + m;
+        }
+      }
+    } catch(e) {}
+
     let late_count = 0;
     let early_count = 0;
     attendanceRes.rows.forEach(att => {
+      let isLate = false;
+      let isEarly = false;
+      
       if (att.late_duration && att.late_duration !== '0h 0m' && att.late_duration !== '') {
-         late_count++;
+         isLate = true;
+      } else if (shiftInMin !== null && att.timestamp) {
+         const t = new Date(att.timestamp);
+         const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+         const [h, m] = tStr.split(':').map(Number);
+         if ((h * 60 + m) > shiftInMin) isLate = true;
       }
+      
       if (att.early_checkout_duration && att.early_checkout_duration !== '0h 0m' && att.early_checkout_duration !== '') {
-         early_count++;
+         isEarly = true;
+      } else if (shiftOutMin !== null && att.checkout_timestamp) {
+         const t = new Date(att.checkout_timestamp);
+         const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+         const [h, m] = tStr.split(':').map(Number);
+         if ((h * 60 + m) < shiftOutMin) isEarly = true;
       }
+      
+      if (isLate) late_count++;
+      if (isEarly) early_count++;
     });
 
     res.status(200).json({

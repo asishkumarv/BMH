@@ -154,18 +154,68 @@ export default function Payslips() {
                     <Text style={styles.psLabel}>Base Salary:</Text>
                     <Text style={styles.psValue}>₹{ps.base_salary}</Text>
                   </View>
-                  <View style={styles.psRow}>
-                    <Text style={styles.psLabel}>Extra Leave Deduction:</Text>
-                    <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{ps.extra_leave_deduction}</Text>
-                  </View>
-                  <View style={styles.psRow}>
-                    <Text style={styles.psLabel}>Late Check-in Deduction:</Text>
-                    <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{ps.late_checkin_deduction}</Text>
-                  </View>
-                  <View style={styles.psRow}>
-                    <Text style={styles.psLabel}>Early Check-out Deduction:</Text>
-                    <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{ps.early_checkout_deduction}</Text>
-                  </View>
+                  
+                  {ps.details ? (
+                    <>
+                      {/* Detailed Breakdown from JSON */}
+                      {(() => {
+                         let d = ps.details;
+                         if (typeof d === 'string') {
+                           try { d = JSON.parse(d); } catch(e){}
+                         }
+                         return (
+                           <>
+                             <View style={styles.psRow}>
+                               <Text style={styles.psLabel}>Extra Leave Deduction:</Text>
+                               <View style={{ alignItems: 'flex-end' }}>
+                                 <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{d.leaves?.total_deduction || 0}</Text>
+                                 <Text style={styles.psSubtext}>
+                                   {d.leaves?.total_taken} taken, {d.leaves?.free_limit} free, {d.leaves?.penalized} penalized @ ₹{d.leaves?.penalty_per_day}/day
+                                 </Text>
+                               </View>
+                             </View>
+
+                             <View style={styles.psRow}>
+                               <Text style={styles.psLabel}>Late Check-in Deduction:</Text>
+                               <View style={{ alignItems: 'flex-end' }}>
+                                 <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{d.late_checkins?.total_deduction || 0}</Text>
+                                 <Text style={styles.psSubtext}>
+                                   {d.late_checkins?.total_occurrences} late, {d.late_checkins?.free_limit} free, {d.late_checkins?.penalized} penalized @ ₹{d.late_checkins?.penalty_per_instance}/instance
+                                 </Text>
+                               </View>
+                             </View>
+
+                             <View style={styles.psRow}>
+                               <Text style={styles.psLabel}>Early Check-out Deduction:</Text>
+                               <View style={{ alignItems: 'flex-end' }}>
+                                 <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{d.early_checkouts?.total_deduction || 0}</Text>
+                                 <Text style={styles.psSubtext}>
+                                   {d.early_checkouts?.total_occurrences} early, {d.early_checkouts?.free_limit} free, {d.early_checkouts?.penalized} penalized @ ₹{d.early_checkouts?.penalty_per_instance}/instance
+                                 </Text>
+                               </View>
+                             </View>
+                           </>
+                         );
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      {/* Fallback for old payslips without details */}
+                      <View style={styles.psRow}>
+                        <Text style={styles.psLabel}>Extra Leave Deduction:</Text>
+                        <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{ps.extra_leave_deduction}</Text>
+                      </View>
+                      <View style={styles.psRow}>
+                        <Text style={styles.psLabel}>Late Check-in Deduction:</Text>
+                        <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{ps.late_checkin_deduction}</Text>
+                      </View>
+                      <View style={styles.psRow}>
+                        <Text style={styles.psLabel}>Early Check-out Deduction:</Text>
+                        <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{ps.early_checkout_deduction}</Text>
+                      </View>
+                    </>
+                  )}
+
                   <View style={[styles.psRow, styles.psTotalRow]}>
                     <Text style={styles.psTotalLabel}>Net Salary:</Text>
                     <Text style={styles.psTotalValue}>₹{ps.net_salary}</Text>
@@ -211,4 +261,5 @@ const styles = StyleSheet.create({
   psTotalRow: { marginTop: 8, paddingTop: 16, borderTopWidth: 2, borderTopColor: Colors.light.background },
   psTotalLabel: { fontSize: 16, fontWeight: '800', color: Colors.light.text },
   psTotalValue: { fontSize: 24, fontWeight: '800', color: Colors.light.primary },
+  psSubtext: { fontSize: 12, color: Colors.light.icon, marginTop: 4 },
 });
