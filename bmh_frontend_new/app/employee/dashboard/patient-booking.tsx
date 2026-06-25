@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
-import { Users, Calendar, Clock, HeartPulse, CreditCard } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image, Platform } from 'react-native';
+import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer } from 'lucide-react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
@@ -14,6 +16,8 @@ export default function PatientBooking() {
 
   // Booking Form State
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [slotBookings, setSlotBookings] = useState<number[]>([]);
+  const [selectedToken, setSelectedToken] = useState<number | null>(null);
   const [patientName, setPatientName] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -68,7 +72,8 @@ export default function PatientBooking() {
         age: parseInt(age),
         gender,
         booked_by: user.id,
-        payment_mode: paymentMode
+        payment_mode: paymentMode,
+        token_number: selectedToken
       });
       
       if (res.data.success) {
@@ -83,11 +88,88 @@ export default function PatientBooking() {
 
   const resetForm = () => {
     setSelectedSlot(null);
+    setSelectedToken(null);
+    setSlotBookings([]);
     setPatientName('');
     setMobile('');
     setEmail('');
     setAge('');
     setSuccessToken(null);
+  };
+
+  const handleSelectSlot = async (s: any) => {
+    setSelectedSlot(s);
+    try {
+      const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${s.id}`);
+      const bookedTokens = res.data.data.map((b: any) => b.token_number);
+      setSlotBookings(bookedTokens);
+    } catch (err) {
+      console.error('Failed to load bookings for slot', err);
+    }
+  };
+
+  const handlePrintReceipt = async () => {
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px; margin-bottom: 20px; }
+            .title { font-size: 28px; font-weight: bold; color: #0f172a; margin-bottom: 5px; }
+            .subtitle { font-size: 16px; color: #64748b; }
+            .token-box { text-align: center; margin: 30px 0; padding: 20px; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
+            .token-label { font-size: 18px; color: #475569; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+            .token-number { font-size: 64px; font-weight: bold; color: #10b981; }
+            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .detail-item { background: #f1f5f9; padding: 15px; border-radius: 8px; }
+            .detail-label { font-size: 12px; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+            .detail-value { font-size: 16px; font-weight: 600; color: #0f172a; }
+            .footer { margin-top: 40px; text-align: center; font-size: 14px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">BMH Hospital</div>
+            <div class="subtitle">Official Patient Booking Receipt</div>
+          </div>
+          <div class="token-box">
+            <div class="token-label">Token Number</div>
+            <div class="token-number">#${successToken}</div>
+          </div>
+          <div class="details-grid">
+            <div class="detail-item">
+              <div class="detail-label">Patient Name</div>
+              <div class="detail-value">${patientName} (${gender}, ${age}y)</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Doctor</div>
+              <div class="detail-value">Dr. ${selectedSlot.doctor_name}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Date & Time</div>
+              <div class="detail-value">${new Date(selectedSlot.date).toLocaleDateString()} | ${selectedSlot.start_time}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Fee & Payment</div>
+              <div class="detail-value">₹${selectedSlot.fee} (${paymentMode})</div>
+            </div>
+          </div>
+          <div class="footer">
+            Thank you for choosing BMH Hospital. Please wait in the lobby until your token number is called.
+          </div>
+        </body>
+      </html>
+    `;
+    try {
+      if (Platform.OS === 'web') {
+        await Print.printAsync({ html });
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri);
+      }
+    } catch (err) {
+      console.error('Error printing receipt', err);
+    }
   };
 
   if (loading) {
@@ -115,9 +197,15 @@ export default function PatientBooking() {
             <Text style={styles.detailText}>Patient: {patientName}</Text>
           </View>
           
-          <TouchableOpacity style={styles.btn} onPress={resetForm}>
-            <Text style={styles.btnText}>Book Another Patient</Text>
-          </TouchableOpacity>
+          <View style={{flexDirection: 'row', gap: 16, width: '100%'}}>
+            <TouchableOpacity style={[styles.btn, {flex: 1, backgroundColor: '#3b82f6', flexDirection: 'row', justifyContent: 'center'}]} onPress={handlePrintReceipt}>
+              <Printer color="white" size={20} style={{marginRight: 8}} />
+              <Text style={styles.btnText}>Print Receipt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.btn, {flex: 1, backgroundColor: '#f1f5f9'}]} onPress={resetForm}>
+              <Text style={[styles.btnText, {color: '#475569'}]}>New Booking</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -132,9 +220,21 @@ export default function PatientBooking() {
           <Text style={styles.sectionTitle}>Select an Available Slot</Text>
           <View style={styles.grid}>
             {slots.map((s, i) => (
-              <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => setSelectedSlot(s)}>
-                <View style={styles.slotHeader}>
-                  <Text style={styles.doctorName}>{s.doctor_name}</Text>
+              <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleSelectSlot(s)}>
+                <View style={[styles.slotHeader, {alignItems: 'flex-start'}]}>
+                  <View style={{flexDirection: 'row', flex: 1, gap: 12}}>
+                    {s.doctor_photo ? (
+                      <Image source={{uri: s.doctor_photo}} style={{width: 48, height: 48, borderRadius: 24, backgroundColor: '#f1f5f9'}} />
+                    ) : (
+                      <View style={{width: 48, height: 48, borderRadius: 24, backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center'}}>
+                        <Users size={24} color="#64748b" />
+                      </View>
+                    )}
+                    <View style={{flex: 1}}>
+                      <Text style={styles.doctorName}>Dr. {s.doctor_name}</Text>
+                      <Text style={{fontSize: 13, color: '#64748b', marginTop: 2}}>{s.doctor_department || 'General'}{s.doctor_role ? ` • ${s.doctor_role}` : ''}</Text>
+                    </View>
+                  </View>
                   <Text style={styles.feeText}>₹{s.fee}</Text>
                 </View>
                 <View style={styles.slotDetails}>
@@ -159,14 +259,43 @@ export default function PatientBooking() {
             {slots.length === 0 && <Text style={{color: '#64748b'}}>No slots available for booking.</Text>}
           </View>
         </View>
-      ) : (
+      ) : !selectedToken ? (
         <View style={styles.formCard}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedSlot(null)}>
             <Text style={styles.backBtnText}>← Back to Slots</Text>
           </TouchableOpacity>
+          <Text style={{fontSize: 20, fontWeight: 'bold', color: '#0f172a', marginBottom: 16}}>Select Token for Dr. {selectedSlot.doctor_name}</Text>
+          <Text style={{fontSize: 14, color: '#64748b', marginBottom: 20}}>Tokens marked in red are already booked.</Text>
+          
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
+            {Array.from({length: selectedSlot.total_tokens}, (_, i) => i + 1).map(t => {
+              const isBooked = slotBookings.includes(t);
+              return (
+                <TouchableOpacity 
+                  key={t}
+                  disabled={isBooked}
+                  style={{
+                    width: 56, height: 56, borderRadius: 12, justifyContent: 'center', alignItems: 'center',
+                    backgroundColor: isBooked ? '#fecaca' : '#d1fae5',
+                    borderWidth: 1, borderColor: isBooked ? '#ef4444' : '#10b981',
+                    opacity: isBooked ? 0.6 : 1
+                  }}
+                  onPress={() => setSelectedToken(t)}
+                >
+                  <Text style={{color: isBooked ? '#b91c1c' : '#047857', fontWeight: 'bold', fontSize: 18}}>{t}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.formCard}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedToken(null)}>
+            <Text style={styles.backBtnText}>← Back to Tokens</Text>
+          </TouchableOpacity>
           
           <View style={styles.selectedSlotBanner}>
-            <Text style={styles.bannerTitle}>Booking Appointment With</Text>
+            <Text style={styles.bannerTitle}>Booking Token #{selectedToken} With</Text>
             <Text style={styles.bannerDoctor}>Dr. {selectedSlot.doctor_name}</Text>
             <Text style={styles.bannerTime}>{new Date(selectedSlot.date).toLocaleDateString()} at {selectedSlot.start_time}</Text>
           </View>

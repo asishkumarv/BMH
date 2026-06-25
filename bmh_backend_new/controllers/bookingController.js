@@ -3,7 +3,7 @@ const pool = require('../db');
 // Create a patient booking
 exports.createBooking = async (req, res) => {
   try {
-    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode } = req.body;
+    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number } = req.body;
     
     await pool.query('BEGIN');
 
@@ -20,20 +20,22 @@ exports.createBooking = async (req, res) => {
       patient_id = newPat.rows[0].id;
     }
 
-    // 2. Check slot token availability and get next token number
+    // 2. Check slot token availability and explicitly validate token_number
     const slotRes = await pool.query('SELECT total_tokens FROM doctor_slots WHERE id = $1', [slot_id]);
     if (slotRes.rowCount === 0) throw new Error('Slot not found');
     const total_tokens = slotRes.rows[0].total_tokens;
 
-    const bookRes = await pool.query('SELECT COUNT(*) FROM patient_bookings WHERE slot_id = $1', [slot_id]);
-    const current_bookings = parseInt(bookRes.rows[0].count);
-
-    if (current_bookings >= total_tokens) {
+    if (!token_number || token_number < 1 || token_number > total_tokens) {
       await pool.query('ROLLBACK');
-      return res.status(400).json({ success: false, message: 'Slot is fully booked' });
+      return res.status(400).json({ success: false, message: 'Invalid token number selected' });
     }
 
-    const token_number = current_bookings + 1;
+    const existingToken = await pool.query('SELECT id FROM patient_bookings WHERE slot_id = $1 AND token_number = $2', [slot_id, token_number]);
+    
+    if (existingToken.rowCount > 0) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'This token is already booked' });
+    }
 
     // 3. Create booking
     await pool.query(

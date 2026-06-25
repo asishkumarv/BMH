@@ -142,7 +142,7 @@ exports.getSlots = async (req, res) => {
   try {
     const { doctor_id, date } = req.query;
     let query = `
-      SELECT ds.*, d.full_name as doctor_name, e.full_name as peon_name
+      SELECT ds.*, d.full_name as doctor_name, d.department as doctor_department, d.role as doctor_role, d.profile_photo as doctor_photo, e.full_name as peon_name
       FROM doctor_slots ds
       JOIN doctors d ON ds.doctor_id = d.id
       LEFT JOIN employees e ON ds.assigned_peon_id = e.id
