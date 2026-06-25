@@ -1,0 +1,223 @@
+const pool = require('../db');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+// Register Doctor (Pending Approval)
+exports.registerDoctor = async (req, res) => {
+  try {
+    const { id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    
+    // Check if email exists
+    const existing = await pool.query('SELECT id FROM doctors WHERE email = $1', [email]);
+    if (existing.rowCount > 0) return res.status(400).json({ success: false, message: 'Email already exists' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    await pool.query(
+      `INSERT INTO doctors (id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pending')`,
+      [id, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo]
+    );
+
+    res.json({ success: true, message: 'Registration successful. Waiting for Admin approval.' });
+  } catch (error) {
+    console.error('Register Doctor Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Login Doctor
+exports.loginDoctor = async (req, res) => {
+  try {
+    const { emailOrId, password } = req.body;
+
+    const result = await pool.query('SELECT * FROM doctors WHERE email = $1 OR id = $1', [emailOrId]);
+    if (result.rowCount === 0) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    const doctor = result.rows[0];
+    if (doctor.status !== 'Approved') return res.status(403).json({ success: false, message: `Account is ${doctor.status}` });
+
+    const match = await bcrypt.compare(password, doctor.password);
+    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    const token = jwt.sign({ id: doctor.id, role: 'Doctor', department: doctor.department }, process.env.JWT_SECRET || 'secret', { expiresIn: '24h' });
+
+    const { password: _, ...doctorData } = doctor;
+    res.json({ success: true, token, doctor: doctorData });
+  } catch (error) {
+    console.error('Login Doctor Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Admin/Subadmin Create Doctor directly
+exports.createDoctor = async (req, res) => {
+  try {
+    const { full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    
+    // Auto generate ID: e.g. CARDIOD101
+    const deptPrefix = department ? department.substring(0, 3).toUpperCase() : 'DOC';
+    const countRes = await pool.query("SELECT COUNT(*) FROM doctors WHERE id LIKE $1", [`${deptPrefix}D%`]);
+    const nextNum = parseInt(countRes.rows[0].count) + 1;
+    const newId = `${deptPrefix}D${nextNum.toString().padStart(3, '0')}`;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    await pool.query(
+      `INSERT INTO doctors (id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Approved')`,
+      [newId, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo]
+    );
+
+    res.json({ success: true, message: 'Doctor created successfully', id: newId });
+  } catch (error) {
+    console.error('Create Doctor Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Get list of doctors
+exports.getDoctors = async (req, res) => {
+  try {
+    const { department, status } = req.query;
+    let query = 'SELECT id, full_name, email, phone_number, department, role, experience, gender, status, profile_photo FROM doctors WHERE 1=1';
+    let params = [];
+    
+    if (department) {
+      params.push(department);
+      query += ` AND department = $${params.length}`;
+    }
+    if (status) {
+      params.push(status);
+      query += ` AND status = $${params.length}`;
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Doctors Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Approve Doctor
+exports.approveDoctor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // Approved or Rejected
+    await pool.query('UPDATE doctors SET status = $1 WHERE id = $2', [status, id]);
+    res.json({ success: true, message: `Doctor ${status}` });
+  } catch (error) {
+    console.error('Approve Doctor Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Slot Management
+exports.createSlot = async (req, res) => {
+  try {
+    const { doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id } = req.body;
+    
+    await pool.query(
+      `INSERT INTO doctor_slots (doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id]
+    );
+    res.json({ success: true, message: 'Slot created successfully' });
+  } catch (error) {
+    console.error('Create Slot Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.getSlots = async (req, res) => {
+  try {
+    const { doctor_id, date } = req.query;
+    let query = `
+      SELECT ds.*, d.full_name as doctor_name, e.full_name as peon_name
+      FROM doctor_slots ds
+      JOIN doctors d ON ds.doctor_id = d.id
+      LEFT JOIN employees e ON ds.assigned_peon_id = e.id
+      WHERE 1=1
+    `;
+    let params = [];
+    
+    if (doctor_id) {
+      params.push(doctor_id);
+      query += ` AND ds.doctor_id = $${params.length}`;
+    }
+    if (date) {
+      params.push(date);
+      query += ` AND ds.date = $${params.length}`;
+    }
+
+    query += ' ORDER BY ds.date DESC, ds.start_time ASC';
+
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Slots Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Available Peons
+exports.getAvailablePeons = async (req, res) => {
+  try {
+    const { date, department } = req.query;
+    
+    // Find all employees where lower(role) in ('peon', 'poen')
+    // and who are not on approved leave on that date
+    let query = `
+      SELECT e.id, e.full_name, e.department
+      FROM employees e
+      WHERE LOWER(e.role) IN ('peon', 'poen')
+    `;
+    let params = [];
+
+    if (department) {
+      params.push(department);
+      query += ` AND e.department = $${params.length}`;
+    }
+
+    if (date) {
+      params.push(date);
+      query += `
+        AND e.id NOT IN (
+          SELECT employee_id FROM leave_requests
+          WHERE status = 'Approved' 
+          AND $${params.length} BETWEEN start_date AND end_date
+        )
+      `;
+    }
+
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Available Peons Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Save Consultation
+exports.saveConsultation = async (req, res) => {
+  try {
+    const { booking_id, doctor_id, patient_id, notes, next_consultation_date } = req.body;
+    
+    await pool.query(
+      `INSERT INTO consultations (booking_id, doctor_id, patient_id, notes, next_consultation_date)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [booking_id, doctor_id, patient_id, notes, next_consultation_date]
+    );
+
+    // Optionally mark booking as Completed if not already
+    await pool.query('UPDATE patient_bookings SET status = $1 WHERE id = $2 AND status != $1', ['Completed', booking_id]);
+
+    res.json({ success: true, message: 'Consultation notes saved successfully' });
+  } catch (error) {
+    console.error('Save Consultation Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};

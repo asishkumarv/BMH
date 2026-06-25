@@ -3,6 +3,7 @@ import {  View, Text, StyleSheet, Pressable, Platform , Image } from 'react-nati
 import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
+import axios from 'axios';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/department/dashboard' },
@@ -19,6 +20,25 @@ const NAV_ITEMS = [
 export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const [navItems, setNavItems] = React.useState(NAV_ITEMS);
+
+  React.useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await axios.get('https://bmh-eitu.onrender.com/settings');
+        if (res.data.success && res.data.settings.doctor_management_access) {
+          let value = res.data.settings.doctor_management_access;
+          if (typeof value === 'string') value = JSON.parse(value);
+          if (value.sub_admin) {
+            setNavItems([...NAV_ITEMS.slice(0, 7), { name: 'Doctors', icon: Users, route: '/department/dashboard/doctors' }, ...NAV_ITEMS.slice(7)]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch settings', err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -28,7 +48,7 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
       </View>
 
       <View style={styles.navContainer}>
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive = pathname === item.route || (item.route !== '/department/dashboard' && pathname.startsWith(item.route));
           
           return (

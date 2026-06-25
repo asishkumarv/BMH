@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks } from 'lucide-react-native';
+import PeonQueue from './PeonQueue';
 
 export default function EmployeeDashboardScreen() {
   const { isDesktop } = useResponsive();
@@ -281,6 +282,12 @@ export default function EmployeeDashboardScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* Render Peon Live Queue if user is a Peon */}
+        {user && (user.role?.toLowerCase() === 'peon' || user.role?.toLowerCase() === 'poen') && (
+          <PeonQueue user={user} />
+        )}
+
       </View>
       </ScrollView>
     </View>
