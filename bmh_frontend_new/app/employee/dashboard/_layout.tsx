@@ -3,6 +3,7 @@ import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal } from
 import { Slot } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { EmployeeSidebar } from '../../../components/ui/EmployeeSidebar';
+import { TopHeader } from '../../../components/ui/TopHeader';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 
@@ -43,6 +44,7 @@ export default function EmployeeLayout() {
           styles.contentWrapper, 
           isDesktop && { marginLeft: 260 } // Offset for fixed sidebar on web
         ]}>
+          <TopHeader userType="employee" />
           <Slot />
         </View>
       </View>

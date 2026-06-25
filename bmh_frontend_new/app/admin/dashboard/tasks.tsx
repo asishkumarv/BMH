@@ -28,6 +28,8 @@ export default function AdminTasksScreen() {
   const [rejectionReason, setRejectionReason] = useState('');
 
   const [users, setUsers] = useState<{emps: any[], admins: any[], superAdmins: any[], depts: any[]}>({ emps: [], admins: [], superAdmins: [], depts: [] });
+  const [globalUsers, setGlobalUsers] = useState<any[]>([]);
+  const [priority, setPriority] = useState('Moderate');
 
   const adminUser = typeof window !== 'undefined' && localStorage.getItem('superAdminUser') 
     ? JSON.parse(localStorage.getItem('superAdminUser') || '{}') 
@@ -53,11 +55,12 @@ export default function AdminTasksScreen() {
 
   const fetchUsers = async () => {
     try {
-      const [empRes, adminRes, superAdminRes, deptRes] = await Promise.all([
+      const [empRes, adminRes, superAdminRes, deptRes, globalRes] = await Promise.all([
         axios.get('https://bmh-eitu.onrender.com/employees'),
         axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
         axios.get('https://bmh-eitu.onrender.com/admin/super-admins'),
-        axios.get('https://bmh-eitu.onrender.com/department')
+        axios.get('https://bmh-eitu.onrender.com/department'),
+        axios.get('https://bmh-eitu.onrender.com/employees/all-users')
       ]);
       setUsers({
         emps: empRes.data.success ? empRes.data.data : [],
@@ -65,6 +68,9 @@ export default function AdminTasksScreen() {
         superAdmins: superAdminRes.data.success ? superAdminRes.data.data : [],
         depts: deptRes.data.success ? deptRes.data.data : []
       });
+      if (globalRes.data.success) {
+        setGlobalUsers(globalRes.data.data);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -106,13 +112,15 @@ export default function AdminTasksScreen() {
         assignee_type: finalAssigneeType,
         assignee_id: parseInt(finalAssigneeId),
         department: finalDept,
-        due_date: dueDate || null
+        due_date: dueDate || null,
+        priority
       });
       setShowCreateModal(false);
       fetchTasks();
       setTitle('');
       setDescription('');
       setDueDate('');
+      setPriority('Moderate');
       Alert.alert('Success', 'Task created successfully');
     } catch (e) {
       console.error(e);
@@ -143,8 +151,13 @@ export default function AdminTasksScreen() {
     <View key={task.id} style={styles.taskCard}>
       <View style={styles.taskHeader}>
         <Text style={styles.taskTitle}>{task.title}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status.toUpperCase()}</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status.toUpperCase()}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: task.priority === 'High' ? '#fee2e2' : task.priority === 'Moderate' ? '#fef3c7' : '#e0f2fe' }]}>
+            <Text style={[styles.statusText, { color: task.priority === 'High' ? '#ef4444' : task.priority === 'Moderate' ? '#f59e0b' : '#0ea5e9' }]}>{task.priority || 'Moderate'}</Text>
+          </View>
         </View>
       </View>
       
@@ -273,14 +286,14 @@ export default function AdminTasksScreen() {
 
             {(assigneeType === 'employee' || assigneeType === 'department_admin') && (
               <>
-                <Text style={styles.label}>Select Department</Text>
+                <Text style={styles.label}>Select Department (Optional)</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
                   <select 
                     style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
                     value={selectedDeptId}
                     onChange={(e) => { setSelectedDeptId(e.target.value); setAssigneeId(''); }}
                   >
-                    <option value="">-- Choose Department --</option>
+                    <option value="">-- All Departments --</option>
                     {users.depts.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
@@ -299,32 +312,36 @@ export default function AdminTasksScreen() {
                     onChange={(e) => setAssigneeId(e.target.value)}
                   >
                     <option value="">-- Choose Assignee --</option>
-                    {assigneeType === 'employee' && users.emps
-                      .filter(e => {
-                        if (!selectedDeptId) return true;
-                        const d = users.depts.find(dept => String(dept.id) === String(selectedDeptId));
-                        return d && e.department === d.name;
-                      })
-                      .map(e => (
-                        <option key={e.id} value={e.id}>{e.full_name} ({e.email})</option>
-                      ))}
-
-                    {assigneeType === 'department_admin' && users.admins
-                      .filter(a => {
-                        if (!selectedDeptId) return true;
-                        return String(a.department_id) === String(selectedDeptId);
-                      })
-                      .map(a => (
-                        <option key={a.id} value={a.id}>{a.full_name} ({a.email})</option>
-                      ))}
-
                     {assigneeType === 'super_admin' && users.superAdmins.map(sa => (
                       <option key={sa.id} value={sa.id}>{sa.full_name} ({sa.email})</option>
                     ))}
+                    {(assigneeType === 'employee' || assigneeType === 'department_admin') && globalUsers
+                      .filter(u => u.type === assigneeType)
+                      .filter(u => {
+                        if (!selectedDeptId) return true;
+                        const d = users.depts.find(dept => String(dept.id) === String(selectedDeptId));
+                        return d && u.department === d.name;
+                      })
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.full_name} - {u.department} ({u.role})</option>
+                      ))}
                   </select>
                 </View>
               </>
             )}
+
+            <Text style={styles.label}>Priority</Text>
+            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+              <select 
+                style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+              >
+                <option value="Low">Low</option>
+                <option value="Moderate">Moderate</option>
+                <option value="High">High</option>
+              </select>
+            </View>
 
             <Text style={styles.label}>Due Date & Time</Text>
             <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: Colors.light.background }}>

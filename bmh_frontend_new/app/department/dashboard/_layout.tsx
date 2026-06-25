@@ -3,6 +3,7 @@ import { View, StyleSheet, Platform, SafeAreaView, ActivityIndicator, Pressable,
 import { Slot, useRouter } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { SubAdminSidebar } from '../../../components/ui/SubAdminSidebar';
+import { TopHeader } from '../../../components/ui/TopHeader';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 
@@ -60,8 +61,9 @@ export default function SubAdminLayout() {
         
         <View style={[
           styles.contentWrapper, 
-          isDesktop && { marginLeft: 260 }
+          isDesktop && { marginLeft: 260 } 
         ]}>
+          <TopHeader userType="department_admin" />
           <Slot />
         </View>
       </View>

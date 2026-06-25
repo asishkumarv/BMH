@@ -13,5 +13,6 @@ router.get('/summary', analyticsController.getAttendanceSummary);
 router.get('/reports', analyticsController.getAdvancedReports);
 router.get('/employee-analytics', analyticsController.getEmployeeAnalytics);
 router.get('/employee-dashboard/:employeeId', attendanceController.getEmployeeDashboardStatus);
+router.get('/today/:employeeId', attendanceController.checkTodayAttendance);
 
 module.exports = router;

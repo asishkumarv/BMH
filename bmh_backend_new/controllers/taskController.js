@@ -14,13 +14,13 @@ const createNotification = async (userType, userId, message) => {
 
 exports.createTask = async (req, res) => {
   try {
-    const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date } = req.body;
+    const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority } = req.body;
 
     const result = await pool.query(
       `INSERT INTO tasks 
-      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date || null]
+      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date || null, priority || 'Moderate']
     );
 
     const task = result.rows[0];

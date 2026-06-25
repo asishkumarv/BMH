@@ -153,6 +153,7 @@ export default function AdminWalletScreen() {
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Name / ID</Text>
                 <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>Role</Text>
+                <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>Department</Text>
                 <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Cash in Hand</Text>
               </View>
               {walletBalances.map((item, idx) => (
@@ -162,6 +163,7 @@ export default function AdminWalletScreen() {
                     <Text style={{ fontSize: 12, color: Colors.light.icon }}>{item.employee_id}</Text>
                   </View>
                   <Text style={[styles.tableCell, { flex: 1 }]}>{item.role}</Text>
+                  <Text style={[styles.tableCell, { flex: 1, color: Colors.light.icon, fontSize: 13 }]}>{item.department || 'N/A'}</Text>
                   <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#059669' }]}>
                     ₹{item.cash_in_hand}
                   </Text>

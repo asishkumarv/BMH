@@ -308,10 +308,12 @@ exports.getAllWalletBalances = async (req, res) => {
         CASE WHEN ew.employee_id = e.id::text THEN 'EMP-' || e.id ELSE ew.employee_id END as employee_id,
         ew.balance, ew.cash_in_hand,
         COALESCE(e.full_name, sa.full_name, a.full_name) as full_name,
-        COALESCE(e.role, 'Sub Admin') as role
+        COALESCE(e.role, 'Sub Admin') as role,
+        COALESCE(e.department, d.name) as department
       FROM employee_wallets ew
       LEFT JOIN employees e ON ew.employee_id = 'EMP-' || e.id OR ew.employee_id = e.id::text
       LEFT JOIN department_admins sa ON ew.employee_id = 'SA-' || sa.id
+      LEFT JOIN departments d ON sa.department_id = d.id
       LEFT JOIN super_admins a ON ew.employee_id = 'ADMIN-' || a.id
       WHERE ew.employee_id NOT LIKE 'ADMIN-%'
       ORDER BY ew.cash_in_hand DESC

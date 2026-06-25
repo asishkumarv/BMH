@@ -270,13 +270,14 @@ exports.getAllPatientHistory = async (req, res) => {
     
     let query = `
       SELECT p.id, p.name, p.mobile, p.email, p.age, p.gender, 
-             c.id as consultation_id, c.next_consultation_date, c.created_at as consultation_date,
+             c.id as consultation_id, c.next_consultation_date, COALESCE(c.created_at, pb.created_at) as consultation_date,
              d.full_name as doctor_name, d.department as doctor_department
              ${role !== 'Employee' ? ', c.notes' : ''}
-      FROM consultations c
-      JOIN patients p ON c.patient_id = p.id
-      JOIN doctors d ON c.doctor_id = d.id
-      WHERE 1=1
+      FROM patient_bookings pb
+      LEFT JOIN consultations c ON c.booking_id = pb.id
+      JOIN patients p ON pb.patient_id = p.id
+      JOIN doctors d ON pb.doctor_id = d.id
+      WHERE pb.status = 'Completed'
     `;
     let params = [];
 
@@ -298,10 +299,10 @@ exports.getAllPatientHistory = async (req, res) => {
     }
     if (start_date && end_date) {
       params.push(start_date, end_date);
-      query += ` AND DATE(c.created_at) BETWEEN $${params.length - 1} AND $${params.length}`;
+      query += ` AND DATE(COALESCE(c.created_at, pb.created_at)) BETWEEN $${params.length - 1} AND $${params.length}`;
     }
 
-    query += ' ORDER BY c.created_at DESC';
+    query += ' ORDER BY consultation_date DESC';
 
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });

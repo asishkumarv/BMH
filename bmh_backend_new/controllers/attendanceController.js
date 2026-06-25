@@ -366,3 +366,31 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+exports.checkTodayAttendance = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const result = await pool.query(
+      `SELECT status, late_duration FROM attendance WHERE employee_id = $1 AND date = CURRENT_DATE LIMIT 1`,
+      [employeeId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.json({ success: true, data: { status: 'Not Checked In', color: 'red' } });
+    }
+
+    const { status, late_duration } = result.rows[0];
+    let color = 'green';
+    
+    if (status === 'Absent') {
+      color = 'red';
+    } else if (late_duration && late_duration !== '0h 0m') {
+      color = 'yellow';
+    }
+
+    res.json({ success: true, data: { status, color, late_duration } });
+  } catch (error) {
+    console.error("Check today attendance error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
