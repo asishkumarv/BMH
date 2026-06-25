@@ -80,8 +80,17 @@ export default function SubAdminWalletScreen() {
 
   const fetchPeers = async (id: string) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/employees/peers/${id}`);
-      if (res.data.success) setPeers(res.data.data);
+      const res = await axios.get('https://bmh-eitu.onrender.com/admin/super-admins');
+      if (res.data.success) {
+        const superAdmins = res.data.data.map((sa: any) => ({
+          id: `ADMIN-${sa.id}`,
+          full_name: sa.full_name,
+          email: sa.email,
+          role: 'Super Admin',
+          department: 'Administration'
+        }));
+        setPeers(superAdmins);
+      }
     } catch (error) {}
   };
 

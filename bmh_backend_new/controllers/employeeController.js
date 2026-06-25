@@ -141,10 +141,21 @@ exports.updateEmployeeProfile = async (req, res) => {
 exports.getDepartmentPeers = async (req, res) => {
   try {
     const { id } = req.params; // The employee's ID
-    const eRes = await pool.query('SELECT department FROM employees WHERE id = $1', [id]);
-    if (eRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Employee not found' });
+    let departmentName;
     
-    const departmentName = eRes.rows[0].department;
+    if (id.startsWith('SA-')) {
+      const numericId = id.replace('SA-', '');
+      const dRes = await pool.query(
+        'SELECT d.name FROM departments d JOIN department_admins da ON d.id = da.department_id WHERE da.id = $1', 
+        [numericId]
+      );
+      if (dRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Sub-admin not found' });
+      departmentName = dRes.rows[0].name;
+    } else {
+      const eRes = await pool.query('SELECT department FROM employees WHERE id = $1', [id]);
+      if (eRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Employee not found' });
+      departmentName = eRes.rows[0].department;
+    }
 
     // 1. Fetch employees in this department (keep id as string)
     const empResult = await pool.query(
