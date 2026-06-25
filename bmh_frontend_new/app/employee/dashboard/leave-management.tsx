@@ -232,7 +232,7 @@ export default function LeaveManagement() {
                     min={minDateStr}
                     value={startDate}
                     onChange={(e: any) => setStartDate(e.target.value)}
-                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
+                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
                   />
                 ) : (
                   <TextInput
@@ -252,7 +252,7 @@ export default function LeaveManagement() {
                     min={startDate || minDateStr}
                     value={endDate}
                     onChange={(e: any) => setEndDate(e.target.value)}
-                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
+                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
                   />
                 ) : (
                   <TextInput

@@ -276,7 +276,7 @@ export default function AdminTasksScreen() {
                 <Text style={styles.label}>Select Department</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
                   <select 
-                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
                     value={selectedDeptId}
                     onChange={(e) => { setSelectedDeptId(e.target.value); setAssigneeId(''); }}
                   >
@@ -294,7 +294,7 @@ export default function AdminTasksScreen() {
                 <Text style={styles.label}>Select Assignee</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
                   <select 
-                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
                     value={assigneeId}
                     onChange={(e) => setAssigneeId(e.target.value)}
                   >
@@ -331,7 +331,7 @@ export default function AdminTasksScreen() {
               {Platform.OS === 'web' ? (
                 <input 
                   type="datetime-local"
-                  style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', outline: 'none', color: Colors.light.text, fontFamily: 'inherit', fontSize: '15px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', color: Colors.light.text, fontFamily: 'inherit', fontSize: '15px', boxSizing: 'border-box' }}
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                 />

@@ -265,7 +265,7 @@ export default function AdminLeaveManagement() {
                 <select 
                   value={dDept} 
                   onChange={(e: any) => setDDept(e.target.value)} 
-                  style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                  style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
                   {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
@@ -313,7 +313,7 @@ export default function AdminLeaveManagement() {
                         const deptRoles = roles.filter(r => r.departmentId == deptId);
                         setRRole(deptRoles.length > 0 ? deptRoles[0].name : '');
                       }} 
-                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                     >
                       {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                     </select>
@@ -327,7 +327,7 @@ export default function AdminLeaveManagement() {
                     <select 
                       value={rRole} 
                       onChange={(e: any) => setRRole(e.target.value)} 
-                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                     >
                       {roles.filter(r => r.departmentId == departments.find(d => d.name === rDept)?.id).map(r => (
                         <option key={r.id} value={r.name}>{r.name}</option>
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, padding: 14, backgroundColor: Colors.light.background, fontSize: 15, marginBottom: 16 },
   pickerContainer: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, backgroundColor: Colors.light.background, marginBottom: 16, overflow: 'hidden' },
-  webSelect: { width: '100%', padding: 14, fontSize: 15, backgroundColor: 'transparent', border: 'none', outline: 'none' } as any,
+  webSelect: { width: '100%', padding: 14, fontSize: 15, backgroundColor: 'transparent', border: 'none' } as any,
   saveBtn: { flexDirection: 'row', backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   saveBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
   emptyState: { alignItems: 'center', justifyContent: 'center', padding: 48, backgroundColor: Colors.light.card, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, borderStyle: 'dashed' },

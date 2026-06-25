@@ -402,7 +402,7 @@ export default function SubAdminAllowancesScreen() {
               <TextInput style={[styles.input, { marginBottom: 0, flex: 1, minWidth: 200, padding: 10 }]} placeholder="Search Employee Name..." value={historySearchName} onChangeText={setHistorySearchName} />
               {Platform.OS === 'web' && (
                 <View style={{ flex: 1, minWidth: 150, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#FFF', height: 42, justifyContent: 'center' }}>
-                  <select value={historyFilterType} onChange={(e) => setHistoryFilterType(e.target.value)} style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', padding: '0 10px', outline: 'none' }}>
+                  <select value={historyFilterType} onChange={(e) => setHistoryFilterType(e.target.value)} style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', padding: '0 10px' }}>
                     <option value="All">All Types</option>
                     <option value="Requests">Requests</option>
                     <option value="Allocations">Allocations</option>

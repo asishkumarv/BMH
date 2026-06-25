@@ -438,7 +438,7 @@ export default function SubAdminStationaryScreen() {
                 <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Approver Role</Text>
                   <select 
-                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
                     value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
                   >
                     <option value="All">All</option>
@@ -450,7 +450,7 @@ export default function SubAdminStationaryScreen() {
                 <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Status</Text>
                   <select 
-                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
                     value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                   >
                     <option value="All">All</option>

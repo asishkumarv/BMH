@@ -18,7 +18,7 @@ export default function AdminWalletScreen() {
   useEffect(() => {
     let aId = null;
     if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('adminUser');
+      const userStr = localStorage.getItem('superAdminUser');
       if (userStr) {
         const user = JSON.parse(userStr);
         aId = `ADMIN-${user.id}`;
@@ -27,6 +27,8 @@ export default function AdminWalletScreen() {
     }
     if (aId) {
       fetchData(aId);
+    } else {
+      setLoading(false);
     }
   }, []);
 

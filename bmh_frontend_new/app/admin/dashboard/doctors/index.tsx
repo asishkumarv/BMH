@@ -270,7 +270,7 @@ export default function DoctorManagement() {
                   type="date"
                   value={newSlot.date}
                   onChange={(e) => setNewSlot({...newSlot, date: e.target.value})}
-                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1e293b', outline: 'none' } as any}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1e293b' } as any}
                 />
               ) : (
                 <>

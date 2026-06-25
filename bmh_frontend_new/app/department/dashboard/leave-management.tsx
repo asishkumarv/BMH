@@ -265,7 +265,7 @@ export default function SubAdminLeaveManagement() {
                 <select 
                   value={rRole} 
                   onChange={(e: any) => setRRole(e.target.value)} 
-                  style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, outline: 'none', border: `1px solid ${Colors.light.border}`}}
+                  style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
                   {roles.filter(r => !deptNumId || r.departmentId == deptNumId).map(r => (
                     <option key={r.id} value={r.name}>{r.name}</option>
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, padding: 14, backgroundColor: Colors.light.background, fontSize: 15, marginBottom: 16 },
   pickerContainer: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, backgroundColor: Colors.light.background, marginBottom: 16, overflow: 'hidden' },
-  webSelect: { width: '100%', padding: 14, fontSize: 15, backgroundColor: 'transparent', border: 'none', outline: 'none' } as any,
+  webSelect: { width: '100%', padding: 14, fontSize: 15, backgroundColor: 'transparent', border: 'none' } as any,
   saveBtn: { flexDirection: 'row', backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   saveBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
   emptyState: { alignItems: 'center', justifyContent: 'center', padding: 48, backgroundColor: Colors.light.card, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, borderStyle: 'dashed' },

@@ -256,7 +256,7 @@ export default function AdminStationaryScreen() {
 
       let adminStr = 'Super Admin';
       if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('adminUser');
+        const userStr = localStorage.getItem('superAdminUser');
         if (userStr) {
           const u = JSON.parse(userStr);
           adminStr = `Super Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
@@ -428,7 +428,7 @@ export default function AdminStationaryScreen() {
                 <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Department</Text>
                   <select 
-                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
                     value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}
                   >
                     {uniqueDepartments.map(d => <option key={d} value={d}>{d}</option>)}
@@ -438,7 +438,7 @@ export default function AdminStationaryScreen() {
                 <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Approver Role</Text>
                   <select 
-                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
                     value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
                   >
                     <option value="All">All</option>
@@ -450,7 +450,7 @@ export default function AdminStationaryScreen() {
                 <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Status</Text>
                   <select 
-                    style={{ border: 'none', outline: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
                     value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                   >
                     <option value="All">All</option>

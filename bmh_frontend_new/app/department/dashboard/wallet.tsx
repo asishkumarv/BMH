@@ -41,7 +41,7 @@ export default function SubAdminWalletScreen() {
   useEffect(() => {
     let empId = null;
     if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('deptUser');
+      const userStr = localStorage.getItem('subAdminUser');
       if (userStr) {
         const user = JSON.parse(userStr);
         empId = `SA-${user.id}`;
@@ -52,6 +52,8 @@ export default function SubAdminWalletScreen() {
       fetchData(empId);
       fetchPeers(empId);
       fetchBookings(empId);
+    } else {
+      setLoading(false);
     }
   }, []);
 

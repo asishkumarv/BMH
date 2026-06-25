@@ -113,7 +113,7 @@ export default function AdminAllowancesScreen() {
     try {
       let adminStr = 'Super Admin';
       if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('adminUser');
+        const userStr = localStorage.getItem('superAdminUser');
         if (userStr) {
           const u = JSON.parse(userStr);
           adminStr = `Super Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
@@ -393,13 +393,13 @@ export default function AdminAllowancesScreen() {
               {Platform.OS === 'web' && (
                 <>
                   <View style={{ flex: 1, minWidth: 150, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#FFF', height: 42, justifyContent: 'center' }}>
-                    <select value={historyFilterDept} onChange={(e) => setHistoryFilterDept(e.target.value)} style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', padding: '0 10px', outline: 'none' }}>
+                    <select value={historyFilterDept} onChange={(e) => setHistoryFilterDept(e.target.value)} style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', padding: '0 10px' }}>
                       <option value="">All Departments</option>
                       {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                     </select>
                   </View>
                   <View style={{ flex: 1, minWidth: 150, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#FFF', height: 42, justifyContent: 'center' }}>
-                    <select value={historyFilterType} onChange={(e) => setHistoryFilterType(e.target.value)} style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', padding: '0 10px', outline: 'none' }}>
+                    <select value={historyFilterType} onChange={(e) => setHistoryFilterType(e.target.value)} style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', padding: '0 10px' }}>
                       <option value="All">All Types</option>
                       <option value="Requests">Requests</option>
                       <option value="Allocations">Allocations</option>

@@ -263,14 +263,14 @@ export default function SubAdminAttendanceDashboard() {
                 type="date" 
                 value={startDate} 
                 onChange={(e) => setStartDate(e.target.value)} 
-                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
+                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
               />
               <Text style={{color: '#6b7280', fontWeight: '500', textAlign: 'center'}}>to</Text>
               <input 
                 type="date" 
                 value={endDate} 
                 onChange={(e) => setEndDate(e.target.value)} 
-                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', outline: 'none', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
+                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
               />
               <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
                 <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchData(false)}>

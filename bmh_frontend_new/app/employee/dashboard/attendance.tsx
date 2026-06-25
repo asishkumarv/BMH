@@ -16,7 +16,7 @@ const Dropdown = ({ options, value, onChange }: any) => {
           {
             value: value,
             onChange: (e: any) => onChange(e.target.value),
-            style: { width: '100%', height: '40px', border: 'none', outline: 'none', backgroundColor: 'transparent', padding: '0 12px', fontSize: '14px', color: '#374151', cursor: 'pointer' }
+            style: { width: '100%', height: '40px', border: 'none', backgroundColor: 'transparent', padding: '0 12px', fontSize: '14px', color: '#374151', cursor: 'pointer' }
           },
           ...options.map((o: any) => React.createElement('option', { key: o, value: o }, o))
         )}
@@ -138,14 +138,14 @@ export default function EmployeeAttendanceHistory() {
                     type="date" 
                     value={startDate} 
                     onChange={(e) => setStartDate(e.target.value)} 
-                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', outline: 'none', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
+                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
                   />
                   <Text style={{color: '#9ca3af', fontWeight: '500'}}>-</Text>
                   <input 
                     type="date" 
                     value={endDate} 
                     onChange={(e) => setEndDate(e.target.value)} 
-                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', outline: 'none', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
+                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
                   />
                 </View>
                 
