@@ -38,13 +38,13 @@ exports.getAllWallets = async (req, res) => {
     let walletsQuery = `
       SELECT w.*, e.full_name, e.department, e.email, e.profile_data 
       FROM employee_wallets w
-      JOIN employees e ON w.employee_id = e.id
+      JOIN employees e ON w.employee_id = e.id::text
     `;
     
     let txQuery = `
       SELECT wt.*, e.full_name, e.department
       FROM wallet_transactions wt
-      JOIN employees e ON wt.employee_id = e.id
+      JOIN employees e ON wt.employee_id = e.id::text
     `;
 
     const params = [];
@@ -278,10 +278,16 @@ exports.getHandovers = async (req, res) => {
   try {
     const { employee_id } = req.params;
     const result = await pool.query(`
-      SELECT ch.*, f.full_name as from_name, t.full_name as to_name
+      SELECT ch.*, 
+             COALESCE(f.full_name, d_f.full_name, s_f.full_name, 'Unknown') as from_name, 
+             COALESCE(t.full_name, d_t.full_name, s_t.full_name, 'Unknown') as to_name
       FROM cash_handovers ch
-      JOIN employees f ON ch.from_employee_id = f.id
-      JOIN employees t ON ch.to_employee_id = t.id
+      LEFT JOIN employees f ON ch.from_employee_id = f.id::text
+      LEFT JOIN department_admins d_f ON ch.from_employee_id = 'SA-' || d_f.id::text
+      LEFT JOIN super_admins s_f ON ch.from_employee_id = 'ADMIN-' || s_f.id::text
+      LEFT JOIN employees t ON ch.to_employee_id = t.id::text
+      LEFT JOIN department_admins d_t ON ch.to_employee_id = 'SA-' || d_t.id::text
+      LEFT JOIN super_admins s_t ON ch.to_employee_id = 'ADMIN-' || s_t.id::text
       WHERE ch.from_employee_id = $1 OR ch.to_employee_id = $1
       ORDER BY ch.created_at DESC
     `, [employee_id]);
@@ -295,10 +301,16 @@ exports.getHandovers = async (req, res) => {
 exports.getAllHandovers = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT ch.*, f.full_name as from_name, t.full_name as to_name
+      SELECT ch.*, 
+             COALESCE(f.full_name, d_f.full_name, s_f.full_name, 'Unknown') as from_name, 
+             COALESCE(t.full_name, d_t.full_name, s_t.full_name, 'Unknown') as to_name
       FROM cash_handovers ch
-      JOIN employees f ON ch.from_employee_id = f.id
-      JOIN employees t ON ch.to_employee_id = t.id
+      LEFT JOIN employees f ON ch.from_employee_id = f.id::text
+      LEFT JOIN department_admins d_f ON ch.from_employee_id = 'SA-' || d_f.id::text
+      LEFT JOIN super_admins s_f ON ch.from_employee_id = 'ADMIN-' || s_f.id::text
+      LEFT JOIN employees t ON ch.to_employee_id = t.id::text
+      LEFT JOIN department_admins d_t ON ch.to_employee_id = 'SA-' || d_t.id::text
+      LEFT JOIN super_admins s_t ON ch.to_employee_id = 'ADMIN-' || s_t.id::text
       ORDER BY ch.created_at DESC
     `);
     res.json({ success: true, data: result.rows });

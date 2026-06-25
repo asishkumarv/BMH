@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { name: 'Tasks', icon: Activity, route: '/department/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/department/dashboard/stationary' },
   { name: 'Allowances', icon: Wallet, route: '/department/dashboard/allowances' },
+  { name: 'My Wallet', icon: Wallet, route: '/department/dashboard/wallet' },
   { name: 'Notifications', icon: Bell, route: '/department/dashboard/notifications' },
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];
