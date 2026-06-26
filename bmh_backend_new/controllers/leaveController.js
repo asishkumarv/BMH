@@ -418,9 +418,9 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
     if (empRes.rows.length === 0) return res.status(404).json({ message: 'Employee not found' });
     const emp = empRes.rows[0];
 
-    // 2. Get role settings
-    let roleQuery = `SELECT * FROM role_leave_settings WHERE (department = $1 OR department = 'All') AND (role = $2 OR role = 'All') ORDER BY department DESC, role DESC LIMIT 1`;
-    const roleSetRes = await pool.query(roleQuery, [emp.department, emp.role]);
+    // 2. Get employee settings
+    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1`;
+    const empSetRes = await pool.query(empSetQuery, [employee_id]);
     
     let settings = {
       leaves_per_month: 0,
@@ -430,7 +430,7 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
       late_checkin_penalty: 0,
       early_checkout_penalty: 0,
     };
-    if (roleSetRes.rows.length > 0) settings = roleSetRes.rows[0];
+    if (empSetRes.rows.length > 0) settings = empSetRes.rows[0];
 
     // 3. Calculate actual leaves taken in this month
     const leavesRes = await pool.query(`

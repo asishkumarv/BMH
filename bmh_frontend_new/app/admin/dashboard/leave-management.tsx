@@ -57,7 +57,7 @@ export default function AdminLeaveManagement() {
         }
       }
       if (empRes.data && empRes.data.success) {
-        setEmployees(empRes.data.data);
+        setEmployees(empRes.data.data || []);
       }
     } catch (error) {
       console.error("Dropdown fetch error:", error);
@@ -83,8 +83,8 @@ export default function AdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/settings`);
       if (res.ok) {
         const data = await res.json();
-        setDeptSettings(data.departmentSettings);
-        setEmployeeSettings(data.employeeSettings);
+        setDeptSettings(data.departmentSettings || []);
+        setEmployeeSettings(data.employeeSettings || []);
       }
     } catch (e) { console.error(e); }
   };

@@ -71,7 +71,7 @@ export default function SubAdminLeaveManagement() {
     try {
       const res = await axios.get(`${API_URL}/employees`);
       if (res.data && res.data.success) {
-        setEmployees(res.data.data.filter((e: any) => e.department === dept));
+        setEmployees((res.data.data || []).filter((e: any) => e.department === dept));
       }
     } catch (e) { console.error("Dropdown fetch error:", e); }
   };
@@ -101,7 +101,7 @@ export default function SubAdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/settings?department=${dept}`);
       if (res.ok) {
         const data = await res.json();
-        setEmployeeSettings(data.employeeSettings.filter((r: any) => r.department === dept));
+        setEmployeeSettings((data.employeeSettings || []).filter((r: any) => r.department === dept));
       }
     } catch (e) { console.error(e); }
   };
