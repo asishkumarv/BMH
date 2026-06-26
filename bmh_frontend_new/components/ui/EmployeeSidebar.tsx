@@ -43,9 +43,15 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
         }
         
         // Fetch user to check role for Peon Queue
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-          const u = JSON.parse(userData);
+        let userDataStr = null;
+        if (Platform.OS === 'web') {
+          userDataStr = localStorage.getItem('employeeUser');
+        } else {
+          userDataStr = await AsyncStorage.getItem('employeeUser');
+        }
+        
+        if (userDataStr) {
+          const u = JSON.parse(userDataStr);
           if (u.role?.toLowerCase() === 'peon' || u.role?.toLowerCase() === 'poen') {
             dynamicNavItems.push({ name: 'Live Queue', icon: Users, route: '/employee/dashboard/queue' });
           }
