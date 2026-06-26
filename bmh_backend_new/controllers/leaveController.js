@@ -302,14 +302,23 @@ exports.generatePayslip = async (req, res) => {
         const end = new Date(lr.end_date);
         for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             if (d.getMonth() === m && d.getFullYear() === year) {
-                approvedLeaveDays.add(d.getDate());
+                if (d.getDay() !== 0) { // Exclude Sundays from approved leaves
+                    approvedLeaveDays.add(d.getDate());
+                }
             }
         }
     });
 
-    // Calculate missing days
+    // Calculate missing days (absents)
     let missingDays = 0;
-    for (let day = 1; day <= daysInMonth; day++) {
+    
+    // If it is the current month, only calculate missing days up to yesterday (to avoid premature absent flags)
+    const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const [tDay, tMonth, tYear] = todayStr.split('/').map(Number);
+    const currentMonthStr = `${tYear}-${String(tMonth).padStart(2, '0')}`;
+    const limitDay = (month === currentMonthStr) ? tDay : daysInMonth + 1;
+
+    for (let day = 1; day < limitDay; day++) {
         const dateObj = new Date(year, m, day);
         const isSunday = dateObj.getDay() === 0;
         if (!isSunday && !holidaySet.has(day)) {
@@ -456,7 +465,9 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
         const end = new Date(lr.end_date);
         for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             if (d.getMonth() === m && d.getFullYear() === year) {
-                approvedLeaveDays.add(d.getDate());
+                if (d.getDay() !== 0) { // Exclude Sundays from approved leaves
+                    approvedLeaveDays.add(d.getDate());
+                }
             }
         }
     });
