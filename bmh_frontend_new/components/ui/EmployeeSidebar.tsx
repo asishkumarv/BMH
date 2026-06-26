@@ -1,9 +1,10 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User, CalendarDays, FileText } from 'lucide-react-native';
+import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User, CalendarDays, FileText, Users } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/employee/dashboard' },
@@ -27,6 +28,8 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
     const fetchSettings = async () => {
       try {
         const res = await axios.get('https://bmh-eitu.onrender.com/settings');
+        let dynamicNavItems = [...NAV_ITEMS];
+        
         if (res.data.success && res.data.settings.doctor_management_access) {
           let value = res.data.settings.doctor_management_access;
           if (typeof value === 'string') value = JSON.parse(value);
@@ -35,9 +38,20 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
           const hasAccess = value.employee === true || Object.values(value).some((dept: any) => dept && dept.employee === true);
           
           if (hasAccess) {
-            setNavItems([...NAV_ITEMS, { name: 'Patient Booking', icon: FileText, route: '/employee/dashboard/patient-booking' }]);
+            dynamicNavItems.push({ name: 'Patient Booking', icon: FileText, route: '/employee/dashboard/patient-booking' });
           }
         }
+        
+        // Fetch user to check role for Peon Queue
+        const userData = await AsyncStorage.getItem('userData');
+        if (userData) {
+          const u = JSON.parse(userData);
+          if (u.role?.toLowerCase() === 'peon' || u.role?.toLowerCase() === 'poen') {
+            dynamicNavItems.push({ name: 'Live Queue', icon: Users, route: '/employee/dashboard/queue' });
+          }
+        }
+        
+        setNavItems(dynamicNavItems);
       } catch (err) {
         console.error('Failed to fetch settings', err);
       }

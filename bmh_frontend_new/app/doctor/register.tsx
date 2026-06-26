@@ -17,6 +17,7 @@ export default function DoctorRegisterScreen() {
     password: '',
     phone_number: '',
     department: '',
+    role: 'Doctor',
     experience: '',
     gender: 'Male',
     description: '',
@@ -168,6 +169,22 @@ export default function DoctorRegisterScreen() {
                       {departments.map((d, i) => (
                         <Picker.Item key={i} label={d.name} value={d.name} />
                       ))}
+                    </Picker>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Role *</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={form.role}
+                      onValueChange={(itemValue) => setForm({...form, role: itemValue})}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Doctor" value="Doctor" />
+                      <Picker.Item label="Senior Consultant" value="Senior Consultant" />
+                      <Picker.Item label="Surgeon" value="Surgeon" />
+                      <Picker.Item label="Specialist" value="Specialist" />
                     </Picker>
                   </View>
                 </View>

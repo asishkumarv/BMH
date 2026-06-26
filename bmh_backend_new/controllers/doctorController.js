@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 // Register Doctor (Pending Approval)
 exports.registerDoctor = async (req, res) => {
   try {
-    const { full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    const { full_name, email, password, phone_number, department, role, experience, gender, description, profile_photo } = req.body;
     
     // Check if email exists
     const existing = await pool.query('SELECT id FROM doctors WHERE email = $1', [email]);
@@ -20,9 +20,9 @@ exports.registerDoctor = async (req, res) => {
     const newId = `${deptPrefix}D${nextNum.toString().padStart(3, '0')}`;
 
     await pool.query(
-      `INSERT INTO doctors (id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pending')`,
-      [newId, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo]
+      `INSERT INTO doctors (id, full_name, email, password, phone_number, department, role, experience, gender, description, profile_photo, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pending')`,
+      [newId, full_name, email, hashedPassword, phone_number, department, role || 'Doctor', experience, gender, description, profile_photo]
     );
 
     res.json({ success: true, message: 'Registration successful. Waiting for Admin approval.', id: newId });
