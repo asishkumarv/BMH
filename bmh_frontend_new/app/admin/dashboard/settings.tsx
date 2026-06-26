@@ -24,7 +24,7 @@ export default function AdminSettings() {
       const depts = deptRes.data.data || [];
       setDepartments(depts);
 
-      let currentSettings = {};
+      let currentSettings: any = {};
       if (settingsRes.data.success && settingsRes.data.settings.doctor_management_access) {
         let value = settingsRes.data.settings.doctor_management_access;
         if (typeof value === 'string') value = JSON.parse(value);

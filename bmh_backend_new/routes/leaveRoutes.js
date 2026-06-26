@@ -5,7 +5,7 @@ const leaveController = require('../controllers/leaveController');
 // Settings
 router.get('/settings', leaveController.getSettings);
 router.post('/settings/department', leaveController.updateDepartmentSettings);
-router.post('/settings/role', leaveController.updateRoleSettings);
+router.post('/settings/employee', leaveController.updateEmployeeSettings);
 
 // Requests
 router.post('/request', leaveController.applyLeave);

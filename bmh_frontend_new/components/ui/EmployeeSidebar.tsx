@@ -53,7 +53,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (userDataStr) {
           const u = JSON.parse(userDataStr);
           if (u.role?.toLowerCase() === 'peon' || u.role?.toLowerCase() === 'poen') {
-            dynamicNavItems.push({ name: 'Live Queue', icon: Users, route: '/employee/dashboard/queue' });
+            dynamicNavItems.splice(1, 0, { name: 'Live Queue', icon: Users, route: '/employee/dashboard/queue' });
           }
         }
         

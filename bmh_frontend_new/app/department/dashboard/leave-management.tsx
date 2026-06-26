@@ -16,11 +16,11 @@ export default function SubAdminLeaveManagement() {
   const [deptNumId, setDeptNumId] = useState<string>('');
 
   // Settings State
-  const [roleSettings, setRoleSettings] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
+  const [employeeSettings, setEmployeeSettings] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   
   // Settings Form State
-  const [rRole, setRRole] = useState('');
+  const [rEmployeeId, setREmployeeId] = useState('');
   const [rLeaves, setRLeaves] = useState('1');
   const [rExtraPen, setRExtraPen] = useState('0');
   const [rLateLim, setRLateLim] = useState('3');
@@ -58,7 +58,7 @@ export default function SubAdminLeaveManagement() {
       if (deptName) {
         fetchRequests(deptName);
         fetchSettings(deptName);
-        fetchRoles();
+        fetchEmployees(deptName);
         fetchHolidays(deptName);
       } else {
         setLoading(false);
@@ -67,21 +67,20 @@ export default function SubAdminLeaveManagement() {
     init();
   }, []);
 
-  const fetchRoles = async () => {
+  const fetchEmployees = async (dept: string) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/roles`);
+      const res = await axios.get(`${API_URL}/employees`);
       if (res.data && res.data.success) {
-        setRoles(res.data.data);
+        setEmployees(res.data.data.filter((e: any) => e.department === dept));
       }
     } catch (e) { console.error("Dropdown fetch error:", e); }
   };
 
   useEffect(() => {
-    if (roles.length > 0 && deptNumId && !rRole) {
-      const validRoles = roles.filter(r => !deptNumId || r.departmentId == deptNumId);
-      if (validRoles.length > 0) setRRole(validRoles[0].name);
+    if (employees.length > 0 && !rEmployeeId) {
+      setREmployeeId(employees[0].id.toString());
     }
-  }, [roles, deptNumId, rRole]);
+  }, [employees, rEmployeeId]);
 
   const fetchRequests = async (dept: string) => {
     try {
@@ -102,7 +101,7 @@ export default function SubAdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/settings?department=${dept}`);
       if (res.ok) {
         const data = await res.json();
-        setRoleSettings(data.roleSettings.filter((r: any) => r.department === dept));
+        setEmployeeSettings(data.employeeSettings.filter((r: any) => r.department === dept));
       }
     } catch (e) { console.error(e); }
   };
@@ -121,20 +120,24 @@ export default function SubAdminLeaveManagement() {
     } catch (e) { console.error(e); }
   };
 
-  const saveRoleSetting = async () => {
+  const saveEmployeeSetting = async () => {
     try {
-      const res = await fetch(`${API_URL}/leave/settings/role`, {
+      if (!rEmployeeId) {
+        Alert.alert('Error', 'Please select an employee');
+        return;
+      }
+      const res = await fetch(`${API_URL}/leave/settings/employee`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          department: departmentId, role: rRole,
+          employee_id: parseInt(rEmployeeId),
           leaves_per_month: parseInt(rLeaves), extra_leave_penalty: parseFloat(rExtraPen),
           late_checkin_limit: parseInt(rLateLim), late_checkin_penalty: parseInt(rLatePen),
           early_checkout_limit: parseInt(rEarlyLim), early_checkout_penalty: parseInt(rEarlyPen)
         })
       });
       if (res.ok) {
-        Alert.alert('Success', 'Role setting saved');
+        Alert.alert('Success', 'Employee setting saved');
         fetchSettings(departmentId);
       }
     } catch (e) { console.error(e); }
@@ -256,23 +259,36 @@ export default function SubAdminLeaveManagement() {
             <View style={styles.card}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                 <Clock size={20} color={Colors.light.primary} style={{ marginRight: 8 }} />
-                <Text style={styles.cardTitle}>Set Role Allowances & Penalties</Text>
+                <Text style={styles.cardTitle}>Set Employee Allowances & Penalties</Text>
               </View>
               <Text style={styles.helperText}>Configure how many leaves are free per month, and set penalties for late check-ins or extra leaves.</Text>
               
-              <Text style={styles.label}>Role</Text>
+              <Text style={styles.label}>Employee</Text>
               {Platform.OS === 'web' ? (
                 <select 
-                  value={rRole} 
-                  onChange={(e: any) => setRRole(e.target.value)} 
+                  value={rEmployeeId} 
+                  onChange={(e: any) => { 
+                    const empId = e.target.value;
+                    setREmployeeId(empId);
+                    const existing = employeeSettings.find(es => es.employee_id == empId);
+                    if (existing) {
+                      setRLeaves(existing.leaves_per_month.toString());
+                      setRExtraPen(existing.extra_leave_penalty.toString());
+                      setRLateLim(existing.late_checkin_limit.toString());
+                      setRLatePen(existing.late_checkin_penalty.toString());
+                      setREarlyLim(existing.early_checkout_limit.toString());
+                      setREarlyPen(existing.early_checkout_penalty.toString());
+                    } else {
+                      setRLeaves('0'); setRExtraPen('0'); setRLateLim('0'); setRLatePen('0'); setREarlyLim('0'); setREarlyPen('0');
+                    }
+                  }} 
                   style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
-                  {roles.filter(r => !deptNumId || r.departmentId == deptNumId).map(r => (
-                    <option key={r.id} value={r.name}>{r.name}</option>
-                  ))}
+                  <option value="">Select an Employee</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name} ({emp.department} - {emp.role})</option>)}
                 </select>
               ) : (
-                <TextInput style={styles.input} value={rRole} onChangeText={setRRole} placeholder="e.g. Senior Surgeon" />
+                <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />
               )}
               
               <View style={{ flexDirection: 'row', gap: 16 }}>
@@ -308,19 +324,19 @@ export default function SubAdminLeaveManagement() {
                 </View>
               </View>
               
-              <Pressable style={styles.saveBtn} onPress={saveRoleSetting}>
+              <Pressable style={styles.saveBtn} onPress={saveEmployeeSetting}>
                 <Save size={18} color="white" style={{ marginRight: 8 }} />
                 <Text style={styles.saveBtnText}>Save Policy</Text>
               </Pressable>
 
               <View style={styles.existingRules}>
-                <Text style={styles.rulesHeading}>Active Role Policies</Text>
-                {roleSettings.filter(rs => rs.role !== 'All').map((rs, i) => (
+                <Text style={styles.rulesHeading}>Active Employee Policies</Text>
+                {employeeSettings.map((es, i) => (
                   <View key={i} style={styles.ruleItem}>
                     <View>
-                      <Text style={styles.ruleName}>{rs.role}</Text>
+                      <Text style={styles.ruleName}>{es.employee_name} ({es.department} - {es.role})</Text>
                       <Text style={[styles.ruleVal, { fontSize: 13, marginTop: 4 }]}>
-                        {rs.leaves_per_month} free | ₹{rs.extra_leave_penalty} extra | {rs.late_checkin_limit} late/₹{rs.late_checkin_penalty} | {rs.early_checkout_limit} early/₹{rs.early_checkout_penalty}
+                        {es.leaves_per_month} free | ₹{es.extra_leave_penalty} extra | {es.late_checkin_limit} late/₹{es.late_checkin_penalty} | {es.early_checkout_limit} early/₹{es.early_checkout_penalty}
                       </Text>
                     </View>
                   </View>

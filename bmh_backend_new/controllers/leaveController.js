@@ -16,18 +16,22 @@ exports.getSettings = async (req, res) => {
     }
     const depRes = await pool.query(depQuery, depValues);
 
-    // Role settings
-    let roleQuery = 'SELECT * FROM role_leave_settings';
-    let roleValues = [];
+    // Employee settings
+    let empQuery = `
+      SELECT els.*, e.full_name as employee_name, e.department, e.role
+      FROM employee_leave_settings els
+      JOIN employees e ON els.employee_id = e.id
+    `;
+    let empValues = [];
     if (department && department !== 'All') {
-      roleQuery += ' WHERE department = $1 OR department = $2';
-      roleValues.push(department, 'All');
+      empQuery += ' WHERE e.department = $1';
+      empValues.push(department);
     }
-    const roleRes = await pool.query(roleQuery, roleValues);
+    const empRes = await pool.query(empQuery, empValues);
 
     res.status(200).json({
       departmentSettings: depRes.rows,
-      roleSettings: roleRes.rows,
+      employeeSettings: empRes.rows,
     });
   } catch (error) {
     console.error('Error fetching leave settings:', error);
@@ -55,20 +59,20 @@ exports.updateDepartmentSettings = async (req, res) => {
   }
 };
 
-// Update role settings
-exports.updateRoleSettings = async (req, res) => {
+// Update employee settings
+exports.updateEmployeeSettings = async (req, res) => {
   try {
     const {
-      department, role, leaves_per_month, extra_leave_penalty,
+      employee_id, leaves_per_month, extra_leave_penalty,
       late_checkin_limit, late_checkin_penalty,
       early_checkout_limit, early_checkout_penalty
     } = req.body;
 
     const query = `
-      INSERT INTO role_leave_settings 
-      (department, role, leaves_per_month, extra_leave_penalty, late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (department, role) DO UPDATE
+      INSERT INTO employee_leave_settings 
+      (employee_id, leaves_per_month, extra_leave_penalty, late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (employee_id) DO UPDATE
       SET leaves_per_month = EXCLUDED.leaves_per_month,
           extra_leave_penalty = EXCLUDED.extra_leave_penalty,
           late_checkin_limit = EXCLUDED.late_checkin_limit,
@@ -79,13 +83,13 @@ exports.updateRoleSettings = async (req, res) => {
       RETURNING *;
     `;
     const values = [
-      department, role, leaves_per_month, extra_leave_penalty,
+      employee_id, leaves_per_month, extra_leave_penalty,
       late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty
     ];
     const result = await pool.query(query, values);
     res.status(200).json(result.rows[0]);
   } catch (error) {
-    console.error('Error updating role settings:', error);
+    console.error('Error updating employee settings:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -207,17 +211,16 @@ exports.generatePayslip = async (req, res) => {
       }
     } catch (e) {}
 
-    // 2. Get role settings
-    // Check specific role first, then 'All' roles for department, then 'All' departments
-    let roleQuery = `SELECT * FROM role_leave_settings WHERE (department = $1 OR department = 'All') AND (role = $2 OR role = 'All') ORDER BY department DESC, role DESC LIMIT 1`;
-    const roleSetRes = await pool.query(roleQuery, [emp.department, emp.role]);
+    // 2. Get employee settings
+    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1`;
+    const empSetRes = await pool.query(empSetQuery, [employee_id]);
     
     let settings = {
       leaves_per_month: 0, extra_leave_penalty: 0,
       late_checkin_limit: 0, late_checkin_penalty: 0,
       early_checkout_limit: 0, early_checkout_penalty: 0
     };
-    if (roleSetRes.rows.length > 0) settings = roleSetRes.rows[0];
+    if (empSetRes.rows.length > 0) settings = empSetRes.rows[0];
 
     const [yearStr, monthStr] = month.split('-');
     const year = parseInt(yearStr);

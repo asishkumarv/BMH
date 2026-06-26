@@ -15,9 +15,9 @@ export default function AdminLeaveManagement() {
   
   // Settings State
   const [deptSettings, setDeptSettings] = useState<any[]>([]);
-  const [roleSettings, setRoleSettings] = useState<any[]>([]);
+  const [employeeSettings, setEmployeeSettings] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   
   // Forms State
   const [dDept, setDDept] = useState('');
@@ -28,8 +28,7 @@ export default function AdminLeaveManagement() {
   const [hDate, setHDate] = useState('');
   const [hDesc, setHDesc] = useState('');
   
-  const [rDept, setRDept] = useState('');
-  const [rRole, setRRole] = useState('');
+  const [rEmployeeId, setREmployeeId] = useState('');
   const [rLeaves, setRLeaves] = useState('1');
   const [rExtraPen, setRExtraPen] = useState('0');
   const [rLateLim, setRLateLim] = useState('3');
@@ -46,21 +45,19 @@ export default function AdminLeaveManagement() {
 
   const fetchDropdownData = async () => {
     try {
-      const [deptRes, roleRes] = await Promise.all([
+      const [deptRes, empRes] = await Promise.all([
         axios.get(`https://bmh-eitu.onrender.com/department`),
-        axios.get(`https://bmh-eitu.onrender.com/roles`)
+        axios.get(`${API_URL}/employees`)
       ]);
       if (deptRes.data && deptRes.data.success) {
         const depts = deptRes.data.data;
         setDepartments(depts);
         if (depts.length > 0) {
           setDDept(depts[0].name);
-          setRDept(depts[0].name);
         }
       }
-      if (roleRes.data && roleRes.data.success) {
-        const rls = roleRes.data.data;
-        setRoles(rls);
+      if (empRes.data && empRes.data.success) {
+        setEmployees(empRes.data.data);
       }
     } catch (error) {
       console.error("Dropdown fetch error:", error);
@@ -87,7 +84,7 @@ export default function AdminLeaveManagement() {
       if (res.ok) {
         const data = await res.json();
         setDeptSettings(data.departmentSettings);
-        setRoleSettings(data.roleSettings);
+        setEmployeeSettings(data.employeeSettings);
       }
     } catch (e) { console.error(e); }
   };
@@ -120,20 +117,24 @@ export default function AdminLeaveManagement() {
     } catch (e) { console.error(e); }
   };
 
-  const saveRoleSetting = async () => {
+  const saveEmployeeSetting = async () => {
     try {
-      const res = await fetch(`${API_URL}/leave/settings/role`, {
+      if (!rEmployeeId) {
+        Alert.alert('Error', 'Please select an employee');
+        return;
+      }
+      const res = await fetch(`${API_URL}/leave/settings/employee`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          department: rDept, role: rRole,
+          employee_id: parseInt(rEmployeeId),
           leaves_per_month: parseInt(rLeaves), extra_leave_penalty: parseFloat(rExtraPen),
           late_checkin_limit: parseInt(rLateLim), late_checkin_penalty: parseInt(rLatePen),
           early_checkout_limit: parseInt(rEarlyLim), early_checkout_penalty: parseInt(rEarlyPen)
         })
       });
       if (res.ok) {
-        Alert.alert('Success', 'Role setting saved');
+        Alert.alert('Success', 'Employee setting saved');
         fetchSettings();
       }
     } catch (e) { console.error(e); }
@@ -303,38 +304,32 @@ export default function AdminLeaveManagement() {
               
               <View style={[{ flexDirection: 'row', gap: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Department</Text>
+                  <Text style={styles.label}>Employee</Text>
                   {Platform.OS === 'web' ? (
                     <select 
-                      value={rDept} 
+                      value={rEmployeeId} 
                       onChange={(e: any) => { 
-                        setRDept(e.target.value); 
-                        const deptId = departments.find(d => d.name === e.target.value)?.id;
-                        const deptRoles = roles.filter(r => r.departmentId == deptId);
-                        setRRole(deptRoles.length > 0 ? deptRoles[0].name : '');
+                        const empId = e.target.value;
+                        setREmployeeId(empId);
+                        const existing = employeeSettings.find(es => es.employee_id == empId);
+                        if (existing) {
+                          setRLeaves(existing.leaves_per_month.toString());
+                          setRExtraPen(existing.extra_leave_penalty.toString());
+                          setRLateLim(existing.late_checkin_limit.toString());
+                          setRLatePen(existing.late_checkin_penalty.toString());
+                          setREarlyLim(existing.early_checkout_limit.toString());
+                          setREarlyPen(existing.early_checkout_penalty.toString());
+                        } else {
+                          setRLeaves('0'); setRExtraPen('0'); setRLateLim('0'); setRLatePen('0'); setREarlyLim('0'); setREarlyPen('0');
+                        }
                       }} 
                       style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                     >
-                      {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                      <option value="">Select an Employee</option>
+                      {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name} ({emp.department} - {emp.role})</option>)}
                     </select>
                   ) : (
-                    <TextInput style={styles.input} value={rDept} onChangeText={setRDept} placeholder="e.g. Cardiology" />
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Role</Text>
-                  {Platform.OS === 'web' ? (
-                    <select 
-                      value={rRole} 
-                      onChange={(e: any) => setRRole(e.target.value)} 
-                      style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
-                    >
-                      {roles.filter(r => r.departmentId == departments.find(d => d.name === rDept)?.id).map(r => (
-                        <option key={r.id} value={r.name}>{r.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <TextInput style={styles.input} value={rRole} onChangeText={setRRole} placeholder="e.g. Senior Surgeon" />
+                    <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />
                   )}
                 </View>
               </View>
@@ -372,19 +367,19 @@ export default function AdminLeaveManagement() {
                 </View>
               </View>
               
-              <Pressable style={styles.saveBtn} onPress={saveRoleSetting}>
+              <Pressable style={styles.saveBtn} onPress={saveEmployeeSetting}>
                 <Save size={18} color="white" style={{ marginRight: 8 }} />
                 <Text style={styles.saveBtnText}>Save Policy</Text>
               </Pressable>
 
               <View style={styles.existingRules}>
-                <Text style={styles.rulesHeading}>Active Role Policies</Text>
-                {roleSettings.filter(rs => rs.role !== 'All' && rs.department !== 'All').map((rs, i) => (
+                <Text style={styles.rulesHeading}>Active Employee Policies</Text>
+                {employeeSettings.map((es, i) => (
                   <View key={i} style={styles.ruleItem}>
                     <View>
-                      <Text style={styles.ruleName}>{rs.role} ({rs.department})</Text>
+                      <Text style={styles.ruleName}>{es.employee_name} ({es.department} - {es.role})</Text>
                       <Text style={[styles.ruleVal, { fontSize: 13, marginTop: 4 }]}>
-                        {rs.leaves_per_month} free | ₹{rs.extra_leave_penalty} extra | {rs.late_checkin_limit} late/₹{rs.late_checkin_penalty} | {rs.early_checkout_limit} early/₹{rs.early_checkout_penalty}
+                        {es.leaves_per_month} free | ₹{es.extra_leave_penalty} extra | {es.late_checkin_limit} late/₹{es.late_checkin_penalty} | {es.early_checkout_limit} early/₹{es.early_checkout_penalty}
                       </Text>
                     </View>
                   </View>

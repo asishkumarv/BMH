@@ -131,7 +131,7 @@ export default function DoctorLoginScreen() {
               </View>
               
               <View style={[styles.loginLinkRow, { marginTop: 20 }]}>
-                <Pressable onPress={() => router.push('/login')}>
+                <Pressable onPress={() => router.push('/employee/login' as any)}>
                   <Text style={styles.loginLinkText}>Go to Employee Portal</Text>
                 </Pressable>
               </View>

@@ -35,6 +35,16 @@ export default function PatientBooking() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [successToken, setSuccessToken] = useState<number | null>(null);
 
+  // Refs for Input Navigation
+  const mobileRef = React.useRef<TextInput>(null);
+  const ageRef = React.useRef<TextInput>(null);
+  const bloodGroupRef = React.useRef<TextInput>(null);
+  const reasonRef = React.useRef<TextInput>(null);
+  const cityRef = React.useRef<TextInput>(null);
+  const pinCodeRef = React.useRef<TextInput>(null);
+  const guardianRef = React.useRef<TextInput>(null);
+  const emailRef = React.useRef<TextInput>(null);
+
   // My Bookings State
   const [activeTab, setActiveTab] = useState('New Booking');
   const [myBookings, setMyBookings] = useState<any[]>([]);
@@ -59,15 +69,33 @@ export default function PatientBooking() {
       const res = await axios.get(url);
       setMyBookings(res.data.data);
       
-      if (uniqueDoctors.length === 0 && res.data.data.length > 0) {
-        const docs = res.data.data.map((b: any) => ({id: b.doctor_id, name: b.doctor_name}));
-        const unique = Array.from(new Set(docs.map((d:any) => d.id))).map(id => docs.find((d:any) => d.id === id));
-        setUniqueDoctors(unique);
-      }
     } catch (err) {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    const fetchDoctorsForFilter = async () => {
+      try {
+        const res = await axios.get('https://bmh-eitu.onrender.com/doctors');
+        if (res.data.success && res.data.data) {
+          let docs = res.data.data;
+          // Only show doctors from this employee's department if applicable
+          if (user && user.department) {
+            docs = docs.filter((d: any) => d.department === user.department);
+          }
+          const formatted = docs.map((d: any) => ({ id: d.id, name: d.full_name || d.name }));
+          setUniqueDoctors(formatted);
+        }
+      } catch (err) {
+        console.error('Failed to load doctors for filter', err);
+      }
+    };
+    if (user) {
+      fetchDoctorsForFilter();
+    }
+  }, [user]);
+
 
   const handleExportCSV = async () => {
     if (!myBookings || myBookings.length === 0) return;
@@ -402,49 +430,49 @@ export default function PatientBooking() {
           </View>
           
           <Text style={styles.formLabel}>Patient Full Name *</Text>
-          <TextInput style={styles.input} value={patientName} onChangeText={setPatientName} placeholder="Enter patient name" />
+          <TextInput style={styles.input} value={patientName} onChangeText={setPatientName} placeholder="Enter patient name" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => mobileRef.current?.focus()} />
           
           <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>Mobile Number *</Text>
-              <TextInput style={styles.input} value={mobile} onChangeText={setMobile} placeholder="Enter mobile" keyboardType="phone-pad" />
+              <TextInput ref={mobileRef} style={styles.input} value={mobile} onChangeText={setMobile} placeholder="Enter mobile" keyboardType="phone-pad" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => ageRef.current?.focus()} />
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Age *</Text>
-              <TextInput style={styles.input} value={age} onChangeText={setAge} placeholder="Age" keyboardType="numeric" />
+              <TextInput ref={ageRef} style={styles.input} value={age} onChangeText={setAge} placeholder="Age" keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => bloodGroupRef.current?.focus()} />
             </View>
           </View>
           
           <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>Blood Group</Text>
-              <TextInput style={styles.input} value={bloodGroup} onChangeText={setBloodGroup} placeholder="e.g. O+" />
+              <TextInput ref={bloodGroupRef} style={styles.input} value={bloodGroup} onChangeText={setBloodGroup} placeholder="e.g. O+" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => reasonRef.current?.focus()} />
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Reason for Visit</Text>
-              <TextInput style={styles.input} value={reasonForVisit} onChangeText={setReasonForVisit} placeholder="Brief reason" />
+              <TextInput ref={reasonRef} style={styles.input} value={reasonForVisit} onChangeText={setReasonForVisit} placeholder="Brief reason" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => cityRef.current?.focus()} />
             </View>
           </View>
           
           <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>City</Text>
-              <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City name" />
+              <TextInput ref={cityRef} style={styles.input} value={city} onChangeText={setCity} placeholder="City name" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => pinCodeRef.current?.focus()} />
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Pin Code</Text>
-              <TextInput style={styles.input} value={pinCode} onChangeText={setPinCode} placeholder="Postal Code" keyboardType="numeric" />
+              <TextInput ref={pinCodeRef} style={styles.input} value={pinCode} onChangeText={setPinCode} placeholder="Postal Code" keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => guardianRef.current?.focus()} />
             </View>
           </View>
 
           <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>Guardian / Parent Name</Text>
-              <TextInput style={styles.input} value={guardianName} onChangeText={setGuardianName} placeholder="Guardian Name" />
+              <TextInput ref={guardianRef} style={styles.input} value={guardianName} onChangeText={setGuardianName} placeholder="Guardian Name" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => emailRef.current?.focus()} />
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Email Address (Optional)</Text>
-              <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" />
+              <TextInput ref={emailRef} style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" returnKeyType="done" onSubmitEditing={handleBooking} />
             </View>
           </View>
           
