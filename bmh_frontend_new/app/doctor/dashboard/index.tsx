@@ -124,6 +124,25 @@ export default function DoctorDashboard() {
                 </View>
               </View>
 
+              <View style={styles.detailsBox}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Blood Group:</Text>
+                  <Text style={styles.detailValue}>{currentPatient.blood_group || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Reason for Visit:</Text>
+                  <Text style={styles.detailValue}>{currentPatient.reason_for_visit || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>City / Pin Code:</Text>
+                  <Text style={styles.detailValue}>{(currentPatient.city || 'N/A')} / {(currentPatient.pin_code || 'N/A')}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Guardian:</Text>
+                  <Text style={styles.detailValue}>{currentPatient.guardian_name || 'N/A'}</Text>
+                </View>
+              </View>
+
               <Text style={styles.label}>Medical Notes & Prescription *</Text>
               <TextInput 
                 style={styles.textArea} 
@@ -226,6 +245,11 @@ const styles = StyleSheet.create({
   patientInfoBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
   patientNameBig: { fontSize: 20, fontWeight: 'bold', color: Colors.light.primary, marginLeft: 12 },
   
+  detailsBox: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
+  detailRow: { flexDirection: 'row', marginBottom: 8 },
+  detailLabel: { width: 130, fontSize: 14, fontWeight: '600', color: '#64748b' },
+  detailValue: { flex: 1, fontSize: 14, color: '#334155', fontWeight: '500' },
+
   label: { fontSize: 14, fontWeight: '600', color: '#334155', marginBottom: 8, marginTop: 16 },
   textArea: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 16, fontSize: 16, color: '#1e293b', minHeight: 200, textAlignVertical: 'top' },
   input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 16, fontSize: 16, color: '#1e293b' },

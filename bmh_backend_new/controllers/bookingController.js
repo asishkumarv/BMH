@@ -3,7 +3,7 @@ const pool = require('../db');
 // Create a patient booking
 exports.createBooking = async (req, res) => {
   try {
-    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number } = req.body;
+    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number, blood_group, city, pin_code, guardian_name, reason_for_visit } = req.body;
     
     await pool.query('BEGIN');
 
@@ -12,10 +12,15 @@ exports.createBooking = async (req, res) => {
     const patRes = await pool.query('SELECT id FROM patients WHERE mobile = $1', [mobile]);
     if (patRes.rowCount > 0) {
       patient_id = patRes.rows[0].id;
+      // Update existing patient with new details
+      await pool.query(
+        'UPDATE patients SET blood_group = $1, city = $2, pin_code = $3, guardian_name = $4 WHERE id = $5',
+        [blood_group || null, city || null, pin_code || null, guardian_name || null, patient_id]
+      );
     } else {
       const newPat = await pool.query(
-        'INSERT INTO patients (name, mobile, email, age, gender) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [patient_name, mobile, email, age, gender]
+        'INSERT INTO patients (name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+        [patient_name, mobile, email, age, gender, blood_group || null, city || null, pin_code || null, guardian_name || null]
       );
       patient_id = newPat.rows[0].id;
     }
@@ -40,9 +45,9 @@ exports.createBooking = async (req, res) => {
 
     // 3. Create booking
     await pool.query(
-      `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status)
-       VALUES ($1, $2, $3, $4, $5, 'Booked')`,
-      [slot_id, patient_id, token_number, booked_by, payment_mode]
+      `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit)
+       VALUES ($1, $2, $3, $4, $5, 'Booked', $6)`,
+      [slot_id, patient_id, token_number, booked_by, payment_mode, reason_for_visit || null]
     );
 
     // 4. Update cash_in_hand if Cash payment
@@ -67,11 +72,11 @@ exports.createBooking = async (req, res) => {
 // Get bookings (Sub-admin view - no revenue, or Employee view)
 exports.getBookings = async (req, res) => {
   try {
-    const { date, department, slot_id, booked_by } = req.query;
+    const { date, department, slot_id, booked_by, doctor_id, patient_name } = req.query;
     
     let query = `
-      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode,
-             p.name as patient_name, p.mobile,
+      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
+             p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name,
              ds.date, ds.start_time, ds.end_time, ds.fee,
              d.full_name as doctor_name, d.department,
              e.full_name as booked_by_name
@@ -99,6 +104,14 @@ exports.getBookings = async (req, res) => {
     if (booked_by) {
       params.push(booked_by);
       query += ` AND pb.booked_by = $${params.length}`;
+    }
+    if (doctor_id) {
+      params.push(doctor_id);
+      query += ` AND d.id = $${params.length}`;
+    }
+    if (patient_name) {
+      params.push(`%${patient_name}%`);
+      query += ` AND p.name ILIKE $${params.length}`;
     }
 
     query += ' ORDER BY ds.date DESC, ds.start_time ASC, pb.token_number ASC';

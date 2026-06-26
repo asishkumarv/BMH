@@ -3,10 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Activi
 import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function PatientBooking() {
   const { isMobile } = useResponsive();
@@ -23,9 +26,72 @@ export default function PatientBooking() {
   const [email, setEmail] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Male');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [reasonForVisit, setReasonForVisit] = useState('');
+  const [city, setCity] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [guardianName, setGuardianName] = useState('');
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [bookingLoading, setBookingLoading] = useState(false);
   const [successToken, setSuccessToken] = useState<number | null>(null);
+
+  // My Bookings State
+  const [activeTab, setActiveTab] = useState('New Booking');
+  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [filterDate, setFilterDate] = useState('');
+  const [filterDoctor, setFilterDoctor] = useState('');
+  const [filterPatient, setFilterPatient] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [uniqueDoctors, setUniqueDoctors] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'My Bookings' && user) {
+      fetchMyBookings();
+    }
+  }, [activeTab, filterDate, filterDoctor, filterPatient, user]);
+
+  const fetchMyBookings = async () => {
+    try {
+      let url = `https://bmh-eitu.onrender.com/bookings?booked_by=${user.id}`;
+      if (filterDate) url += `&date=${filterDate}`;
+      if (filterDoctor) url += `&doctor_id=${filterDoctor}`;
+      if (filterPatient) url += `&patient_name=${filterPatient}`;
+      const res = await axios.get(url);
+      setMyBookings(res.data.data);
+      
+      if (uniqueDoctors.length === 0 && res.data.data.length > 0) {
+        const docs = res.data.data.map((b: any) => ({id: b.doctor_id, name: b.doctor_name}));
+        const unique = Array.from(new Set(docs.map((d:any) => d.id))).map(id => docs.find((d:any) => d.id === id));
+        setUniqueDoctors(unique);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (!myBookings || myBookings.length === 0) return;
+    
+    let csvContent = "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode\n";
+    myBookings.forEach((b) => {
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString()},${b.start_time},${b.status},${b.payment_mode}\n`;
+    });
+    
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'my_bookings.csv');
+      a.click();
+    } else {
+      // @ts-ignore
+      const uri = FileSystem.documentDirectory + "my_bookings.csv";
+      // @ts-ignore
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri);
+    }
+  };
 
   useEffect(() => {
     const loadUserAndSlots = async () => {
@@ -71,6 +137,11 @@ export default function PatientBooking() {
         email,
         age: parseInt(age),
         gender,
+        blood_group: bloodGroup,
+        reason_for_visit: reasonForVisit,
+        city,
+        pin_code: pinCode,
+        guardian_name: guardianName,
         booked_by: user.id,
         payment_mode: paymentMode,
         token_number: selectedToken
@@ -94,6 +165,11 @@ export default function PatientBooking() {
     setMobile('');
     setEmail('');
     setAge('');
+    setBloodGroup('');
+    setReasonForVisit('');
+    setCity('');
+    setPinCode('');
+    setGuardianName('');
     setSuccessToken(null);
   };
 
@@ -226,7 +302,21 @@ export default function PatientBooking() {
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Patient Booking</Text>
       
-      {!selectedSlot ? (
+      <View style={styles.tabContainer}>
+        {['New Booking', 'My Bookings'].map(tab => (
+          <TouchableOpacity 
+            key={tab} 
+            style={[styles.tab, activeTab === tab && styles.activeTab]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {activeTab === 'New Booking' ? (
+        <View>
+          {!selectedSlot ? (
         <View>
           <Text style={styles.sectionTitle}>Select an Available Slot</Text>
           <View style={styles.grid}>
@@ -325,8 +415,38 @@ export default function PatientBooking() {
             </View>
           </View>
           
-          <Text style={styles.formLabel}>Email Address (Optional)</Text>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" />
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+            <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
+              <Text style={styles.formLabel}>Blood Group</Text>
+              <TextInput style={styles.input} value={bloodGroup} onChangeText={setBloodGroup} placeholder="e.g. O+" />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.formLabel}>Reason for Visit</Text>
+              <TextInput style={styles.input} value={reasonForVisit} onChangeText={setReasonForVisit} placeholder="Brief reason" />
+            </View>
+          </View>
+          
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+            <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
+              <Text style={styles.formLabel}>City</Text>
+              <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City name" />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.formLabel}>Pin Code</Text>
+              <TextInput style={styles.input} value={pinCode} onChangeText={setPinCode} placeholder="Postal Code" keyboardType="numeric" />
+            </View>
+          </View>
+
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+            <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
+              <Text style={styles.formLabel}>Guardian / Parent Name</Text>
+              <TextInput style={styles.input} value={guardianName} onChangeText={setGuardianName} placeholder="Guardian Name" />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.formLabel}>Email Address (Optional)</Text>
+              <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" />
+            </View>
+          </View>
           
           <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
@@ -370,6 +490,105 @@ export default function PatientBooking() {
           </TouchableOpacity>
         </View>
       )}
+        </View>
+      ) : (
+        <View style={styles.card}>
+          <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
+            <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>My Booked Patients</Text>
+            <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
+              <Text style={styles.exportBtnText}>Export CSV</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
+            <View style={[styles.filterCol, {minWidth: 150}]}>
+              <Text style={styles.label}>Patient Name</Text>
+              <TextInput style={[styles.input, {padding: 10}]} value={filterPatient} onChangeText={setFilterPatient} placeholder="Search patient" />
+            </View>
+            <View style={[styles.filterCol, {minWidth: 150}]}>
+              <Text style={styles.label}>Date Filter</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, color: '#1e293b' } as any}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                    <TextInput style={styles.input} value={filterDate} editable={false} placeholder="Select Date" />
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={filterDate ? new Date(filterDate) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowDatePicker(false);
+                        if (selectedDate) setFilterDate(selectedDate.toISOString().split('T')[0]);
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+            <View style={[styles.filterCol, {minWidth: 150}]}>
+              <Text style={styles.label}>Doctor Filter</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={filterDoctor}
+                  onValueChange={(val) => setFilterDoctor(val)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="All Doctors" value="" />
+                  {uniqueDoctors.map((d: any) => (
+                    <Picker.Item key={d.id} label={d.name} value={d.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+            <View style={[styles.filterCol, {minWidth: 150, justifyContent: 'flex-end'}]}>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => { setFilterDate(''); setFilterDoctor(''); setFilterPatient(''); }}>
+                <Text style={styles.clearBtnText}>Clear Filters</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: isMobile ? 800 : '100%' }}>
+              <View style={styles.tableRowHeader}>
+                <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                <Text style={styles.tableCellHeader}>Patient</Text>
+                <Text style={styles.tableCellHeader}>Doctor</Text>
+                <Text style={styles.tableCellHeader}>Date/Time</Text>
+                <Text style={styles.tableCellHeader}>Payment</Text>
+                <Text style={styles.tableCellHeader}>Status</Text>
+              </View>
+              {myBookings.map((b, i) => (
+                <View key={i} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                  <View style={styles.tableCell}>
+                    <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
+                    <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
+                  </View>
+                  <View style={styles.tableCell}>
+                    <Text>{b.doctor_name}</Text>
+                    <Text style={{fontSize: 12, color: '#64748b'}}>{b.department}</Text>
+                  </View>
+                  <View style={styles.tableCell}>
+                    <Text>{new Date(b.date).toLocaleDateString()}</Text>
+                    <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
+                  </View>
+                  <Text style={styles.tableCell}>{b.payment_mode}</Text>
+                  <Text style={styles.tableCell}>{b.status}</Text>
+                </View>
+              ))}
+              {myBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found.</Text>}
+            </View>
+          </ScrollView>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -377,6 +596,11 @@ export default function PatientBooking() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: '#f8fafc' },
   header: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 24 },
+  tabContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', padding: 4, borderRadius: 12, marginBottom: 24 },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 },
+  activeTab: { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  activeTabText: { color: Colors.light.primary },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#334155', marginBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   slotCard: { width: 300, backgroundColor: 'white', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: '#e2e8f0' },
@@ -425,4 +649,20 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 15, color: '#334155', marginBottom: 8 },
   btn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, width: '100%', alignItems: 'center' },
   btnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  
+  card: { backgroundColor: 'white', padding: 24, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  exportBtn: { backgroundColor: '#10b981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  filterRow: { flexDirection: 'row', gap: 16, marginBottom: 24 },
+  filterCol: { flex: 1 },
+  label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
+  pickerContainer: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden' },
+  picker: { padding: 10, fontSize: 14, color: '#1e293b', ...Platform.select({ web: { outlineStyle: 'none' as any, border: 'none', backgroundColor: 'transparent' } }) },
+  clearBtn: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#f8fafc' },
+  clearBtnText: { color: '#64748b', fontWeight: 'bold' },
+  tableRowHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0' },
+  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
+  tableCellHeader: { flex: 1, minWidth: 100, fontSize: 13, fontWeight: 'bold', color: '#475569' },
+  tableCell: { flex: 1, minWidth: 100, fontSize: 14, color: '#334155' },
 });

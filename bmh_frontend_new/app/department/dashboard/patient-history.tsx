@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { Search, Filter, Calendar } from 'lucide-react-native';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function PatientHistoryDepartment() {
+  const { isMobile } = useResponsive();
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -22,9 +24,15 @@ export default function PatientHistoryDepartment() {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        const user = JSON.parse(userData);
+      let dataStr = null;
+      if (Platform.OS === 'web') {
+        dataStr = localStorage.getItem('subAdminUser');
+      } else {
+        dataStr = await AsyncStorage.getItem('subAdminUser');
+      }
+      
+      if (dataStr) {
+        const user = JSON.parse(dataStr);
         const params = new URLSearchParams();
         params.append('role', 'SubAdmin');
         params.append('department', user.department);
@@ -73,7 +81,7 @@ export default function PatientHistoryDepartment() {
       ) : (
         history.map((record, index) => (
           <View key={index} style={styles.recordCard}>
-            <View style={styles.cardHeader}>
+            <View style={[styles.cardHeader, isMobile && { flexDirection: 'column', gap: 8 }]}>
               <View>
                 <Text style={styles.patientName}>{record.name}</Text>
                 <Text style={styles.patientInfo}>Age: {record.age} | Gender: {record.gender} | Phone: {record.mobile}</Text>

@@ -238,7 +238,7 @@ export default function EmployeeWalletScreen() {
 
           {activeTab === 'Allowance' ? (
             <>
-              <View style={[styles.balanceCard, !isDesktop && { flexDirection: 'column', alignItems: 'center', textAlign: 'center' }]}>
+              <View style={[styles.balanceCard, !isDesktop && { flexDirection: 'column', alignItems: 'center' }]}>
                 <View style={styles.balanceIconWrapper}>
                   <Wallet size={32} color={Colors.light.primary} />
                 </View>

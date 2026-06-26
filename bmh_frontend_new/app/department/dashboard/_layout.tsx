@@ -34,15 +34,7 @@ export default function SubAdminLayout() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Mobile/Tablet Header */}
-      {!isDesktop && (
-        <View style={styles.mobileHeader}>
-          <Pressable onPress={() => setIsMobileSidebarOpen(true)} style={styles.menuButton}>
-            <Menu color={Colors.light.text} size={24} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Department Portal</Text>
-        </View>
-      )}
+      {/* Mobile/Tablet Header is handled by TopHeader */}
 
       {/* Mobile/Tablet Sidebar Overlay */}
       {!isDesktop && isMobileSidebarOpen && (
@@ -63,7 +55,11 @@ export default function SubAdminLayout() {
           styles.contentWrapper, 
           isDesktop && { marginLeft: 260 } 
         ]}>
-          <TopHeader userType="department_admin" />
+          <TopHeader 
+            userType="department_admin" 
+            title={!isDesktop ? "Department Portal" : undefined}
+            onMenuPress={!isDesktop ? () => setIsMobileSidebarOpen(true) : undefined}
+          />
           <Slot />
         </View>
       </View>
@@ -83,24 +79,6 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     backgroundColor: Colors.light.background,
-  },
-  mobileHeader: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.light.text,
   },
   overlay: {
     flex: 1,

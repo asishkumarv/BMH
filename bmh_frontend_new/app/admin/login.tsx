@@ -4,6 +4,7 @@ import { ArrowLeft, ShieldCheck, Eye, EyeOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { useResponsive } from '../../hooks/useResponsive';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 export default function AdminLoginScreen() {
@@ -36,6 +37,11 @@ export default function AdminLoginScreen() {
       if (res.data.success) {
         if (Platform.OS === 'web') {
           localStorage.setItem('superAdminUser', JSON.stringify({
+            ...res.data.data,
+            role: 'Super Administrator'
+          }));
+        } else {
+          await AsyncStorage.setItem('superAdminUser', JSON.stringify({
             ...res.data.data,
             role: 'Super Administrator'
           }));

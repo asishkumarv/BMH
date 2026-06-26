@@ -7,6 +7,8 @@ import { useResponsive } from '../../../../hooks/useResponsive';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Platform } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 const TABS = ['Doctors', 'Slots', 'Bookings', 'Revenue'];
 
@@ -45,9 +47,65 @@ export default function DoctorManagement() {
   const [slotDept, setSlotDept] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Booking Filters
+  const [bDept, setBDept] = useState('');
+  const [bDoctor, setBDoctor] = useState('');
+  const [bEmployee, setBEmployee] = useState('');
+  const [bDate, setBDate] = useState('');
+  const [bPatient, setBPatient] = useState('');
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [showBDatePicker, setShowBDatePicker] = useState(false);
+
   useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+    if (activeTab === 'Bookings') fetchBookings();
+    else fetchData();
+  }, [activeTab, bDept, bDoctor, bEmployee, bDate, bPatient]);
+
+  const fetchBookings = async () => {
+    try {
+      let url = 'https://bmh-eitu.onrender.com/bookings?';
+      if (bDept) url += `department=${bDept}&`;
+      if (bDoctor) url += `doctor_id=${bDoctor}&`;
+      if (bEmployee) url += `booked_by=${bEmployee}&`;
+      if (bDate) url += `date=${bDate}&`;
+      if (bPatient) url += `patient_name=${bPatient}&`;
+      const res = await axios.get(url);
+      setBookings(res.data.data);
+      
+      const deptsRes = await axios.get('https://bmh-eitu.onrender.com/department').catch(() => ({data: {data: []}}));
+      setDepartments(deptsRes.data.data || []);
+      const empRes = await axios.get('https://bmh-eitu.onrender.com/employees').catch(()=>null);
+      if (empRes?.data?.data) setEmployees(empRes.data.data);
+      const docsRes = await axios.get('https://bmh-eitu.onrender.com/doctors').catch(()=>null);
+      if (docsRes?.data?.data) setDoctors(docsRes.data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (!bookings || bookings.length === 0) return;
+    
+    let csvContent = "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode,Booked By\n";
+    bookings.forEach((b) => {
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString()},${b.start_time},${b.status},${b.payment_mode},${b.booked_by_name || 'Self'}\n`;
+    });
+    
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'bookings_export.csv');
+      a.click();
+    } else {
+      // @ts-ignore
+      const uri = FileSystem.documentDirectory + "bookings_export.csv";
+      // @ts-ignore
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -67,9 +125,6 @@ export default function DoctorManagement() {
         setSlots(resSlots.data.data);
         setPeons(resPeons.data.data);
         setDoctors(resDocs.data.data); // Needed for dropdown
-      } else if (activeTab === 'Bookings') {
-        const res = await axios.get('https://bmh-eitu.onrender.com/bookings');
-        setBookings(res.data.data);
       } else if (activeTab === 'Revenue') {
         const res = await axios.get('https://bmh-eitu.onrender.com/bookings/revenue');
         setRevenue(res.data.data);
@@ -445,6 +500,80 @@ export default function DoctorManagement() {
 
             {activeTab === 'Bookings' && (
               <View style={styles.card}>
+                <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
+                  <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>Bookings Filter</Text>
+                  <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
+                    <Text style={styles.exportBtnText}>Export CSV</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Patient Name</Text>
+                    <TextInput style={[styles.input, {padding: 10}]} value={bPatient} onChangeText={setBPatient} placeholder="Search patient" />
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Date</Text>
+                    {Platform.OS === 'web' ? (
+                      <input 
+                        type="date"
+                        value={bDate}
+                        onChange={(e) => setBDate(e.target.value)}
+                        style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, color: '#1e293b', width: '100%' } as any}
+                      />
+                    ) : (
+                      <>
+                        <TouchableOpacity onPress={() => setShowBDatePicker(true)}>
+                          <TextInput style={[styles.input, {padding: 10}]} value={bDate} editable={false} placeholder="Select Date" />
+                        </TouchableOpacity>
+                        {showBDatePicker && (
+                          <DateTimePicker
+                            value={bDate ? new Date(bDate) : new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={(event, selectedDate) => {
+                              setShowBDatePicker(false);
+                              if (selectedDate) setBDate(selectedDate.toISOString().split('T')[0]);
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Department</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker selectedValue={bDept} onValueChange={(val) => { setBDept(val); setBDoctor(''); }} style={styles.picker}>
+                        <Picker.Item label="All" value="" />
+                        {departments.map((d: any) => <Picker.Item key={d.name} label={d.name} value={d.name} />)}
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Doctor</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker selectedValue={bDoctor} onValueChange={(val) => setBDoctor(val)} style={styles.picker} enabled={!!bDept}>
+                        <Picker.Item label="All Doctors" value="" />
+                        {doctors.filter(d => d.department === bDept).map((d: any) => <Picker.Item key={d.id} label={d.full_name} value={d.id} />)}
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Booked By (Employee)</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker selectedValue={bEmployee} onValueChange={(val) => setBEmployee(val)} style={styles.picker}>
+                        <Picker.Item label="All" value="" />
+                        {employees.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150, justifyContent: 'flex-end'}]}>
+                    <TouchableOpacity style={styles.clearBtn} onPress={() => { setBDept(''); setBDoctor(''); setBEmployee(''); setBDate(''); setBPatient(''); }}>
+                      <Text style={styles.clearBtnText}>Clear Filters</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 <View style={styles.tableRowHeader}>
                   <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
                   <Text style={styles.tableCellHeader}>Patient</Text>
@@ -519,8 +648,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0' },
   tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
-  tableCellHeader: { flex: 1, fontSize: 13, fontWeight: 'bold', color: '#475569' },
-  tableCell: { flex: 1, fontSize: 14, color: '#334155' },
+  tableCellHeader: { flex: 1, minWidth: 100, fontSize: 13, fontWeight: 'bold', color: '#475569' },
+  tableCell: { flex: 1, minWidth: 100, fontSize: 14, color: '#334155' },
   
   // Form Styles
   backBtn: { marginBottom: 16 },
@@ -537,4 +666,10 @@ const styles = StyleSheet.create({
   pickerItemTextActive: { color: 'white', fontWeight: 'bold' },
   saveBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  exportBtn: { backgroundColor: '#10b981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  exportBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  filterRow: { flexDirection: 'row', gap: 16, marginBottom: 24 },
+  filterCol: { flex: 1 },
+  clearBtn: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#f8fafc' },
+  clearBtnText: { color: '#64748b', fontWeight: 'bold' },
 });

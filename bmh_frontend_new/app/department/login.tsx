@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { Colors } from '../../constants/Colors';
 import { useResponsive } from '../../hooks/useResponsive';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SubAdminLoginScreen() {
   const router = useRouter();
@@ -29,9 +30,11 @@ export default function SubAdminLoginScreen() {
       });
 
       if (res.data.success) {
-        // Store session data in localStorage for web or pass via params
+        // Store session data
         if (Platform.OS === 'web') {
           localStorage.setItem('subAdminUser', JSON.stringify(res.data.data));
+        } else {
+          await AsyncStorage.setItem('subAdminUser', JSON.stringify(res.data.data));
         }
         
         // Navigate to department dashboard, passing department_id

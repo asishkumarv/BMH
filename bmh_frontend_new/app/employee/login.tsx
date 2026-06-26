@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Platform, TextInput, Image, Keyboard
 import { ArrowLeft, Clock, Eye, EyeOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/Colors';
 import { useResponsive } from '../../hooks/useResponsive';
 
@@ -29,6 +30,8 @@ export default function EmployeePortal() {
       if (response.data.success) {
         if (Platform.OS === 'web') {
           localStorage.setItem('employeeUser', JSON.stringify(response.data.data));
+        } else {
+          await AsyncStorage.setItem('employeeUser', JSON.stringify(response.data.data));
         }
         router.replace('/employee/dashboard' as any);
       }
@@ -220,13 +223,15 @@ const styles = StyleSheet.create({
     maxWidth: 500,
   },
   backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
     marginRight: 16,
+  },
+  backBtnText: {
+    color: '#1E40AF',
+    fontWeight: '700',
+    fontSize: 14,
+    marginLeft: 4,
   },
   headerLogo: {
     flexDirection: 'row',

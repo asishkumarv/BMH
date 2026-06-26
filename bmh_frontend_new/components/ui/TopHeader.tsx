@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Wallet, User, LogOut } from 'lucide-react-native';
+import { Wallet, User, LogOut, Menu } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
 
 type TopHeaderProps = {
   userType: 'super_admin' | 'department_admin' | 'employee';
+  title?: string;
+  onMenuPress?: () => void;
 };
 
-export function TopHeader({ userType }: TopHeaderProps) {
+export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
   const router = useRouter();
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [ringColor, setRingColor] = useState<string>('transparent');
@@ -23,17 +25,27 @@ export function TopHeader({ userType }: TopHeaderProps) {
       if (Platform.OS === 'web') {
         if (userType === 'super_admin') dataStr = localStorage.getItem('superAdminUser');
         else if (userType === 'department_admin') dataStr = localStorage.getItem('subAdminUser');
-        else if (userType === 'employee') dataStr = localStorage.getItem('empUser');
+        else if (userType === 'employee') dataStr = localStorage.getItem('employeeUser');
       } else {
         if (userType === 'super_admin') dataStr = await AsyncStorage.getItem('superAdminUser');
         else if (userType === 'department_admin') dataStr = await AsyncStorage.getItem('subAdminUser');
-        else if (userType === 'employee') dataStr = await AsyncStorage.getItem('empUser');
+        else if (userType === 'employee') dataStr = await AsyncStorage.getItem('employeeUser');
       }
 
       if (dataStr) {
         const user = JSON.parse(dataStr);
         if (user.profile_photo) {
           setProfilePhoto(user.profile_photo);
+        } else if (user.profile_data) {
+          try {
+            let pd = user.profile_data;
+            if (typeof pd === 'string') {
+               pd = JSON.parse(pd);
+            }
+            if (pd.photo && pd.photo.length > 5 && pd.photo !== 'null') {
+              setProfilePhoto(pd.photo);
+            }
+          } catch(e) {}
         }
         if (userType === 'employee' && user.id) {
           fetchAttendanceStatus(user.id);
@@ -82,7 +94,16 @@ export function TopHeader({ userType }: TopHeaderProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, onMenuPress && { justifyContent: 'space-between' }]}>
+      {onMenuPress && (
+        <View style={styles.leftSection}>
+          <TouchableOpacity style={styles.menuButton} onPress={onMenuPress}>
+            <Menu color={Colors.light.text} size={24} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{title}</Text>
+        </View>
+      )}
+
       <View style={styles.actions}>
         <TouchableOpacity style={styles.iconButton} onPress={handleWalletClick}>
           <Wallet size={24} color={Colors.light.text} />
@@ -94,7 +115,7 @@ export function TopHeader({ userType }: TopHeaderProps) {
             onPress={() => setDropdownVisible(!dropdownVisible)}
           >
             {profilePhoto ? (
-              <Image source={{ uri: `https://bmh-eitu.onrender.com${profilePhoto}` }} style={styles.profileImage} />
+              <Image source={{ uri: profilePhoto.startsWith('http') || profilePhoto.startsWith('data:image') ? profilePhoto : `https://bmh-eitu.onrender.com${profilePhoto}` }} style={styles.profileImage} />
             ) : (
               <User size={24} color={Colors.light.text} />
             )}
@@ -130,6 +151,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
     zIndex: 100, // For dropdown
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.light.text,
   },
   actions: {
     flexDirection: 'row',

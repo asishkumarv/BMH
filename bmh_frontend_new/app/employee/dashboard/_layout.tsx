@@ -13,15 +13,7 @@ export default function EmployeeLayout() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Mobile/Tablet Header */}
-      {!isDesktop && (
-        <View style={styles.mobileHeader}>
-          <Pressable onPress={() => setIsMobileSidebarOpen(true)} style={styles.menuButton}>
-            <Menu color={Colors.light.text} size={24} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Employee Portal</Text>
-        </View>
-      )}
+      {/* Mobile/Tablet Header is now handled by TopHeader */}
 
       {/* Mobile/Tablet Sidebar Overlay */}
       {!isDesktop && isMobileSidebarOpen && (
@@ -44,7 +36,11 @@ export default function EmployeeLayout() {
           styles.contentWrapper, 
           isDesktop && { marginLeft: 260 } // Offset for fixed sidebar on web
         ]}>
-          <TopHeader userType="employee" />
+          <TopHeader 
+            userType="employee" 
+            title={!isDesktop ? "Employee Portal" : undefined}
+            onMenuPress={!isDesktop ? () => setIsMobileSidebarOpen(true) : undefined}
+          />
           <Slot />
         </View>
       </View>
@@ -64,24 +60,6 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     backgroundColor: Colors.light.background,
-  },
-  mobileHeader: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.light.text,
   },
   overlay: {
     flex: 1,
