@@ -90,6 +90,11 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
 
   const handleLogout = async () => {
     await AsyncStorage.clear();
+    if (Platform.OS === 'web') {
+      localStorage.clear();
+    } else if ((global as any).localStorage) {
+      (global as any).localStorage.clear();
+    }
     router.replace('/');
   };
 

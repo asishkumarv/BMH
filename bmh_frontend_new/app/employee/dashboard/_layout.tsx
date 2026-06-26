@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal } from 'react-native';
+import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar } from 'react-native';
 import { Slot } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { EmployeeSidebar } from '../../../components/ui/EmployeeSidebar';
@@ -52,6 +52,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.light.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

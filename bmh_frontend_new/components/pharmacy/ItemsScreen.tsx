@@ -110,37 +110,41 @@ export default function ItemsScreen() {
           </View>
         ) : (
           <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Item Code</Text>
-              <Text style={[styles.headerCell, { flex: 3 }]}>Item Name</Text>
-              <Text style={[styles.headerCell, { flex: 2 }]}>Category</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>HSN/SAC</Text>
-              <Text style={[styles.headerCell, { flex: 1, textAlign: 'center' }]}>Qty/Box</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Updated Date</Text>
-            </View>
-
-            {/* Table Body */}
-            {displayedData.length > 0 ? (
-              displayedData.map((item, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.primary }]}>
-                    {item.itemCode || '-'}
-                  </Text>
-                  <Text style={[styles.cell, { flex: 3 }]}>{item.itemName || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 2 }]}>{item.categoryName || item.categoryCode || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 1.5 }]}>{item.hsnSacCode || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 1, textAlign: 'center' }]}>{item.itemQtyPerBox || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 1.5 }]}>
-                    {item.itemUpdatedDate ? new Date(item.itemUpdatedDate).toLocaleDateString() : '-'}
-                  </Text>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={styles.horizontalScroll}>
+              <View style={[styles.scrollableTable, { minWidth: 800 }]}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Item Code</Text>
+                  <Text style={[styles.headerCell, { flex: 3 }]}>Item Name</Text>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>Category</Text>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>HSN/SAC</Text>
+                  <Text style={[styles.headerCell, { flex: 1, textAlign: 'center' }]}>Qty/Box</Text>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Updated Date</Text>
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No items found</Text>
+
+                {/* Table Body */}
+                {displayedData.length > 0 ? (
+                  displayedData.map((item, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.primary }]}>
+                        {item.itemCode || '-'}
+                      </Text>
+                      <Text style={[styles.cell, { flex: 3 }]}>{item.itemName || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 2 }]}>{item.categoryName || item.categoryCode || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 1.5 }]}>{item.hsnSacCode || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 1, textAlign: 'center' }]}>{item.itemQtyPerBox || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 1.5 }]}>
+                        {item.itemUpdatedDate ? new Date(item.itemUpdatedDate).toLocaleDateString() : '-'}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyRow}>
+                    <Text style={styles.emptyText}>No items found</Text>
+                  </View>
+                )}
               </View>
-            )}
+            </ScrollView>
 
             {/* Pagination */}
             {filteredData.length > 0 && (
@@ -356,5 +360,11 @@ const styles = StyleSheet.create({
   },
   pageBtnDisabled: {
     opacity: 0.5,
+  },
+  horizontalScroll: {
+    width: '100%',
+  },
+  scrollableTable: {
+    flexDirection: 'column',
   },
 });

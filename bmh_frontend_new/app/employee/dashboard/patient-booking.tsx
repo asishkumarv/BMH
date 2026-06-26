@@ -687,7 +687,17 @@ const styles = StyleSheet.create({
   bannerTime: { fontSize: 14, color: '#2563eb' },
   
   formLabel: { fontSize: 14, fontWeight: '500', color: '#475569', marginBottom: 8 },
-  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, fontSize: 16, color: '#1e293b', marginBottom: 16 },
+  input: { 
+    backgroundColor: '#f8fafc', 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    borderRadius: 8, 
+    paddingHorizontal: 12, 
+    fontSize: 16, 
+    color: '#1e293b', 
+    marginBottom: 16,
+    height: 50,
+  },
   row: { flexDirection: 'row', marginBottom: 16 },
   
   toggleRow: { flexDirection: 'row', backgroundColor: '#f8fafc', borderRadius: 8, padding: 4, borderWidth: 1, borderColor: '#e2e8f0' },

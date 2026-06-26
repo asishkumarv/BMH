@@ -135,49 +135,53 @@ export default function StockScreen() {
           </View>
         ) : (
           <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.headerCell, { flex: 1.2 }]}>Item Code</Text>
-              <Text style={[styles.headerCell, { flex: 3 }]}>Item Name</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Batch</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Expiry Date</Text>
-              <Text style={[styles.headerCell, { flex: 1, textAlign: 'center' }]}>Stock Qty</Text>
-              <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>MRP</Text>
-              <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>Sale Rate</Text>
-            </View>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={styles.horizontalScroll}>
+              <View style={[styles.scrollableTable, { minWidth: 900 }]}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.headerCell, { flex: 1.2 }]}>Item Code</Text>
+                  <Text style={[styles.headerCell, { flex: 3 }]}>Item Name</Text>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Batch</Text>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Expiry Date</Text>
+                  <Text style={[styles.headerCell, { flex: 1, textAlign: 'center' }]}>Stock Qty</Text>
+                  <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>MRP</Text>
+                  <Text style={[styles.headerCell, { flex: 1, textAlign: 'right' }]}>Sale Rate</Text>
+                </View>
 
-            {/* Table Body */}
-            {displayedData.length > 0 ? (
-              displayedData.map((item, index) => {
-                const expired = isExpired(item.expiryDate);
-                return (
-                  <View key={index} style={styles.tableRow}>
-                    <Text style={[styles.cell, { flex: 1.2, fontWeight: '700', color: Colors.light.primary }]}>
-                      {item.c_item_code || '-'}
-                    </Text>
-                    <Text style={[styles.cell, { flex: 3 }]}>{item.itemName || '-'}</Text>
-                    <Text style={[styles.cell, { flex: 1.5 }]}>{item.batchNo || '-'}</Text>
-                    <Text style={[
-                      styles.cell, 
-                      { 
-                        flex: 1.5, 
-                        fontWeight: '600', 
-                        color: expired ? Colors.light.error : Colors.light.success 
-                      }
-                    ]}>
-                      {item.expiryDate || '-'}
-                    </Text>
-                    <Text style={[styles.cell, { flex: 1, textAlign: 'center' }]}>{item.stockBalQty || '0'}</Text>
-                    <Text style={[styles.cell, { flex: 1, textAlign: 'right' }]}>₹{item.mrp || '0.00'}</Text>
-                    <Text style={[styles.cell, { flex: 1, textAlign: 'right' }]}>₹{item.saleRate || '0.00'}</Text>
+                {/* Table Body */}
+                {displayedData.length > 0 ? (
+                  displayedData.map((item, index) => {
+                    const expired = isExpired(item.expiryDate);
+                    return (
+                      <View key={index} style={styles.tableRow}>
+                        <Text style={[styles.cell, { flex: 1.2, fontWeight: '700', color: Colors.light.primary }]}>
+                          {item.c_item_code || '-'}
+                        </Text>
+                        <Text style={[styles.cell, { flex: 3 }]}>{item.itemName || '-'}</Text>
+                        <Text style={[styles.cell, { flex: 1.5 }]}>{item.batchNo || '-'}</Text>
+                        <Text style={[
+                          styles.cell, 
+                          { 
+                            flex: 1.5, 
+                            fontWeight: '600', 
+                            color: expired ? Colors.light.error : Colors.light.success 
+                          }
+                        ]}>
+                          {item.expiryDate || '-'}
+                        </Text>
+                        <Text style={[styles.cell, { flex: 1, textAlign: 'center' }]}>{item.stockBalQty || '0'}</Text>
+                        <Text style={[styles.cell, { flex: 1, textAlign: 'right' }]}>₹{item.mrp || '0.00'}</Text>
+                        <Text style={[styles.cell, { flex: 1, textAlign: 'right' }]}>₹{item.saleRate || '0.00'}</Text>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={styles.emptyRow}>
+                    <Text style={styles.emptyText}>No stock found</Text>
                   </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No stock found</Text>
+                )}
               </View>
-            )}
+            </ScrollView>
 
             {/* Pagination */}
             {filteredData.length > 0 && (
@@ -398,5 +402,11 @@ const styles = StyleSheet.create({
   },
   pageBtnDisabled: {
     opacity: 0.5,
+  },
+  horizontalScroll: {
+    width: '100%',
+  },
+  scrollableTable: {
+    flexDirection: 'column',
   },
 });

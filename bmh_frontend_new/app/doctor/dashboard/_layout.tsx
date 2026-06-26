@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, SafeAreaView, StatusBar } from 'react-native';
 import { Slot, router, usePathname } from 'expo-router';
 import { LayoutDashboard, Users, LogOut, Activity, Calendar } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,7 +42,8 @@ export default function DoctorLayout() {
   ];
 
   return (
-    <View style={[styles.container, isMobile && { flexDirection: 'column' }]}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.container, isMobile && { flexDirection: 'column' }]}>
       {!isMobile && (
         <View style={styles.sidebar}>
           <View style={styles.logoContainer}>
@@ -109,7 +110,8 @@ export default function DoctorLayout() {
           })}
         </View>
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -134,4 +136,9 @@ const styles = StyleSheet.create({
   bottomNav: { flexDirection: 'row', backgroundColor: 'white', borderTopWidth: 1, borderColor: '#e2e8f0', paddingBottom: Platform.OS === 'ios' ? 20 : 0 },
   bottomNavItem: { flex: 1, alignItems: 'center', padding: 12 },
   bottomNavText: { fontSize: 10, color: '#64748b', marginTop: 4 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
 });

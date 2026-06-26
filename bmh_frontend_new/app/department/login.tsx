@@ -35,6 +35,7 @@ export default function SubAdminLoginScreen() {
           localStorage.setItem('subAdminUser', JSON.stringify(res.data.data));
         } else {
           await AsyncStorage.setItem('subAdminUser', JSON.stringify(res.data.data));
+          localStorage.setItem('subAdminUser', JSON.stringify(res.data.data));
         }
         
         // Navigate to department dashboard, passing department_id

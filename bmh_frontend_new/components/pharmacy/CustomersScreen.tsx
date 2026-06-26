@@ -128,35 +128,39 @@ export default function CustomersScreen() {
           </View>
         ) : (
           <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Customer ID</Text>
-              <Text style={[styles.headerCell, { flex: 3 }]}>Name</Text>
-              <Text style={[styles.headerCell, { flex: 2 }]}>City</Text>
-              <Text style={[styles.headerCell, { flex: 2 }]}>Customer Type</Text>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Added Date</Text>
-            </View>
-
-            {/* Table Body */}
-            {displayedData.length > 0 ? (
-              displayedData.map((item, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.primary }]}>
-                    {item.lcCode || '-'}
-                  </Text>
-                  <Text style={[styles.cell, { flex: 3 }]}>{item.lcName || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 2 }]}>{item.city || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 2 }]}>{item.parentName || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 1.5 }]}>
-                    {item.addedDate ? new Date(item.addedDate).toLocaleDateString() : '-'}
-                  </Text>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={styles.horizontalScroll}>
+              <View style={[styles.scrollableTable, { minWidth: 800 }]}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Customer ID</Text>
+                  <Text style={[styles.headerCell, { flex: 3 }]}>Name</Text>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>City</Text>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>Customer Type</Text>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Added Date</Text>
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No customers found</Text>
+
+                {/* Table Body */}
+                {displayedData.length > 0 ? (
+                  displayedData.map((item, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.primary }]}>
+                        {item.lcCode || '-'}
+                      </Text>
+                      <Text style={[styles.cell, { flex: 3 }]}>{item.lcName || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 2 }]}>{item.city || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 2 }]}>{item.parentName || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 1.5 }]}>
+                        {item.addedDate ? new Date(item.addedDate).toLocaleDateString() : '-'}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyRow}>
+                    <Text style={styles.emptyText}>No customers found</Text>
+                  </View>
+                )}
               </View>
-            )}
+            </ScrollView>
 
             {/* Pagination */}
             {filteredData.length > 0 && (
@@ -377,5 +381,11 @@ const styles = StyleSheet.create({
   },
   pageBtnDisabled: {
     opacity: 0.5,
+  },
+  horizontalScroll: {
+    width: '100%',
+  },
+  scrollableTable: {
+    flexDirection: 'column',
   },
 });

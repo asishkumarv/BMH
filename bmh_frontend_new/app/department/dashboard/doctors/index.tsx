@@ -594,9 +594,40 @@ const styles = StyleSheet.create({
   formRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
   formCol: { flex: 1 },
   label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
-  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1e293b' },
-  pickerContainer: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden' },
-  picker: { padding: 14, fontSize: 14, color: '#1e293b', ...Platform.select({ web: { outlineStyle: 'none' as any, border: 'none', backgroundColor: 'transparent' } }) },
+  input: { 
+    backgroundColor: '#f8fafc', 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    borderRadius: 8, 
+    paddingHorizontal: 14, 
+    fontSize: 14, 
+    color: '#1e293b',
+    height: 50,
+  },
+  pickerContainer: { 
+    backgroundColor: '#f8fafc', 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    borderRadius: 8, 
+    overflow: 'hidden',
+    height: 50,
+    justifyContent: 'center',
+  },
+  picker: { 
+    fontSize: 14, 
+    color: '#1e293b', 
+    ...Platform.select({ 
+      web: { 
+        outlineStyle: 'none' as any, 
+        border: 'none', 
+        backgroundColor: 'transparent',
+        padding: 14,
+      },
+      default: {
+        height: 50,
+      }
+    }) 
+  },
   pickerItem: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#f1f5f9', marginRight: 10 },
   pickerItemActive: { backgroundColor: Colors.light.primary },
   pickerItemText: { color: '#64748b', fontWeight: '500' },

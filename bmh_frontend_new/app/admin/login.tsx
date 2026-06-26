@@ -35,16 +35,15 @@ export default function AdminLoginScreen() {
       });
 
       if (res.data.success) {
+        const userData = {
+          ...res.data.data,
+          role: 'Super Administrator'
+        };
         if (Platform.OS === 'web') {
-          localStorage.setItem('superAdminUser', JSON.stringify({
-            ...res.data.data,
-            role: 'Super Administrator'
-          }));
+          localStorage.setItem('superAdminUser', JSON.stringify(userData));
         } else {
-          await AsyncStorage.setItem('superAdminUser', JSON.stringify({
-            ...res.data.data,
-            role: 'Super Administrator'
-          }));
+          await AsyncStorage.setItem('superAdminUser', JSON.stringify(userData));
+          localStorage.setItem('superAdminUser', JSON.stringify(userData));
         }
         router.replace('/admin/dashboard' as any);
       }

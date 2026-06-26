@@ -1,5 +1,5 @@
 import React from 'react';
-import {  View, Text, StyleSheet, Pressable, Platform, ScrollView , Image } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, Platform, ScrollView , Image, Linking } from 'react-native';
 import { ArrowLeft, User, Briefcase, Building, ShieldCheck, Stethoscope, Truck } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../constants/Colors';
@@ -8,6 +8,18 @@ import { useResponsive } from '../hooks/useResponsive';
 export default function RolesScreen() {
   const router = useRouter();
   const { isMobile } = useResponsive();
+
+  const handlePress = (role: any) => {
+    if (role.id === 'patient') {
+      if (Platform.OS === 'web') {
+        window.location.href = 'https://patient-bmh.web.app/';
+      } else {
+        Linking.openURL('https://patient-bmh.web.app/').catch(err => console.error("Error opening URL:", err));
+      }
+    } else {
+      router.push(role.route as any);
+    }
+  };
 
   const ROLES = [
     { id: 'patient', icon: User, title: 'Patient Login', desc: 'Book appointments, order medicines', route: '/patient/login' },
@@ -48,7 +60,7 @@ export default function RolesScreen() {
                 isMobile && styles.roleCardMobile,
                 pressed && styles.roleCardPressed
               ]}
-              onPress={() => router.push(role.route as any)}
+              onPress={() => handlePress(role)}
             >
               <View style={styles.iconWrapper}>
                 <role.icon color="#3B82F6" size={24} />

@@ -128,37 +128,41 @@ export default function PurchaseOrderScreen() {
           </View>
         ) : (
           <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.headerCell, { flex: 1.5 }]}>Branch</Text>
-              <Text style={[styles.headerCell, { flex: 3 }]}>Reference</Text>
-              <Text style={[styles.headerCell, { flex: 2, textAlign: 'right' }]}>Total Value</Text>
-              <Text style={[styles.headerCell, { flex: 2 }]}>Created Date</Text>
-              <Text style={[styles.headerCell, { flex: 1.5, textAlign: 'center' }]}>Items Count</Text>
-            </View>
-
-            {/* Table Body */}
-            {displayedData.length > 0 ? (
-              displayedData.map((item, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.cell, { flex: 1.5, fontWeight: '600' }]}>{item.br_code || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 3 }]}>{item.refname || '-'}</Text>
-                  <Text style={[styles.cell, { flex: 2, textAlign: 'right', fontWeight: '700', color: Colors.light.success }]}>
-                    ₹{item.total || '0.00'}
-                  </Text>
-                  <Text style={[styles.cell, { flex: 2 }]}>
-                    {item.createDateTime ? new Date(item.createDateTime).toLocaleDateString() : '-'}
-                  </Text>
-                  <Text style={[styles.cell, { flex: 1.5, textAlign: 'center' }]}>
-                    {item.details ? item.details.length : 0}
-                  </Text>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={styles.horizontalScroll}>
+              <View style={[styles.scrollableTable, { minWidth: 800 }]}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.headerCell, { flex: 1.5 }]}>Branch</Text>
+                  <Text style={[styles.headerCell, { flex: 3 }]}>Reference</Text>
+                  <Text style={[styles.headerCell, { flex: 2, textAlign: 'right' }]}>Total Value</Text>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>Created Date</Text>
+                  <Text style={[styles.headerCell, { flex: 1.5, textAlign: 'center' }]}>Items Count</Text>
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No orders found</Text>
+
+                {/* Table Body */}
+                {displayedData.length > 0 ? (
+                  displayedData.map((item, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      <Text style={[styles.cell, { flex: 1.5, fontWeight: '600' }]}>{item.br_code || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 3 }]}>{item.refname || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 2, textAlign: 'right', fontWeight: '700', color: Colors.light.success }]}>
+                        ₹{item.total || '0.00'}
+                      </Text>
+                      <Text style={[styles.cell, { flex: 2 }]}>
+                        {item.createDateTime ? new Date(item.createDateTime).toLocaleDateString() : '-'}
+                      </Text>
+                      <Text style={[styles.cell, { flex: 1.5, textAlign: 'center' }]}>
+                        {item.details ? item.details.length : 0}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyRow}>
+                    <Text style={styles.emptyText}>No orders found</Text>
+                  </View>
+                )}
               </View>
-            )}
+            </ScrollView>
 
             {/* Pagination */}
             {filteredData.length > 0 && (
@@ -379,5 +383,11 @@ const styles = StyleSheet.create({
   },
   pageBtnDisabled: {
     opacity: 0.5,
+  },
+  horizontalScroll: {
+    width: '100%',
+  },
+  scrollableTable: {
+    flexDirection: 'column',
   },
 });

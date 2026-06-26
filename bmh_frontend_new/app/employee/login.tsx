@@ -32,6 +32,7 @@ export default function EmployeePortal() {
           localStorage.setItem('employeeUser', JSON.stringify(response.data.data));
         } else {
           await AsyncStorage.setItem('employeeUser', JSON.stringify(response.data.data));
+          localStorage.setItem('employeeUser', JSON.stringify(response.data.data));
         }
         router.replace('/employee/dashboard' as any);
       }

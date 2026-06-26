@@ -121,6 +121,15 @@ export default function EmployeeTasksScreen() {
     ? tasks.filter(t => t.assignee_type === 'employee' && t.assignee_id === empUser.id)
     : tasks.filter(t => t.assigner_type === 'employee' && t.assigner_id === empUser.id);
 
+  const myWorkload = tasks.filter(t => t.assignee_type === 'employee' && t.assignee_id === empUser.id);
+  const stats = {
+    total: myWorkload.length,
+    completed: myWorkload.filter(t => t.status === 'completed').length,
+    high: myWorkload.filter(t => t.priority === 'High').length,
+    moderate: myWorkload.filter(t => t.priority === 'Moderate' || !t.priority).length,
+    low: myWorkload.filter(t => t.priority === 'Low').length,
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
@@ -147,6 +156,30 @@ export default function EmployeeTasksScreen() {
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { borderLeftColor: '#3B82F6' }]}>
+              <Text style={styles.statLabel}>Total Tasks</Text>
+              <Text style={styles.statValue}>{stats.total}</Text>
+            </View>
+            <View style={[styles.statCard, { borderLeftColor: '#10B981' }]}>
+              <Text style={styles.statLabel}>Completed</Text>
+              <Text style={styles.statValue}>{stats.completed}</Text>
+            </View>
+            <View style={[styles.statCard, { borderLeftColor: '#EF4444' }]}>
+              <Text style={styles.statLabel}>High</Text>
+              <Text style={styles.statValue}>{stats.high}</Text>
+            </View>
+            <View style={[styles.statCard, { borderLeftColor: '#F59E0B' }]}>
+              <Text style={styles.statLabel}>Moderate</Text>
+              <Text style={styles.statValue}>{stats.moderate}</Text>
+            </View>
+            <View style={[styles.statCard, { borderLeftColor: '#0EA5E9' }]}>
+              <Text style={styles.statLabel}>Low</Text>
+              <Text style={styles.statValue}>{stats.low}</Text>
+            </View>
+          </View>
+
           {filteredTasks.length === 0 ? (
             <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
           ) : (
@@ -412,5 +445,41 @@ const styles = StyleSheet.create({
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: Colors.light.background },
   cancelBtnText: { color: Colors.light.icon, fontWeight: '600', fontSize: 15 },
   saveBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: Colors.light.primary },
-  saveBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 }
+  saveBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 120,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderLeftWidth: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+      },
+      default: {
+        elevation: 1,
+      }
+    })
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 4,
+  },
 });

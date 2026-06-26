@@ -108,52 +108,56 @@ export default function OrderStatusScreen() {
           </View>
         ) : (
           <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.headerCell, { flex: 2 }]}>Order ID</Text>
-              <Text style={[styles.headerCell, { flex: 2 }]}>Customer Code</Text>
-              <Text style={[styles.headerCell, { flex: 2 }]}>Customer Type</Text>
-              <Text style={[styles.headerCell, { flex: 2, textAlign: 'center' }]}>Invoice Status</Text>
-              <Text style={[styles.headerCell, { flex: 2, textAlign: 'right' }]}>Total Value</Text>
-            </View>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={styles.horizontalScroll}>
+              <View style={[styles.scrollableTable, { minWidth: 800 }]}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>Order ID</Text>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>Customer Code</Text>
+                  <Text style={[styles.headerCell, { flex: 2 }]}>Customer Type</Text>
+                  <Text style={[styles.headerCell, { flex: 2, textAlign: 'center' }]}>Invoice Status</Text>
+                  <Text style={[styles.headerCell, { flex: 2, textAlign: 'right' }]}>Total Value</Text>
+                </View>
 
-            {/* Table Body */}
-            {displayedData.length > 0 ? (
-              displayedData.map((item, index) => {
-                const invoice = item.invoices && item.invoices.length > 0 ? item.invoices[0] : null;
-                const status = invoice ? invoice.docStatus : 'Pending';
-                const isCreated = status === 'Invoice Created';
-                return (
-                  <View key={index} style={styles.tableRow}>
-                    <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.primary }]}>
-                      {item.orderId || '-'}
-                    </Text>
-                    <Text style={[styles.cell, { flex: 2 }]}>{item.custCode || '-'}</Text>
-                    <Text style={[styles.cell, { flex: 2 }]}>{item.customerType || '-'}</Text>
-                    <View style={[styles.cell, { flex: 2, alignItems: 'center' }]}>
-                      <View style={[
-                        styles.statusBadge, 
-                        { backgroundColor: isCreated ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)' }
-                      ]}>
-                        <Text style={[
-                          styles.statusBadgeText, 
-                          { color: isCreated ? Colors.light.success : '#D97706' }
-                        ]}>
-                          {status}
+                {/* Table Body */}
+                {displayedData.length > 0 ? (
+                  displayedData.map((item, index) => {
+                    const invoice = item.invoices && item.invoices.length > 0 ? item.invoices[0] : null;
+                    const status = invoice ? invoice.docStatus : 'Pending';
+                    const isCreated = status === 'Invoice Created';
+                    return (
+                      <View key={index} style={styles.tableRow}>
+                        <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.primary }]}>
+                          {item.orderId || '-'}
+                        </Text>
+                        <Text style={[styles.cell, { flex: 2 }]}>{item.custCode || '-'}</Text>
+                        <Text style={[styles.cell, { flex: 2 }]}>{item.customerType || '-'}</Text>
+                        <View style={[styles.cell as any, { flex: 2, alignItems: 'center' }]}>
+                          <View style={[
+                            styles.statusBadge, 
+                            { backgroundColor: isCreated ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)' }
+                          ]}>
+                            <Text style={[
+                              styles.statusBadgeText, 
+                              { color: isCreated ? Colors.light.success : '#D97706' }
+                            ]}>
+                              {status}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.cell, { flex: 2, textAlign: 'right', fontWeight: '700' }]}>
+                          ₹{invoice ? invoice.docTotal : '0.00'}
                         </Text>
                       </View>
-                    </View>
-                    <Text style={[styles.cell, { flex: 2, textAlign: 'right', fontWeight: '700' }]}>
-                      ₹{invoice ? invoice.docTotal : '0.00'}
-                    </Text>
+                    );
+                  })
+                ) : (
+                  <View style={styles.emptyRow}>
+                    <Text style={styles.emptyText}>No orders found</Text>
                   </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No orders found</Text>
+                )}
               </View>
-            )}
+            </ScrollView>
 
             {/* Pagination */}
             {filteredData.length > 0 && (
@@ -389,5 +393,11 @@ const styles = StyleSheet.create({
   },
   pageBtnDisabled: {
     opacity: 0.5,
+  },
+  horizontalScroll: {
+    width: '100%',
+  },
+  scrollableTable: {
+    flexDirection: 'column',
   },
 });

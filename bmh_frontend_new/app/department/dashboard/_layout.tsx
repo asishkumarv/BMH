@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Platform, SafeAreaView, ActivityIndicator, Pressable, Text, Modal } from 'react-native';
+import { View, StyleSheet, Platform, SafeAreaView, ActivityIndicator, Pressable, Text, Modal, StatusBar } from 'react-native';
 import { Slot, useRouter } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { SubAdminSidebar } from '../../../components/ui/SubAdminSidebar';
@@ -71,6 +71,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.light.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
