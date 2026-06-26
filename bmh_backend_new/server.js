@@ -21,6 +21,7 @@ const holidayRoutes = require('./routes/holidayRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const pharmacyRoutes = require('./routes/pharmacyRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -37,8 +38,17 @@ app.use('/holidays', holidayRoutes);
 app.use('/doctors', doctorRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/settings', settingsRoutes);
+app.use('/pharmacy', pharmacyRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  
+  // Initialize Pharmacy Background Sync
+  try {
+    const { initPharmacySync } = require('./controllers/pharmacyController');
+    initPharmacySync();
+  } catch (err) {
+    console.error("Failed to initialize pharmacy sync:", err.message);
+  }
 });

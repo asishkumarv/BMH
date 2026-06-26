@@ -1,6 +1,6 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays } from 'lucide-react-native';
+import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -20,10 +20,27 @@ const NAV_ITEMS = [
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];
 
+const PHARMACY_ITEMS = [
+  { name: 'Generate Token', route: '/dashboard/pharmacy/generate-token' },
+  { name: 'Create Order', route: '/dashboard/pharmacy/create-order' },
+  { name: 'Item Master', route: '/dashboard/pharmacy/items' },
+  { name: 'Stock Details', route: '/dashboard/pharmacy/stock' },
+  { name: 'Local Customers', route: '/dashboard/pharmacy/customers' },
+  { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-order' },
+  { name: 'Order Status', route: '/dashboard/pharmacy/order-status' },
+];
+
 export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [navItems, setNavItems] = React.useState(NAV_ITEMS);
+  const [pharmacyOpen, setPharmacyOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (pathname.includes('/dashboard/pharmacy')) {
+      setPharmacyOpen(true);
+    }
+  }, [pathname]);
 
   React.useEffect(() => {
     const fetchSettings = async () => {
@@ -76,6 +93,44 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
                 />
                 <Text style={[styles.navText, isActive && styles.navTextActive]}>
                   {item.name}
+                </Text>
+              </Pressable>
+            </Link>
+          );
+        })}
+
+        {/* EcoGreen APIs Collapsible Menu */}
+        <Pressable 
+          style={[styles.navItem, pathname.includes('/dashboard/pharmacy') && styles.navItemActive]} 
+          onPress={() => setPharmacyOpen(!pharmacyOpen)}
+        >
+          <Package color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={20} />
+          <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>EcoGreen APIs</Text>
+          <View style={{ marginLeft: 'auto' }}>
+            {pharmacyOpen ? (
+              <ChevronDown color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />
+            ) : (
+              <ChevronRight color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />
+            )}
+          </View>
+        </Pressable>
+
+        {pharmacyOpen && PHARMACY_ITEMS.map((subItem) => {
+          const fullRoute = `/department${subItem.route}`;
+          const isSubActive = pathname === fullRoute;
+          return (
+            <Link key={subItem.name} href={fullRoute as any} asChild>
+              <Pressable 
+                style={StyleSheet.flatten([
+                  styles.subNavItem, 
+                  isSubActive && styles.subNavItemActive
+                ])}
+                onPress={() => {
+                  if (onClose && !isSubActive) onClose();
+                }}
+              >
+                <Text style={[styles.subNavText, isSubActive && styles.subNavTextActive]}>
+                  •  {subItem.name}
                 </Text>
               </Pressable>
             </Link>
@@ -169,5 +224,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: Colors.light.error,
-  }
+  },
+  subNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingLeft: 36,
+    borderRadius: 10,
+    marginBottom: 2,
+  },
+  subNavItemActive: {
+    backgroundColor: Colors.light.secondary,
+  },
+  subNavText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.light.textMuted,
+  },
+  subNavTextActive: {
+    color: Colors.light.primary,
+    fontWeight: '700',
+  },
 });
