@@ -26,6 +26,16 @@ export default function LeaveManagement() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Cache for monthly summaries
+  const [monthlySummaries, setMonthlySummaries] = useState<{[key: string]: any}>({});
+  const loadedMonthsRef = React.useRef<Set<string>>(new Set());
+
+  // Reset cache when employee changes
+  useEffect(() => {
+    setMonthlySummaries({});
+    loadedMonthsRef.current = new Set();
+  }, [employee?.id]);
+
   useEffect(() => {
     fetchEmployeeAndRequests();
   }, []);
@@ -64,6 +74,30 @@ export default function LeaveManagement() {
     }
   };
 
+  // Fetch summaries for months involved in the date range
+  useEffect(() => {
+    if (!employee || !startDate || !endDate) return;
+    
+    const startMonth = startDate.substring(0, 7);
+    const endMonth = endDate.substring(0, 7);
+    const months = Array.from(new Set([startMonth, endMonth].filter(m => m.length === 7)));
+    
+    months.forEach(async (m) => {
+      if (loadedMonthsRef.current.has(m)) return;
+      
+      try {
+        const res = await fetch(`${API_URL}/leave/summary/${employee.id}?month=${m}`);
+        if (res.ok) {
+          const data = await res.json();
+          loadedMonthsRef.current.add(m);
+          setMonthlySummaries(prev => ({ ...prev, [m]: data }));
+        }
+      } catch (err) {
+        console.error(`Error fetching summary for month ${m}:`, err);
+      }
+    });
+  }, [startDate, endDate, employee?.id]);
+
   const getTomorrowString = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -71,30 +105,42 @@ export default function LeaveManagement() {
   };
   const minDateStr = getTomorrowString();
 
+  // Multi-month aware cost projection
   useEffect(() => {
-    if (startDate && endDate && summary) {
+    if (startDate && endDate && employee && summary) {
       if (startDate > endDate) {
          setProjection(null);
          return;
       }
-      let days = 0;
+      
       const start = new Date(startDate);
       const end = new Date(endDate);
-      
       const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]));
-
+      
+      // Group requested working days by month
+      const daysByMonth: { [key: string]: number } = {};
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         if (d.getDay() !== 0) { // Not Sunday
           const dStr = d.toISOString().split('T')[0];
           if (!holidayDates.has(dStr)) {
-            days++;
+            const monthStr = dStr.substring(0, 7);
+            daysByMonth[monthStr] = (daysByMonth[monthStr] || 0) + 1;
           }
         }
       }
 
-      const used = summary.usage.leaves;
-      const limit = summary.limits.leaves;
-      const penaltyRate = parseFloat(summary.penalties?.extra_leave || 0);
+      const monthsInvolved = Object.keys(daysByMonth);
+      
+      // Helper to get summary for a month (fallback to main summary if current month)
+      const getSummaryForMonth = (m: string) => {
+        return monthlySummaries[m] || (m === new Date().toISOString().substring(0, 7) ? summary : null);
+      };
+
+      let totalDays = 0;
+      let totalPenalizedDays = 0;
+      let totalSalaryDeduction = 0;
+      let totalPenaltyDeduction = 0;
+      let penaltyRate = 0;
 
       let baseSalary = 0;
       try {
@@ -105,25 +151,38 @@ export default function LeaveManagement() {
         }
       } catch (e) {}
       const salaryPerDay = baseSalary / 30;
-      
-      let penalizedDays = 0;
-      if (used + days > limit) {
-        penalizedDays = (used + days) - Math.max(used, limit);
+
+      for (const m of monthsInvolved) {
+        const mSummary = getSummaryForMonth(m);
+        if (!mSummary) return; // Wait for summaries to load
+        
+        const N = daysByMonth[m];
+        totalDays += N;
+        
+        const used = mSummary.usage.leaves;
+        const limit = mSummary.limits.leaves;
+        const extraPen = parseFloat(mSummary.penalties?.extra_leave || 0);
+        penaltyRate = extraPen;
+        
+        const penalized = Math.max(0, used + N - limit) - Math.max(0, used - limit);
+        totalPenalizedDays += penalized;
+        totalSalaryDeduction += penalized * salaryPerDay;
+        totalPenaltyDeduction += penalized * extraPen;
       }
 
       setProjection({
-        days,
+        days: totalDays,
         salaryPerDay,
         penaltyRate,
-        penalizedDays,
-        salaryDeduction: penalizedDays * salaryPerDay,
-        penaltyDeduction: penalizedDays * penaltyRate,
-        totalDeduction: penalizedDays * (salaryPerDay + penaltyRate)
+        penalizedDays: totalPenalizedDays,
+        salaryDeduction: totalSalaryDeduction,
+        penaltyDeduction: totalPenaltyDeduction,
+        totalDeduction: totalSalaryDeduction + totalPenaltyDeduction
       });
     } else {
       setProjection(null);
     }
-  }, [startDate, endDate, summary, holidays]);
+  }, [startDate, endDate, summary, monthlySummaries, holidays, employee]);
 
   const submitRequest = async () => {
     if (!startDate || !endDate || !reason) {
