@@ -313,6 +313,7 @@ exports.generatePayslip = async (req, res) => {
     let missingDays = 0;
     
     // If it is the current month, only calculate missing days up to yesterday (to avoid premature absent flags)
+    const now = new Date();
     const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
     const [tDay, tMonth, tYear] = todayStr.split('/').map(Number);
     const currentMonthStr = `${tYear}-${String(tMonth).padStart(2, '0')}`;

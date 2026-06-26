@@ -71,21 +71,21 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
 
   const handleWalletClick = () => {
     if (userType === 'super_admin') {
-      router.push('/admin/dashboard/wallet');
+      router.push('/admin/dashboard/wallet' as any);
     } else if (userType === 'department_admin') {
-      router.push('/department/dashboard/wallet');
+      router.push('/department/dashboard/wallet' as any);
     } else if (userType === 'employee') {
-      router.push('/employee/dashboard/wallet');
+      router.push('/employee/dashboard/wallet' as any);
     }
   };
 
   const handleProfileClick = () => {
     if (userType === 'super_admin') {
-      router.push('/admin/dashboard/profile');
+      router.push('/admin/dashboard/profile' as any);
     } else if (userType === 'department_admin') {
-      router.push('/department/dashboard/profile');
+      router.push('/department/dashboard/profile' as any);
     } else if (userType === 'employee') {
-      router.push('/employee/dashboard/profile');
+      router.push('/employee/dashboard/profile' as any);
     } else if (userType === 'patient') {
       router.push('/dashboard/profile');
     }

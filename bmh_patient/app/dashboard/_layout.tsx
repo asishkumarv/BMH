@@ -57,7 +57,7 @@ export default function DashboardLayout() {
   if (!isMobile) {
     return (
       <View style={styles.container}>
-        <PatientSidebar patientName={patientName} />
+        <PatientSidebar />
         <View style={styles.mainContent}>
           <TopHeader title="Patient Portal" userType="patient" />
           <View style={styles.slotWrapper}>
@@ -89,7 +89,7 @@ export default function DashboardLayout() {
         <View style={styles.mobileDrawerContainer}>
           <TouchableOpacity style={styles.mobileDrawerBackdrop} onPress={toggleMobileMenu} />
           <View style={styles.mobileDrawerContent}>
-            <PatientSidebar onClose={toggleMobileMenu} patientName={patientName} />
+            <PatientSidebar onClose={toggleMobileMenu} />
           </View>
         </View>
       )}

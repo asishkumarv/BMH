@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Users, Calendar, ShoppingBag, Clock, Plus, BookOpen, ChevronRight } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
+import { useResponsive } from '../../hooks/useResponsive';
 import axios from 'axios';
 
 export default function PatientDashboard() {
   const router = useRouter();
+  const { isMobile } = useResponsive();
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -61,22 +63,28 @@ export default function PatientDashboard() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Welcome Banner */}
-      <View style={styles.banner}>
-        <View style={styles.bannerContent}>
+      <View style={[styles.banner, isMobile && styles.bannerMobile]}>
+        <View style={[styles.bannerContent, isMobile && styles.bannerContentMobile]}>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>OVERVIEW</Text>
           </View>
-          <Text style={styles.bannerTitle}>Welcome back, {patientName}</Text>
+          <Text style={[styles.bannerTitle, isMobile && { fontSize: 24 }]}>Welcome back, {patientName}</Text>
           <Text style={styles.bannerSubtitle}>
             A clear snapshot of your health activity and upcoming care.
           </Text>
         </View>
-        <View style={styles.bannerActions}>
-          <TouchableOpacity style={styles.bannerBtnSecondary} onPress={() => router.push('/dashboard/appointments')}>
+        <View style={[styles.bannerActions, isMobile && styles.bannerActionsMobile]}>
+          <TouchableOpacity 
+            style={[styles.bannerBtnSecondary, isMobile && styles.bannerBtnMobile]} 
+            onPress={() => router.push('/dashboard/appointments')}
+          >
             <Clock size={16} color="#ffffff" style={{ marginRight: 8 }} />
             <Text style={styles.bannerBtnSecondaryText}>Schedule</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bannerBtnPrimary} onPress={() => router.push('/dashboard/doctors')}>
+          <TouchableOpacity 
+            style={[styles.bannerBtnPrimary, isMobile && styles.bannerBtnMobile]} 
+            onPress={() => router.push('/dashboard/doctors')}
+          >
             <Plus size={16} color="#1e293b" style={{ marginRight: 8 }} />
             <Text style={styles.bannerBtnPrimaryText}>Book Appointment</Text>
           </TouchableOpacity>
@@ -203,9 +211,19 @@ const styles = StyleSheet.create({
       }
     })
   },
+  bannerMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    padding: 20,
+    gap: 20,
+  },
   bannerContent: {
     flex: 1,
     minWidth: 280,
+  },
+  bannerContentMobile: {
+    minWidth: 0,
+    width: '100%',
   },
   badge: {
     alignSelf: 'flex-start',
@@ -239,6 +257,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     flexWrap: 'wrap',
+  },
+  bannerActionsMobile: {
+    flexDirection: 'column-reverse',
+    width: '100%',
+    gap: 10,
+  },
+  bannerBtnMobile: {
+    width: '100%',
+    justifyContent: 'center',
   },
   bannerBtnPrimary: {
     backgroundColor: '#FFF',

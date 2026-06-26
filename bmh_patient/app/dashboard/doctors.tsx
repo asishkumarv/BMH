@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Alert, Platform } from 'react-native';
-import { Search, Calendar, Clock, HeartPulse, Shield, ChevronRight, X, Sparkles, AlertTriangle, ArrowLeft, Users } from 'lucide-react-native';
+import { Search, Calendar, Clock, HeartPulse, Shield, ChevronRight, X, Sparkles, AlertTriangle, ArrowLeft, Users, User, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/Colors';
@@ -28,6 +28,15 @@ export default function FindDoctor() {
   const [paymentMode, setPaymentMode] = useState('Online');
   const [bookingLoading, setBookingLoading] = useState(false);
   const [successToken, setSuccessToken] = useState<number | null>(null);
+
+  // Other patient states
+  const [bookForOther, setBookForOther] = useState(false);
+  const [otherName, setOtherName] = useState('');
+  const [otherMobile, setOtherMobile] = useState('');
+  const [otherAge, setOtherAge] = useState('');
+  const [otherGender, setOtherGender] = useState('Male');
+  const [otherBloodGroup, setOtherBloodGroup] = useState('');
+  const [otherGuardian, setOtherGuardian] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -88,20 +97,40 @@ export default function FindDoctor() {
   const handleBooking = async () => {
     if (!selectedSlot || !selectedToken || !patient) return;
     
+    let bookingName = patient.name;
+    let bookingMobile = patient.mobile;
+    let bookingAge = patient.age ? parseInt(patient.age) : 30;
+    let bookingGender = patient.gender || 'Male';
+    let bookingBloodGroup = patient.blood_group;
+    let bookingGuardian = patient.guardian_name;
+
+    if (bookForOther) {
+      if (!otherName.trim() || !otherMobile.trim() || !otherAge.trim()) {
+        Alert.alert('Required Fields', 'Please fill in Patient Name, Mobile, and Age.');
+        return;
+      }
+      bookingName = otherName;
+      bookingMobile = otherMobile;
+      bookingAge = parseInt(otherAge);
+      bookingGender = otherGender;
+      bookingBloodGroup = otherBloodGroup;
+      bookingGuardian = otherGuardian;
+    }
+    
     setBookingLoading(true);
     try {
       const res = await axios.post('https://bmh-eitu.onrender.com/bookings/create', {
         slot_id: selectedSlot.id,
-        patient_name: patient.name,
-        mobile: patient.mobile,
+        patient_name: bookingName,
+        mobile: bookingMobile,
         email: patient.email,
-        age: patient.age ? parseInt(patient.age) : 30,
-        gender: patient.gender || 'Male',
-        blood_group: patient.blood_group,
+        age: bookingAge,
+        gender: bookingGender,
+        blood_group: bookingBloodGroup,
         reason_for_visit: reasonForVisit,
         city: patient.city,
         pin_code: patient.pin_code,
-        guardian_name: patient.guardian_name,
+        guardian_name: bookingGuardian,
         booked_by: null, // Patient booked themselves
         payment_mode: paymentMode,
         token_number: selectedToken
@@ -127,6 +156,13 @@ export default function FindDoctor() {
     setSelectedToken(null);
     setReasonForVisit('');
     setSuccessToken(null);
+    setBookForOther(false);
+    setOtherName('');
+    setOtherMobile('');
+    setOtherAge('');
+    setOtherGender('Male');
+    setOtherBloodGroup('');
+    setOtherGuardian('');
   };
 
   const departments = ['All', ...Array.from(new Set(doctors.map((d: any) => d.department)))];
@@ -318,13 +354,121 @@ export default function FindDoctor() {
                 </View>
               </View>
 
-              {/* Patient details summary for verification */}
-              <View style={styles.verificationBox}>
-                <Text style={styles.verificationTitle}>Patient Information Details</Text>
-                <Text style={styles.verificationText}>Name: {patient?.name}</Text>
-                <Text style={styles.verificationText}>Phone: {patient?.mobile}</Text>
-                <Text style={styles.verificationText}>Age & Gender: {patient?.age}y, {patient?.gender}</Text>
+              {/* Toggle: Book for Self vs Book for Other */}
+              <View style={styles.togglePatientRow}>
+                <TouchableOpacity 
+                  style={[styles.togglePatientBtn, !bookForOther && styles.togglePatientBtnActive]}
+                  onPress={() => setBookForOther(false)}
+                >
+                  <User size={16} color={!bookForOther ? '#3B82F6' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.togglePatientText, !bookForOther && styles.togglePatientTextActive]}>
+                    Book for Myself
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.togglePatientBtn, bookForOther && styles.togglePatientBtnActive]}
+                  onPress={() => {
+                    setBookForOther(true);
+                    if (!otherMobile) setOtherMobile(patient.mobile || '');
+                  }}
+                >
+                  <Plus size={16} color={bookForOther ? '#3B82F6' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.togglePatientText, bookForOther && styles.togglePatientTextActive]}>
+                    Book for Another Patient
+                  </Text>
+                </TouchableOpacity>
               </View>
+
+              {bookForOther ? (
+                /* Other Patient Form */
+                <View style={styles.otherPatientForm}>
+                  <Text style={styles.formSectionTitle}>Dependent / Other Patient Details</Text>
+                  
+                  {/* Row: Name & Mobile */}
+                  <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                    <View style={[{ flex: 1, marginRight: 8 }, isMobile && { marginRight: 0, marginBottom: 12 }]}>
+                      <Text style={styles.formLabelSmall}>Full Name *</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="Patient's full name"
+                        value={otherName}
+                        onChangeText={setOtherName}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.formLabelSmall}>Mobile Number *</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="10-digit mobile"
+                        keyboardType="phone-pad"
+                        value={otherMobile}
+                        onChangeText={setOtherMobile}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Row: Age & Gender */}
+                  <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                    <View style={[{ flex: 1, marginRight: 8 }, isMobile && { marginRight: 0, marginBottom: 12 }]}>
+                      <Text style={styles.formLabelSmall}>Age *</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="Age"
+                        keyboardType="numeric"
+                        value={otherAge}
+                        onChangeText={setOtherAge}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.formLabelSmall}>Gender</Text>
+                      <View style={styles.genderToggleRow}>
+                        <TouchableOpacity 
+                          style={[styles.genderToggleBtn, otherGender === 'Male' && styles.genderToggleBtnActive]}
+                          onPress={() => setOtherGender('Male')}
+                        >
+                          <Text style={[styles.genderToggleText, otherGender === 'Male' && styles.genderToggleTextActive]}>Male</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.genderToggleBtn, otherGender === 'Female' && styles.genderToggleBtnActive]}
+                          onPress={() => setOtherGender('Female')}
+                        >
+                          <Text style={[styles.genderToggleText, otherGender === 'Female' && styles.genderToggleTextActive]}>Female</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Row: Blood Group & Guardian */}
+                  <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                    <View style={[{ flex: 1, marginRight: 8 }, isMobile && { marginRight: 0, marginBottom: 12 }]}>
+                      <Text style={styles.formLabelSmall}>Blood Group (Optional)</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="e.g. O+"
+                        value={otherBloodGroup}
+                        onChangeText={setOtherBloodGroup}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.formLabelSmall}>Guardian Name (Optional)</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="Guardian Name"
+                        value={otherGuardian}
+                        onChangeText={setOtherGuardian}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                /* Patient details summary for verification */
+                <View style={styles.verificationBox}>
+                  <Text style={styles.verificationTitle}>Patient Information Details</Text>
+                  <Text style={styles.verificationText}>Name: {patient?.name}</Text>
+                  <Text style={styles.verificationText}>Phone: {patient?.mobile}</Text>
+                  <Text style={styles.verificationText}>Age & Gender: {patient?.age}y, {patient?.gender}</Text>
+                </View>
+              )}
 
               <TouchableOpacity 
                 style={[styles.btnPrimary, bookingLoading && { opacity: 0.7 }]}
@@ -981,5 +1125,93 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.light.text,
     marginBottom: 4,
+  },
+  togglePatientRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  togglePatientBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    backgroundColor: Colors.light.card,
+  },
+  togglePatientBtnActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    borderColor: '#3B82F6',
+  },
+  togglePatientText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  togglePatientTextActive: {
+    color: '#1E293B',
+  },
+  otherPatientForm: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    padding: 16,
+    marginBottom: 20,
+  },
+  formSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 12,
+  },
+  formRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  formLabelSmall: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  formInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#1E293B',
+    ...Platform.select({ web: { outlineStyle: 'none' as any } }),
+  },
+  genderToggleRow: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 38,
+  },
+  genderToggleBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  genderToggleBtnActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+  },
+  genderToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  genderToggleTextActive: {
+    color: '#3B82F6',
   },
 });

@@ -158,7 +158,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (Platform.OS === 'web') {
           localStorage.removeItem('employeeUser');
         }
-        router.replace('/roles');
+        router.replace('/roles' as any);
       }}>
         <LogOut color={Colors.light.error} size={20} />
         <Text style={styles.logoutText}>Logout</Text>

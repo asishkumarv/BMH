@@ -115,7 +115,7 @@ export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
 
       <Pressable style={styles.logoutBtn} onPress={() => {
         if (onClose) onClose();
-        router.replace('/roles');
+        router.replace('/roles' as any);
       }}>
         <LogOut color={Colors.light.error} size={20} />
         <Text style={styles.logoutText}>Logout</Text>

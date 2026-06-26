@@ -143,7 +143,7 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (Platform.OS === 'web') {
           localStorage.removeItem('subAdminUser');
         }
-        router.replace('/roles');
+        router.replace('/roles' as any);
       }}>
         <LogOut color={Colors.light.error} size={20} />
         <Text style={styles.logoutText}>Logout</Text>
