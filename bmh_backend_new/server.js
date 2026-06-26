@@ -22,6 +22,7 @@ const doctorRoutes = require('./routes/doctorRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const pharmacyRoutes = require('./routes/pharmacyRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -39,6 +40,7 @@ app.use('/doctors', doctorRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/pharmacy', pharmacyRoutes);
+app.use('/patient', patientRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -34,6 +34,38 @@ export default function PatientBooking() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [bookingLoading, setBookingLoading] = useState(false);
   const [successToken, setSuccessToken] = useState<number | null>(null);
+  const [autofilled, setAutofilled] = useState(false);
+
+  useEffect(() => {
+    const lookupPatient = async () => {
+      const cleaned = mobile.replace(/\D/g, '');
+      if (cleaned.length === 10) {
+        try {
+          const res = await axios.get(`https://bmh-eitu.onrender.com/patient/by-mobile/${cleaned}`);
+          if (res.data.success && res.data.patient) {
+            const p = res.data.patient;
+            setPatientName(p.name || '');
+            setEmail(p.email || '');
+            setAge(p.age ? p.age.toString() : '');
+            setGender(p.gender === 'Female' ? 'Female' : 'Male');
+            setBloodGroup(p.blood_group || '');
+            setCity(p.city || '');
+            setPinCode(p.pin_code || '');
+            setGuardianName(p.guardian_name || '');
+            setAutofilled(true);
+          } else {
+            setAutofilled(false);
+          }
+        } catch (err) {
+          // Ignore, patient not found means new patient registration
+          setAutofilled(false);
+        }
+      } else {
+        setAutofilled(false);
+      }
+    };
+    lookupPatient();
+  }, [mobile]);
 
   // Refs for Input Navigation
   const mobileRef = React.useRef<TextInput>(null);
@@ -436,6 +468,11 @@ export default function PatientBooking() {
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
               <Text style={styles.formLabel}>Mobile Number *</Text>
               <TextInput ref={mobileRef} style={styles.input} value={mobile} onChangeText={setMobile} placeholder="Enter mobile" keyboardType="phone-pad" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => ageRef.current?.focus()} />
+              {autofilled && (
+                <Text style={{ fontSize: 12, color: '#10b981', fontWeight: '600', marginTop: 4 }}>
+                  ✓ Patient record found and autofilled
+                </Text>
+              )}
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Age *</Text>

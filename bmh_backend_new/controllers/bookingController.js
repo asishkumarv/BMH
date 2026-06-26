@@ -1,4 +1,5 @@
 const pool = require('../db');
+const bcrypt = require('bcrypt');
 
 // Create a patient booking
 exports.createBooking = async (req, res) => {
@@ -9,18 +10,30 @@ exports.createBooking = async (req, res) => {
 
     // 1. Check if patient exists or create new
     let patient_id;
-    const patRes = await pool.query('SELECT id FROM patients WHERE mobile = $1', [mobile]);
+    const patRes = await pool.query('SELECT id, password FROM patients WHERE mobile = $1', [mobile]);
     if (patRes.rowCount > 0) {
       patient_id = patRes.rows[0].id;
-      // Update existing patient with new details
-      await pool.query(
-        'UPDATE patients SET blood_group = $1, city = $2, pin_code = $3, guardian_name = $4 WHERE id = $5',
-        [blood_group || null, city || null, pin_code || null, guardian_name || null, patient_id]
-      );
+      const existingPat = patRes.rows[0];
+      
+      // If the existing patient has no password set, set it to their mobile number
+      let updateQuery = 'UPDATE patients SET name = $1, email = $2, age = $3, gender = $4, blood_group = $5, city = $6, pin_code = $7, guardian_name = $8';
+      let updateParams = [patient_name, email || null, age || null, gender || null, blood_group || null, city || null, pin_code || null, guardian_name || null];
+      
+      if (!existingPat.password) {
+        const hashedPassword = await bcrypt.hash(mobile, 10);
+        updateQuery += ', password = $9';
+        updateParams.push(hashedPassword);
+      }
+      
+      updateQuery += ' WHERE id = $' + (updateParams.length + 1);
+      updateParams.push(patient_id);
+      
+      await pool.query(updateQuery, updateParams);
     } else {
+      const hashedPassword = await bcrypt.hash(mobile, 10);
       const newPat = await pool.query(
-        'INSERT INTO patients (name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-        [patient_name, mobile, email, age, gender, blood_group || null, city || null, pin_code || null, guardian_name || null]
+        'INSERT INTO patients (name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name, password) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
+        [patient_name, mobile, email || null, age || null, gender || null, blood_group || null, city || null, pin_code || null, guardian_name || null, hashedPassword]
       );
       patient_id = newPat.rows[0].id;
     }
@@ -72,7 +85,7 @@ exports.createBooking = async (req, res) => {
 // Get bookings (Sub-admin view - no revenue, or Employee view)
 exports.getBookings = async (req, res) => {
   try {
-    const { date, department, slot_id, booked_by, doctor_id, patient_name } = req.query;
+    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id } = req.query;
     
     let query = `
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
@@ -112,6 +125,10 @@ exports.getBookings = async (req, res) => {
     if (patient_name) {
       params.push(`%${patient_name}%`);
       query += ` AND p.name ILIKE $${params.length}`;
+    }
+    if (patient_id) {
+      params.push(patient_id);
+      query += ` AND pb.patient_id = $${params.length}`;
     }
 
     query += ' ORDER BY ds.date DESC, ds.start_time ASC, pb.token_number ASC';
