@@ -6,7 +6,7 @@ const multer = require("multer");
 const path = require("path");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../utils/cloudinary");
-const admin = require("../../firebase"); // Firebase Admin SDK
+const admin = require("../utils/firebase"); // Firebase Admin SDK
 
 const router = express.Router();
 
