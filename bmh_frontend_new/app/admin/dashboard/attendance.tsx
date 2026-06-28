@@ -214,7 +214,9 @@ export default function AdminAttendanceScreen() {
     const formatTimeForInput = (isoStr: string) => {
       if (!isoStr) return '';
       const d = new Date(isoStr);
-      return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+      const h = d.getHours().toString().padStart(2, '0');
+      const m = d.getMinutes().toString().padStart(2, '0');
+      return `${h}:${m}`;
     };
     setEditCheckIn(formatTimeForInput(r.check_in));
     setEditCheckOut(formatTimeForInput(r.check_out));
@@ -633,5 +635,6 @@ const webInputStyle = {
   border: '1px solid #d1d5db',
   fontSize: '16px',
   outline: 'none',
-  backgroundColor: '#fff'
+  backgroundColor: '#fff',
+  boxSizing: 'border-box' as 'border-box'
 };

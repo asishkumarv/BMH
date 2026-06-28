@@ -400,26 +400,21 @@ exports.adminUpdateAttendance = async (req, res) => {
     const { id } = req.params;
     const { check_in, check_out, status } = req.body;
     
-    const attRes = await pool.query('SELECT date FROM attendance WHERE id = $1', [id]);
+    const attRes = await pool.query("SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str FROM attendance WHERE id = $1", [id]);
     if (attRes.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Attendance record not found' });
     }
     
-    const attDate = new Date(attRes.rows[0].date);
-    const yyyy = attDate.getFullYear();
-    const mm = String(attDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(attDate.getDate()).padStart(2, '0');
-    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const dateStr = attRes.rows[0].date_str;
     
     let checkInTimestamp = null;
     if (check_in) {
-      // Assuming check_in is "HH:MM"
-      checkInTimestamp = `${dateStr} ${check_in}:00+05:30`;
+      checkInTimestamp = new Date(`${dateStr}T${check_in}:00+05:30`).toISOString();
     }
     
     let checkOutTimestamp = null;
     if (check_out) {
-      checkOutTimestamp = `${dateStr} ${check_out}:00+05:30`;
+      checkOutTimestamp = new Date(`${dateStr}T${check_out}:00+05:30`).toISOString();
     }
 
     await pool.query(
