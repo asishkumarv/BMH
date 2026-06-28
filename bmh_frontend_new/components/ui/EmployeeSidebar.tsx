@@ -20,13 +20,11 @@ const NAV_ITEMS = [
 ];
 
 const PHARMACY_ITEMS = [
-  { name: 'Generate Token', route: '/dashboard/pharmacy/generate-token' },
-  { name: 'Create Order', route: '/dashboard/pharmacy/create-order' },
-  { name: 'Item Master', route: '/dashboard/pharmacy/items' },
-  { name: 'Stock Details', route: '/dashboard/pharmacy/stock' },
-  { name: 'Local Customers', route: '/dashboard/pharmacy/customers' },
-  { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-order' },
-  { name: 'Order Status', route: '/dashboard/pharmacy/order-status' },
+  { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-orders' },
+  { name: 'Purchase Orderlist', route: '/dashboard/pharmacy/purchase-orderlist' },
+  { name: 'Sales order', route: '/dashboard/pharmacy/sales-order' },
+  { name: 'Sales Invoice Manager', route: '/dashboard/pharmacy/sales-invoices' },
+  { name: 'Ecogreen Sales invocie', route: '/dashboard/pharmacy/ecogreen-invoices' },
 ];
 
 export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
@@ -120,7 +118,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
           onPress={() => setPharmacyOpen(!pharmacyOpen)}
         >
           <Package color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={20} />
-          <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>EcoGreen APIs</Text>
+          <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>ECOGREEN INTEGRATION</Text>
           <View style={{ marginLeft: 'auto' }}>
             {pharmacyOpen ? (
               <ChevronDown color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />

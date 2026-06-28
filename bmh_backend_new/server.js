@@ -23,6 +23,12 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const pharmacyRoutes = require('./routes/pharmacyRoutes');
 const patientRoutes = require('./routes/patientRoutes');
+const ecogreenRoutes = require('./routes/ecogreenRoutes');
+const purchaseOrdersRoutes = require('./routes/purchaseOrdersRoutes');
+const salesOrdersRoutes = require('./routes/salesOrdersRoutes');
+const normalSalesOrderRoutes = require('./routes/normalSalesOrderRoutes');
+const deliveryBoyRoutes = require('./routes/deliveryBoyRoutes');
+const deliveryAddressRoutes = require('./routes/deliveryAddressRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -41,6 +47,12 @@ app.use('/bookings', bookingRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/pharmacy', pharmacyRoutes);
 app.use('/patient', patientRoutes);
+app.use('/ecogreen', ecogreenRoutes);
+app.use('/purchase-orders', purchaseOrdersRoutes);
+app.use('/sales-orders', salesOrdersRoutes);
+app.use('/normal-sales', normalSalesOrderRoutes);
+app.use('/delivery-boy', deliveryBoyRoutes);
+app.use('/delivery-address', deliveryAddressRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

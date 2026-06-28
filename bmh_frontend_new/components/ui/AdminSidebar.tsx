@@ -22,13 +22,18 @@ const NAV_ITEMS = [
 ];
 
 const PHARMACY_ITEMS = [
-  { name: 'Generate Token', route: '/dashboard/pharmacy/generate-token' },
-  { name: 'Create Order', route: '/dashboard/pharmacy/create-order' },
-  { name: 'Item Master', route: '/dashboard/pharmacy/items' },
-  { name: 'Stock Details', route: '/dashboard/pharmacy/stock' },
-  { name: 'Local Customers', route: '/dashboard/pharmacy/customers' },
-  { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-order' },
-  { name: 'Order Status', route: '/dashboard/pharmacy/order-status' },
+  { name: 'Get Item Master Data', route: '/dashboard/pharmacy/items' },
+  { name: 'Get Stock Details', route: '/dashboard/pharmacy/stock' },
+  { name: 'Get Customer Master Data', route: '/dashboard/pharmacy/customers' },
+  { name: 'Get Purchase Order', route: '/dashboard/pharmacy/purchase-order' },
+  { name: 'Create Sales Order', route: '/dashboard/pharmacy/create-order' },
+  { name: 'Sales Order Status', route: '/dashboard/pharmacy/order-status' },
+  { name: 'Ecogreen Sales Order Data', route: '/dashboard/pharmacy/ecogreen-sales-orders' },
+  { name: 'Ecogreen Sales Invoice Data', route: '/dashboard/pharmacy/ecogreen-invoices' },
+  { name: 'Sales Order List', route: '/dashboard/pharmacy/sales-list' },
+  { name: 'PurchaseOrderList', route: '/dashboard/pharmacy/purchase-list' },
+  { name: 'EcoGreen Stock Data', route: '/dashboard/pharmacy/ecogreen-stock' },
+  { name: 'Local Master Data', route: '/dashboard/pharmacy/local-master' },
 ];
 
 export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
@@ -80,7 +85,7 @@ export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
           onPress={() => setPharmacyOpen(!pharmacyOpen)}
         >
           <Package color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={20} />
-          <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>EcoGreen APIs</Text>
+          <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>ECOGREEN INTEGRATION</Text>
           <View style={{ marginLeft: 'auto' }}>
             {pharmacyOpen ? (
               <ChevronDown color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />

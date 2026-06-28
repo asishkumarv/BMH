@@ -1,0 +1,437 @@
+const express = require("express");
+const router = express.Router();
+const pool = require("../db");
+
+// -------------------- CREATE Purchase Order --------------------
+router.post("/add", async (req, res) => { 
+  try {
+    const {
+      supplier,
+      delivery_type,
+      received_date,
+      status,
+      assignedto,
+      receivedby,
+      items // array of purchase order items
+    } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: "Purchase items are required" });
+    }
+
+    // Generate purchase_no automatically
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+    const purchase_no = `PO-${dateStr}-${randomNum}`;
+
+    // Insert into database
+    const result = await pool.query(
+      `INSERT INTO purchase_orders 
+       (supplier, purchase_no, delivery_type, received_date, status, assignedto, receivedby, purchase_items) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        supplier,
+        purchase_no,
+        delivery_type,
+        received_date,
+        status,
+        assignedto,
+        receivedby,
+        JSON.stringify(items) // now stored in purchase_items
+      ]
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// -------------------- GET All Purchase Orders --------------------
+router.get("/all", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM purchase_orders ORDER BY id ASC");
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// -------------------- GET Purchase Order by ID --------------------
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("SELECT * FROM purchase_orders WHERE id = $1", [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Purchase order not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// -------------------- UPDATE Purchase Order --------------------
+router.put("/update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      supplier,
+      purchase_no,
+      delivery_type,
+      received_date,
+      status,
+      assignedto,
+      receivedby,
+      purchaseentry
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE purchase_orders SET 
+      supplier=$1, purchase_no=$2, delivery_type=$3, received_date=$4, 
+      status=$5, assignedto=$6, receivedby=$7, purchaseentry=$8 
+      WHERE id=$9 RETURNING *`,
+      [supplier, purchase_no, delivery_type, received_date, status, assignedto, receivedby, purchaseentry, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Purchase order not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// -------------------- DELETE Purchase Order --------------------
+router.delete("/delete/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query("DELETE FROM purchase_orders WHERE id = $1 RETURNING *", [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Purchase order not found" });
+    }
+
+    res.json({ success: true, message: "Purchase order deleted successfully", data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+router.post("/receive/:poId", async (req, res) => {
+  const { poId } = req.params;
+  const { received_date, items } = req.body;
+
+  try {
+    // 1. Update purchase order status
+    await pool.query(
+      `UPDATE purchase_orders SET status='Received', received_date=$1 WHERE id=$2`,
+      [received_date, poId]
+    );
+
+    // 2. Update stock for each medicine
+    for (let item of items) {
+      const stockToAdd = parseInt(item.stock, 10); // Ensure it's a number
+      if (isNaN(stockToAdd)) continue; // Skip invalid entries
+
+      const result = await pool.query(
+        `UPDATE medicines SET stock = stock + $1 WHERE id = $2 RETURNING id, name, stock`,
+        [stockToAdd, item.medicine_id]
+      );
+
+      if (result.rowCount === 0) {
+        console.warn(`Medicine with id ${item.medicine_id} not found`);
+      } else {
+        console.log(
+          `Updated medicine ${result.rows[0].name} (ID: ${result.rows[0].id}) new stock: ${result.rows[0].stock}`
+        );
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: err.message });
+  }
+});
+
+// Node.js / Express example
+router.get("/by-delivery-boy/:id", async (req, res) => {
+  const deliveryBoyId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM purchase_orders WHERE assignedto = $1",
+      [deliveryBoyId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: err.message });
+  }
+});
+
+router.post('/payment/collect', async (req, res) => {
+  const {
+    purchase_order_id,
+    collected_by,
+    delivery_type,
+    amount_collected,
+    payment_mode_collected,
+    remarks
+  } = req.body;
+
+  if (!purchase_order_id || !collected_by || !amount_collected || !payment_mode_collected) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+
+  const amountCollected = parseFloat(amount_collected);
+  if (isNaN(amountCollected) || amountCollected <= 0) {
+    return res.status(400).json({ success: false, message: "Invalid amount_collected" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Fetch the purchase order
+    const poResult = await client.query(
+      'SELECT * FROM purchase_orders WHERE id = $1',
+      [purchase_order_id]
+    );
+
+    if (poResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: "Purchase order not found" });
+    }
+
+    const po = poResult.rows[0];
+
+    // Calculate totalAmount from JSON if not already stored
+    let totalAmount = po.total_amount;
+    if (!totalAmount) {
+      const items = Array.isArray(po.purchase_items) ? po.purchase_items : [];
+      totalAmount = items.reduce((sum, item) => sum + (item.stock * item.unitPrice), 0);
+    }
+
+    const existingPayments = Array.isArray(po.payments) ? po.payments : [];
+    const totalCollectedSoFar = existingPayments.reduce(
+      (sum, p) => sum + parseFloat(p.amount_collected || 0),
+      0
+    );
+
+    if (amountCollected + totalCollectedSoFar > totalAmount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: "Collected amount cannot exceed total amount" });
+    }
+
+    // Create new payment entry
+    const paymentEntry = {
+      collected_by,
+      delivery_type,
+      amount_collected: amountCollected,
+      payment_mode_collected,
+      collected_at: new Date(),
+      remarks: remarks || null
+    };
+
+    const updatedPayments = [...existingPayments, paymentEntry];
+
+    // Update purchase order status
+    const newTotalCollected = updatedPayments.reduce((sum, p) => sum + parseFloat(p.amount_collected || 0), 0);
+    let newStatus = "Partial";
+    if (newTotalCollected >= totalAmount) newStatus = "Paid";
+    else if (newTotalCollected === 0) newStatus = "Received";
+
+    // Update only payments and status (no amount_paid column needed)
+    const updateQuery = `
+      UPDATE purchase_orders
+      SET payments = $1, status = $2
+      WHERE id = $3
+      RETURNING *
+    `;
+
+    const updatedPoResult = await client.query(updateQuery, [
+      JSON.stringify(updatedPayments),
+      newStatus,
+      purchase_order_id
+    ]);
+
+    await client.query('COMMIT');
+
+    res.status(200).json({
+      success: true,
+      message: "Payment collected successfully",
+      purchase_order: updatedPoResult.rows[0]
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
+  }
+});
+router.post("/bulk-add", async (req, res) => {
+  const { purchaseOrders } = req.body;
+
+  if (!purchaseOrders || !Array.isArray(purchaseOrders) || purchaseOrders.length === 0) {
+    return res.status(400).json({ success: false, message: "No purchase orders provided" });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (const po of purchaseOrders) {
+        const columns = [];
+        const placeholders = [];
+        const values = [];
+        let idx = 1;
+
+        // Use the items from whichever key is present
+        const itemsToProcess = po.purchase_items || po.items || [];
+
+        for (const key in po) {
+          // Skip the items key here; we handle it explicitly below to ensure column name matches DB
+          if (key === "items" || key === "purchase_items") continue;
+
+          columns.push(key);
+          placeholders.push(`$${idx}`);
+          values.push(po[key]);
+          idx++;
+        }
+
+        // Explicitly add purchase_items as a JSON string
+        columns.push("purchase_items");
+        placeholders.push(`$${idx}`);
+        values.push(JSON.stringify(itemsToProcess));
+
+        const query = `
+          INSERT INTO purchase_orders (${columns.join(", ")})
+          VALUES (${placeholders.join(", ")})
+          RETURNING id
+        `;
+
+        const result = await client.query(query, values);
+        const poId = result.rows[0].id;
+
+        // Update stock logic
+        if (po.status === "Received" && itemsToProcess.length > 0) {
+          for (const item of itemsToProcess) {
+            await client.query(
+              `UPDATE medicines SET stock = stock + $1 WHERE id = $2`,
+              [item.stock, item.medicine_id]
+            );
+          }
+        }
+      }
+
+      await client.query("COMMIT");
+      res.json({ success: true, message: "Bulk purchase orders inserted successfully" });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Bulk Insert Error:", err);
+      // Send the actual error detail to help debugging
+      res.status(500).json({ success: false, message: err.message, detail: err.detail });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Database connection error" });
+  }
+});
+
+router.put("/mark-delivered/:id", async (req, res) => {
+  const orderId = parseInt(req.params.id);
+  const { receivedby } = req.body; // receive employeeId as receivedby
+
+  try {
+    const result = await pool.query(
+      `UPDATE purchase_orders
+       SET status = 'Delivered',
+           receivedby = $2,
+           delivered_date = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [orderId, receivedby]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    res.json({ success: true, order: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+router.get("/all/fields", async (req, res) => {
+  try {
+    // Fetch one purchase order to detect all keys
+    const result = await pool.query("SELECT * FROM purchase_orders LIMIT 1");
+    const purchaseOrder = result.rows[0] || {};
+
+    // Default fields from table columns
+    const defaultFields = Object.keys(purchaseOrder).map((field) => ({
+      name: field,
+      display_name: field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      type: typeof purchaseOrder[field],
+      source: "default",
+    }));
+
+    // Optional: fetch custom fields from your custom fields table
+    const customResult = await pool.query("SELECT field_name, field_type FROM purchase_order_custom_fields");
+    const customFields = customResult.rows.map((f) => ({
+      name: f.field_name,
+      display_name: f.field_name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      type: f.field_type,
+      source: "custom",
+    }));
+
+    res.json({
+      success: true,
+      fields: [...defaultFields, ...customFields],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to fetch fields" });
+  }
+});
+
+// 2️⃣ Toggle hide/show field (default or custom)
+router.post("/toggle-hide", async (req, res) => {
+  const { field_name, hide } = req.body;
+  try {
+    // Store hidden status in DB
+    await pool.query(
+      `INSERT INTO hidden_fields(field_name, hidden)
+       VALUES($1, $2)
+       ON CONFLICT (field_name) DO UPDATE SET hidden = $2`,
+      [field_name, hide]
+    );
+    res.json({ success: true, field_name, hidden: hide });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to update field visibility" });
+  }
+});
+module.exports = router;
