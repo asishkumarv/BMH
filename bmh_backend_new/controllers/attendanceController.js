@@ -394,3 +394,50 @@ exports.checkTodayAttendance = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+exports.adminUpdateAttendance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { check_in, check_out, status } = req.body;
+    
+    const attRes = await pool.query('SELECT date FROM attendance WHERE id = $1', [id]);
+    if (attRes.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Attendance record not found' });
+    }
+    
+    const attDate = new Date(attRes.rows[0].date);
+    const yyyy = attDate.getFullYear();
+    const mm = String(attDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(attDate.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    
+    let checkInTimestamp = null;
+    if (check_in) {
+      // Assuming check_in is "HH:MM"
+      checkInTimestamp = `${dateStr} ${check_in}:00+05:30`;
+    }
+    
+    let checkOutTimestamp = null;
+    if (check_out) {
+      checkOutTimestamp = `${dateStr} ${check_out}:00+05:30`;
+    }
+
+    await pool.query(
+      `UPDATE attendance 
+       SET timestamp = $1, checkout_timestamp = $2, status = $3 
+       WHERE id = $4`,
+      [checkInTimestamp, checkOutTimestamp, status, id]
+    );
+
+    await pool.query(
+      `INSERT INTO attendance_audit_logs (employee_id, action_type, details) 
+       VALUES ((SELECT employee_id FROM attendance WHERE id = $1), 'ADMIN_UPDATE', 'Attendance manually updated by Super Admin')`,
+      [id]
+    );
+
+    res.json({ success: true, message: 'Attendance updated successfully' });
+  } catch (error) {
+    console.error('Error updating attendance by admin:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

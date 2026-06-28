@@ -15,4 +15,6 @@ router.get('/employee-analytics', analyticsController.getEmployeeAnalytics);
 router.get('/employee-dashboard/:employeeId', attendanceController.getEmployeeDashboardStatus);
 router.get('/today/:employeeId', attendanceController.checkTodayAttendance);
 
+router.put('/admin-update/:id', attendanceController.adminUpdateAttendance);
+
 module.exports = router;

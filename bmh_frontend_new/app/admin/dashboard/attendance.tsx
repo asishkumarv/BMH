@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image, Modal } from 'react-native';
 import axios from 'axios';
-import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Download, MapPin, ChevronDown, ChevronUp, Edit2, X } from 'lucide-react-native';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
@@ -111,6 +111,14 @@ export default function AdminAttendanceScreen() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Edit State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editRecord, setEditRecord] = useState<any>(null);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [updating, setUpdating] = useState(false);
+
   useEffect(() => {
     fetchData();
 
@@ -198,6 +206,43 @@ export default function AdminAttendanceScreen() {
       }
     } catch (err) {
       Alert.alert("Error", "Server error while updating location.");
+    }
+  };
+
+  const openEditModal = (r: any) => {
+    setEditRecord(r);
+    const formatTimeForInput = (isoStr: string) => {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    };
+    setEditCheckIn(formatTimeForInput(r.check_in));
+    setEditCheckOut(formatTimeForInput(r.check_out));
+    setEditStatus(r.status || 'On Duty');
+    setEditModalVisible(true);
+  };
+
+  const handleUpdateAttendance = async () => {
+    if (!editRecord) return;
+    try {
+      setUpdating(true);
+      const res = await axios.put(`https://bmh-eitu.onrender.com/attendance/admin-update/${editRecord.id}`, {
+        check_in: editCheckIn,
+        check_out: editCheckOut,
+        status: editStatus
+      });
+      if (res.data.success) {
+        Alert.alert("Success", "Attendance updated successfully.");
+        setEditModalVisible(false);
+        fetchReports(selectedReportDept, true);
+      } else {
+        Alert.alert("Error", res.data.message || "Update failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Failed to update attendance.");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -406,6 +451,7 @@ export default function AdminAttendanceScreen() {
             <Text style={styles.tableCellHeader}>Deviation</Text>
             <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
+            <Text style={[styles.tableCellHeader, {flex: 0.5, textAlign: 'center'}]}>Action</Text>
           </View>
           {filteredReports.map((r, i) => (
             <TouchableOpacity 
@@ -445,6 +491,11 @@ export default function AdminAttendanceScreen() {
                 ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
               </View>
               <Text style={styles.tableCell}>{r.status}</Text>
+              <View style={[styles.tableCell, { flex: 0.5, alignItems: 'center' }]}>
+                <TouchableOpacity onPress={() => openEditModal(r)} style={{ padding: 4 }}>
+                  <Edit2 size={16} color="#3b82f6" />
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           ))}
           </View>
@@ -456,6 +507,87 @@ export default function AdminAttendanceScreen() {
         onClose={() => setModalVisible(false)} 
         employeeId={selectedEmployeeId} 
       />
+
+      <Modal visible={editModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Attendance</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{ marginBottom: 15 }}>
+              <Text style={styles.label}>Check In Time (HH:mm)</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="time" 
+                  value={editCheckIn} 
+                  onChange={(e) => setEditCheckIn(e.target.value)} 
+                  style={webInputStyle}
+                />
+              ) : (
+                <TextInput 
+                  style={styles.modalInput} 
+                  placeholder="HH:mm" 
+                  value={editCheckIn} 
+                  onChangeText={setEditCheckIn} 
+                />
+              )}
+            </View>
+
+            <View style={{ marginBottom: 15 }}>
+              <Text style={styles.label}>Check Out Time (HH:mm)</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="time" 
+                  value={editCheckOut} 
+                  onChange={(e) => setEditCheckOut(e.target.value)} 
+                  style={webInputStyle}
+                />
+              ) : (
+                <TextInput 
+                  style={styles.modalInput} 
+                  placeholder="HH:mm" 
+                  value={editCheckOut} 
+                  onChangeText={setEditCheckOut} 
+                />
+              )}
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text style={styles.label}>Status</Text>
+              {Platform.OS === 'web' ? (
+                <select 
+                  value={editStatus} 
+                  onChange={(e) => setEditStatus(e.target.value)} 
+                  style={webInputStyle}
+                >
+                  <option value="On Duty">On Duty</option>
+                  <option value="Checked Out">Checked Out</option>
+                  <option value="Absent">Absent</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="On Break">On Break</option>
+                  <option value="Half Day">Half Day</option>
+                </select>
+              ) : (
+                <TextInput 
+                  style={styles.modalInput} 
+                  placeholder="Status" 
+                  value={editStatus} 
+                  onChangeText={setEditStatus} 
+                />
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={handleUpdateAttendance} disabled={updating}>
+              <Text style={styles.buttonText}>{updating ? 'Saving...' : 'Save Changes'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -485,5 +617,21 @@ const styles = StyleSheet.create({
   tabText: { color: '#4b5563', fontWeight: '500' },
   activeTabText: { color: 'white' },
   thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
-  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '100%', maxWidth: 400, backgroundColor: 'white', borderRadius: 12, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  modalInput: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16 }
 });
+
+const webInputStyle = {
+  width: '100%',
+  padding: '12px',
+  borderRadius: '8px',
+  border: '1px solid #d1d5db',
+  fontSize: '16px',
+  outline: 'none',
+  backgroundColor: '#fff'
+};
