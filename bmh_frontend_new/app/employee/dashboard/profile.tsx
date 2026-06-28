@@ -5,6 +5,8 @@ import { Colors } from '../../../constants/Colors';
 import { Building, Lock, Mail, Phone, Clock, CreditCard, User, Camera } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
 import * as ImagePicker from 'expo-image-picker';
+import { Edit2 } from 'lucide-react-native';
+import { Modal } from 'react-native';
 
 export default function EmployeeProfileScreen() {
   const { isDesktop } = useResponsive();
@@ -14,7 +16,12 @@ export default function EmployeeProfileScreen() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [updating, setUpdating] = useState(false);
+  
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
+  const [requestingUpdate, setRequestingUpdate] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -56,6 +63,39 @@ export default function EmployeeProfileScreen() {
       Alert.alert('Error', error.response?.data?.message || 'Failed to update password');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const openEditModal = () => {
+    setEditForm({
+      mobile: pd.mobile || '',
+      bloodGroup: pd.bloodGroup || '',
+      emergencyContact: pd.emergencyContact || '',
+      address: pd.address || '',
+      bankName: pd.bankName || '',
+      accountNo: pd.accountNo || '',
+      ifsc: pd.ifsc || ''
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleRequestProfileUpdate = async () => {
+    setRequestingUpdate(true);
+    try {
+      const res = await axios.post('https://bmh-eitu.onrender.com/profile-requests', {
+        user_type: 'employee',
+        user_id: user.id,
+        department_name: user.department,
+        requested_data: editForm
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Profile update requested! Waiting for admin approval.');
+        setEditModalVisible(false);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to request update');
+    } finally {
+      setRequestingUpdate(false);
     }
   };
 
@@ -104,6 +144,53 @@ export default function EmployeeProfileScreen() {
         <Text style={styles.title}>My Profile</Text>
         <Text style={styles.subtitle}>View your corporate credentials and manage your account.</Text>
       </View>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={editModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Request Profile Update</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+              <View>
+                <Text style={styles.label}>Mobile Number</Text>
+                <TextInput style={styles.modalInput} value={editForm.mobile} onChangeText={(t) => setEditForm({...editForm, mobile: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>Emergency Contact</Text>
+                <TextInput style={styles.modalInput} value={editForm.emergencyContact} onChangeText={(t) => setEditForm({...editForm, emergencyContact: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>Blood Group</Text>
+                <TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>Address</Text>
+                <TextInput style={[styles.modalInput, { height: 60 }]} multiline value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>Bank Name</Text>
+                <TextInput style={styles.modalInput} value={editForm.bankName} onChangeText={(t) => setEditForm({...editForm, bankName: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>Account No</Text>
+                <TextInput style={styles.modalInput} value={editForm.accountNo} onChangeText={(t) => setEditForm({...editForm, accountNo: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>IFSC Code</Text>
+                <TextInput style={styles.modalInput} value={editForm.ifsc} onChangeText={(t) => setEditForm({...editForm, ifsc: t})} />
+              </View>
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setEditModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.submitBtnModal} onPress={handleRequestProfileUpdate} disabled={requestingUpdate}>
+                <Text style={styles.submitBtnText}>{requestingUpdate ? 'Submitting...' : 'Request Update'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.row, !isDesktop && styles.rowMobile]}>
         {/* Left Column: Password Management */}
@@ -197,7 +284,13 @@ export default function EmployeeProfileScreen() {
         {/* Right Column: Profile Metadata */}
         <View style={[styles.rightCol, !isDesktop && styles.colMobile]}>
           <View style={[styles.card, !isDesktop && styles.cardMobile]}>
-            <Text style={[styles.sectionTitle, { marginBottom: 24 }]}>Employee Information</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <Text style={styles.sectionTitle}>Employee Information</Text>
+              <Pressable style={styles.editBtn} onPress={openEditModal}>
+                <Edit2 size={14} color={Colors.light.primary} />
+                <Text style={styles.editBtnText}>Edit Details</Text>
+              </Pressable>
+            </View>
             
             <View style={styles.infoSection}>
               <View style={styles.infoRow}><Mail size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Email</Text><Text style={styles.infoVal}>{user.email}</Text></View>
@@ -282,4 +375,16 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center' },
   infoLabel: { fontSize: 14, fontWeight: '600', color: Colors.light.icon, marginLeft: 8, width: 100 },
   infoVal: { fontSize: 14, fontWeight: '700', color: Colors.light.text, flex: 1, textAlign: 'right' },
+  
+  editBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
+  editBtnText: { color: Colors.light.primary, fontSize: 13, fontWeight: '700', marginLeft: 6 },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#FFF', borderRadius: 24, padding: 32, width: '100%', maxWidth: 500, maxHeight: '80%', ...Platform.select({ web: { boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' } }) },
+  modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.light.text, marginBottom: 24 },
+  modalInput: { backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 14, fontSize: 14, color: Colors.light.text, ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 24 },
+  cancelBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, backgroundColor: '#F1F5F9' },
+  cancelBtnText: { color: Colors.light.icon, fontWeight: '700', fontSize: 15 },
+  submitBtnModal: { backgroundColor: Colors.light.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
 });

@@ -129,6 +129,14 @@ export default function Payslips() {
               <td><strong>Base Salary</strong></td>
               <td class="amount">${payslip.base_salary}</td>
             </tr>
+            <tr>
+              <td><strong>Appreciation Amount</strong></td>
+              <td class="amount" style="color: #10B981">+ ${payslip.appreciation_amount || 0}</td>
+            </tr>
+            <tr>
+              <td><strong>Extra Working Amount</strong></td>
+              <td class="amount" style="color: #10B981">+ ${payslip.extra_working_amount || 0}</td>
+            </tr>
             ${d ? `
             <tr>
               <td>
@@ -318,6 +326,13 @@ export default function Payslips() {
                                  <Text style={styles.psSubtext}>
                                    {d.early_checkouts?.total_occurrences} early, {d.early_checkouts?.free_limit} free, {d.early_checkouts?.penalized} penalized @ ₹{d.early_checkouts?.penalty_per_instance}/instance
                                  </Text>
+                               </View>
+                             </View>
+                             <View style={styles.psRow}>
+                               <Text style={styles.psLabel}>Appreciation / Extra Work:</Text>
+                               <View style={{ alignItems: 'flex-end' }}>
+                                 <Text style={[styles.psValue, { color: '#10B981' }]}>+ ₹{parseFloat(ps.appreciation_amount || 0) + parseFloat(ps.extra_working_amount || 0)}</Text>
+                                 <Text style={styles.psSubtext}>Appreciation: ₹{ps.appreciation_amount || 0}, Extra: ₹{ps.extra_working_amount || 0}</Text>
                                </View>
                              </View>
                            </>

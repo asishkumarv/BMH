@@ -29,6 +29,7 @@ const salesOrdersRoutes = require('./routes/salesOrdersRoutes');
 const normalSalesOrderRoutes = require('./routes/normalSalesOrderRoutes');
 const deliveryBoyRoutes = require('./routes/deliveryBoyRoutes');
 const deliveryAddressRoutes = require('./routes/deliveryAddressRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -53,6 +54,7 @@ app.use('/sales-orders', salesOrdersRoutes);
 app.use('/normal-sales', normalSalesOrderRoutes);
 app.use('/delivery-boy', deliveryBoyRoutes);
 app.use('/delivery-address', deliveryAddressRoutes);
+app.use('/profile', profileRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

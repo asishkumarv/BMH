@@ -25,6 +25,17 @@ export default function SubAdminRegisterScreen() {
   const [joiningDate, setJoiningDate] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // New Fields
+  const [scheduleIn, setScheduleIn] = useState('09:00');
+  const [scheduleOut, setScheduleOut] = useState('17:00');
+  const [breakIn, setBreakIn] = useState('13:00');
+  const [breakOut, setBreakOut] = useState('14:00');
+  const [weeklyOffDays, setWeeklyOffDays] = useState('Sunday');
+  const [bankAccount, setBankAccount] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [address, setAddress] = useState('');
+  
   const [registering, setRegistering] = useState(false);
 
   React.useEffect(() => {
@@ -78,9 +89,17 @@ export default function SubAdminRegisterScreen() {
         email,
         password,
         department_id: selectedDept,
+        mobile: phone,
+        image: photo,
+        schedule_in: scheduleIn,
+        schedule_out: scheduleOut,
+        break_in: breakIn,
+        break_out: breakOut,
+        weekly_off_days: weeklyOffDays,
+        bank_account: bankAccount,
+        blood_group: bloodGroup,
+        address: address,
         profile_data: {
-          photo,
-          phone,
           joiningDate
         }
       });
@@ -207,6 +226,39 @@ export default function SubAdminRegisterScreen() {
                   )}
                 </View>
 
+                {/* Additional Details */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Schedule In</Text>
+                  <TextInput style={styles.input} placeholder="HH:MM" value={scheduleIn} onChangeText={setScheduleIn} />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Schedule Out</Text>
+                  <TextInput style={styles.input} placeholder="HH:MM" value={scheduleOut} onChangeText={setScheduleOut} />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Break In</Text>
+                  <TextInput style={styles.input} placeholder="HH:MM" value={breakIn} onChangeText={setBreakIn} />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Break Out</Text>
+                  <TextInput style={styles.input} placeholder="HH:MM" value={breakOut} onChangeText={setBreakOut} />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Weekly Off Days</Text>
+                  <TextInput style={styles.input} placeholder="e.g. Sunday" value={weeklyOffDays} onChangeText={setWeeklyOffDays} />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Bank Account Details</Text>
+                  <TextInput style={styles.input} placeholder="Account Number, IFSC..." value={bankAccount} onChangeText={setBankAccount} />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Blood Group</Text>
+                  <TextInput style={styles.input} placeholder="e.g. O+" value={bloodGroup} onChangeText={setBloodGroup} />
+                </View>
+                <View style={[styles.inputGroup, { width: '100%' }]}>
+                  <Text style={styles.label}>Address</Text>
+                  <TextInput style={[styles.input, { height: 60 }]} placeholder="Full Address" multiline value={address} onChangeText={setAddress} />
+                </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Password *</Text>

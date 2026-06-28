@@ -20,12 +20,22 @@ exports.getSettings = async (req, res) => {
     let empQuery = `
       SELECT els.*, e.full_name as employee_name, e.department, e.role
       FROM employee_leave_settings els
-      JOIN employees e ON els.employee_id = e.id
+      JOIN employees e ON els.employee_id = e.id AND els.user_type = 'employee'
     `;
     let empValues = [];
     if (department && department !== 'All') {
       empQuery += ' WHERE e.department = $1';
       empValues.push(department);
+    }
+    
+    empQuery += `
+      UNION ALL
+      SELECT els.*, da.full_name as employee_name, (SELECT name FROM departments WHERE id = da.department_id) as department, 'Sub Admin' as role
+      FROM employee_leave_settings els
+      JOIN department_admins da ON els.employee_id = da.id AND els.user_type = 'sub_admin'
+    `;
+    if (department && department !== 'All') {
+      empQuery += ' WHERE (SELECT name FROM departments WHERE id = da.department_id) = $1';
     }
     const empRes = await pool.query(empQuery, empValues);
 
@@ -63,15 +73,15 @@ exports.updateDepartmentSettings = async (req, res) => {
 exports.updateEmployeeSettings = async (req, res) => {
   try {
     const {
-      employee_id, leaves_per_month, extra_leave_penalty,
+      employee_id, user_type = 'employee', leaves_per_month, extra_leave_penalty,
       late_checkin_limit, late_checkin_penalty,
       early_checkout_limit, early_checkout_penalty
     } = req.body;
 
     const query = `
       INSERT INTO employee_leave_settings 
-      (employee_id, leaves_per_month, extra_leave_penalty, late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (employee_id, user_type, leaves_per_month, extra_leave_penalty, late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (employee_id) DO UPDATE
       SET leaves_per_month = EXCLUDED.leaves_per_month,
           extra_leave_penalty = EXCLUDED.extra_leave_penalty,
@@ -83,7 +93,7 @@ exports.updateEmployeeSettings = async (req, res) => {
       RETURNING *;
     `;
     const values = [
-      employee_id, leaves_per_month, extra_leave_penalty,
+      employee_id, user_type, leaves_per_month, extra_leave_penalty,
       late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty
     ];
     const result = await pool.query(query, values);
@@ -99,11 +109,15 @@ exports.updateEmployeeSettings = async (req, res) => {
 // Apply for leave (Employee)
 exports.applyLeave = async (req, res) => {
   try {
-    const { employee_id, start_date, end_date, reason } = req.body;
+    const { employee_id, user_type = 'employee', start_date, end_date, reason } = req.body;
 
     // Get employee department
-    const empRes = await pool.query('SELECT department FROM employees WHERE id = $1', [employee_id]);
-    if (empRes.rows.length === 0) return res.status(404).json({ message: 'Employee not found' });
+    const tableName = user_type === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = user_type === 'sub_admin' 
+      ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
+      : 'department';
+    const empRes = await pool.query(`SELECT ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
+    if (empRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
     const department = empRes.rows[0].department;
 
     // Check max employees limit for the requested dates
@@ -125,10 +139,10 @@ exports.applyLeave = async (req, res) => {
     }
 
     const query = `
-      INSERT INTO leave_requests (employee_id, start_date, end_date, reason)
-      VALUES ($1, $2, $3, $4) RETURNING *;
+      INSERT INTO leave_requests (employee_id, user_type, start_date, end_date, reason)
+      VALUES ($1, $2, $3, $4, $5) RETURNING *;
     `;
-    const result = await pool.query(query, [employee_id, start_date, end_date, reason]);
+    const result = await pool.query(query, [employee_id, user_type, start_date, end_date, reason]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error applying for leave:', error);
@@ -139,18 +153,34 @@ exports.applyLeave = async (req, res) => {
 // Get requests (Admin/Sub-admin or Employee)
 exports.getRequests = async (req, res) => {
   try {
-    const { employee_id, department, month } = req.query; // If employee_id is passed, get for that employee. If department, for department.
+    const { employee_id, user_type, department, month } = req.query; // If employee_id is passed, get for that employee. If department, for department.
     
     let query = `
       SELECT lr.*, e.full_name, e.department, e.role 
       FROM leave_requests lr
-      JOIN employees e ON lr.employee_id = e.id
+      JOIN employees e ON lr.employee_id = e.id AND lr.user_type = 'employee'
       WHERE 1=1
     `;
     let values = [];
     let idx = 1;
 
-    if (employee_id) {
+    // We can also union with sub_admins if needed, for simplicity let's just use union all if not specific
+    // Actually, to fully support it:
+    query = `
+      SELECT lr.*, u.full_name, u.department, u.role
+      FROM leave_requests lr
+      JOIN (
+        SELECT id, full_name, department, role, 'employee' as user_type FROM employees
+        UNION ALL
+        SELECT id, full_name, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'Sub Admin' as role, 'sub_admin' as user_type FROM department_admins
+      ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
+      WHERE 1=1
+    `;
+
+    if (employee_id && user_type) {
+      query += ` AND lr.employee_id = $${idx++} AND lr.user_type = $${idx++}`;
+      values.push(employee_id, user_type);
+    } else if (employee_id) {
       query += ` AND lr.employee_id = $${idx++}`;
       values.push(employee_id);
     }
@@ -195,11 +225,15 @@ exports.updateRequestStatus = async (req, res) => {
 
 exports.generatePayslip = async (req, res) => {
   try {
-    const { employee_id, month } = req.body; // Month format 'YYYY-MM'
+    const { employee_id, user_type = 'employee', month, appreciation_amount = 0, extra_working_amount = 0 } = req.body; // Month format 'YYYY-MM'
     
     // 1. Get employee data
-    const empRes = await pool.query('SELECT * FROM employees WHERE id = $1', [employee_id]);
-    if (empRes.rows.length === 0) return res.status(404).json({ message: 'Employee not found' });
+    const tableName = user_type === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = user_type === 'sub_admin' 
+      ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
+      : 'department';
+    const empRes = await pool.query(`SELECT *, ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
+    if (empRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
     const emp = empRes.rows[0];
     
     // Extract base_salary from profile_data
@@ -212,8 +246,8 @@ exports.generatePayslip = async (req, res) => {
     } catch (e) {}
 
     // 2. Get employee settings
-    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1`;
-    const empSetRes = await pool.query(empSetQuery, [employee_id]);
+    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1 AND user_type = $2`;
+    const empSetRes = await pool.query(empSetQuery, [employee_id, user_type]);
     
     let settings = {
       leaves_per_month: 0, extra_leave_penalty: 0,
@@ -238,8 +272,8 @@ exports.generatePayslip = async (req, res) => {
     const attendanceRes = await pool.query(`
       SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
       FROM attendance 
-      WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2
-    `, [employee_id, month]);
+      WHERE employee_id = $1 AND user_type = $3 AND TO_CHAR(date, 'YYYY-MM') = $2
+    `, [employee_id, month, user_type]);
 
     const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
 
@@ -292,9 +326,9 @@ exports.generatePayslip = async (req, res) => {
     // Fetch approved leaves
     const leavesListRes = await pool.query(`
       SELECT start_date, end_date FROM leave_requests
-      WHERE employee_id = $1 AND status = 'approved'
+      WHERE employee_id = $1 AND user_type = $3 AND status = 'approved'
       AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
-    `, [employee_id, month]);
+    `, [employee_id, month, user_type]);
 
     const approvedLeaveDays = new Set();
     leavesListRes.rows.forEach(lr => {
@@ -342,7 +376,7 @@ exports.generatePayslip = async (req, res) => {
     const extra_early = Math.max(0, early_count - settings.early_checkout_limit);
     const early_checkout_deduction = extra_early * settings.early_checkout_penalty;
 
-    let net_salary = base_salary - (extra_leave_deduction + late_checkin_deduction + early_checkout_deduction);
+    let net_salary = base_salary - (extra_leave_deduction + late_checkin_deduction + early_checkout_deduction) + parseFloat(appreciation_amount) + parseFloat(extra_working_amount);
     if (net_salary < 0) net_salary = 0;
 
     // Detailed breakdown
@@ -374,18 +408,20 @@ exports.generatePayslip = async (req, res) => {
 
     // 6. Save or update payslip
     const psQuery = `
-      INSERT INTO payslips (employee_id, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, net_salary, details)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO payslips (employee_id, user_type, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, appreciation_amount, extra_working_amount, net_salary, details)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT (employee_id, month) DO UPDATE
       SET base_salary = EXCLUDED.base_salary,
           extra_leave_deduction = EXCLUDED.extra_leave_deduction,
           late_checkin_deduction = EXCLUDED.late_checkin_deduction,
           early_checkout_deduction = EXCLUDED.early_checkout_deduction,
+          appreciation_amount = EXCLUDED.appreciation_amount,
+          extra_working_amount = EXCLUDED.extra_working_amount,
           net_salary = EXCLUDED.net_salary,
           details = EXCLUDED.details
       RETURNING *;
     `;
-    const psResult = await pool.query(psQuery, [employee_id, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, net_salary, JSON.stringify(details)]);
+    const psResult = await pool.query(psQuery, [employee_id, user_type, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, appreciation_amount, extra_working_amount, net_salary, JSON.stringify(details)]);
     
     res.status(200).json(psResult.rows[0]);
   } catch (error) {
@@ -396,13 +432,30 @@ exports.generatePayslip = async (req, res) => {
 
 exports.getPayslips = async (req, res) => {
   try {
-    const { employee_id, month } = req.query;
-    let query = 'SELECT p.*, e.full_name, e.department, e.role FROM payslips p JOIN employees e ON p.employee_id = e.id WHERE 1=1';
+    const { employee_id, user_type, month, department } = req.query;
+    
+    let query = `
+      SELECT p.*, u.full_name, u.department, u.role 
+      FROM payslips p
+      JOIN (
+        SELECT id, full_name, department, role, 'employee' as user_type FROM employees
+        UNION ALL
+        SELECT id, full_name, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'Sub Admin' as role, 'sub_admin' as user_type FROM department_admins
+      ) u ON p.employee_id = u.id AND p.user_type = u.user_type
+      WHERE 1=1
+    `;
     let values = [];
     let idx = 1;
-    if (employee_id) {
+    if (employee_id && user_type) {
+      query += ` AND p.employee_id = $${idx++} AND p.user_type = $${idx++}`;
+      values.push(employee_id, user_type);
+    } else if (employee_id) {
       query += ` AND p.employee_id = $${idx++}`;
       values.push(employee_id);
+    }
+    if (department && department !== 'All') {
+      query += ` AND u.department = $${idx++}`;
+      values.push(department);
     }
     if (month) {
       query += ` AND p.month = $${idx++}`;
@@ -420,7 +473,7 @@ exports.getPayslips = async (req, res) => {
 exports.getEmployeeLeaveSummary = async (req, res) => {
   try {
     const { employee_id } = req.params;
-    const { month: queryMonth } = req.query;
+    const { month: queryMonth, user_type = 'employee' } = req.query;
     const now = new Date();
     
     // Calculate current month using Indian timezone (GMT+5:30)
@@ -435,13 +488,17 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
     const daysInMonth = new Date(year, m + 1, 0).getDate();
 
     // 1. Get employee data
-    const empRes = await pool.query('SELECT * FROM employees WHERE id = $1', [employee_id]);
-    if (empRes.rows.length === 0) return res.status(404).json({ message: 'Employee not found' });
+    const tableName = user_type === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = user_type === 'sub_admin' 
+      ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
+      : 'department';
+    const empRes = await pool.query(`SELECT *, ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
+    if (empRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
     const emp = empRes.rows[0];
 
     // 2. Get employee settings
-    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1`;
-    const empSetRes = await pool.query(empSetQuery, [employee_id]);
+    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1 AND user_type = $2`;
+    const empSetRes = await pool.query(empSetQuery, [employee_id, user_type]);
     
     let settings = {
       leaves_per_month: 0,
@@ -456,9 +513,9 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
     // 3. Fetch approved leaves for this month
     const leavesListRes = await pool.query(`
       SELECT start_date, end_date FROM leave_requests
-      WHERE employee_id = $1 AND status = 'approved'
+      WHERE employee_id = $1 AND user_type = $3 AND status = 'approved'
       AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
-    `, [employee_id, month]);
+    `, [employee_id, month, user_type]);
 
     const approvedLeaveDays = new Set();
     leavesListRes.rows.forEach(lr => {
@@ -491,8 +548,8 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
       const attendanceRes = await pool.query(`
         SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
         FROM attendance 
-        WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2
-      `, [employee_id, month]);
+        WHERE employee_id = $1 AND user_type = $3 AND TO_CHAR(date, 'YYYY-MM') = $2
+      `, [employee_id, month, user_type]);
 
       const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
 

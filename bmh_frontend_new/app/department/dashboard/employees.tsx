@@ -343,7 +343,11 @@ export default function SubAdminEmployeesScreen() {
                             <Text style={{ fontWeight: '700', marginBottom: 4 }}>{ps.month}</Text>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                               <Text style={{ color: Colors.light.icon }}>Base: ₹{ps.base_salary}</Text>
-                              <Text style={{ color: Colors.light.error }}>Deductions: ₹{parseFloat(ps.extra_leave_deduction) + parseFloat(ps.late_checkin_deduction) + parseFloat(ps.early_checkout_deduction)}</Text>
+                              <Text style={{ color: Colors.light.error }}>Deductions: ₹{parseFloat(ps.extra_leave_deduction || 0) + parseFloat(ps.late_checkin_deduction || 0) + parseFloat(ps.early_checkout_deduction || 0)}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={{ color: '#10B981', fontSize: 12 }}>Appreciation: ₹{ps.appreciation_amount || 0}</Text>
+                              <Text style={{ color: '#10B981', fontSize: 12 }}>Extra Work: ₹{ps.extra_working_amount || 0}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                               <Text style={{ fontWeight: '700', color: Colors.light.primary }}>Net Pay: ₹{ps.net_salary}</Text>

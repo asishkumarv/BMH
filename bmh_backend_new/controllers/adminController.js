@@ -22,12 +22,27 @@ exports.getSuperAdmins = async (req, res) => {
 
 exports.addAdmin = async (req, res) => {
   try {
-    const { full_name, email, password, department_id, profile_data } = req.body;
+    const { 
+      full_name, email, password, department_id, 
+      mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days,
+      bank_account, blood_group, address, profile_data 
+    } = req.body;
     
-    // In a real app we would hash the password with bcrypt, but storing as plain text for this demo based on previous setup
+    let finalProfileData = typeof profile_data === 'string' ? JSON.parse(profile_data) : (profile_data || {});
+    if (bank_account) finalProfileData.bank_account = bank_account;
+    if (blood_group) finalProfileData.blood_group = blood_group;
+    if (address) finalProfileData.address = address;
+
     const insertResult = await pool.query(
-      'INSERT INTO department_admins (full_name, email, password, department_id, status, profile_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [full_name, email, password, department_id, 'pending', profile_data ? JSON.stringify(profile_data) : null]
+      `INSERT INTO department_admins (
+        full_name, email, password, department_id, status, 
+        mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days, profile_data
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [
+        full_name, email, password, department_id, 'pending',
+        mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days,
+        Object.keys(finalProfileData).length > 0 ? JSON.stringify(finalProfileData) : null
+      ]
     );
 
     res.status(201).json({ success: true, data: insertResult.rows[0] });

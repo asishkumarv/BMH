@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { name: 'Patient History', icon: Users, route: '/admin/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/admin/dashboard/notifications' },
   { name: 'Settings', icon: Settings, route: '/admin/dashboard/settings' },
+  { name: 'Profile Requests', icon: Users, route: '/admin/dashboard/profile-requests' },
   { name: 'Profile', icon: Users, route: '/admin/dashboard/profile' },
 ];
 

@@ -36,6 +36,12 @@ export default function EmployeesScreen() {
   const [addingRole, setAddingRole] = useState(false);
   const [employeePayslips, setEmployeePayslips] = useState<any[]>([]);
 
+  // Payslip Generation
+  const [generatePayslipMonth, setGeneratePayslipMonth] = useState('');
+  const [appreciationAmount, setAppreciationAmount] = useState('0');
+  const [extraWorkingAmount, setExtraWorkingAmount] = useState('0');
+  const [generatingPayslip, setGeneratingPayslip] = useState(false);
+
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
@@ -67,6 +73,34 @@ export default function EmployeesScreen() {
       setEmployeePayslips([]);
     }
   }, [selectedEmployee]);
+
+  const handleGeneratePayslip = async () => {
+    if (!selectedEmployee) return;
+    if (!generatePayslipMonth) {
+      Alert.alert('Error', 'Please enter a month (YYYY-MM)');
+      return;
+    }
+    setGeneratingPayslip(true);
+    try {
+      const res = await axios.post(`${API_URL}/leave/payslips/generate`, {
+        employee_id: selectedEmployee.id,
+        user_type: selectedEmployee.role === 'Sub Admin' ? 'sub_admin' : 'employee',
+        month: generatePayslipMonth,
+        appreciation_amount: appreciationAmount ? Number(appreciationAmount) : 0,
+        extra_working_amount: extraWorkingAmount ? Number(extraWorkingAmount) : 0
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Payslip generated successfully!');
+        // Refresh payslips
+        const refreshRes = await axios.get(`${API_URL}/leave/payslips?employee_id=${selectedEmployee.id}`);
+        setEmployeePayslips(refreshRes.data);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to generate payslip');
+    } finally {
+      setGeneratingPayslip(false);
+    }
+  };
 
   const handleAddRole = async () => {
     if (!newRoleName) {
@@ -355,7 +389,11 @@ export default function EmployeesScreen() {
                             <Text style={{ fontWeight: '700', marginBottom: 4 }}>{ps.month}</Text>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                               <Text style={{ color: Colors.light.icon }}>Base: ₹{ps.base_salary}</Text>
-                              <Text style={{ color: Colors.light.error }}>Deductions: ₹{parseFloat(ps.extra_leave_deduction) + parseFloat(ps.late_checkin_deduction) + parseFloat(ps.early_checkout_deduction)}</Text>
+                              <Text style={{ color: Colors.light.error }}>Deductions: ₹{parseFloat(ps.extra_leave_deduction || 0) + parseFloat(ps.late_checkin_deduction || 0) + parseFloat(ps.early_checkout_deduction || 0)}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={{ color: '#10B981', fontSize: 12 }}>Appreciation: ₹{ps.appreciation_amount || 0}</Text>
+                              <Text style={{ color: '#10B981', fontSize: 12 }}>Extra Work: ₹{ps.extra_working_amount || 0}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                               <Text style={{ fontWeight: '700', color: Colors.light.primary }}>Net Pay: ₹{ps.net_salary}</Text>
@@ -364,6 +402,29 @@ export default function EmployeesScreen() {
                         ))}
                       </View>
                     )}
+
+                    <View style={{ backgroundColor: '#F1F5F9', padding: 16, borderRadius: 12, marginTop: 16 }}>
+                      <Text style={[styles.sectionLabel, {marginTop: 0, marginBottom: 12}]}>Generate Payslip (Super Admin)</Text>
+                      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Month (YYYY-MM)</Text>
+                          <TextInput style={styles.input} placeholder="e.g. 2026-06" value={generatePayslipMonth} onChangeText={setGeneratePayslipMonth} />
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Appreciation Amount (₹)</Text>
+                          <TextInput style={styles.input} keyboardType="numeric" value={appreciationAmount} onChangeText={setAppreciationAmount} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Extra Working Amount (₹)</Text>
+                          <TextInput style={styles.input} keyboardType="numeric" value={extraWorkingAmount} onChangeText={setExtraWorkingAmount} />
+                        </View>
+                      </View>
+                      <Pressable style={styles.submitBtn} onPress={handleGeneratePayslip} disabled={generatingPayslip}>
+                        <Text style={styles.submitBtnText}>{generatingPayslip ? 'Generating...' : 'Generate / Update Payslip'}</Text>
+                      </Pressable>
+                    </View>
 
                     <Text style={[styles.sectionLabel, {marginTop: 16}]}>Operations & Shifts</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Manager:</Text><Text style={styles.profileVal}>{pd.manager || 'N/A'}</Text></View>

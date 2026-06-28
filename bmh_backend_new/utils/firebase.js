@@ -20,10 +20,15 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 }
 
 if (serviceAccount) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-  console.log("✅ Firebase Admin Initialized");
+  try {
+    const { initializeApp, cert } = require('firebase-admin/app');
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+    console.log("✅ Firebase Admin Initialized");
+  } catch (err) {
+    console.error("⚠️ Firebase Admin skipped initialization (error):", err.message);
+  }
 } else {
   console.log("⚠️ Firebase Admin skipped initialization (missing credentials)");
 }

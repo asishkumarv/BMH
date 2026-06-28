@@ -19,13 +19,18 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
 
 exports.verifyLocation = async (req, res) => {
   try {
-    const { employeeId, latitude, longitude } = req.body;
+    const { employeeId, userType = 'employee', latitude, longitude } = req.body;
 
     if (!employeeId || latitude == null || longitude == null) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    const empRes = await pool.query('SELECT department FROM employees WHERE id = $1', [employeeId]);
+    const tableName = userType === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptQuery = userType === 'sub_admin' 
+      ? 'SELECT (SELECT name FROM departments WHERE id = department_admins.department_id) as department FROM department_admins WHERE id = $1'
+      : 'SELECT department FROM employees WHERE id = $1';
+
+    const empRes = await pool.query(deptQuery, [employeeId]);
     if (empRes.rowCount === 0) {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
@@ -69,7 +74,7 @@ exports.verifyLocation = async (req, res) => {
 
 exports.verifyFaceAndMarkAttendance = async (req, res) => {
   try {
-    const { employeeId, action = "login", locationVerified, base64Image } = req.body;
+    const { employeeId, userType = 'employee', action = "login", locationVerified, base64Image } = req.body;
 
     if (!base64Image) {
       return res.status(400).json({ success: false, message: "Image base64 required" });
@@ -79,7 +84,12 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
       return res.status(400).json({ success: false, message: "Employee ID required" });
     }
 
-    const empRes = await pool.query("SELECT id, profile_data, schedule_in, schedule_out FROM employees WHERE id = $1", [employeeId]);
+    const tableName = userType === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptQuery = userType === 'sub_admin' 
+      ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
+      : 'department';
+
+    const empRes = await pool.query(`SELECT id, profile_data, schedule_in, schedule_out, ${deptQuery}, image FROM ${tableName} WHERE id = $1`, [employeeId]);
     if (!empRes.rowCount) {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
@@ -98,10 +108,8 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
     }
 
     if (!registeredImgBase64) {
-      // If we don't have it in profile_data, check if it's in the image column we added
-      const empImageRes = await pool.query("SELECT image FROM employees WHERE id = $1", [employeeId]);
-      if (empImageRes.rowCount && empImageRes.rows[0].image) {
-         registeredImgBase64 = empImageRes.rows[0].image;
+      if (empRes.rows[0].image) {
+         registeredImgBase64 = empRes.rows[0].image;
       } else {
          return res.status(400).json({ success: false, message: "No registered profile photo found for employee" });
       }
@@ -150,8 +158,8 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
     // Check if already marked
     if (action === "login") {
       const alreadyMarked = await pool.query(
-        `SELECT id FROM attendance WHERE employee_id = $1 AND date = CURRENT_DATE LIMIT 1`,
-        [employeeId]
+        `SELECT id FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,
+        [employeeId, userType]
       );
 
       if (alreadyMarked.rowCount > 0) {
@@ -165,11 +173,10 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
       }
 
       // Compute late duration based on shiftIn
-      const empRes = await pool.query('SELECT profile_data FROM employees WHERE id = $1', [employeeId]);
       let late_duration = '0h 0m';
-      if (empRes.rows.length > 0 && empRes.rows[0].profile_data) {
+      if (profileDataStr) {
         try {
-          const profileData = JSON.parse(empRes.rows[0].profile_data);
+          const profileData = JSON.parse(profileDataStr);
           if (profileData.shiftIn) {
             const [shiftHour, shiftMin] = profileData.shiftIn.split(':').map(Number);
             const now = new Date();
@@ -186,10 +193,10 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
       }
 
       const insertResult = await pool.query(
-        `INSERT INTO attendance (employee_id, department, timestamp, image_url, status, late_duration)
-         VALUES ($1, (SELECT department FROM employees WHERE id = $1), CURRENT_TIMESTAMP, $2, $3, $4)
+        `INSERT INTO attendance (employee_id, user_type, department, timestamp, image_url, status, late_duration)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6)
          RETURNING id, timestamp, status`,
-        [employeeId, storedCapturedUrl, status, late_duration]
+        [employeeId, userType, empRes.rows[0].department, storedCapturedUrl, status, late_duration]
       );
 
       return res.json({
@@ -203,8 +210,8 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
     } else if (action === "logout") {
       // Find the today's record
       const todayRecord = await pool.query(
-        `SELECT id, timestamp FROM attendance WHERE employee_id = $1 AND date = CURRENT_DATE LIMIT 1`,
-        [employeeId]
+        `SELECT id, timestamp FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,
+        [employeeId, userType]
       );
 
       if (todayRecord.rowCount === 0) {
@@ -214,12 +221,10 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
         });
       }
 
-      // Compute early checkout duration based on shiftOut
-      const empRes = await pool.query('SELECT profile_data FROM employees WHERE id = $1', [employeeId]);
       let early_checkout_duration = '0h 0m';
-      if (empRes.rows.length > 0 && empRes.rows[0].profile_data) {
+      if (profileDataStr) {
         try {
-          const profileData = JSON.parse(empRes.rows[0].profile_data);
+          const profileData = JSON.parse(profileDataStr);
           if (profileData.shiftOut) {
             const [shiftHour, shiftMin] = profileData.shiftOut.split(':').map(Number);
             const now = new Date();
@@ -237,10 +242,10 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
 
       const updateResult = await pool.query(
         `UPDATE attendance 
-         SET checkout_timestamp = CURRENT_TIMESTAMP, checkout_image_url = $2, early_checkout_duration = $3
-         WHERE employee_id = $1 AND date = CURRENT_DATE
+         SET checkout_timestamp = CURRENT_TIMESTAMP, checkout_image_url = $3, early_checkout_duration = $4
+         WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE
          RETURNING id, checkout_timestamp`,
-        [employeeId, storedCapturedUrl, early_checkout_duration]
+        [employeeId, userType, storedCapturedUrl, early_checkout_duration]
       );
 
       return res.json({
@@ -260,7 +265,7 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
 
 exports.markBreak = async (req, res) => {
   try {
-    const { employeeId, breakType, locationVerified, faceVerified, base64Image } = req.body;
+    const { employeeId, userType = 'employee', breakType, locationVerified, faceVerified, base64Image } = req.body;
 
     if (!employeeId || !breakType) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -280,9 +285,9 @@ exports.markBreak = async (req, res) => {
     const storedCapturedUrl = base64Image ? (base64Image.startsWith('data:image') ? base64Image : `data:image/jpeg;base64,${base64Image}`) : null;
 
     await pool.query(
-      `INSERT INTO break_logs (employee_id, break_type, timestamp, image_url, status)
-       VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4)`,
-      [employeeId, breakType, storedCapturedUrl, status]
+      `INSERT INTO break_logs (employee_id, user_type, break_type, timestamp, image_url, status)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5)`,
+      [employeeId, userType, breakType, storedCapturedUrl, status]
     );
 
     return res.json({
@@ -299,20 +304,21 @@ exports.markBreak = async (req, res) => {
 exports.getEmployeeDashboardStatus = async (req, res) => {
   try {
     const { employeeId } = req.params;
+    const { userType = 'employee' } = req.query;
 
     // 1. Get today's attendance
     const attResult = await pool.query(
       `SELECT id, timestamp as check_in, checkout_timestamp as check_out, status 
-       FROM attendance WHERE employee_id = $1 AND date = CURRENT_DATE LIMIT 1`,
-      [employeeId]
+       FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,
+      [employeeId, userType]
     );
 
     // 2. Get last break log today
     const breakResult = await pool.query(
       `SELECT break_type, timestamp FROM break_logs 
-       WHERE employee_id = $1 AND DATE(timestamp) = CURRENT_DATE 
+       WHERE employee_id = $1 AND user_type = $2 AND DATE(timestamp) = CURRENT_DATE 
        ORDER BY timestamp DESC LIMIT 1`,
-      [employeeId]
+      [employeeId, userType]
     );
 
     // 3. Get pending task counts
@@ -321,8 +327,8 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
          COUNT(*) as total_tasks,
          SUM(CASE WHEN status IN ('pending', 'in_progress') THEN 1 ELSE 0 END) as pending_tasks,
          SUM(CASE WHEN status IN ('completed', 'resolved') THEN 1 ELSE 0 END) as completed_tasks
-       FROM tasks WHERE assignee_id = $1 AND assignee_type = 'employee'`,
-      [employeeId]
+       FROM tasks WHERE assignee_id = $1 AND assignee_type = $2`,
+      [employeeId, userType === 'sub_admin' ? 'department_admin' : userType]
     );
 
     let att = attResult.rowCount > 0 ? attResult.rows[0] : null;
@@ -370,9 +376,10 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
 exports.checkTodayAttendance = async (req, res) => {
   try {
     const { employeeId } = req.params;
+    const { userType = 'employee' } = req.query;
     const result = await pool.query(
-      `SELECT status, late_duration FROM attendance WHERE employee_id = $1 AND date = CURRENT_DATE LIMIT 1`,
-      [employeeId]
+      `SELECT status, late_duration FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,
+      [employeeId, userType]
     );
 
     if (result.rowCount === 0) {

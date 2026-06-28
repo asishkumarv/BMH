@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { name: 'My Wallet', icon: Wallet, route: '/department/dashboard/wallet' },
   { name: 'Patient History', icon: Users, route: '/department/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/department/dashboard/notifications' },
+  { name: 'Profile Requests', icon: Users, route: '/department/dashboard/profile-requests' },
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];
 
