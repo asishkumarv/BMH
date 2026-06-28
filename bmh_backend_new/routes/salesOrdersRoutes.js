@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../cloudinary");
+const cloudinary = require("../utils/cloudinary");
 
 // ---------------- Cloudinary Storage ------------------
 const storage = new CloudinaryStorage({
