@@ -109,7 +109,7 @@ exports.getBookings = async (req, res) => {
              d.full_name as doctor_name, d.department,
              e.full_name as booked_by_name
       FROM patient_bookings pb
-      JOIN patients p ON pb.patient_id = p.id
+      LEFT JOIN patients p ON pb.patient_id = p.id
       JOIN doctor_slots ds ON pb.slot_id = ds.id
       JOIN doctors d ON ds.doctor_id = d.id
       LEFT JOIN employees e ON pb.booked_by = e.id

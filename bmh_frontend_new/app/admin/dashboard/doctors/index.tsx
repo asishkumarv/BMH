@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform } from 'react-native';
 import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../../constants/Colors';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Platform } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 
@@ -47,9 +46,11 @@ export default function DoctorManagement() {
   // Manage Tokens
   const [manageTokenSlot, setManageTokenSlot] = useState<any>(null);
   const [slotBookingsMap, setSlotBookingsMap] = useState<any>({});
+  const [selectedTokens, setSelectedTokens] = useState<number[]>([]);
 
   const handleManageTokens = async (s: any) => {
     setManageTokenSlot(s);
+    setSelectedTokens([]);
     try {
       const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${s.id}`);
       const mapping: any = {};
@@ -62,25 +63,69 @@ export default function DoctorManagement() {
     }
   };
 
-  const handleToggleBlock = async (token_number: number) => {
+  const handleTokenSelect = (token_number: number) => {
     const status = slotBookingsMap[token_number];
     if (status && status !== 'VIP Quota') {
       alert('This token is already booked by a patient.');
       return;
     }
-    const action = status === 'VIP Quota' ? 'unblock' : 'block';
-    try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/bookings/block-token', {
-        slot_id: manageTokenSlot.id,
-        token_number,
-        action,
-        booked_by: undefined
-      });
-      if (res.data.success) {
-        setSlotBookingsMap({...slotBookingsMap, [token_number]: action === 'block' ? 'VIP Quota' : undefined });
+    setSelectedTokens(prev => 
+      prev.includes(token_number) 
+        ? prev.filter(t => t !== token_number) 
+        : [...prev, token_number]
+    );
+  };
+
+  const executeMultiBlock = async (action: 'block' | 'unblock') => {
+    if (selectedTokens.length === 0) return;
+    
+    const confirmMsg = action === 'block' 
+      ? `Are you sure you want to block ${selectedTokens.length} tokens?`
+      : `Are you sure you want to unblock ${selectedTokens.length} tokens?`;
+
+    const proceed = async () => {
+      try {
+        const results = await Promise.all(selectedTokens.map(async (token_number) => {
+          // Skip if already in desired state
+          if (action === 'block' && slotBookingsMap[token_number] === 'VIP Quota') return token_number;
+          if (action === 'unblock' && slotBookingsMap[token_number] !== 'VIP Quota') return token_number;
+
+          const res = await axios.post('https://bmh-eitu.onrender.com/bookings/block-token', {
+            slot_id: manageTokenSlot.id,
+            token_number,
+            action,
+            booked_by: undefined
+          });
+          return res.data.success ? token_number : null;
+        }));
+
+        const successful = results.filter(Boolean);
+        if (successful.length > 0) {
+          const newMap = { ...slotBookingsMap };
+          successful.forEach((t: any) => {
+            newMap[t] = action === 'block' ? 'VIP Quota' : undefined;
+          });
+          setSlotBookingsMap(newMap);
+        }
+        setSelectedTokens([]);
+        alert(`Successfully ${action}ed ${successful.length} tokens.`);
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Error updating tokens');
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Error updating token');
+    };
+
+    if (Platform.OS === 'web') {
+      if (!window.confirm(confirmMsg)) return;
+      proceed();
+    } else {
+      Alert.alert(
+        action === 'block' ? 'Block Tokens' : 'Unblock Tokens',
+        confirmMsg,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Confirm', onPress: proceed }
+        ]
+      );
     }
   };
   const [peons, setPeons] = useState<any[]>([]);
@@ -478,7 +523,7 @@ export default function DoctorManagement() {
               </TouchableOpacity>
             </View>
             <Text style={{fontSize: 14, color: '#64748b', marginBottom: 15}}>
-              Click a token to block/unblock (VIP Quota). Tokens in red are patient bookings. Gold are VIP Quota.
+              Select multiple tokens to block/unblock (VIP Quota). Tokens in red are patient bookings. Gold are VIP Quota. Selected tokens show a blue outline.
             </Text>
             
             <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center'}}>
@@ -486,23 +531,43 @@ export default function DoctorManagement() {
                 const status = slotBookingsMap[t];
                 const isBooked = status && status !== 'VIP Quota';
                 const isVip = status === 'VIP Quota';
+                const isSelected = selectedTokens.includes(t);
                 
                 return (
                   <TouchableOpacity
                     key={t}
                     style={{
-                      width: 50, height: 50, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+                      width: 60, height: 60, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
                       backgroundColor: isBooked ? '#fecaca' : (isVip ? '#fef3c7' : '#d1fae5'),
-                      borderWidth: 1, borderColor: isBooked ? '#ef4444' : (isVip ? '#f59e0b' : '#10b981'),
+                      borderWidth: isSelected ? 3 : 1, 
+                      borderColor: isSelected ? '#3b82f6' : (isBooked ? '#ef4444' : (isVip ? '#f59e0b' : '#10b981')),
                       opacity: isBooked ? 0.6 : 1
                     }}
-                    onPress={() => handleToggleBlock(t)}
+                    onPress={() => handleTokenSelect(t)}
                   >
                     <Text style={{fontWeight: 'bold', color: isBooked ? '#b91c1c' : (isVip ? '#b45309' : '#047857')}}>{t}</Text>
+                    {isVip && <Text style={{fontSize: 9, color: '#b45309', fontWeight: 'bold', marginTop: 2}}>Blocked</Text>}
                   </TouchableOpacity>
                 );
               })}
             </View>
+
+            {selectedTokens.length > 0 && (
+              <View style={{flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 20}}>
+                <TouchableOpacity 
+                  style={{backgroundColor: '#f59e0b', padding: 12, borderRadius: 8, flex: 1, alignItems: 'center'}}
+                  onPress={() => executeMultiBlock('block')}
+                >
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Block Selected</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{backgroundColor: '#10b981', padding: 12, borderRadius: 8, flex: 1, alignItems: 'center'}}
+                  onPress={() => executeMultiBlock('unblock')}
+                >
+                  <Text style={{color: 'white', fontWeight: 'bold'}}>Unblock Selected</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
