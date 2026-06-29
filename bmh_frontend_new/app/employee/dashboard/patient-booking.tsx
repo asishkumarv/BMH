@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
   filterCol: { flex: 1 },
   label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
   pickerContainer: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden' },
-  picker: { padding: 10, fontSize: 14, color: '#1e293b', ...Platform.select({ web: { outlineStyle: 'none' as any, border: 'none', backgroundColor: 'transparent' } }) },
+  picker: { padding: 10, fontSize: 14, color: '#1e293b', ...Platform.select({ web: { outlineWidth: 0 as any, border: 'none', backgroundColor: 'transparent' } }) },
   clearBtn: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#f8fafc' },
   clearBtnText: { color: '#64748b', fontWeight: 'bold' },
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0' },

@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   cartItemQty: { fontSize: 16, fontWeight: '700', color: Colors.light.primary },
 
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
-  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 14, fontSize: 14, color: Colors.light.text, marginBottom: 20, ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
+  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 14, fontSize: 14, color: Colors.light.text, marginBottom: 20, ...Platform.select({ web: { outlineWidth: 0 as any } }) },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
   cancelBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 },
   cancelBtnText: { color: Colors.light.text, fontWeight: '700', fontSize: 15 },

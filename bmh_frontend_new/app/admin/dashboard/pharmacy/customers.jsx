@@ -388,7 +388,7 @@ const FormInput = ({ label, ...props }) => (
 
 const webInputStyle = {
   width: '100%', padding: '12px 16px', borderRadius: '12px', border: `1.5px solid ${COLORS.border}`,
-  backgroundColor: COLORS.surface, fontSize: '14px', outline: 'none', color: COLORS.text, boxSizing: 'border-box'
+  backgroundColor: COLORS.surface, fontSize: '14px', outlineWidth: 0, color: COLORS.text, boxSizing: 'border-box'
 };
 
 const styles = StyleSheet.create({
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12,
     paddingHorizontal: 16, height: 48, backgroundColor: COLORS.surface,
     color: COLORS.text, fontSize: 14,
-    ...Platform.select({ web: { outlineStyle: "none" } })
+    ...Platform.select({ web: { outlineWidth: 0 } })
   },
 
   buttonRow: { flexDirection: 'row', marginTop: 16, gap: 12, flexWrap: 'wrap' },
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
 
   searchBarWrapper: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   searchIcon: { marginRight: 10 },
-  tableSearchInput: { flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  tableSearchInput: { flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: COLORS.surface, width: '90%', maxWidth: 800, maxHeight: '90%', borderRadius: 20, padding: 24 },

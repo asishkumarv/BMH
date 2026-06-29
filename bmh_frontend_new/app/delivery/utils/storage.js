@@ -29,3 +29,5 @@ export const clearStorage = async () => {
     await AsyncStorage.removeItem('employeeUser');
   }
 };
+
+export default function DummyStorage() { return null; }

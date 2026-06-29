@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     fontSize: "14px",
     color: "#374151",
-    outline: "none",
+    outlineWidth: 0,
   },
   messageContainer: {
     marginBottom: 10,

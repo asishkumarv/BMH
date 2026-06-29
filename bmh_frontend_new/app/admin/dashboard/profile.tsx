@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 12, backgroundColor: '#FFF' },
   inputIcon: { paddingHorizontal: 16 },
-  input: { flex: 1, paddingVertical: 14, paddingRight: 14, fontSize: 14, color: Colors.light.text, ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
+  input: { flex: 1, paddingVertical: 14, paddingRight: 14, fontSize: 14, color: Colors.light.text, ...Platform.select({ web: { outlineWidth: 0 as any } }) },
   eyeIcon: { padding: 14 },
   
   submitBtn: { backgroundColor: Colors.light.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },

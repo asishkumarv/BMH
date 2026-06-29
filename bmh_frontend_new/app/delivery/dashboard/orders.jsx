@@ -1412,7 +1412,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0'
   },
-  searchInput: { flex: 1, fontSize: 15, marginLeft: 10, color: '#1e293b',outlineStyle: "none" },
+  searchInput: { flex: 1, fontSize: 15, marginLeft: 10, color: '#1e293b',outlineWidth: 0 },
 
   filterRow: { flexDirection: "row", justifyContent: 'space-between', marginBottom: 25, backgroundColor: '#fff', padding: 10, borderRadius: 12 },
   filterCard: { flex: 1, alignItems: "center", paddingVertical: 10, flexDirection: 'row', justifyContent: 'center' },

@@ -503,9 +503,9 @@ const styles = StyleSheet.create({
   // Inputs
   searchContainer: { flexDirection: "row", flexWrap: 'wrap', gap: 12 },
   searchBox: { flex: 2, flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 15, height: 45 },
-  searchInput: { marginLeft: 10, flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  searchInput: { marginLeft: 10, flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
   agentSelect: { flex: 1, minWidth: 160, backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12, justifyContent: "center", height: 45 },
-  webSelect: { width: "100%", padding: 10, border: "none", outline: "none", backgroundColor: "transparent", fontSize: 13, fontWeight: "600", color: COLORS.text },
+  webSelect: { width: "100%", padding: 10, border: "none", outlineWidth: 0, backgroundColor: "transparent", fontSize: 13, fontWeight: "600", color: COLORS.text },
 
   // KPI Metrics
   statsContainer: { flexDirection: "row", gap: 15, marginBottom: 16 },

@@ -597,7 +597,7 @@ const webSelectStyle = {
   backgroundColor: COLORS.surface,
   fontSize: "13px",
   color: COLORS.text,
-  outline: "none",
+  outlineWidth: 0,
   width: "100%"
 };
 
@@ -612,7 +612,7 @@ const webDateInputStyle = {
   padding: "8px 12px",
   borderRadius: "8px",
   border: "none",
-  outline: "none",
+  outlineWidth: 0,
   backgroundColor: "rgba(255, 255, 255, 0.2)",
   color: "#fff",
   fontSize: "14px",
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 44,
   },
-  searchInput: { paddingVertical: 10, marginLeft: 10, flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  searchInput: { paddingVertical: 10, marginLeft: 10, flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
 
   mainContent: { flex: 1 },
   scrollContent: { padding: 20 },

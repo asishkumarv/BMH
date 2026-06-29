@@ -444,7 +444,7 @@ export default function SubAdminAttendanceDashboard() {
             <View style={styles.inputRow}>
               <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
                 <TextInput 
-                  style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
+                  style={[{flex: 1}, Platform.OS === 'web' && {outlineWidth: 0} as any]}
                   placeholder="Radius" 
                   value={radius} 
                   onChangeText={setRadius} 

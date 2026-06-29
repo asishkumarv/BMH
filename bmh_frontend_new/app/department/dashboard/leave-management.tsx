@@ -43,11 +43,14 @@ export default function SubAdminLeaveManagement() {
           numId = user.department_id;
           setDeptNumId(numId);
           try {
-            const res = await fetch(`${API_URL}/department/${numId}`);
+            const res = await fetch(`${API_URL}/department`);
             if (res.ok) {
                const data = await res.json();
-               deptName = data.data.name; 
-               setDepartmentId(deptName);
+               const match = (data.data || []).find((d: any) => String(d.id) === String(numId));
+               if (match) {
+                 deptName = match.name; 
+                 setDepartmentId(deptName);
+               }
             }
           } catch (e) {
             console.error(e);
@@ -58,7 +61,7 @@ export default function SubAdminLeaveManagement() {
       if (deptName) {
         fetchRequests(deptName);
         fetchSettings(deptName);
-        fetchEmployees(deptName);
+        fetchEmployees(deptName, numId);
         fetchHolidays(deptName);
       } else {
         setLoading(false);
@@ -67,12 +70,31 @@ export default function SubAdminLeaveManagement() {
     init();
   }, []);
 
-  const fetchEmployees = async (dept: string) => {
+  const fetchEmployees = async (dept: string, numId: string) => {
     try {
-      const res = await axios.get(`${API_URL}/employees`);
-      if (res.data && res.data.success) {
-        setEmployees((res.data.data || []).filter((e: any) => e.department === dept));
+      const [empRes, adminRes] = await Promise.all([
+        axios.get(`${API_URL}/employees`),
+        axios.get(`${API_URL}/admin/department-admins`).catch(() => ({ data: { data: [] } }))
+      ]);
+      let allUsers: any[] = [];
+      if (empRes.data && empRes.data.success) {
+        const emps = (empRes.data.data || []).map((e: any) => ({ ...e, user_type: 'employee' }));
+        allUsers = [...allUsers, ...emps];
       }
+      if (adminRes.data && adminRes.data.data) {
+        const admins = (adminRes.data.data || []).map((a: any) => ({
+          ...a,
+          department: dept, // since they are in this dept
+          role: 'Sub Admin',
+          user_type: 'sub_admin'
+        }));
+        allUsers = [...allUsers, ...admins];
+      }
+      
+      setEmployees(allUsers.filter((e: any) => 
+        (e.department && e.department.toLowerCase() === dept.toLowerCase()) || 
+        (e.department_id && String(e.department_id) === String(numId))
+      ));
     } catch (e) { console.error("Dropdown fetch error:", e); }
   };
 
@@ -101,7 +123,7 @@ export default function SubAdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/settings?department=${dept}`);
       if (res.ok) {
         const data = await res.json();
-        setEmployeeSettings((data.employeeSettings || []).filter((r: any) => r.department === dept));
+        setEmployeeSettings((data.employeeSettings || []).filter((r: any) => r.department && r.department.toLowerCase() === dept.toLowerCase()));
       }
     } catch (e) { console.error(e); }
   };
@@ -126,11 +148,15 @@ export default function SubAdminLeaveManagement() {
         Alert.alert('Error', 'Please select an employee');
         return;
       }
+      const employee = employees.find(e => e.id.toString() === rEmployeeId);
+      const userType = employee ? employee.user_type : 'employee';
+      
       const res = await fetch(`${API_URL}/leave/settings/employee`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_id: parseInt(rEmployeeId),
+          user_type: userType,
           leaves_per_month: parseInt(rLeaves), extra_leave_penalty: parseFloat(rExtraPen),
           late_checkin_limit: parseInt(rLateLim), late_checkin_penalty: parseInt(rLatePen),
           early_checkout_limit: parseInt(rEarlyLim), early_checkout_penalty: parseInt(rEarlyPen)
@@ -285,7 +311,7 @@ export default function SubAdminLeaveManagement() {
                   style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
                   <option value="">Select an Employee</option>
-                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name} ({emp.department} - {emp.role})</option>)}
+                  {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={emp.id}>{emp.full_name} ({emp.department || 'Dept'} - {emp.role || 'Sub Admin'})</option>)}
                 </select>
               ) : (
                 <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />

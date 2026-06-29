@@ -414,7 +414,7 @@ const autoAssignUnassignedOrders = async (orders) => {
     padding: 10,
     borderRadius: 8,
     border: "1px solid #cbd5e1",
-    outline: "none",
+    outlineWidth: 0,
   }}
 />
   ) : (
@@ -656,7 +656,7 @@ mainTitle: {
     marginLeft: 10,
     fontSize: 14,
     color: COLORS.text,
-    ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
+    ...(Platform.OS === "web" ? { outlineWidth: 0 } : {}),
   },
 
   // ---------- TOP BAR ----------

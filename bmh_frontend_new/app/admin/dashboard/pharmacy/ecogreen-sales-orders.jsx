@@ -522,7 +522,7 @@ const webDateFilterStyle = {
   border: `1.5px solid ${COLORS.border}`,
   backgroundColor: '#FFFFFF',
   fontSize: '13px',
-  outline: 'none',
+  outlineWidth: 0,
   color: COLORS.text,
   fontFamily: 'inherit'
 };
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     height: 46,
   },
-  searchInputWeb: { marginLeft: 8, flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  searchInputWeb: { marginLeft: 8, flex: 1, fontSize: 14, color: COLORS.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
 
   card: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
 

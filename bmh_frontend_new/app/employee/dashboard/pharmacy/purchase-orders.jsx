@@ -773,7 +773,7 @@ const S = StyleSheet.create({
     color: BRAND.ink,
     backgroundColor: BRAND.bg,
     marginBottom: 4,
-    ...Platform.select({ web: { outlineStyle: 'none' } })
+    ...Platform.select({ web: { outlineWidth: 0 } })
   },
   pickerWrapper: { borderWidth: 1, borderColor: BRAND.border, borderRadius: 10, backgroundColor: BRAND.bg, overflow: 'hidden' },
   itemsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 },

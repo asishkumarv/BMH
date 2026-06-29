@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput, Image, KeyboardAvoidingView, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Platform, TextInput, Image, KeyboardAvoidingView, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Animated } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Location from 'expo-location';
 import { ArrowLeft, Clock, Eye, EyeOff, Search, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -23,6 +25,15 @@ export default function EmployeePortal() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [markingAttendance, setMarkingAttendance] = useState(false);
 
+  // Camera & Location state
+  const [permission, requestPermission] = useCameraPermissions();
+  const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [actionType, setActionType] = useState<'login' | 'logout' | null>(null);
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [cameraMessage, setCameraMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
+  const cameraRef = useRef<any>(null);
+
   useEffect(() => {
     // Fetch employees for quick attendance
     const fetchEmployees = async () => {
@@ -43,30 +54,71 @@ export default function EmployeePortal() {
     emp.employee_id?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleQuickAttendance = async (action: 'login' | 'logout') => {
+  const handleAction = async (action: 'login' | 'logout') => {
     if (!selectedEmployee) {
       Toast.show({ type: 'error', text1: 'Error', text2: 'Please select an employee first' });
       return;
     }
-    setMarkingAttendance(true);
+    if (!permission?.granted) {
+      const { status } = await requestPermission();
+      if (status !== 'granted') return alert('Camera permission required.');
+    }
+    if (!locationPermission?.granted) {
+      const { status } = await requestLocationPermission();
+      if (status !== 'granted') return alert('Location permission required.');
+    }
+
+    setActionType(action);
+    setCameraMessage(null);
+    setCameraVisible(true);
+  };
+
+  const takePictureAndSubmit = async () => {
+    if (!cameraRef.current) return;
+    setLoadingAction(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/attendance/quick-attendance', {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, base64: true });
+      const location = await Location.getCurrentPositionAsync({});
+
+      // Verify Location first
+      const locRes = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-location', {
         employeeId: selectedEmployee.id,
-        action
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
       });
-      if (res.data.success) {
-        Toast.show({ type: 'success', text1: 'Success', text2: res.data.message });
-        setSearchQuery('');
-        setSelectedEmployee(null);
+
+      const isLocationVerified = locRes.data.success && locRes.data.locationVerified;
+      
+      if (!isLocationVerified) {
+         setCameraMessage({ text: locRes.data.message || "Outside allowed area.", type: 'error' });
+         setLoadingAction(false);
+         return;
       }
-    } catch (err: any) {
-      Toast.show({ 
-        type: 'error', 
-        text1: 'Failed', 
-        text2: err.response?.data?.message || 'Failed to mark attendance' 
-      });
+
+      const payload: any = {
+        base64Image: photo.base64,
+        employeeId: selectedEmployee.id,
+        locationVerified: isLocationVerified,
+        action: actionType
+      };
+
+      const res = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-face', payload);
+      if (res.data.success) {
+        setCameraMessage({ text: res.data.message, type: 'success' });
+        Toast.show({ type: 'success', text1: 'Success', text2: res.data.message });
+        setTimeout(() => {
+          setCameraVisible(false);
+          setSearchQuery('');
+          setSelectedEmployee(null);
+        }, 2000);
+      } else {
+        setCameraMessage({ text: res.data.message, type: 'error' });
+      }
+    } catch (error: any) {
+      console.error(error);
+      setCameraMessage({ text: error.response?.data?.message || "Something went wrong.", type: 'error' });
     } finally {
-      setMarkingAttendance(false);
+      setLoadingAction(false);
     }
   };
 
@@ -99,6 +151,37 @@ export default function EmployeePortal() {
 
   return (
     <View style={styles.container}>
+      {cameraVisible && (
+        <View style={styles.cameraOverlay}>
+          <View style={styles.cameraContainer}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 15, color: '#1E293B', textAlign: 'center' }}>
+              {actionType === 'login' ? 'Duty On' : 'Duty Off'} - Face Verification
+            </Text>
+            
+            <View style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 20, width: '100%', aspectRatio: 3/4, backgroundColor: '#000' }}>
+              <CameraView style={{ flex: 1 }} facing="front" ref={cameraRef} />
+            </View>
+            
+            {cameraMessage && (
+              <View style={{ padding: 12, backgroundColor: cameraMessage.type === 'error' ? '#FEE2E2' : '#D1FAE5', borderRadius: 8, marginBottom: 15 }}>
+                <Text style={{ color: cameraMessage.type === 'error' ? '#DC2626' : '#059669', textAlign: 'center', fontWeight: '500' }}>
+                  {cameraMessage.text}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={[styles.captureBtn, { flex: 1 }]} onPress={takePictureAndSubmit} disabled={loadingAction}>
+                {loadingAction ? <ActivityIndicator color="#fff" /> : <Text style={styles.captureBtnText}>Capture & Submit</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.captureBtn, { flex: 1, backgroundColor: '#ef4444' }]} onPress={() => setCameraVisible(false)}>
+                <Text style={styles.captureBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Left Branding Side (Only visible on larger screens) */}
       {isDesktop && (
         <View style={styles.leftPanel}>
@@ -135,46 +218,7 @@ export default function EmployeePortal() {
 
             <View style={styles.formContainer}>
               <Text style={styles.pageTitle}>Employee Portal</Text>
-              <Text style={styles.pageSubtitle}>Sign in to your account or mark quick attendance below.</Text>
-
-              {/* Toggle Buttons */}
-              <View style={styles.toggleContainer}>
-                <Pressable 
-                  style={styles.toggleBtnOutline} 
-                  onPress={() => router.push('/employee/register')}
-                >
-                  <Text style={styles.toggleBtnTextOutline}>Sign Up</Text>
-                </Pressable>
-                <Pressable style={styles.toggleBtnSolid}>
-                  <Text style={styles.toggleBtnTextSolid}>Login</Text>
-                </Pressable>
-              </View>
-
-              {/* Login Form */}
-              <View style={styles.loginForm}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Email Address</Text>
-                  <TextInput style={styles.input} placeholder="name@hospital.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} autoCapitalize="none" />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Password</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' }}>
-                    <TextInput style={[styles.input, { borderWidth: 0, flex: 1, backgroundColor: 'transparent' }]} placeholder="••••••••" secureTextEntry={!showPassword} placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} />
-                    <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 14 }}>
-                      {showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}
-                    </Pressable>
-                  </View>
-                </View>
-                <Pressable style={styles.loginBtn} onPress={handleLogin} disabled={loggingIn}>
-                  <Text style={styles.loginBtnText}>{loggingIn ? 'Logging in...' : 'Secure Login'}</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.divider}>
-                <View style={styles.line} />
-                <Text style={styles.dividerText}>QUICK ATTENDANCE</Text>
-                <View style={styles.line} />
-              </View>
+              <Text style={styles.pageSubtitle}>Mark quick attendance or sign in to your account below.</Text>
 
               {/* Quick Attendance */}
               <View style={styles.attendanceSection}>
@@ -185,7 +229,7 @@ export default function EmployeePortal() {
                   <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }]}>
                     <Search color="#94A3B8" size={18} style={{ marginRight: 8 }} />
                     <TextInput 
-                      style={{ flex: 1, outlineStyle: 'none' } as any} 
+                      style={{ flex: 1, outlineWidth: 0 } as any} 
                       placeholder="Search by name or ID..." 
                       value={searchQuery}
                       onChangeText={(txt) => {
@@ -231,23 +275,61 @@ export default function EmployeePortal() {
                 <View style={styles.attendanceBtns}>
                   <Pressable 
                     style={[styles.dutyOnBtn, markingAttendance && { opacity: 0.7 }]}
-                    onPress={() => handleQuickAttendance('login')}
+                    onPress={() => handleAction('login')}
                     disabled={markingAttendance}
                   >
-                    {markingAttendance ? <ActivityIndicator color="#FFF" size="small" /> : <Clock color="#FFF" size={16} />}
+                    <Clock color="#FFF" size={16} />
                     <Text style={styles.dutyBtnText}>Duty On</Text>
                   </Pressable>
                   <Pressable 
                     style={[styles.dutyOffBtn, markingAttendance && { opacity: 0.7 }]}
-                    onPress={() => handleQuickAttendance('logout')}
+                    onPress={() => handleAction('logout')}
                     disabled={markingAttendance}
                   >
-                    {markingAttendance ? <ActivityIndicator color="#FFF" size="small" /> : <Clock color="#FFF" size={16} />}
+                    <Clock color="#FFF" size={16} />
                     <Text style={styles.dutyBtnText}>Duty Off</Text>
                   </Pressable>
                 </View>
               </View>
 
+              <View style={styles.divider}>
+                <View style={styles.line} />
+                <Text style={styles.dividerText}>OR SECURE LOGIN</Text>
+                <View style={styles.line} />
+              </View>
+
+              {/* Toggle Buttons */}
+              <View style={styles.toggleContainer}>
+                <Pressable 
+                  style={styles.toggleBtnOutline} 
+                  onPress={() => router.push('/employee/register')}
+                >
+                  <Text style={styles.toggleBtnTextOutline}>Sign Up</Text>
+                </Pressable>
+                <Pressable style={styles.toggleBtnSolid}>
+                  <Text style={styles.toggleBtnTextSolid}>Login</Text>
+                </Pressable>
+              </View>
+
+              {/* Login Form */}
+              <View style={styles.loginForm}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <TextInput style={styles.input} placeholder="name@hospital.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} autoCapitalize="none" />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' }}>
+                    <TextInput style={[styles.input, { borderWidth: 0, flex: 1, backgroundColor: 'transparent' }]} placeholder="••••••••" secureTextEntry={!showPassword} placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} />
+                    <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 14 }}>
+                      {showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}
+                    </Pressable>
+                  </View>
+                </View>
+                <Pressable style={styles.loginBtn} onPress={handleLogin} disabled={loggingIn}>
+                  <Text style={styles.loginBtnText}>{loggingIn ? 'Logging in...' : 'Secure Login'}</Text>
+                </Pressable>
+              </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -419,7 +501,7 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 15,
     color: '#1E293B',
-    ...Platform.select({ web: { outlineStyle: 'none' as any } })
+    ...Platform.select({ web: { outlineWidth: 0 as any } })
   },
   loginBtn: {
     backgroundColor: '#1E40AF',
@@ -452,6 +534,7 @@ const styles = StyleSheet.create({
   },
   attendanceSection: {
     width: '100%',
+    zIndex: 50,
   },
   attendanceBtns: {
     flexDirection: 'row',
@@ -516,5 +599,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
+  },
+  cameraOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    zIndex: 9999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  cameraContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 24,
+    ...Platform.select({ web: { boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }})
+  },
+  captureBtn: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  captureBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   }
 });

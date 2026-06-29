@@ -842,7 +842,7 @@ const styles = StyleSheet.create({
     color: THEME.ink,
     fontWeight: "500",
     ...Platform.select({
-      web: { outlineStyle: "none" },
+      web: { outlineWidth: 0 },
       default: {},
     }),
   },

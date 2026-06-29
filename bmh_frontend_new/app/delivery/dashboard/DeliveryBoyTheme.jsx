@@ -59,3 +59,5 @@ export const DB_BASE = StyleSheet.create({
     fontSize: 15,
   },
 });
+
+export default function DummyTheme() { return null; }

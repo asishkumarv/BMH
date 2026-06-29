@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 15,
     color: '#1E293B',
-    ...Platform.select({ web: { outlineStyle: 'none' as any } })
+    ...Platform.select({ web: { outlineWidth: 0 as any } })
   },
   loginBtn: {
     backgroundColor: '#1E40AF',

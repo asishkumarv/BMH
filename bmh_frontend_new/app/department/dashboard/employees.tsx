@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   addRoleSection: { marginBottom: 32, backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border },
   addRoleRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
-  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 14, fontSize: 14, color: Colors.light.text, marginBottom: 20, ...Platform.select({ web: { outlineStyle: 'none' as any } }) },
+  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 14, fontSize: 14, color: Colors.light.text, marginBottom: 20, ...Platform.select({ web: { outlineWidth: 0 as any } }) },
   
   existingRolesSection: { flex: 1 },
   roleItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },

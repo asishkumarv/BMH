@@ -45,9 +45,10 @@ export default function AdminLeaveManagement() {
 
   const fetchDropdownData = async () => {
     try {
-      const [deptRes, empRes] = await Promise.all([
+      const [deptRes, empRes, adminRes] = await Promise.all([
         axios.get(`https://bmh-eitu.onrender.com/department`),
-        axios.get(`${API_URL}/employees`)
+        axios.get(`${API_URL}/employees`),
+        axios.get(`${API_URL}/admin/department-admins`).catch(() => ({ data: { data: [] } }))
       ]);
       if (deptRes.data && deptRes.data.success) {
         const depts = deptRes.data.data;
@@ -56,9 +57,28 @@ export default function AdminLeaveManagement() {
           setDDept(depts[0].name);
         }
       }
+      let allUsers: any[] = [];
       if (empRes.data && empRes.data.success) {
-        setEmployees(empRes.data.data || []);
+        const emps = (empRes.data.data || []).map((e: any) => ({ ...e, user_type: 'employee' }));
+        allUsers = [...allUsers, ...emps];
       }
+      if (adminRes.data && adminRes.data.data) {
+        const admins = (adminRes.data.data || []).map((a: any) => {
+          let deptName = 'Dept';
+          if (deptRes.data && deptRes.data.success) {
+            const match = deptRes.data.data.find((d: any) => d.id === a.department_id);
+            if (match) deptName = match.name;
+          }
+          return {
+            ...a,
+            department: deptName,
+            role: 'Sub Admin',
+            user_type: 'sub_admin'
+          };
+        });
+        allUsers = [...allUsers, ...admins];
+      }
+      setEmployees(allUsers);
     } catch (error) {
       console.error("Dropdown fetch error:", error);
     }
@@ -123,11 +143,15 @@ export default function AdminLeaveManagement() {
         Alert.alert('Error', 'Please select an employee');
         return;
       }
+      const employee = employees.find(e => e.id.toString() === rEmployeeId);
+      const userType = employee ? employee.user_type : 'employee';
+      
       const res = await fetch(`${API_URL}/leave/settings/employee`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employee_id: parseInt(rEmployeeId),
+          user_type: userType,
           leaves_per_month: parseInt(rLeaves), extra_leave_penalty: parseFloat(rExtraPen),
           late_checkin_limit: parseInt(rLateLim), late_checkin_penalty: parseInt(rLatePen),
           early_checkout_limit: parseInt(rEarlyLim), early_checkout_penalty: parseInt(rEarlyPen)
@@ -326,7 +350,7 @@ export default function AdminLeaveManagement() {
                       style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                     >
                       <option value="">Select an Employee</option>
-                      {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name} ({emp.department} - {emp.role})</option>)}
+                      {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={emp.id}>{emp.full_name} ({emp.department} - {emp.role || 'Sub Admin'})</option>)}
                     </select>
                   ) : (
                     <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />

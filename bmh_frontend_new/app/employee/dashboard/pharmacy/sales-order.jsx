@@ -462,10 +462,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: "800", color: BRAND.ink, textTransform: "uppercase", letterSpacing: 0.5 },
 
   fieldLabel: { fontSize: 11, fontWeight: "800", color: BRAND.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 },
-  input: { backgroundColor: BRAND.bg, borderWidth: 1, borderColor: BRAND.border, borderRadius: 10, paddingHorizontal: 15, height: 46, fontSize: 14, color: BRAND.ink, marginBottom: 15, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) },
-  phoneInputRow: { flexDirection: "row", alignItems: "center", ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) },
+  input: { backgroundColor: BRAND.bg, borderWidth: 1, borderColor: BRAND.border, borderRadius: 10, paddingHorizontal: 15, height: 46, fontSize: 14, color: BRAND.ink, marginBottom: 15, ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {}) },
+  phoneInputRow: { flexDirection: "row", alignItems: "center", ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {}) },
   prefix: { color: BRAND.muted, fontWeight: "700", fontSize: 14 },
-  flexInput: { flex: 1, color: BRAND.ink, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}) },
+  flexInput: { flex: 1, color: BRAND.ink, ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {}) },
 
   itemCard: { backgroundColor: BRAND.surface, padding: 18, borderRadius: 12, marginBottom: 15, marginHorizontal: 24, borderWidth: 1, borderColor: BRAND.border, elevation: 1 },
   itemCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },

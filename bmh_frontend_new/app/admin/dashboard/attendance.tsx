@@ -227,14 +227,9 @@ export default function AdminAttendanceScreen() {
   const handleSaveEdit = async () => {
     setUpdating(true);
     try {
-      let checkInTime = null;
-      let checkOutTime = null;
-      if (editCheckIn) checkInTime = new Date(`${editRecord.date}T${editCheckIn}:00Z`).toISOString();
-      if (editCheckOut) checkOutTime = new Date(`${editRecord.date}T${editCheckOut}:00Z`).toISOString();
-
       await axios.put(`https://bmh-eitu.onrender.com/attendance/admin-update/${editRecord.id}`, {
-        check_in: checkInTime,
-        check_out: checkOutTime,
+        check_in: editCheckIn || null,
+        check_out: editCheckOut || null,
         status: editStatus
       });
       Alert.alert('Success', 'Attendance updated');
@@ -284,12 +279,12 @@ export default function AdminAttendanceScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.sectionHeader}>
+      <View style={[styles.sectionHeader, !isDesktop && { flexDirection: 'column', alignItems: 'flex-start', gap: 15 }]}>
         <View>
           <Text style={styles.header}>Attendance Dashboard</Text>
           <Text style={styles.subtitle}>Overview of today's presence</Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
           <View style={styles.userTypeToggle}>
             <TouchableOpacity 
               style={[styles.toggleBtn, selectedUserType === 'employee' && styles.toggleBtnActive]}
@@ -354,7 +349,7 @@ export default function AdminAttendanceScreen() {
             
             <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
               <TextInput 
-                style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
+                style={[{flex: 1}, Platform.OS === 'web' && {outlineWidth: 0} as any]}
                 placeholder="Radius" 
                 value={radius} 
                 onChangeText={setRadius} 
@@ -449,7 +444,7 @@ export default function AdminAttendanceScreen() {
           </ScrollView>
           <View style={[styles.input, { flex: 0.5, minWidth: 200, margin: 0, padding: 8 }]}>
              <TextInput 
-               style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
+               style={[{flex: 1}, Platform.OS === 'web' && {outlineWidth: 0} as any]}
                placeholder="Search Name, Email, Phone..." 
                value={searchQuery} 
                onChangeText={setSearchQuery} 
@@ -502,13 +497,7 @@ export default function AdminAttendanceScreen() {
               </View>
               <Text style={styles.tableCell}>{r.status}</Text>
               <View style={[styles.tableCell, { flex: 0.8, alignItems: 'center', gap: 5 }]}>
-                <TouchableOpacity style={styles.actionBtnText} onPress={() => {
-                  setEditRecord(r);
-                  setEditCheckIn(r.check_in ? new Date(r.check_in).toISOString().split('T')[1].substring(0,5) : '');
-                  setEditCheckOut(r.check_out ? new Date(r.check_out).toISOString().split('T')[1].substring(0,5) : '');
-                  setEditStatus(r.status);
-                  setEditModalVisible(true);
-                }}>
+                <TouchableOpacity style={styles.actionBtnText} onPress={() => openEditModal(r)}>
                   <Edit2 size={16} color={Colors.light.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtnText} onPress={() => {setSelectedEmployeeId(r.employee_id); setModalVisible(true);}}>
@@ -660,7 +649,7 @@ const webInputStyle = {
   borderRadius: '8px',
   border: '1px solid #d1d5db',
   fontSize: '16px',
-  outline: 'none',
+  outlineWidth: 0,
   backgroundColor: '#fff',
   boxSizing: 'border-box' as 'border-box'
 };

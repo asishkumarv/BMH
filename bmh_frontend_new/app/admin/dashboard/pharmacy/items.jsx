@@ -523,7 +523,7 @@ const FilterInput = ({ label, placeholder, value, onChange, type = 'text' }) => 
 
 const webInputStyle = {
   width: '100%', padding: '12px 16px', borderRadius: '12px', border: `1.5px solid ${COLORS.border}`,
-  backgroundColor: COLORS.surface, fontSize: '14px', outline: 'none', color: COLORS.text
+  backgroundColor: COLORS.surface, fontSize: '14px', outlineWidth: 0, color: COLORS.text
 };
 
 const styles = StyleSheet.create({
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12, 
     paddingHorizontal: 16, height: 48, backgroundColor: COLORS.surface, 
     color: COLORS.text, fontSize: 14,
-    ...Platform.select({ web: { outlineStyle: "none" } })
+    ...Platform.select({ web: { outlineWidth: 0 } })
   },
   
   buttonRow: { flexDirection: 'row', marginTop: 16, gap: 12, flexWrap: 'wrap' },
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#fff', fontWeight: '700' },
 
   tableSearchContainer: { padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  tableSearch: { backgroundColor: "#F8FAFC", paddingHorizontal: 16, height: 44, borderRadius: 12, width: '100%', maxWidth: 400, borderWidth: 1.5, borderColor: COLORS.border, color: COLORS.text, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  tableSearch: { backgroundColor: "#F8FAFC", paddingHorizontal: 16, height: 44, borderRadius: 12, width: '100%', maxWidth: 400, borderWidth: 1.5, borderColor: COLORS.border, color: COLORS.text, ...Platform.select({ web: { outlineWidth: 0 } }) },
   tableHeader: { flexDirection: 'row', backgroundColor: "#F8FAFC", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerCellText: { fontWeight: '800', color: COLORS.textMuted, fontSize: 12, textTransform: 'uppercase' },
   tableRow: { flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border, alignItems: 'center' },

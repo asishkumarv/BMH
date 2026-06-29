@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  textInput: { flex: 1, color: COLORS.text, fontSize: 14, ...Platform.select({ web: { outlineStyle: 'none' } }) },
+  textInput: { flex: 1, color: COLORS.text, fontSize: 14, ...Platform.select({ web: { outlineWidth: 0 } }) },
 
   // Linear Gradient Tracking Button
   searchBtn: {

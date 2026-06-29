@@ -365,7 +365,7 @@ const FormInput = ({ label, ...props }) => (
 
 const webInputStyle = {
   width: '100%', padding: '12px 16px', borderRadius: '12px', border: `1.5px solid ${COLORS.border}`,
-  backgroundColor: COLORS.surface, fontSize: '14px', outline: 'none', color: COLORS.text
+  backgroundColor: COLORS.surface, fontSize: '14px', outlineWidth: 0, color: COLORS.text
 };
 
 const styles = StyleSheet.create({
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12,
     paddingHorizontal: 16, height: 48, backgroundColor: COLORS.surface,
     color: COLORS.text, fontSize: 14,
-    ...Platform.select({ web: { outlineStyle: "none" } })
+    ...Platform.select({ web: { outlineWidth: 0 } })
   },
 
   buttonRow: { flexDirection: 'row', marginTop: 16, gap: 12, flexWrap: 'wrap' },
