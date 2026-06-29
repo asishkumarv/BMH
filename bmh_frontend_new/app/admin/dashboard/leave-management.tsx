@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { API_URL } from '@/config';
@@ -8,6 +10,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function AdminLeaveManagement() {
   const { isMobile, isDesktop } = useResponsive();
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeTab, setActiveTab] = useState<'requests' | 'settings' | 'holidays'>('requests');
   const [requests, setRequests] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
@@ -224,7 +227,7 @@ export default function AdminLeaveManagement() {
         </View>
       </View>
 
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={{flexGrow: 1}}>
         <Pressable style={[styles.tab, activeTab === 'requests' && styles.activeTab]} onPress={() => setActiveTab('requests')}>
           <Users size={18} color={activeTab === 'requests' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Leave Requests</Text>
@@ -237,7 +240,7 @@ export default function AdminLeaveManagement() {
           <CalendarDays size={18} color={activeTab === 'holidays' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'holidays' && styles.activeTabText]}>Holidays</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       {activeTab === 'requests' && (
         <View>
@@ -301,10 +304,16 @@ export default function AdminLeaveManagement() {
                   onChange={(e: any) => setDDept(e.target.value)} 
                   style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
+                  <option value="">Select Department</option>
                   {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
               ) : (
-                <TextInput style={styles.input} value={dDept} onChangeText={setDDept} placeholder="e.g. Cardiology" />
+                <View style={[styles.input, { paddingHorizontal: 0, justifyContent: 'center' }]}>
+                  <Picker selectedValue={dDept} onValueChange={setDDept} style={{ width: '100%', height: 50 }}>
+                    <Picker.Item label="Select Department" value="" />
+                    {departments.map(d => <Picker.Item key={d.id} label={d.name} value={d.name} />)}
+                  </Picker>
+                </View>
               )}
               
               <Text style={styles.label}>Max Concurrent Leaves</Text>
@@ -362,7 +371,30 @@ export default function AdminLeaveManagement() {
                       {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={`${emp.user_type}-${emp.id}`}>{emp.full_name} ({emp.department} - {emp.role || 'Sub Admin'})</option>)}
                     </select>
                   ) : (
-                    <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />
+                    <View style={[styles.input, { paddingHorizontal: 0, justifyContent: 'center' }]}>
+                      <Picker 
+                        selectedValue={rEmployeeId} 
+                        onValueChange={(val) => {
+                          const [uType, eIdStr] = val.split('-');
+                          setREmployeeId(val);
+                          const existing = employeeSettings.find(es => es.employee_id == eIdStr && es.user_type === uType);
+                          if (existing) {
+                            setRLeaves(existing.leaves_per_month.toString());
+                            setRExtraPen(existing.extra_leave_penalty.toString());
+                            setRLateLim(existing.late_checkin_limit.toString());
+                            setRLatePen(existing.late_checkin_penalty.toString());
+                            setREarlyLim(existing.early_checkout_limit.toString());
+                            setREarlyPen(existing.early_checkout_penalty.toString());
+                          } else {
+                            setRLeaves('0'); setRExtraPen('0'); setRLateLim('0'); setRLatePen('0'); setREarlyLim('0'); setREarlyPen('0');
+                          }
+                        }}
+                        style={{ width: '100%', height: 50 }}
+                      >
+                        <Picker.Item label="Select an Employee" value="" />
+                        {employees.map(emp => <Picker.Item key={`${emp.user_type}-${emp.id}`} label={`${emp.full_name} (${emp.department})`} value={`${emp.user_type}-${emp.id}`} />)}
+                      </Picker>
+                    </View>
                   )}
                 </View>
               </View>
@@ -432,14 +464,46 @@ export default function AdminLeaveManagement() {
               
               <Text style={styles.label}>Department</Text>
               <View style={styles.pickerContainer}>
-                <select style={styles.webSelect} value={hDept} onChange={(e) => setHDept(e.target.value)}>
-                  <option value="All">All Departments</option>
-                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                </select>
+                {Platform.OS === 'web' ? (
+                  <select style={styles.webSelect} value={hDept} onChange={(e) => setHDept(e.target.value)}>
+                    <option value="All">All Departments</option>
+                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                ) : (
+                  <View style={[styles.input, { paddingHorizontal: 0, justifyContent: 'center' }]}>
+                    <Picker selectedValue={hDept} onValueChange={setHDept} style={{ width: '100%', height: 50 }}>
+                      <Picker.Item label="All Departments" value="All" />
+                      {departments.map(d => <Picker.Item key={d.id} label={d.name} value={d.name} />)}
+                    </Picker>
+                  </View>
+                )}
               </View>
 
               <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
-              <TextInput style={styles.input} value={hDate} onChangeText={setHDate} placeholder="e.g. 2026-12-25" />
+              {Platform.OS === 'web' ? (
+                <input type="date" value={hDate} onChange={(e) => setHDate(e.target.value)} style={{...(styles.input as any), width: '100%', boxSizing: 'border-box'}} />
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                    <View pointerEvents="none">
+                      <TextInput style={styles.input} value={hDate} placeholder="e.g. 2026-12-25" editable={false} />
+                    </View>
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker 
+                      value={hDate ? new Date(hDate) : new Date()} 
+                      mode="date" 
+                      display="default" 
+                      onChange={(event: any, selectedDate: any) => {
+                        setShowDatePicker(false);
+                        if (selectedDate) {
+                          setHDate(selectedDate.toISOString().split('T')[0]);
+                        }
+                      }} 
+                    />
+                  )}
+                </>
+              )}
 
               <Text style={styles.label}>Description</Text>
               <TextInput style={styles.input} value={hDesc} onChangeText={setHDesc} placeholder="e.g. Christmas Day" />

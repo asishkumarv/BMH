@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image } from 'react-native';
+import { WebView } from 'react-native-webview';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Download, MapPin, ChevronDown, ChevronUp, Clock, Coffee, CheckCircle, AlertTriangle } from 'lucide-react-native';
@@ -7,38 +8,59 @@ import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
-const MapPicker = ({ lat, lng }: any) => {
+const MapPicker = ({ lat, lng, onSelect }: any) => {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>body, html, #map { height: 100%; margin: 0; padding: 0; }</style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          var map = L.map('map').setView([${lat || 20.5937}, ${lng || 78.9629}], ${lat ? 15 : 5});
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+          var marker = ${lat ? `L.marker([${lat}, ${lng}]).addTo(map)` : 'null'};
+          map.on('click', function(e) {
+            if(marker) map.removeLayer(marker);
+            marker = L.marker(e.latlng).addTo(map);
+            var msg = JSON.stringify({ type: 'map-click', lat: e.latlng.lat, lng: e.latlng.lng });
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(msg);
+            } else {
+              window.parent.postMessage(msg, '*');
+            }
+          });
+        </script>
+      </body>
+    </html>
+  `;
+
   if (Platform.OS === 'web') {
     return (
       <iframe 
-        srcDoc={`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-              <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-              <style>body, html, #map { height: 100%; margin: 0; padding: 0; }</style>
-            </head>
-            <body>
-              <div id="map"></div>
-              <script>
-                var map = L.map('map').setView([${lat || 20.5937}, ${lng || 78.9629}], ${lat ? 15 : 5});
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                var marker = ${lat ? `L.marker([${lat}, ${lng}]).addTo(map)` : 'null'};
-                map.on('click', function(e) {
-                  if(marker) map.removeLayer(marker);
-                  marker = L.marker(e.latlng).addTo(map);
-                  window.parent.postMessage(JSON.stringify({ type: 'map-click', lat: e.latlng.lat, lng: e.latlng.lng }), '*');
-                });
-              </script>
-            </body>
-          </html>
-        `}
+        srcDoc={htmlContent}
         style={{ width: '100%', height: 300, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, marginTop: 15 }}
       />
     );
   }
-  return <Text style={{marginTop: 10, color: '#6b7280'}}>Map selection not supported on native without extra packages. Please enter coordinates manually.</Text>;
+  return (
+    <WebView
+      source={{ html: htmlContent }}
+      style={{ width: '100%', height: 300, borderRadius: 8, marginTop: 15 }}
+      onMessage={(event) => {
+        try {
+          const data = JSON.parse(event.nativeEvent.data);
+          if (data.type === 'map-click' && onSelect) {
+            onSelect(data.lat, data.lng);
+          }
+        } catch(e) {}
+      }}
+    />
+  );
 };
 
 const Dropdown = ({ options, value, onChange }: any) => {
@@ -465,7 +487,7 @@ export default function SubAdminAttendanceDashboard() {
               </View>
             </View>
 
-            <MapPicker lat={lat} lng={lng} />
+            <MapPicker lat={lat} lng={lng} onSelect={(newLat: any, newLng: any) => { setLat(newLat.toString()); setLng(newLng.toString()); }} />
 
             <TouchableOpacity style={styles.button} onPress={handleUpdateConfig}>
               <Text style={styles.buttonText}>Save Configuration</Text>

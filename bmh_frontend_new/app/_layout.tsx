@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator, Platform, LogBox } from 'react-native';
 import { Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 import Toast from 'react-native-toast-message';
 import axios from 'axios';
+
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  'expo-notifications functionality is not fully supported',
+]);
 
 if (Platform.OS !== 'web') {
   const store = new Map<string, string>();
@@ -59,14 +64,6 @@ export default function RootLayout() {
     }
   }, []);
 
-  if (!ready) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.light.background }}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
-      </View>
-    );
-  }
-
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => {
@@ -92,6 +89,14 @@ export default function RootLayout() {
       axios.interceptors.response.eject(interceptor);
     };
   }, []);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.light.background }}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </View>
+    );
+  }
 
   return (
     <>

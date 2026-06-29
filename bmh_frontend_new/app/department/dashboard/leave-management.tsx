@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { API_URL } from '@/config';
@@ -220,7 +221,7 @@ export default function SubAdminLeaveManagement() {
         </View>
       </View>
 
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={{flexGrow: 1}}>
         <Pressable style={[styles.tab, activeTab === 'requests' && styles.activeTab]} onPress={() => setActiveTab('requests')}>
           <Users size={18} color={activeTab === 'requests' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Leave Requests</Text>
@@ -233,7 +234,7 @@ export default function SubAdminLeaveManagement() {
           <CalendarDays size={18} color={activeTab === 'holidays' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'holidays' && styles.activeTabText]}>Holidays</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       {activeTab === 'requests' && (
         <View>
@@ -310,11 +311,34 @@ export default function SubAdminLeaveManagement() {
                   }} 
                   style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
-                  <option value="">Select an Employee</option>
-                  {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={emp.id}>{emp.full_name} ({emp.department || 'Dept'} - {emp.role || 'Sub Admin'})</option>)}
+                  <option value="">Select an Employee...</option>
+                  {employees.map(e => <option key={`employee-${e.id}`} value={e.id}>{e.full_name} ({e.department || 'Dept'})</option>)}
                 </select>
               ) : (
-                <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />
+                <View style={[styles.input, { paddingHorizontal: 0, justifyContent: 'center' }]}>
+                  <Picker 
+                    selectedValue={rEmployeeId} 
+                    onValueChange={(val) => {
+                      const empId = val;
+                      setREmployeeId(empId);
+                      const existing = employeeSettings.find(es => es.employee_id == empId);
+                      if (existing) {
+                        setRLeaves(existing.leaves_per_month.toString());
+                        setRExtraPen(existing.extra_leave_penalty.toString());
+                        setRLateLim(existing.late_checkin_limit.toString());
+                        setRLatePen(existing.late_checkin_penalty.toString());
+                        setREarlyLim(existing.early_checkout_limit.toString());
+                        setREarlyPen(existing.early_checkout_penalty.toString());
+                      } else {
+                        setRLeaves('0'); setRExtraPen('0'); setRLateLim('0'); setRLatePen('0'); setREarlyLim('0'); setREarlyPen('0');
+                      }
+                    }}
+                    style={{ width: '100%', height: 50 }}
+                  >
+                    <Picker.Item label="Select an Employee..." value="" />
+                    {employees.map(e => <Picker.Item key={`employee-${e.id}`} label={`${e.full_name} (${e.department || 'Dept'})`} value={e.id.toString()} />)}
+                  </Picker>
+                </View>
               )}
               
               <View style={{ flexDirection: 'row', gap: 16 }}>

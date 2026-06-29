@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Alert, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
@@ -18,20 +19,29 @@ export default function AdminWalletScreen() {
   const [adminId, setAdminId] = useState<string | null>(null);
 
   useEffect(() => {
-    let aId = null;
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('superAdminUser');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        aId = `ADMIN-${user.id}`;
-        setAdminId(aId);
+    const init = async () => {
+      try {
+        let userStr = null;
+        if (Platform.OS === 'web') {
+          userStr = localStorage.getItem('superAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('superAdminUser');
+        }
+        
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          const aId = `ADMIN-${user.id}`;
+          setAdminId(aId);
+          fetchData(aId);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error fetching admin user:', err);
+        setLoading(false);
       }
-    }
-    if (aId) {
-      fetchData(aId);
-    } else {
-      setLoading(false);
-    }
+    };
+    init();
   }, []);
 
   const fetchData = async (id: string) => {

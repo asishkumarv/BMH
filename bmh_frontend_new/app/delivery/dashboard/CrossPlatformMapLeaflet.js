@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 let MapContainer, TileLayer, Marker, Popup, Polyline, useMap, L;
-if (typeof window !== "undefined") {
+if (Platform.OS === 'web') {
   require("leaflet/dist/leaflet.css");
   const ReactLeaflet = require("react-leaflet");
   MapContainer = ReactLeaflet.MapContainer;
@@ -23,7 +23,7 @@ if (typeof window !== "undefined") {
 
 
 const createColoredIcon = (color) => {
-  if (typeof window === "undefined" || !L) return null;
+  if (Platform.OS !== 'web' || !L) return null;
   return L.divIcon({
     className: "",
     html: `
@@ -43,7 +43,7 @@ const createColoredIcon = (color) => {
 };
 
 let bikeIcon = null;
-if (typeof window !== "undefined" && L) {
+if (Platform.OS === 'web' && L) {
   bikeIcon = L.divIcon({
     className: "",
     html: `
@@ -96,7 +96,7 @@ export default function CrossPlatformMapLeaflet({
   onMarkerPress,
   linePositions = [],
 }) {
-  if (typeof window === "undefined" || !MapContainer) {
+  if (Platform.OS !== 'web' || !MapContainer) {
     return null;
   }
   return (

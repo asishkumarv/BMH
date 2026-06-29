@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {  View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView , Image } from 'react-native';
+import { View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView, Image } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { ShieldCheck, Lock, Eye, EyeOff, Camera } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -20,8 +21,14 @@ export default function SuperAdminProfileScreen() {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('superAdminUser');
+    const init = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('superAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('superAdminUser');
+      }
+      
       if (userStr) {
         const parsed = JSON.parse(userStr);
         setUser(parsed);
@@ -29,7 +36,8 @@ export default function SuperAdminProfileScreen() {
           try { setPd(JSON.parse(parsed.profile_data)); } catch (e) {}
         }
       }
-    }
+    };
+    init();
   }, []);
 
   const handleChangePassword = async () => {
