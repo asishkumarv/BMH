@@ -6,10 +6,28 @@ import { EmployeeSidebar } from '../../../components/ui/EmployeeSidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
 
 export default function EmployeeLayout() {
   const { isDesktop } = useResponsive();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      let userDataStr = null;
+      if (Platform.OS === 'web') {
+        userDataStr = localStorage.getItem('employeeUser');
+      } else {
+        userDataStr = await AsyncStorage.getItem('employeeUser');
+      }
+      if (userDataStr) setUser(JSON.parse(userDataStr));
+    };
+    fetchUser();
+  }, []);
+
+  useAttendanceReminder(user);
 
   return (
     <SafeAreaView style={styles.safeArea}>

@@ -4,6 +4,7 @@ const attendanceController = require('../controllers/attendanceController');
 const analyticsController = require('../controllers/attendanceAnalyticsController');
 
 // Actions
+router.post('/quick-attendance', attendanceController.quickAttendance);
 router.post('/verify-location', attendanceController.verifyLocation);
 router.post('/verify-face', attendanceController.verifyFaceAndMarkAttendance);
 router.post('/break', attendanceController.markBreak);

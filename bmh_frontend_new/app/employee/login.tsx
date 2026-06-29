@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput, Image, KeyboardAvoidingView, ScrollView } from 'react-native';
-import { ArrowLeft, Clock, Eye, EyeOff } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, Platform, TextInput, Image, KeyboardAvoidingView, ScrollView, ActivityIndicator } from 'react-native';
+import { ArrowLeft, Clock, Eye, EyeOff, Search, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 import { Colors } from '../../constants/Colors';
 import { useResponsive } from '../../hooks/useResponsive';
 
@@ -15,6 +16,59 @@ export default function EmployeePortal() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [markingAttendance, setMarkingAttendance] = useState(false);
+
+  useEffect(() => {
+    // Fetch employees for quick attendance
+    const fetchEmployees = async () => {
+      try {
+        const response = await axios.get('https://bmh-eitu.onrender.com/employees');
+        if (response.data.success) {
+          setEmployees(response.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch employees', err);
+      }
+    };
+    fetchEmployees();
+  }, []);
+
+  const filteredEmployees = employees.filter(emp => 
+    emp.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    emp.employee_id?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleQuickAttendance = async (action: 'login' | 'logout') => {
+    if (!selectedEmployee) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Please select an employee first' });
+      return;
+    }
+    setMarkingAttendance(true);
+    try {
+      const res = await axios.post('https://bmh-eitu.onrender.com/attendance/quick-attendance', {
+        employeeId: selectedEmployee.id,
+        action
+      });
+      if (res.data.success) {
+        Toast.show({ type: 'success', text1: 'Success', text2: res.data.message });
+        setSearchQuery('');
+        setSelectedEmployee(null);
+      }
+    } catch (err: any) {
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Failed', 
+        text2: err.response?.data?.message || 'Failed to mark attendance' 
+      });
+    } finally {
+      setMarkingAttendance(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -124,20 +178,71 @@ export default function EmployeePortal() {
 
               {/* Quick Attendance */}
               <View style={styles.attendanceSection}>
-                <Text style={styles.label}>Phone Number</Text>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Enter 10-digit phone number" 
-                  keyboardType="numeric"
-                  placeholderTextColor="#94A3B8" 
-                />
+                <Text style={styles.label}>Select Employee</Text>
+                
+                {/* Searchable Dropdown */}
+                <View style={{ zIndex: 10 }}>
+                  <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }]}>
+                    <Search color="#94A3B8" size={18} style={{ marginRight: 8 }} />
+                    <TextInput 
+                      style={{ flex: 1, outlineStyle: 'none' } as any} 
+                      placeholder="Search by name or ID..." 
+                      value={searchQuery}
+                      onChangeText={(txt) => {
+                        setSearchQuery(txt);
+                        setShowDropdown(true);
+                        if (selectedEmployee && selectedEmployee.full_name !== txt) {
+                          setSelectedEmployee(null);
+                        }
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                      placeholderTextColor="#94A3B8" 
+                    />
+                  </View>
+
+                  {showDropdown && searchQuery.length > 0 && !selectedEmployee && (
+                    <View style={styles.dropdown}>
+                      <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                        {filteredEmployees.length === 0 ? (
+                          <Text style={{ padding: 12, color: '#64748B' }}>No employees found</Text>
+                        ) : (
+                          filteredEmployees.map((emp, index) => (
+                            <Pressable 
+                              key={emp.id} 
+                              style={[styles.dropdownItem, index !== filteredEmployees.length - 1 && styles.dropdownItemBorder]}
+                              onPress={() => {
+                                setSelectedEmployee(emp);
+                                setSearchQuery(emp.full_name);
+                                setShowDropdown(false);
+                              }}
+                            >
+                              <View>
+                                <Text style={styles.dropdownName}>{emp.full_name}</Text>
+                                <Text style={styles.dropdownId}>ID: {emp.employee_id || 'N/A'} - {emp.department}</Text>
+                              </View>
+                            </Pressable>
+                          ))
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+
                 <View style={styles.attendanceBtns}>
-                  <Pressable style={styles.dutyOnBtn}>
-                    <Clock color="#FFF" size={16} />
+                  <Pressable 
+                    style={[styles.dutyOnBtn, markingAttendance && { opacity: 0.7 }]}
+                    onPress={() => handleQuickAttendance('login')}
+                    disabled={markingAttendance}
+                  >
+                    {markingAttendance ? <ActivityIndicator color="#FFF" size="small" /> : <Clock color="#FFF" size={16} />}
                     <Text style={styles.dutyBtnText}>Duty On</Text>
                   </Pressable>
-                  <Pressable style={styles.dutyOffBtn}>
-                    <Clock color="#FFF" size={16} />
+                  <Pressable 
+                    style={[styles.dutyOffBtn, markingAttendance && { opacity: 0.7 }]}
+                    onPress={() => handleQuickAttendance('logout')}
+                    disabled={markingAttendance}
+                  >
+                    {markingAttendance ? <ActivityIndicator color="#FFF" size="small" /> : <Clock color="#FFF" size={16} />}
                     <Text style={styles.dutyBtnText}>Duty Off</Text>
                   </Pressable>
                 </View>
@@ -376,5 +481,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 15,
+  },
+  dropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  dropdownItem: {
+    padding: 12,
+    backgroundColor: '#FFF',
+  },
+  dropdownItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0F172A',
+  },
+  dropdownId: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   }
 });

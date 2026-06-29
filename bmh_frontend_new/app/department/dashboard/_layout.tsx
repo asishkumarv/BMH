@@ -6,27 +6,39 @@ import { SubAdminSidebar } from '../../../components/ui/SubAdminSidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
 
 export default function SubAdminLayout() {
   const { isDesktop } = useResponsive();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     // Basic auth check
-    if (Platform.OS === 'web') {
-      const user = localStorage.getItem('subAdminUser');
-      if (!user) {
-        router.replace('/department/login');
+    const init = async () => {
+      if (Platform.OS === 'web') {
+        const userStr = localStorage.getItem('subAdminUser');
+        if (!userStr) {
+          router.replace('/department/login');
+        } else {
+          setUser(JSON.parse(userStr));
+          setLoading(false);
+        }
       } else {
+        const userStr = await AsyncStorage.getItem('subAdminUser');
+        if (userStr) {
+          setUser(JSON.parse(userStr));
+        }
         setLoading(false);
       }
-    } else {
-      // For mobile we skip strict auth check for now or implement AsyncStorage
-      setLoading(false);
-    }
+    };
+    init();
   }, []);
+
+  useAttendanceReminder(user);
 
   if (loading) {
     return <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}><ActivityIndicator /></View>;

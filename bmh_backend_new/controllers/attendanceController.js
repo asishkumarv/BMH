@@ -443,3 +443,38 @@ exports.adminUpdateAttendance = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+
+exports.quickAttendance = async (req, res) => {
+  try {
+    const { employeeId, action } = req.body;
+    if (!employeeId || !action) return res.status(400).json({ success: false, message: 'Missing fields' });
+
+    const now = new Date();
+    const todayDate = now.toISOString().split('T')[0];
+    const checkAttQuery = SELECT * FROM attendance WHERE employee_id =  AND TO_CHAR(date, \'YYYY-MM-DD\') = ;
+    const checkRes = await pool.query(checkAttQuery, [employeeId, todayDate]);
+
+    if (action === 'login') {
+      if (checkRes.rowCount > 0) return res.status(400).json({ success: false, message: 'Already checked in today' });
+      await pool.query(
+        INSERT INTO attendance (employee_id, date, status, timestamp) VALUES (, , , ),
+        [employeeId, now, 'Present', now]
+      );
+      return res.json({ success: true, message: 'Duty On recorded successfully!' });
+    } else if (action === 'logout') {
+      if (checkRes.rowCount === 0) return res.status(400).json({ success: false, message: 'No check-in record found for today' });
+      if (checkRes.rows[0].checkout_timestamp) return res.status(400).json({ success: false, message: 'Already checked out today' });
+      await pool.query(
+        UPDATE attendance SET checkout_timestamp =  WHERE employee_id =  AND TO_CHAR(date, \'YYYY-MM-DD\') = ,
+        [now, employeeId, todayDate]
+      );
+      return res.json({ success: true, message: 'Duty Off recorded successfully!' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid action' });
+    }
+  } catch (error) {
+    console.error('Quick attendance error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

@@ -526,7 +526,7 @@ export default function DoctorManagement() {
               Select multiple tokens to block/unblock (VIP Quota). Tokens in red are patient bookings. Gold are VIP Quota. Selected tokens show a blue outline.
             </Text>
             
-            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center'}}>
+            <ScrollView contentContainerStyle={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingBottom: 10}}>
               {manageTokenSlot && Array.from({length: manageTokenSlot.total_tokens}, (_, i) => i + 1).map(t => {
                 const status = slotBookingsMap[t];
                 const isBooked = status && status !== 'VIP Quota';
@@ -550,7 +550,7 @@ export default function DoctorManagement() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {selectedTokens.length > 0 && (
               <View style={{flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 20}}>
