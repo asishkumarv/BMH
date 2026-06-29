@@ -105,6 +105,7 @@ export default function AdminAttendanceScreen() {
 
   // New states for Reports
   const [selectedReportDept, setSelectedReportDept] = useState('All');
+  const [selectedUserType, setSelectedUserType] = useState('employee');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -137,11 +138,11 @@ export default function AdminAttendanceScreen() {
     }
   }, []);
 
-  const fetchReports = async (dept: string, forceClear = false) => {
+  const fetchReports = async (dept: string, userTypeStr = selectedUserType, forceClear = false) => {
     try {
       let url = dept === 'All' 
-        ? `https://bmh-eitu.onrender.com/attendance/reports?1=1`
-        : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}`;
+        ? `https://bmh-eitu.onrender.com/attendance/reports?userType=${userTypeStr}`
+        : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}&userType=${userTypeStr}`;
       
       if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
@@ -157,15 +158,15 @@ export default function AdminAttendanceScreen() {
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (userTypeStr = selectedUserType) => {
     try {
       setLoading(true);
-      const sumRes = await axios.get('https://bmh-eitu.onrender.com/attendance/summary');
+      const sumRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/summary?userType=${userTypeStr}`);
       if (sumRes.data.success) {
         setSummary(sumRes.data.summary);
       }
 
-      await fetchReports(selectedReportDept);
+      await fetchReports(selectedReportDept, userTypeStr);
 
       const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
       if (deptRes.data.success) {
@@ -179,8 +180,8 @@ export default function AdminAttendanceScreen() {
   };
 
   useEffect(() => {
-    fetchReports(selectedReportDept);
-  }, [selectedReportDept]);
+    fetchReports(selectedReportDept, selectedUserType);
+  }, [selectedReportDept, selectedUserType]);
 
   const handleUpdateConfig = async () => {
     if (!deptName || !lat || !lng || !radius) {
@@ -223,26 +224,25 @@ export default function AdminAttendanceScreen() {
     setEditStatus(r.status || 'On Duty');
     setEditModalVisible(true);
   };
-
-  const handleUpdateAttendance = async () => {
-    if (!editRecord) return;
+  const handleSaveEdit = async () => {
+    setUpdating(true);
     try {
-      setUpdating(true);
-      const res = await axios.put(`https://bmh-eitu.onrender.com/attendance/admin-update/${editRecord.id}`, {
-        check_in: editCheckIn,
-        check_out: editCheckOut,
+      let checkInTime = null;
+      let checkOutTime = null;
+      if (editCheckIn) checkInTime = new Date(`${editRecord.date}T${editCheckIn}:00Z`).toISOString();
+      if (editCheckOut) checkOutTime = new Date(`${editRecord.date}T${editCheckOut}:00Z`).toISOString();
+
+      await axios.put(`https://bmh-eitu.onrender.com/attendance/admin-update/${editRecord.id}`, {
+        check_in: checkInTime,
+        check_out: checkOutTime,
         status: editStatus
       });
-      if (res.data.success) {
-        Alert.alert("Success", "Attendance updated successfully.");
-        setEditModalVisible(false);
-        fetchReports(selectedReportDept, true);
-      } else {
-        Alert.alert("Error", res.data.message || "Update failed.");
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Failed to update attendance.");
+      Alert.alert('Success', 'Attendance updated');
+      setEditModalVisible(false);
+      fetchReports(selectedReportDept, selectedUserType);
+      fetchData(selectedUserType);
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.message || 'Failed to update');
     } finally {
       setUpdating(false);
     }
@@ -284,7 +284,32 @@ export default function AdminAttendanceScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Attendance Dashboard</Text>
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.header}>Attendance Dashboard</Text>
+          <Text style={styles.subtitle}>Overview of today's presence</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={styles.userTypeToggle}>
+            <TouchableOpacity 
+              style={[styles.toggleBtn, selectedUserType === 'employee' && styles.toggleBtnActive]}
+              onPress={() => { setSelectedUserType('employee'); fetchData('employee'); }}
+            >
+              <Text style={[styles.toggleText, selectedUserType === 'employee' && styles.toggleTextActive]}>Employees</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleBtn, selectedUserType === 'sub_admin' && styles.toggleBtnActive]}
+              onPress={() => { setSelectedUserType('sub_admin'); fetchData('sub_admin'); }}
+            >
+              <Text style={[styles.toggleText, selectedUserType === 'sub_admin' && styles.toggleTextActive]}>Sub Admins</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => setShowConfig(!showConfig)}>
+            <MapPin color={Colors.light.primary} size={20} />
+            {isDesktop && <Text style={styles.settingsBtnText}>Location Config</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
       
       {/* Summary Cards */}
       <View style={styles.summaryGrid}>
@@ -307,65 +332,56 @@ export default function AdminAttendanceScreen() {
       </View>
 
       {/* Config Section */}
-      <View style={[styles.section, {zIndex: 1000}]}>
-        <TouchableOpacity 
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} 
-          onPress={() => setShowConfig(!showConfig)}
-        >
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Configure Department Location</Text>
-          {showConfig ? <ChevronUp size={24} color="#374151" /> : <ChevronDown size={24} color="#374151" />}
-        </TouchableOpacity>
-        
-        {showConfig && (
-          <View style={{ marginTop: 15 }}>
-            <Text style={{color: '#6b7280', marginBottom: 15}}>Select a department and tap on the map to set its geofence boundaries.</Text>
+      {showConfig && (
+        <View style={[styles.section, {zIndex: 1000}]}>
+          <Text style={[styles.sectionTitle, { marginBottom: 15 }]}>Configure Department Location</Text>
+          <Text style={{color: '#6b7280', marginBottom: 15}}>Select a department and tap on the map to set its geofence boundaries.</Text>
+          
+          <View style={styles.inputRow}>
+            <Dropdown 
+              options={departments} 
+              value={deptName} 
+              onChange={(name: string) => {
+                setDeptName(name);
+                const dept = departments.find(d => d.name === name);
+                if (dept) {
+                  setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
+                  setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
+                  setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '200');
+                }
+              }} 
+            />
             
-            <View style={styles.inputRow}>
-              <Dropdown 
-                options={departments} 
-                value={deptName} 
-                onChange={(name: string) => {
-                  setDeptName(name);
-                  const dept = departments.find(d => d.name === name);
-                  if (dept) {
-                    setLat(dept.allowed_latitude ? dept.allowed_latitude.toString() : '');
-                    setLng(dept.allowed_longitude ? dept.allowed_longitude.toString() : '');
-                    setRadius(dept.allowed_radius ? dept.allowed_radius.toString() : '200');
-                  }
-                }} 
+            <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
+              <TextInput 
+                style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
+                placeholder="Radius" 
+                value={radius} 
+                onChangeText={setRadius} 
+                keyboardType="numeric" 
               />
-              
-              <View style={[styles.input, {flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 150}]}>
-                <TextInput 
-                  style={[{flex: 1}, Platform.OS === 'web' && {outlineStyle: 'none'} as any]}
-                  placeholder="Radius" 
-                  value={radius} 
-                  onChangeText={setRadius} 
-                  keyboardType="numeric" 
-                />
-                <Text style={{color: '#6b7280', marginLeft: 8, fontWeight: '500'}}>meters</Text>
-              </View>
+              <Text style={{color: '#6b7280', marginLeft: 8, fontWeight: '500'}}>meters</Text>
             </View>
-            
-            <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
-              <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
-                 <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
-                 <Text style={{color: '#6b7280'}}>{lat ? `Lat: ${Number(lat).toFixed(6)}` : 'Latitude'}</Text>
-              </View>
-              <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
-                 <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
-                 <Text style={{color: '#6b7280'}}>{lng ? `Lng: ${Number(lng).toFixed(6)}` : 'Longitude'}</Text>
-              </View>
-            </View>
-
-            <MapPicker lat={lat} lng={lng} />
-
-            <TouchableOpacity style={styles.button} onPress={handleUpdateConfig}>
-              <Text style={styles.buttonText}>Save Configuration</Text>
-            </TouchableOpacity>
           </View>
-        )}
-      </View>
+          
+          <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
+            <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
+                <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
+                <Text style={{color: '#6b7280'}}>{lat ? `Lat: ${Number(lat).toFixed(6)}` : 'Latitude'}</Text>
+            </View>
+            <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
+                <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
+                <Text style={{color: '#6b7280'}}>{lng ? `Lng: ${Number(lng).toFixed(6)}` : 'Longitude'}</Text>
+            </View>
+          </View>
+
+          <MapPicker lat={lat} lng={lng} />
+
+          <TouchableOpacity style={styles.button} onPress={handleUpdateConfig}>
+            <Text style={styles.buttonText}>Save Configuration</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Reports Section */}
       <View style={[styles.section, {zIndex: 1}]}>
@@ -397,7 +413,7 @@ export default function AdminAttendanceScreen() {
                 <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchReports(selectedReportDept)}>
                   <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, true); }}>
+                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, selectedUserType, true); }}>
                   <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
                 </TouchableOpacity>
               </View>
@@ -411,7 +427,7 @@ export default function AdminAttendanceScreen() {
                 <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchReports(selectedReportDept)}>
                   <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, true); }}>
+                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, selectedUserType, true); }}>
                   <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
                 </TouchableOpacity>
               </View>
@@ -453,17 +469,10 @@ export default function AdminAttendanceScreen() {
             <Text style={styles.tableCellHeader}>Deviation</Text>
             <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
             <Text style={styles.tableCellHeader}>Status</Text>
-            <Text style={[styles.tableCellHeader, {flex: 0.5, textAlign: 'center'}]}>Action</Text>
+            <Text style={[styles.tableCellHeader, {flex: 0.8, textAlign: 'center'}]}>Action</Text>
           </View>
           {filteredReports.map((r, i) => (
-            <TouchableOpacity 
-              key={i} 
-              style={styles.tableRow}
-              onPress={() => {
-                setSelectedEmployeeId(r.employee_id);
-                setModalVisible(true);
-              }}
-            >
+            <View key={i} style={styles.tableRow}>
               <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
@@ -471,7 +480,6 @@ export default function AdminAttendanceScreen() {
               <View style={[styles.tableCell, { justifyContent: 'center' }]}>
                 <Text style={{fontWeight: '500', color: '#1f2937'}}>{r.full_name}</Text>
                 <Text style={{fontSize: 12, color: '#6b7280'}}>{r.email || 'N/A'}</Text>
-                <Text style={{fontSize: 12, color: '#6b7280'}}>{r.mobile || 'N/A'}</Text>
               </View>
               <Text style={styles.tableCell}>{r.department}</Text>
               <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
@@ -493,12 +501,21 @@ export default function AdminAttendanceScreen() {
                 ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
               </View>
               <Text style={styles.tableCell}>{r.status}</Text>
-              <View style={[styles.tableCell, { flex: 0.5, alignItems: 'center' }]}>
-                <TouchableOpacity onPress={() => openEditModal(r)} style={{ padding: 4 }}>
-                  <Edit2 size={16} color="#3b82f6" />
+              <View style={[styles.tableCell, { flex: 0.8, alignItems: 'center', gap: 5 }]}>
+                <TouchableOpacity style={styles.actionBtnText} onPress={() => {
+                  setEditRecord(r);
+                  setEditCheckIn(r.check_in ? new Date(r.check_in).toISOString().split('T')[1].substring(0,5) : '');
+                  setEditCheckOut(r.check_out ? new Date(r.check_out).toISOString().split('T')[1].substring(0,5) : '');
+                  setEditStatus(r.status);
+                  setEditModalVisible(true);
+                }}>
+                  <Edit2 size={16} color={Colors.light.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtnText} onPress={() => {setSelectedEmployeeId(r.employee_id); setModalVisible(true);}}>
+                  <Text style={{color: Colors.light.primary, fontWeight: '600', fontSize: 12}}>Analytics</Text>
                 </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+            </View>
           ))}
           </View>
         </ScrollView>
@@ -583,7 +600,7 @@ export default function AdminAttendanceScreen() {
               )}
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleUpdateAttendance} disabled={updating}>
+            <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={updating}>
               <Text style={styles.buttonText}>{updating ? 'Saving...' : 'Save Changes'}</Text>
             </TouchableOpacity>
           </View>
@@ -596,8 +613,9 @@ export default function AdminAttendanceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f9fafb' },
-  header: { fontSize: 26, fontWeight: 'bold', marginBottom: 20, color: '#111827' },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, marginBottom: 30 },
+  header: { fontSize: 26, fontWeight: 'bold', color: '#111827' },
+  subtitle: { color: '#6b7280', marginTop: 4 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, marginVertical: 30 },
   card: { flex: 1, minWidth: 150, padding: 20, borderRadius: 12, alignItems: 'center' },
   cardValue: { fontSize: 32, fontWeight: 'bold', color: '#1f2937' },
   cardLabel: { fontSize: 14, color: '#4b5563', marginTop: 5 },
@@ -608,12 +626,20 @@ const styles = StyleSheet.create({
   input: { flex: 1, minWidth: 120, borderWidth: 1, borderColor: '#d1d5db', padding: 12, borderRadius: 6, backgroundColor: 'white' },
   button: { backgroundColor: '#3b82f6', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 20 },
   exportButton: { flexDirection: 'row', backgroundColor: '#10b981', padding: 10, borderRadius: 6, alignItems: 'center' },
+  settingsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 8, backgroundColor: '#eff6ff' },
+  settingsBtnText: { color: Colors.light.primary, fontWeight: '600' },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   table: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, overflow: 'hidden' },
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
+  tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb', alignItems: 'center' },
   tableCellHeader: { flex: 1, fontWeight: 'bold', color: '#374151' },
   tableCell: { flex: 1, color: '#4b5563', justifyContent: 'center' },
+  actionBtnText: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 },
+  userTypeToggle: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4 },
+  toggleBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
+  toggleBtnActive: { backgroundColor: 'white', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  toggleText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  toggleTextActive: { color: Colors.light.primary },
   tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f3f4f6', marginRight: 10 },
   activeTab: { backgroundColor: '#3b82f6' },
   tabText: { color: '#4b5563', fontWeight: '500' },

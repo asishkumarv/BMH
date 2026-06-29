@@ -42,17 +42,44 @@ export default function EmployeesScreen() {
   const [extraWorkingAmount, setExtraWorkingAmount] = useState('0');
   const [generatingPayslip, setGeneratingPayslip] = useState(false);
 
+  const [selectedUserType, setSelectedUserType] = useState('employee');
+
+  // Edit Profile States
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editSalary, setEditSalary] = useState('');
+  const [editShiftIn, setEditShiftIn] = useState('');
+  const [editShiftOut, setEditShiftOut] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const [empRes, deptRes, roleRes] = await Promise.all([
+        const [empRes, adminRes, deptRes, roleRes] = await Promise.all([
           axios.get('https://bmh-eitu.onrender.com/employees'),
+          axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
           axios.get('https://bmh-eitu.onrender.com/department'),
           axios.get('https://bmh-eitu.onrender.com/roles')
         ]);
         
-        if (empRes.data.success) setEmployees(empRes.data.data);
-        if (deptRes.data.success) setDepartments(deptRes.data.data);
+        let depts: any[] = [];
+        if (deptRes.data.success) {
+          depts = deptRes.data.data;
+          setDepartments(depts);
+        }
+
+        if (selectedUserType === 'employee') {
+          if (empRes.data.success) setEmployees(empRes.data.data);
+        } else {
+          if (adminRes.data.success) {
+            const mappedAdmins = adminRes.data.data.map((a: any) => ({
+              ...a,
+              role: 'Sub Admin',
+              department: depts.find(d => String(d.id) === String(a.department_id))?.name || 'Unknown'
+            }));
+            setEmployees(mappedAdmins);
+          }
+        }
+
         if (roleRes.data.success) setRoles(roleRes.data.data);
       } catch (error) {
         console.error('Error fetching employees:', error);
@@ -62,7 +89,7 @@ export default function EmployeesScreen() {
     };
     
     fetchEmployees();
-  }, []);
+  }, [selectedUserType]);
 
   useEffect(() => {
     if (selectedEmployee) {
@@ -222,14 +249,30 @@ export default function EmployeesScreen() {
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
-          <Text style={styles.title}>Employees</Text>
+          <Text style={styles.title}>Employees & Admins</Text>
           <Text style={styles.subtitle}>Manage your hospital staff.</Text>
         </View>
         <View style={[styles.headerButtons, !isDesktop && styles.headerButtonsMobile]}>
-          <Pressable style={styles.manageRolesBtn} onPress={() => setRolesModalVisible(true)}>
-            <Shield size={20} color={Colors.light.primary} />
-            <Text style={styles.manageRolesText}>Manage Roles</Text>
-          </Pressable>
+          <View style={styles.userTypeToggle}>
+            <Pressable 
+              style={[styles.toggleBtn, selectedUserType === 'employee' && styles.toggleBtnActive]}
+              onPress={() => setSelectedUserType('employee')}
+            >
+              <Text style={[styles.toggleText, selectedUserType === 'employee' && styles.toggleTextActive]}>Employees</Text>
+            </Pressable>
+            <Pressable 
+              style={[styles.toggleBtn, selectedUserType === 'sub_admin' && styles.toggleBtnActive]}
+              onPress={() => setSelectedUserType('sub_admin')}
+            >
+              <Text style={[styles.toggleText, selectedUserType === 'sub_admin' && styles.toggleTextActive]}>Sub Admins</Text>
+            </Pressable>
+          </View>
+          {selectedUserType === 'employee' && (
+            <Pressable style={styles.manageRolesBtn} onPress={() => setRolesModalVisible(true)}>
+              <Shield size={20} color={Colors.light.primary} />
+              <Text style={styles.manageRolesText}>Manage Roles</Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -343,7 +386,29 @@ export default function EmployeesScreen() {
       <Modal visible={profileModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '80%' }, isDesktop && { width: 600 }]}>
-            <Text style={styles.modalTitle}>Employee Profile</Text>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
+              <Text style={[styles.modalTitle, {marginBottom: 0}]}>Employee Profile</Text>
+              {!isEditingProfile ? (
+                <Pressable onPress={() => {
+                  if (selectedEmployee) {
+                    let pd: any = {};
+                    if (selectedEmployee.profile_data) {
+                      try { pd = JSON.parse(selectedEmployee.profile_data); } catch(e){}
+                    }
+                    setEditSalary(pd.salary || '');
+                    setEditShiftIn(pd.shiftIn || (selectedEmployee as any).schedule_in || '');
+                    setEditShiftOut(pd.shiftOut || (selectedEmployee as any).schedule_out || '');
+                    setIsEditingProfile(true);
+                  }
+                }}>
+                  <Text style={{color: Colors.light.primary, fontWeight: '600'}}>Edit Details</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => setIsEditingProfile(false)}>
+                  <Text style={{color: Colors.light.icon, fontWeight: '600'}}>Cancel Edit</Text>
+                </Pressable>
+              )}
+            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 20 }}>
               {selectedEmployee && (() => {
                 let pd: any = {};
@@ -428,14 +493,79 @@ export default function EmployeesScreen() {
 
                     <Text style={[styles.sectionLabel, {marginTop: 16}]}>Operations & Shifts</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Manager:</Text><Text style={styles.profileVal}>{pd.manager || 'N/A'}</Text></View>
-                    <View style={styles.profileRow}><Text style={styles.profileKey}>Shift Clock:</Text><Text style={styles.profileVal}>{pd.shiftIn || 'N/A'} to {pd.shiftOut || 'N/A'}</Text></View>
+                    <View style={styles.profileRow}><Text style={styles.profileKey}>Shift Clock:</Text><Text style={styles.profileVal}>{pd.shiftIn || (selectedEmployee as any).schedule_in || 'N/A'} to {pd.shiftOut || (selectedEmployee as any).schedule_out || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Break Window:</Text><Text style={styles.profileVal}>{pd.breakStart || 'N/A'} to {pd.breakEnd || 'N/A'}</Text></View>
+                    
+                    {isEditingProfile && (
+                      <View style={{ backgroundColor: '#FFFBEB', padding: 16, borderRadius: 12, marginTop: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
+                        <Text style={[styles.sectionLabel, {marginTop: 0, marginBottom: 12}]}>Edit Super Admin Overrides</Text>
+                        <View style={{ gap: 12 }}>
+                          <View>
+                            <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Base Salary (₹)</Text>
+                            <TextInput style={styles.input} keyboardType="numeric" value={editSalary} onChangeText={setEditSalary} />
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift In (HH:MM)</Text>
+                              <TextInput style={styles.input} placeholder="09:00" value={editShiftIn} onChangeText={setEditShiftIn} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift Out (HH:MM)</Text>
+                              <TextInput style={styles.input} placeholder="17:00" value={editShiftOut} onChangeText={setEditShiftOut} />
+                            </View>
+                          </View>
+                        </View>
+                        <Pressable 
+                          style={[styles.submitBtn, {marginTop: 12}]} 
+                          disabled={savingProfile}
+                          onPress={async () => {
+                            setSavingProfile(true);
+                            try {
+                              let newPd = { ...pd, salary: editSalary, shiftIn: editShiftIn, shiftOut: editShiftOut };
+                              
+                              if (selectedEmployee.role === 'Sub Admin') {
+                                await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${selectedEmployee.id}/profile`, {
+                                  profile_data: newPd,
+                                  schedule_in: editShiftIn,
+                                  schedule_out: editShiftOut
+                                });
+                              } else {
+                                await axios.put(`https://bmh-eitu.onrender.com/employees/${selectedEmployee.id}/profile`, {
+                                  profile_data: newPd
+                                });
+                              }
+                              Alert.alert('Success', 'Profile updated successfully');
+                              setIsEditingProfile(false);
+                              // Refresh
+                              const url = selectedEmployee.role === 'Sub Admin' ? 'https://bmh-eitu.onrender.com/admin/department-admins' : 'https://bmh-eitu.onrender.com/employees';
+                              const empRes = await axios.get(url);
+                              if (empRes.data.success) {
+                                let updatedEmps = empRes.data.data;
+                                if (selectedEmployee.role === 'Sub Admin') {
+                                  updatedEmps = updatedEmps.map((a: any) => ({
+                                    ...a, role: 'Sub Admin', department: selectedEmployee.department
+                                  }));
+                                }
+                                setEmployees(updatedEmps);
+                                setSelectedEmployee(updatedEmps.find((e: any) => String(e.id) === String(selectedEmployee.id)));
+                              }
+                            } catch (e: any) {
+                              Alert.alert('Error', e.response?.data?.message || 'Failed to save');
+                            } finally {
+                              setSavingProfile(false);
+                            }
+                          }}
+                        >
+                          <Text style={styles.submitBtnText}>{savingProfile ? 'Saving...' : 'Save Profile Changes'}</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 );
               })()}
             </ScrollView>
             <View style={styles.modalActions}>
-              <Pressable style={styles.cancelBtn} onPress={() => setProfileModalVisible(false)}>
+              <Pressable style={styles.cancelBtn} onPress={() => { setProfileModalVisible(false); setIsEditingProfile(false); }}>
                 <Text style={styles.cancelBtnText}>Close Profile</Text>
               </Pressable>
             </View>
@@ -480,8 +610,13 @@ const styles = StyleSheet.create({
   },
   headerButtons: { flexDirection: 'row', gap: 16 },
   headerButtonsMobile: { flexWrap: 'wrap' },
-  manageRolesBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE' },
-  manageRolesText: { color: Colors.light.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 },
+  manageRolesBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, gap: 8 },
+  manageRolesText: { color: Colors.light.primary, fontWeight: '600', fontSize: 14 },
+  userTypeToggle: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4 },
+  toggleBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
+  toggleBtnActive: { backgroundColor: 'white', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  toggleText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  toggleTextActive: { color: Colors.light.primary },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
   addBtnText: { color: '#FFF', fontWeight: '700', marginLeft: 8, fontSize: 15 },
   card: {

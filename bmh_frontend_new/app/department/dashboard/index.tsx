@@ -230,49 +230,49 @@ export default function SubAdminDashboard() {
           </View>
           <View style={styles.cuteActionGrid}>
             {!summary || summary.can_check_in ? (
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '23%' : '48%', minWidth: 160 }}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
                 <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#10b981', borderColor: '#34d399' }]} onPress={() => animateButton(() => handleAction('login'))}>
                   <View style={styles.iconCircle}>
                     <Sun color="#10b981" size={32} />
                   </View>
-                  <Text style={styles.cuteActionText}>Check In</Text>
-                  <Text style={styles.cuteActionSub}>Start shift</Text>
+                  <Text style={styles.cuteActionText}>Morning Check In</Text>
+                  <Text style={styles.cuteActionSub}>Start your shift</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
 
             {summary && summary.can_check_out ? (
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '23%' : '48%', minWidth: 160 }}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
                 <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#f43f5e', borderColor: '#fb7185' }]} onPress={() => animateButton(() => handleAction('logout'))}>
                   <View style={styles.iconCircle}>
                     <Moon color="#f43f5e" size={32} />
                   </View>
-                  <Text style={styles.cuteActionText}>Check Out</Text>
-                  <Text style={styles.cuteActionSub}>End day</Text>
+                  <Text style={styles.cuteActionText}>Evening Check Out</Text>
+                  <Text style={styles.cuteActionSub}>End your day</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
 
             {summary && summary.can_break_in ? (
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '23%' : '48%', minWidth: 160 }}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
                 <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#f59e0b', borderColor: '#fbbf24' }]} onPress={() => animateButton(() => handleAction('Break In'))}>
                   <View style={styles.iconCircle}>
                     <Utensils color="#f59e0b" size={32} />
                   </View>
-                  <Text style={styles.cuteActionText}>Break In</Text>
-                  <Text style={styles.cuteActionSub}>Take a break</Text>
+                  <Text style={styles.cuteActionText}>Take a Break</Text>
+                  <Text style={styles.cuteActionSub}>Grab some food</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
 
             {summary && summary.can_break_out ? (
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '23%' : '48%', minWidth: 160 }}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
                 <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#3b82f6', borderColor: '#60a5fa' }]} onPress={() => animateButton(() => handleAction('Break Out'))}>
                   <View style={styles.iconCircle}>
                     <CheckCircle2 color="#3b82f6" size={32} />
                   </View>
-                  <Text style={styles.cuteActionText}>Break Out</Text>
-                  <Text style={styles.cuteActionSub}>Back to work</Text>
+                  <Text style={styles.cuteActionText}>Back to Work</Text>
+                  <Text style={styles.cuteActionSub}>Resume your shift</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : null}
@@ -340,11 +340,11 @@ const styles = StyleSheet.create({
   },
   actionSection: { marginBottom: 32, backgroundColor: '#ffffff', padding: 24, borderRadius: 24, shadowColor: '#cbd5e1', shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: {width: 0, height: 10}, elevation: 5 },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  cuteActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'flex-start' },
-  cuteActionBtn: { padding: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 3 },
-  iconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  cuteActionText: { color: 'white', fontWeight: '900', fontSize: 16, marginBottom: 4 },
-  cuteActionSub: { color: 'rgba(255,255,255,0.8)', fontWeight: '600', fontSize: 13 },
+  cuteActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, justifyContent: 'center' },
+  cuteActionBtn: { padding: 24, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 3 },
+  iconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  cuteActionText: { color: 'white', fontWeight: '900', fontSize: 18, marginBottom: 4 },
+  cuteActionSub: { color: 'rgba(255,255,255,0.8)', fontWeight: '600', fontSize: 14 },
   allDoneBox: { alignItems: 'center', justifyContent: 'center', padding: 24, width: '100%' },
   allDoneText: { fontSize: 20, fontWeight: '800', color: '#10b981' },
   allDoneSub: { fontSize: 14, color: '#6b7280', marginTop: 8 },

@@ -93,13 +93,18 @@ export default function SubAdminProfileScreen() {
 
   const openEditModal = () => {
     setEditForm({
-      mobile: pd.phone || pd.mobile || '',
+      mobile: user.mobile || pd.phone || pd.mobile || '',
       bloodGroup: pd.bloodGroup || '',
       emergencyContact: pd.emergencyContact || '',
       address: pd.address || '',
+      aadhaar: pd.aadhaar || '',
+      pan: pd.pan || '',
+      esi: pd.esi || '',
       bankName: pd.bankName || '',
       accountNo: pd.accountNo || '',
-      ifsc: pd.ifsc || ''
+      ifsc: pd.ifsc || '',
+      shiftIn: user.schedule_in || pd.shiftIn || '',
+      shiftOut: user.schedule_in || pd.shiftOut || ''
     });
     setEditModalVisible(true);
   };
@@ -198,6 +203,18 @@ export default function SubAdminProfileScreen() {
                 <TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} />
               </View>
               <View>
+                <Text style={styles.label}>Aadhaar Number</Text>
+                <TextInput style={styles.modalInput} value={editForm.aadhaar} onChangeText={(t) => setEditForm({...editForm, aadhaar: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>PAN Card</Text>
+                <TextInput style={styles.modalInput} value={editForm.pan} onChangeText={(t) => setEditForm({...editForm, pan: t})} />
+              </View>
+              <View>
+                <Text style={styles.label}>ESI ID</Text>
+                <TextInput style={styles.modalInput} value={editForm.esi} onChangeText={(t) => setEditForm({...editForm, esi: t})} />
+              </View>
+              <View>
                 <Text style={styles.label}>Address</Text>
                 <TextInput style={[styles.modalInput, { height: 60 }]} multiline value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} />
               </View>
@@ -212,6 +229,16 @@ export default function SubAdminProfileScreen() {
               <View>
                 <Text style={styles.label}>IFSC Code</Text>
                 <TextInput style={styles.modalInput} value={editForm.ifsc} onChangeText={(t) => setEditForm({...editForm, ifsc: t})} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Shift In</Text>
+                  <TextInput style={styles.modalInput} placeholder="09:00" value={editForm.shiftIn} onChangeText={(t) => setEditForm({...editForm, shiftIn: t})} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Shift Out</Text>
+                  <TextInput style={styles.modalInput} placeholder="17:00" value={editForm.shiftOut} onChangeText={(t) => setEditForm({...editForm, shiftOut: t})} />
+                </View>
               </View>
             </ScrollView>
             <View style={styles.modalActions}>
@@ -253,25 +280,43 @@ export default function SubAdminProfileScreen() {
         </Pressable>
 
         <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <Mail color={Colors.light.icon} size={16} style={{ marginRight: 8 }} />
-            <Text style={styles.detailText}>{user.email}</Text>
+          {/* Column 1: Basic Info */}
+          <View style={styles.infoCol}>
+            <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Basic Info</Text>
+            <View style={styles.infoSection}>
+              <View style={styles.infoRow}><Mail size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Email</Text><Text style={styles.infoVal}>{user.email}</Text></View>
+              <View style={styles.infoRow}><Phone size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Mobile</Text><Text style={styles.infoVal}>{user.mobile || pd.phone || pd.mobile || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>Blood Group</Text><Text style={styles.infoVal}>{pd.bloodGroup || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>Emergency</Text><Text style={styles.infoVal}>{pd.emergencyContact || 'N/A'}</Text></View>
+            </View>
           </View>
-          {pd.phone && (
-            <View style={styles.detailItem}>
-              <Phone color={Colors.light.icon} size={16} style={{ marginRight: 8 }} />
-              <Text style={styles.detailText}>{pd.phone}</Text>
+
+          {/* Column 2: Compliance & Identity */}
+          <View style={styles.infoCol}>
+            <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Compliance & Identity</Text>
+            <View style={styles.infoSection}>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>Aadhaar</Text><Text style={styles.infoVal}>{pd.aadhaar || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>PAN Card</Text><Text style={styles.infoVal}>{pd.pan || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>ESI ID</Text><Text style={styles.infoVal}>{pd.esi || 'N/A'}</Text></View>
             </View>
-          )}
-          {pd.joiningDate && (
-            <View style={styles.detailItem}>
-              <Calendar color={Colors.light.icon} size={16} style={{ marginRight: 8 }} />
-              <Text style={styles.detailText}>Joined: {pd.joiningDate}</Text>
+          </View>
+
+          {/* Column 3: Payroll & Shifts */}
+          <View style={styles.infoCol}>
+            <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Payroll & Shifts</Text>
+            <View style={styles.infoSection}>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>Bank Name</Text><Text style={styles.infoVal}>{pd.bankName || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>Account No</Text><Text style={styles.infoVal}>{pd.accountNo || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>IFSC</Text><Text style={styles.infoVal}>{pd.ifsc || 'N/A'}</Text></View>
+              
+              <View style={[styles.infoRow, { marginTop: 8 }]}><Text style={styles.infoLabel}>Shift In</Text><Text style={styles.infoVal}>{user.schedule_in || pd.shiftIn || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>Shift Out</Text><Text style={styles.infoVal}>{user.schedule_out || pd.shiftOut || 'N/A'}</Text></View>
+
+              <View style={[styles.infoRow, { marginTop: 8 }]}><Text style={styles.infoLabel}>Status</Text><Text style={styles.infoVal}>{user.status}</Text></View>
+              {pd.joiningDate && (
+                <View style={[styles.infoRow, { marginTop: 8 }]}><Calendar size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Joined</Text><Text style={styles.infoVal}>{pd.joiningDate}</Text></View>
+              )}
             </View>
-          )}
-          <View style={styles.detailItem}>
-            <CheckSquare color={Colors.light.icon} size={16} style={{ marginRight: 8 }} />
-            <Text style={styles.detailText}>Status: {user.status}</Text>
           </View>
         </View>
 
@@ -404,7 +449,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.card,
     borderRadius: 24,
     padding: 32,
-    maxWidth: 600,
+    width: '100%',
     ...Platform.select({ web: { boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' } })
   },
   cardMobile: {
@@ -419,9 +464,15 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 20, fontWeight: '700', color: Colors.light.text },
   profileRole: { fontSize: 14, color: Colors.light.primary, fontWeight: '600' },
   
-  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 32 },
+  infoCol: { flex: 1, minWidth: 280 },
   detailItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100, borderWidth: 1, borderColor: Colors.light.border },
   detailText: { fontSize: 14, fontWeight: '600', color: Colors.light.text },
+
+  infoSection: { gap: 16 },
+  infoRow: { flexDirection: 'row', alignItems: 'center' },
+  infoLabel: { fontSize: 14, fontWeight: '600', color: Colors.light.icon, marginLeft: 8, width: 100 },
+  infoVal: { fontSize: 14, fontWeight: '700', color: Colors.light.text, flex: 1, textAlign: 'right' },
 
   divider: { height: 1, backgroundColor: Colors.light.border, marginVertical: 32 },
   

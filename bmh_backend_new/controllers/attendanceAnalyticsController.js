@@ -2,20 +2,20 @@ const pool = require('../db');
 
 exports.getAttendanceSummary = async (req, res) => {
   try {
-    const { department } = req.query; // optional, for subadmin filtering
+    const { department, userType = 'employee' } = req.query; // optional, for subadmin filtering
 
     let deptFilter = "";
     const queryParams = [];
 
     if (department) {
-      deptFilter = "WHERE e.department = $1";
+      deptFilter = userType === 'sub_admin' ? "WHERE e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "WHERE e.department = $1";
       queryParams.push(department);
     }
 
     // 1. Total employees
     const empResult = await pool.query(`
       SELECT COUNT(*) AS total_employees
-      FROM employees e
+      FROM ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e
       ${deptFilter}
     `, queryParams);
 
@@ -23,29 +23,29 @@ exports.getAttendanceSummary = async (req, res) => {
     const presentResult = await pool.query(`
       SELECT COUNT(DISTINCT a.employee_id) AS total_present
       FROM attendance a
-      JOIN employees e ON a.employee_id = e.id
+      JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE AND a.status = 'On Duty'
-      ${department ? "AND e.department = $1" : ""}
+      ${department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : ""}
     `, queryParams);
 
     // 3. On Leave today (assuming a leaves table exists or treating 'Leave' status)
     const leaveResult = await pool.query(`
       SELECT COUNT(DISTINCT a.employee_id) AS total_on_leave
       FROM attendance a
-      JOIN employees e ON a.employee_id = e.id
+      JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE AND a.status = 'Leave'
-      ${department ? "AND e.department = $1" : ""}
+      ${department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : ""}
     `, queryParams);
 
     // 4. On Break
     const breakResult = await pool.query(`
       SELECT COUNT(DISTINCT bl.employee_id) AS employees_on_break
       FROM break_logs bl
-      JOIN employees e ON bl.employee_id = e.id
+      JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON bl.employee_id = e.id AND bl.user_type = '${userType}'
       WHERE bl.break_type = 'Break In'
         AND bl.status = 'On Break'
         AND DATE(bl.timestamp) = CURRENT_DATE
-        ${department ? "AND e.department = $1" : ""}
+        ${department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : ""}
         AND NOT EXISTS (
           SELECT 1 FROM break_logs bo
           WHERE bo.employee_id = bl.employee_id
@@ -78,11 +78,11 @@ exports.getAttendanceSummary = async (req, res) => {
 
 exports.getAdvancedReports = async (req, res) => {
   try {
-    const { department, status, startDate, endDate, employeeId } = req.query;
+    const { department, status, startDate, endDate, employeeId, userType = 'employee' } = req.query;
 
     let query = `
       SELECT 
-        a.id, a.employee_id, e.full_name, e.department, e.email, e.mobile, e.profile_data, a.date, 
+        a.id, a.employee_id, e.full_name, ${userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = e.department_id) as department' : 'e.department'}, e.email, e.mobile, e.profile_data, a.date, 
         a.timestamp as check_in, a.checkout_timestamp as check_out, 
         a.image_url as check_in_image, a.checkout_image_url as check_out_image,
         a.status, a.late_duration,
@@ -92,7 +92,7 @@ exports.getAdvancedReports = async (req, res) => {
           WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
         ) as breaks
       FROM attendance a
-      JOIN employees e ON a.employee_id = e.id
+      JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE 1=1
     `;
     const params = [];
