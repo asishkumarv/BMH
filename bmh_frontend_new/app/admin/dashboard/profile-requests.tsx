@@ -18,7 +18,7 @@ export default function AdminProfileRequestsScreen() {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('https://bmh-eitu.onrender.com/profile-requests');
+      const res = await axios.get('https://bmh-eitu.onrender.com/profile/pending-requests');
       if (res.data.success) {
         setRequests(res.data.data);
       }
@@ -32,7 +32,7 @@ export default function AdminProfileRequestsScreen() {
   const handleReview = async (id: number, status: 'approved' | 'rejected') => {
     setProcessingId(id);
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/profile-requests/${id}/review`, { status });
+      const res = await axios.put(`https://bmh-eitu.onrender.com/profile/review-request/${id}`, { status });
       if (res.data.success) {
         Alert.alert('Success', `Request ${status} successfully`);
         setRequests(requests.filter(r => r.id !== id));
@@ -58,7 +58,8 @@ export default function AdminProfileRequestsScreen() {
               <User size={20} color="#1E40AF" />
             </View>
             <View>
-              <Text style={styles.userName}>User ID: {item.user_id}</Text>
+              <Text style={styles.userName}>{item.user_name || `User ID: ${item.user_id}`}</Text>
+              <Text style={styles.userEmail}>{item.user_email}</Text>
               <Text style={styles.userType}>{item.user_type === 'sub_admin' ? 'Sub Admin' : 'Employee'} - {item.department_name}</Text>
             </View>
           </View>
@@ -73,10 +74,20 @@ export default function AdminProfileRequestsScreen() {
           <View style={styles.updatesGrid}>
             {Object.keys(pd).map((key) => {
               if (pd[key] !== undefined && pd[key] !== '') {
+                const prevValue = item.current_data ? item.current_data[key] : 'N/A';
                 return (
                   <View key={key} style={styles.updateItem}>
                     <Text style={styles.updateLabel}>{key.replace(/_/g, ' ').toUpperCase()}</Text>
-                    <Text style={styles.updateValue}>{pd[key]}</Text>
+                    <View style={styles.valueRow}>
+                      <View style={styles.valueCol}>
+                        <Text style={styles.valueSub}>Current:</Text>
+                        <Text style={styles.prevValue} numberOfLines={2}>{prevValue || 'N/A'}</Text>
+                      </View>
+                      <View style={styles.valueCol}>
+                        <Text style={styles.valueSub}>Requested:</Text>
+                        <Text style={styles.updateValue} numberOfLines={2}>{pd[key]}</Text>
+                      </View>
+                    </View>
                   </View>
                 );
               }
@@ -147,16 +158,21 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: Colors.light.border, backgroundColor: '#F8FAFC' },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   userName: { fontSize: 18, fontWeight: '700', color: Colors.light.text },
-  userType: { fontSize: 14, color: Colors.light.icon, marginTop: 4, textTransform: 'capitalize' },
+  userType: { fontSize: 13, color: Colors.light.icon, marginTop: 4, textTransform: 'capitalize', fontWeight: '500' },
+  userEmail: { fontSize: 13, color: Colors.light.icon, marginTop: 2 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   statusText: { color: '#D97706', fontSize: 12, fontWeight: '700', marginLeft: 6 },
   
   cardBody: { padding: 24 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.icon, marginBottom: 16, textTransform: 'uppercase' },
   updatesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  updateItem: { width: '45%', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.light.border },
-  updateLabel: { fontSize: 12, fontWeight: '700', color: Colors.light.icon, marginBottom: 4 },
-  updateValue: { fontSize: 15, fontWeight: '600', color: Colors.light.text },
+  updateItem: { width: '47%', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.light.border },
+  updateLabel: { fontSize: 12, fontWeight: '800', color: Colors.light.primary, marginBottom: 12 },
+  valueRow: { flexDirection: 'row', gap: 12 },
+  valueCol: { flex: 1 },
+  valueSub: { fontSize: 11, color: '#94a3b8', fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
+  prevValue: { fontSize: 14, fontWeight: '500', color: '#64748b', textDecorationLine: 'line-through' },
+  updateValue: { fontSize: 14, fontWeight: '700', color: Colors.light.text },
   
   cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', padding: 16, backgroundColor: '#F8FAFC', borderTopWidth: 1, borderTopColor: Colors.light.border, gap: 12 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },

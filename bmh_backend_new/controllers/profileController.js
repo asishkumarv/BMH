@@ -52,7 +52,34 @@ exports.getPendingRequests = async (req, res) => {
     query += ' ORDER BY created_at DESC';
 
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
+    
+    // Enrich the data with user name, email, and current profile_data
+    const enrichedData = await Promise.all(result.rows.map(async (request) => {
+      let tableName = request.user_type === 'sub_admin' ? 'department_admins' : 'employees';
+      let userQuery = `SELECT full_name, email, profile_data FROM ${tableName} WHERE id = $1`;
+      
+      try {
+        const userResult = await pool.query(userQuery, [request.user_id]);
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          let currentProfileData = {};
+          if (user.profile_data) {
+             currentProfileData = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+          }
+          return {
+            ...request,
+            user_name: user.full_name,
+            user_email: user.email,
+            current_data: currentProfileData
+          };
+        }
+      } catch(e) {
+        console.error("Error fetching user data for request", request.id);
+      }
+      return request;
+    }));
+
+    res.json({ success: true, data: enrichedData });
   } catch (error) {
     console.error('Error fetching pending profile requests:', error);
     res.status(500).json({ success: false, message: 'Server error fetching requests' });
@@ -129,5 +156,20 @@ exports.reviewProfileUpdate = async (req, res) => {
   } catch (error) {
     console.error('Error reviewing profile request:', error);
     res.status(500).json({ success: false, message: 'Server error reviewing request' });
+  }
+};
+
+// Get personal requests for an employee or sub_admin
+exports.getMyRequests = async (req, res) => {
+  try {
+    const { user_type, user_id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM profile_update_requests WHERE user_type = $1 AND user_id = $2 ORDER BY created_at DESC',
+      [user_type, user_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching personal profile requests:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching personal requests' });
   }
 };

@@ -26,6 +26,8 @@ export default function SubAdminProfileScreen() {
   const [editForm, setEditForm] = useState<any>({});
   const [requestingUpdate, setRequestingUpdate] = useState(false);
 
+  const [myRequests, setMyRequests] = useState<any[]>([]);
+
   useEffect(() => {
     if (Platform.OS === 'web') {
       const userStr = localStorage.getItem('subAdminUser');
@@ -43,9 +45,21 @@ export default function SubAdminProfileScreen() {
             }
           }).catch(console.error);
         }
+        fetchMyRequests(parsed.id);
       }
     }
   }, []);
+
+  const fetchMyRequests = async (empId: number) => {
+    try {
+      const res = await axios.get(`https://bmh-eitu.onrender.com/profile/my-requests/sub_admin/${empId}`);
+      if (res.data.success) {
+        setMyRequests(res.data.data);
+      }
+    } catch (err) {
+      console.log('Error fetching my requests', err);
+    }
+  };
 
   const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -93,7 +107,7 @@ export default function SubAdminProfileScreen() {
   const handleRequestProfileUpdate = async () => {
     setRequestingUpdate(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/profile-requests', {
+      const res = await axios.post('https://bmh-eitu.onrender.com/profile/request-update', {
         user_type: 'sub_admin',
         user_id: user.id,
         department_name: departmentName || user.department_id,
@@ -102,6 +116,7 @@ export default function SubAdminProfileScreen() {
       if (res.data.success) {
         Alert.alert('Success', 'Profile update requested! Waiting for admin approval.');
         setEditModalVisible(false);
+        fetchMyRequests(user.id);
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to request update');
@@ -324,6 +339,54 @@ export default function SubAdminProfileScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* My Requests Section */}
+      <View style={[styles.card, !isDesktop && styles.cardMobile, { marginTop: 32 }]}>
+        <Text style={styles.sectionTitle}>My Update Requests</Text>
+        {myRequests.length === 0 ? (
+          <Text style={{ color: Colors.light.icon, fontStyle: 'italic' }}>No update requests found.</Text>
+        ) : (
+          <View style={{ gap: 16 }}>
+            {myRequests.map((req, index) => {
+              let reqData = req.requested_data;
+              if (typeof reqData === 'string') {
+                try { reqData = JSON.parse(reqData); } catch (e) {}
+              }
+              const keys = Object.keys(reqData).filter(k => reqData[k] !== undefined && reqData[k] !== '');
+              
+              let statusColor = '#94A3B8';
+              let statusBg = '#F1F5F9';
+              if (req.status === 'Approved') { statusColor = '#059669'; statusBg = '#D1FAE5'; }
+              else if (req.status === 'Rejected') { statusColor = '#DC2626'; statusBg = '#FEE2E2'; }
+              else if (req.status === 'Pending') { statusColor = '#D97706'; statusBg = '#FEF3C7'; }
+
+              return (
+                <View key={req.id || index} style={styles.requestItem}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: Colors.light.icon }}>Requested on: {new Date(req.created_at).toLocaleDateString()}</Text>
+                    <View style={{ backgroundColor: statusBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100 }}>
+                      <Text style={{ color: statusColor, fontSize: 12, fontWeight: '700' }}>{req.status}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                    {keys.map(k => (
+                      <View key={k} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, minWidth: 120, flex: 1, borderWidth: 1, borderColor: Colors.light.border }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.light.primary, marginBottom: 4, textTransform: 'uppercase' }}>{k.replace(/_/g, ' ')}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>{reqData[k]}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {req.rejection_reason ? (
+                    <Text style={{ marginTop: 12, fontSize: 13, color: '#DC2626', backgroundColor: '#FEE2E2', padding: 8, borderRadius: 8 }}>
+                      <Text style={{ fontWeight: '700' }}>Reason:</Text> {req.rejection_reason}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -384,5 +447,6 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 24 },
   cancelBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, backgroundColor: '#F1F5F9' },
   cancelBtnText: { color: Colors.light.icon, fontWeight: '700', fontSize: 15 },
-  submitBtnModal: { backgroundColor: Colors.light.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }
+  submitBtnModal: { backgroundColor: Colors.light.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  requestItem: { padding: 20, borderRadius: 16, backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, ...Platform.select({ web: { boxShadow: '0 2px 4px -1px rgb(0 0 0 / 0.05)' } }) },
 });

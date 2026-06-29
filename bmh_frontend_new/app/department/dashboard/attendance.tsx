@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Download, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Download, MapPin, ChevronDown, ChevronUp, Clock, Coffee, CheckCircle, AlertTriangle } from 'lucide-react-native';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -41,6 +41,212 @@ const MapPicker = ({ lat, lng }: any) => {
   return <Text style={{marginTop: 10, color: '#6b7280'}}>Map selection not supported on native without extra packages. Please enter coordinates manually.</Text>;
 };
 
+const Dropdown = ({ options, value, onChange }: any) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={{ padding: 0, justifyContent: 'center', minWidth: 140, backgroundColor: '#f9fafb', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb' }}>
+        {React.createElement(
+          'select',
+          {
+            value: value,
+            onChange: (e: any) => onChange(e.target.value),
+            style: { width: '100%', height: '40px', border: 'none', backgroundColor: 'transparent', padding: '0 12px', fontSize: '14px', color: '#374151', cursor: 'pointer' }
+          },
+          ...options.map((o: any) => React.createElement('option', { key: o, value: o }, o))
+        )}
+      </View>
+    );
+  }
+  return <Text>Filter</Text>;
+};
+
+function MyAttendanceHistory() {
+  const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async (forceClear = false) => {
+    setLoading(true);
+    try {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('subAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('subAdminUser');
+      }
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (!user || !user.id) return;
+
+      let url = `https://bmh-eitu.onrender.com/attendance/employee-analytics?employeeId=${user.id}&userType=sub_admin`;
+      if (!forceClear && startDate && endDate) {
+        url += `&startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      const res = await axios.get(url);
+      if (res.data.success) {
+        setReports(res.data.history || []);
+        setAnalytics(res.data.analytics);
+      }
+    } catch (err) {
+      console.log('Error fetching history', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredReports = reports.filter(r => {
+    if (statusFilter === 'All') return true;
+    if (statusFilter === 'Late In') return r.late_checkin_mins > 0;
+    if (statusFilter === 'Early Out') return r.early_checkout_mins > 0;
+    return true;
+  });
+
+  const handleExportCSV = () => {
+    if (!filteredReports || filteredReports.length === 0) return;
+    
+    let csvContent = "Date,Check In,Check Out,Status,Late In (mins),Early Out (mins),Breaks\n";
+    filteredReports.forEach((r) => {
+      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
+      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
+      const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
+      
+      csvContent += `${new Date(r.date).toLocaleDateString()},${checkIn},${checkOut},${r.status},${r.late_checkin_mins || 0},${r.early_checkout_mins || 0},"${breaksStr}"\n`;
+    });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `my_attendance.csv`);
+    a.click();
+  };
+
+  if (loading) {
+    return <View style={{flex: 1, justifyContent: 'center', alignItems:'center', padding: 40}}><ActivityIndicator size="large" color={Colors.light.primary} /></View>;
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {analytics && (
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Clock size={24} color="#3b82f6" />
+            <Text style={styles.statValue}>{analytics.avgWorkHours}h</Text>
+            <Text style={styles.statLabel}>Avg Work Time</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Coffee size={24} color="#8b5cf6" />
+            <Text style={styles.statValue}>{analytics.avgBreakMins || 0}m</Text>
+            <Text style={styles.statLabel}>Avg Break Time</Text>
+          </View>
+          <View style={styles.statCard}>
+            <CheckCircle size={24} color="#10b981" />
+            <Text style={styles.statValue}>{analytics.earlyCheckInPercent}%</Text>
+            <Text style={styles.statLabel}>Early Check In</Text>
+          </View>
+          <View style={styles.statCard}>
+            <AlertTriangle size={24} color="#f59e0b" />
+            <Text style={styles.statValue}>{analytics.lateCheckInPercent}%</Text>
+            <Text style={styles.statLabel}>Late Check In</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={[styles.section, {marginBottom: 20}]}>
+        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: '#f3f4f6', flexWrap: 'wrap', gap: 12}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap'}}>
+            {Platform.OS === 'web' ? (
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap'}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={(e) => setStartDate(e.target.value)} 
+                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
+                  />
+                  <Text style={{color: '#9ca3af', fontWeight: '500'}}>-</Text>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={(e) => setEndDate(e.target.value)} 
+                    style={{padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', width: '140px', boxSizing: 'border-box', backgroundColor: '#f9fafb', color: '#374151', fontSize: '14px'}}
+                  />
+                </View>
+                
+                <Dropdown 
+                  options={['All', 'Late In', 'Early Out']} 
+                  value={statusFilter} 
+                  onChange={setStatusFilter} 
+                />
+
+                <View style={{flexDirection: 'row', gap: 8}}>
+                  <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center'}} onPress={() => fetchHistory(false)}>
+                    <Text style={{color: 'white', fontWeight: '600', fontSize: 14}}>Apply</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchHistory(true); }}>
+                    <Text style={{color: '#4b5563', fontWeight: '600', fontSize: 14}}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8}} onPress={handleExportCSV}>
+            <Download size={18} color="white" style={{marginRight: 8}} />
+            <Text style={{color: 'white', fontWeight: 'bold'}}>Export CSV</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+          <View style={[styles.table, { minWidth: 800, width: '100%' }]}>
+            <View style={styles.tableRowHeader}>
+              <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
+              <Text style={styles.tableCellHeader}>Date</Text>
+              <Text style={styles.tableCellHeader}>Check In</Text>
+              <Text style={styles.tableCellHeader}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
+              <Text style={styles.tableCellHeader}>Status</Text>
+            </View>
+          {filteredReports.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: Colors.light.icon }}>No attendance records found.</Text>
+            </View>
+          ) : filteredReports.map((r, i) => (
+            <View key={i} style={styles.tableRow}>
+              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+              </View>
+              <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCell, { flex: 2 }]}>
+                {r.breaks && r.breaks.length > 0 ? (
+                  r.breaks.map((b: any, bi: number) => (
+                    <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
+                      {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={{ fontSize: 12, color: Colors.light.icon }}>-</Text>
+                )}
+              </View>
+              <Text style={styles.tableCell}>{r.status}</Text>
+            </View>
+          ))}
+        </View>
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 export default function SubAdminAttendanceDashboard() {
   const { isDesktop } = useResponsive();
   const formatMins = (mins: number) => {
@@ -65,6 +271,8 @@ export default function SubAdminAttendanceDashboard() {
   
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'department' | 'personal'>('department');
 
   useEffect(() => {
     fetchData();
@@ -177,9 +385,29 @@ export default function SubAdminAttendanceDashboard() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>{userDept} Attendance</Text>
-      
-      {/* Summary Cards */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Text style={styles.header}>{userDept} Attendance</Text>
+        <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 4 }}>
+          <TouchableOpacity 
+            style={[styles.tabBtn, activeTab === 'department' && styles.tabBtnActive]} 
+            onPress={() => setActiveTab('department')}
+          >
+            <Text style={[styles.tabText, activeTab === 'department' && styles.tabTextActive]}>Department Reports</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabBtn, activeTab === 'personal' && styles.tabBtnActive]} 
+            onPress={() => setActiveTab('personal')}
+          >
+            <Text style={[styles.tabText, activeTab === 'personal' && styles.tabTextActive]}>My Attendance</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {activeTab === 'personal' ? (
+        <MyAttendanceHistory />
+      ) : (
+        <>
+          {/* Summary Cards */}
       <View style={styles.summaryGrid}>
         <View style={[styles.card, {backgroundColor: '#E3F2FD'}]}>
           <Text style={styles.cardValue}>{summary?.total_employees || 0}</Text>
@@ -358,6 +586,8 @@ export default function SubAdminAttendanceDashboard() {
         onClose={() => setModalVisible(false)} 
         employeeId={selectedEmployeeId} 
       />
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -383,5 +613,26 @@ const styles = StyleSheet.create({
   tableCellHeader: { flex: 1, fontWeight: 'bold', color: '#374151' },
   tableCell: { flex: 1, color: '#4b5563', justifyContent: 'center' },
   thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
-  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' },
+  tabBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6 },
+  tabBtnActive: { backgroundColor: 'white', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  tabTextActive: { color: Colors.light.primary },
+  statsGrid: { flexDirection: 'row', gap: 16, marginBottom: 24, flexWrap: 'wrap' },
+  statCard: {
+    flex: 1,
+    minWidth: 150,
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f3f4f6'
+  },
+  statValue: { fontSize: 24, fontWeight: 'bold', color: '#1f2937', marginTop: 12, marginBottom: 4 },
+  statLabel: { fontSize: 13, color: '#6b7280', fontWeight: '500' }
 });

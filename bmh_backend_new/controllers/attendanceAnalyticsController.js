@@ -207,11 +207,13 @@ exports.getAdvancedReports = async (req, res) => {
 
 exports.getEmployeeAnalytics = async (req, res) => {
   try {
-    const { employeeId, startDate, endDate } = req.query;
+    const { employeeId, startDate, endDate, userType = 'employee' } = req.query;
     if (!employeeId) return res.status(400).json({ success: false, message: "Missing employeeId" });
 
     // Fetch employee details
-    const empResult = await pool.query('SELECT full_name, email, mobile, department, profile_data FROM employees WHERE id = $1', [employeeId]);
+    const tableName = userType === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' : 'department';
+    const empResult = await pool.query(`SELECT full_name, email, mobile, ${deptCol}, profile_data FROM ${tableName} WHERE id = $1`, [employeeId]);
     if (empResult.rowCount === 0) return res.status(404).json({ success: false, message: "Employee not found" });
     const emp = empResult.rows[0];
     
@@ -235,11 +237,11 @@ exports.getEmployeeAnalytics = async (req, res) => {
           WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
         ) as breaks
       FROM attendance a
-      WHERE a.employee_id = $1
+      WHERE a.employee_id = $1 AND a.user_type = $2
     `;
     
-    const params = [employeeId];
-    let paramIndex = 2;
+    const params = [employeeId, userType];
+    let paramIndex = 3;
 
     if (startDate && endDate) {
       attendanceQuery += ` AND a.date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
