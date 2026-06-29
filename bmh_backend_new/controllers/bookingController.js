@@ -49,19 +49,34 @@ exports.createBooking = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid token number selected' });
     }
 
-    const existingToken = await pool.query('SELECT id FROM patient_bookings WHERE slot_id = $1 AND token_number = $2', [slot_id, token_number]);
+    const existingToken = await pool.query('SELECT id, status FROM patient_bookings WHERE slot_id = $1 AND token_number = $2', [slot_id, token_number]);
     
+    let isOverride = false;
     if (existingToken.rowCount > 0) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ success: false, message: 'This token is already booked' });
+      if (existingToken.rows[0].status === 'VIP Quota' && booked_by) {
+        // Employee is overriding a VIP Quota token
+        isOverride = true;
+      } else {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'This token is already booked or blocked' });
+      }
     }
 
     // 3. Create booking
-    await pool.query(
-      `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit)
-       VALUES ($1, $2, $3, $4, $5, 'Booked', $6)`,
-      [slot_id, patient_id, token_number, booked_by, payment_mode, reason_for_visit || null]
-    );
+    if (isOverride) {
+      await pool.query(
+        `UPDATE patient_bookings 
+         SET patient_id = $1, booked_by = $2, payment_mode = $3, status = 'Booked', reason_for_visit = $4, created_at = NOW()
+         WHERE id = $5`,
+        [patient_id, booked_by, payment_mode, reason_for_visit || null, existingToken.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit)
+         VALUES ($1, $2, $3, $4, $5, 'Booked', $6)`,
+        [slot_id, patient_id, token_number, booked_by, payment_mode, reason_for_visit || null]
+      );
+    }
 
     // 4. Update cash_in_hand if Cash payment
     if (payment_mode === 'Cash') {
@@ -206,6 +221,49 @@ exports.getRevenue = async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Get Revenue Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Block or Unblock a token (Admin/Sub-Admin feature)
+exports.blockToken = async (req, res) => {
+  try {
+    const { slot_id, token_number, action, booked_by } = req.body;
+    
+    if (!slot_id || !token_number || !action) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    if (action === 'block') {
+      // Check if already booked
+      const existingToken = await pool.query('SELECT id, status FROM patient_bookings WHERE slot_id = $1 AND token_number = $2', [slot_id, token_number]);
+      
+      if (existingToken.rowCount > 0) {
+        return res.status(400).json({ success: false, message: 'Token is already booked or blocked' });
+      }
+
+      await pool.query(
+        `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit)
+         VALUES ($1, NULL, $2, $3, 'None', 'VIP Quota', NULL)`,
+        [slot_id, token_number, booked_by || null]
+      );
+      
+      return res.json({ success: true, message: 'Token blocked successfully' });
+    } else if (action === 'unblock') {
+      // Ensure it is actually blocked before deleting
+      const existingToken = await pool.query('SELECT id, status FROM patient_bookings WHERE slot_id = $1 AND token_number = $2 AND status = $3', [slot_id, token_number, 'VIP Quota']);
+      if (existingToken.rowCount === 0) {
+        return res.status(400).json({ success: false, message: 'Token is not currently blocked' });
+      }
+      
+      await pool.query('DELETE FROM patient_bookings WHERE slot_id = $1 AND token_number = $2 AND status = $3', [slot_id, token_number, 'VIP Quota']);
+      return res.json({ success: true, message: 'Token unblocked successfully' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid action' });
+    }
+    
+  } catch (error) {
+    console.error('Block Token Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

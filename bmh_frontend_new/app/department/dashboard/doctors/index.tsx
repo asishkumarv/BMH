@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image } from 'react-native';
-import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal } from 'react-native';
+import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../../constants/Colors';
@@ -36,12 +36,51 @@ export default function DepartmentDoctorManagement() {
   });
   const [adding, setAdding] = useState(false);
 
-  // Add Slot Form State
   const [showAddSlotForm, setShowAddSlotForm] = useState(false);
   const [newSlot, setNewSlot] = useState({
     doctor_id: '', date: '', start_time: '', end_time: '', total_tokens: '', fee: '', assigned_peon_id: ''
   });
   const [addingSlot, setAddingSlot] = useState(false);
+  
+  // Manage Tokens
+  const [manageTokenSlot, setManageTokenSlot] = useState<any>(null);
+  const [slotBookingsMap, setSlotBookingsMap] = useState<any>({});
+
+  const handleManageTokens = async (s: any) => {
+    setManageTokenSlot(s);
+    try {
+      const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${s.id}`);
+      const mapping: any = {};
+      res.data.data.forEach((b: any) => {
+        mapping[b.token_number] = b.status;
+      });
+      setSlotBookingsMap(mapping);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleBlock = async (token_number: number) => {
+    const status = slotBookingsMap[token_number];
+    if (status && status !== 'VIP Quota') {
+      alert('This token is already booked by a patient.');
+      return;
+    }
+    const action = status === 'VIP Quota' ? 'unblock' : 'block';
+    try {
+      const res = await axios.post('https://bmh-eitu.onrender.com/bookings/block-token', {
+        slot_id: manageTokenSlot.id,
+        token_number,
+        action,
+        booked_by: user?.id || undefined
+      });
+      if (res.data.success) {
+        setSlotBookingsMap({...slotBookingsMap, [token_number]: action === 'block' ? 'VIP Quota' : undefined });
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error updating token');
+    }
+  };
   const [peons, setPeons] = useState<any[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -397,6 +436,46 @@ export default function DepartmentDoctorManagement() {
         ))}
       </View>
 
+      {/* Manage Tokens Modal */}
+      <Modal visible={!!manageTokenSlot} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15}}>
+              <Text style={styles.modalHeader}>Manage Tokens for Dr. {manageTokenSlot?.doctor_name}</Text>
+              <TouchableOpacity onPress={() => setManageTokenSlot(null)}>
+                <X color="#6b7280" size={24} />
+              </TouchableOpacity>
+            </View>
+            <Text style={{fontSize: 14, color: '#64748b', marginBottom: 15}}>
+              Click a token to block/unblock (VIP Quota). Tokens in red are patient bookings. Gold are VIP Quota.
+            </Text>
+            
+            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center'}}>
+              {manageTokenSlot && Array.from({length: manageTokenSlot.total_tokens}, (_, i) => i + 1).map(t => {
+                const status = slotBookingsMap[t];
+                const isBooked = status && status !== 'VIP Quota';
+                const isVip = status === 'VIP Quota';
+                
+                return (
+                  <TouchableOpacity
+                    key={t}
+                    style={{
+                      width: 50, height: 50, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+                      backgroundColor: isBooked ? '#fecaca' : (isVip ? '#fef3c7' : '#d1fae5'),
+                      borderWidth: 1, borderColor: isBooked ? '#ef4444' : (isVip ? '#f59e0b' : '#10b981'),
+                      opacity: isBooked ? 0.6 : 1
+                    }}
+                    onPress={() => handleToggleBlock(t)}
+                  >
+                    <Text style={{fontWeight: 'bold', color: isBooked ? '#b91c1c' : (isVip ? '#b45309' : '#047857')}}>{t}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView style={styles.content}>
         {loading ? (
           <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 50 }} />
@@ -452,6 +531,7 @@ export default function DepartmentDoctorManagement() {
                   <Text style={styles.tableCellHeader}>Time</Text>
                   <Text style={styles.tableCellHeader}>Tokens/Fee</Text>
                   <Text style={styles.tableCellHeader}>Assigned Peon</Text>
+                  <Text style={styles.tableCellHeader}>Actions</Text>
                 </View>
                 {slots.map((s, i) => (
                   <View key={i} style={styles.tableRow}>
@@ -460,6 +540,11 @@ export default function DepartmentDoctorManagement() {
                     <Text style={styles.tableCell}>{s.start_time} - {s.end_time}</Text>
                     <Text style={styles.tableCell}>{s.total_tokens} tokens / ₹{s.fee}</Text>
                     <Text style={styles.tableCell}>{s.peon_name || 'Unassigned'}</Text>
+                    <Text style={styles.tableCell}>
+                      <TouchableOpacity style={{backgroundColor: '#3b82f6', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => handleManageTokens(s)}>
+                        <Text style={{color: 'white', fontSize: 12}}>Tokens</Text>
+                      </TouchableOpacity>
+                    </Text>
                   </View>
                 ))}
                 {slots.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No slots found.</Text>}
@@ -640,4 +725,7 @@ const styles = StyleSheet.create({
   filterCol: { flex: 1 },
   clearBtn: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#f8fafc' },
   clearBtnText: { color: '#64748b', fontWeight: 'bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: 'white', borderRadius: 16, padding: 24, width: '90%', maxWidth: 500, maxHeight: '80%' },
+  modalHeader: { fontSize: 20, fontWeight: 'bold', color: '#1e293b' },
 });
