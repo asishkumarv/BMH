@@ -143,14 +143,15 @@ export default function AdminLeaveManagement() {
         Alert.alert('Error', 'Please select an employee');
         return;
       }
-      const employee = employees.find(e => e.id.toString() === rEmployeeId);
+      const [uType, empIdStr] = rEmployeeId.split('-');
+      const employee = employees.find(e => e.id.toString() === empIdStr && e.user_type === uType);
       const userType = employee ? employee.user_type : 'employee';
       
       const res = await fetch(`${API_URL}/leave/settings/employee`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employee_id: parseInt(rEmployeeId),
+          employee_id: parseInt(empIdStr),
           user_type: userType,
           leaves_per_month: parseInt(rLeaves), extra_leave_penalty: parseFloat(rExtraPen),
           late_checkin_limit: parseInt(rLateLim), late_checkin_penalty: parseInt(rLatePen),
@@ -159,9 +160,17 @@ export default function AdminLeaveManagement() {
       });
       if (res.ok) {
         Alert.alert('Success', 'Employee setting saved');
+        if (Platform.OS === 'web') window.alert('Employee policy saved!');
         fetchSettings();
+      } else {
+        Alert.alert('Error', 'Failed to save policy');
+        if (Platform.OS === 'web') window.alert('Failed to save policy');
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e); 
+      Alert.alert('Error', 'An error occurred while saving.');
+      if (Platform.OS === 'web') window.alert('An error occurred while saving.');
+    }
   };
 
   const saveHoliday = async () => {
@@ -333,9 +342,9 @@ export default function AdminLeaveManagement() {
                     <select 
                       value={rEmployeeId} 
                       onChange={(e: any) => { 
-                        const empId = e.target.value;
-                        setREmployeeId(empId);
-                        const existing = employeeSettings.find(es => es.employee_id == empId);
+                        const [uType, eIdStr] = e.target.value.split('-');
+                        setREmployeeId(e.target.value);
+                        const existing = employeeSettings.find(es => es.employee_id == eIdStr && es.user_type === uType);
                         if (existing) {
                           setRLeaves(existing.leaves_per_month.toString());
                           setRExtraPen(existing.extra_leave_penalty.toString());
@@ -350,7 +359,7 @@ export default function AdminLeaveManagement() {
                       style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                     >
                       <option value="">Select an Employee</option>
-                      {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={emp.id}>{emp.full_name} ({emp.department} - {emp.role || 'Sub Admin'})</option>)}
+                      {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={`${emp.user_type}-${emp.id}`}>{emp.full_name} ({emp.department} - {emp.role || 'Sub Admin'})</option>)}
                     </select>
                   ) : (
                     <TextInput style={styles.input} value={rEmployeeId} onChangeText={setREmployeeId} placeholder="Employee ID" />

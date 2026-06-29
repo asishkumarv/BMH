@@ -1,6 +1,6 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react-native';
+import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight, FileText } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { name: 'Stationary', icon: Package, route: '/department/dashboard/stationary' },
   { name: 'Allowances', icon: Wallet, route: '/department/dashboard/allowances' },
   { name: 'My Wallet', icon: Wallet, route: '/department/dashboard/wallet' },
+  { name: 'Payslips', icon: FileText, route: '/department/dashboard/payslips' },
   { name: 'Patient History', icon: Users, route: '/department/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/department/dashboard/notifications' },
   { name: 'Profile Requests', icon: Users, route: '/department/dashboard/profile-requests' },

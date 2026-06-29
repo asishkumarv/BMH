@@ -82,7 +82,7 @@ exports.updateEmployeeSettings = async (req, res) => {
       INSERT INTO employee_leave_settings 
       (employee_id, user_type, leaves_per_month, extra_leave_penalty, late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (employee_id) DO UPDATE
+      ON CONFLICT (employee_id, user_type) DO UPDATE
       SET leaves_per_month = EXCLUDED.leaves_per_month,
           extra_leave_penalty = EXCLUDED.extra_leave_penalty,
           late_checkin_limit = EXCLUDED.late_checkin_limit,
