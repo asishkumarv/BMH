@@ -452,13 +452,13 @@ exports.quickAttendance = async (req, res) => {
 
     const now = new Date();
     const todayDate = now.toISOString().split('T')[0];
-    const checkAttQuery = SELECT * FROM attendance WHERE employee_id =  AND TO_CHAR(date, \'YYYY-MM-DD\') = ;
+    const checkAttQuery = `SELECT * FROM attendance WHERE employee_id = $1 AND TO_CHAR(date, 'YYYY-MM-DD') = $2`;
     const checkRes = await pool.query(checkAttQuery, [employeeId, todayDate]);
 
     if (action === 'login') {
       if (checkRes.rowCount > 0) return res.status(400).json({ success: false, message: 'Already checked in today' });
       await pool.query(
-        INSERT INTO attendance (employee_id, date, status, timestamp) VALUES (, , , ),
+        `INSERT INTO attendance (employee_id, date, status, timestamp) VALUES ($1, $2, $3, $4)`,
         [employeeId, now, 'Present', now]
       );
       return res.json({ success: true, message: 'Duty On recorded successfully!' });
@@ -466,7 +466,7 @@ exports.quickAttendance = async (req, res) => {
       if (checkRes.rowCount === 0) return res.status(400).json({ success: false, message: 'No check-in record found for today' });
       if (checkRes.rows[0].checkout_timestamp) return res.status(400).json({ success: false, message: 'Already checked out today' });
       await pool.query(
-        UPDATE attendance SET checkout_timestamp =  WHERE employee_id =  AND TO_CHAR(date, \'YYYY-MM-DD\') = ,
+        `UPDATE attendance SET checkout_timestamp = $1 WHERE employee_id = $2 AND TO_CHAR(date, 'YYYY-MM-DD') = $3`,
         [now, employeeId, todayDate]
       );
       return res.json({ success: true, message: 'Duty Off recorded successfully!' });
