@@ -54,9 +54,9 @@ export default function AdminAllowancesScreen() {
     setLoading(true);
     try {
       const [walletRes, empRes, deptRes] = await Promise.all([
-        axios.get('https://bmh-eitu.onrender.com/wallet'),
-        axios.get('https://bmh-eitu.onrender.com/employees'),
-        axios.get('https://bmh-eitu.onrender.com/department')
+        axios.get('https://napi.bharatmedicalhallplus.com/wallet'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+        axios.get('https://napi.bharatmedicalhallplus.com/department')
       ]);
       
       if (walletRes.data.success) {
@@ -83,7 +83,7 @@ export default function AdminAllowancesScreen() {
     
     setAllocating(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/allocate', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/allocate', {
         employee_id: selectedEmployeeId,
         amount: Number(allocAmount),
         note: allocNote,
@@ -120,7 +120,7 @@ export default function AdminAllowancesScreen() {
         }
       }
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/wallet/transaction/${reviewingTx.id}`, { 
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/wallet/transaction/${reviewingTx.id}`, { 
         status: reviewingTx.status,
         approved_by: adminStr,
         payment_mode: reviewingTx.status === 'approved' ? reviewPaymentMode : null,

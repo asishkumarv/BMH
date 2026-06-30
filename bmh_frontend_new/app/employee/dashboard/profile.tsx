@@ -40,7 +40,7 @@ export default function EmployeeProfileScreen() {
 
   const fetchMyRequests = async (empId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/profile/my-requests/employee/${empId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/profile/my-requests/employee/${empId}`);
       if (res.data.success) {
         setMyRequests(res.data.data);
       }
@@ -62,7 +62,7 @@ export default function EmployeeProfileScreen() {
 
     setUpdating(true);
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/employees/${user.id}/password`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${user.id}/password`, {
         oldPassword,
         newPassword
       });
@@ -95,7 +95,7 @@ export default function EmployeeProfileScreen() {
   const handleRequestProfileUpdate = async () => {
     setRequestingUpdate(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/profile/request-update', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/profile/request-update', {
         user_type: 'employee',
         user_id: user.id,
         department_name: user.department,
@@ -128,7 +128,7 @@ export default function EmployeeProfileScreen() {
         const newPd = { ...pd, photo: base64Image };
         
         setUpdating(true);
-        const res = await axios.put(`https://bmh-eitu.onrender.com/employees/${user.id}/profile`, {
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${user.id}/profile`, {
           profile_data: newPd
         });
         

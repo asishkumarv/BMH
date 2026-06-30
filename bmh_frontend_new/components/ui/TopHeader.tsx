@@ -57,7 +57,7 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
 
   const fetchAttendanceStatus = async (userId: string | number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/today/${userId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/today/${userId}`);
         if (res.data.success && res.data.data) {
            const color = res.data.data.color;
            setRingColor(color === 'green' ? '#22c55e' : color === 'yellow' ? '#eab308' : '#ef4444');
@@ -120,7 +120,7 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
             onPress={() => setDropdownVisible(!dropdownVisible)}
           >
             {profilePhoto ? (
-              <Image source={{ uri: profilePhoto.startsWith('http') || profilePhoto.startsWith('data:image') ? profilePhoto : `https://bmh-eitu.onrender.com${profilePhoto}` }} style={styles.profileImage} />
+              <Image source={{ uri: profilePhoto.startsWith('http') || profilePhoto.startsWith('data:image') ? profilePhoto : `https://napi.bharatmedicalhallplus.com${profilePhoto}` }} style={styles.profileImage} />
             ) : (
               <User size={24} color={Colors.light.text} />
             )}

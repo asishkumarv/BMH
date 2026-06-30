@@ -26,13 +26,13 @@ export default function PatientDashboard() {
           setPatient(p);
 
           // 1. Fetch doctors count
-          const docRes = await axios.get('https://bmh-eitu.onrender.com/doctors');
+          const docRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors');
           if (docRes.data.success && docRes.data.data) {
             setSpecialistsCount(docRes.data.data.length);
           }
 
           // 2. Fetch upcoming visits
-          const bookingsRes = await axios.get(`https://bmh-eitu.onrender.com/bookings?patient_id=${p.id}`);
+          const bookingsRes = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?patient_id=${p.id}`);
           if (bookingsRes.data.success && bookingsRes.data.data) {
             const activeBookings = bookingsRes.data.data.filter((b: any) => 
               b.status === 'Booked' || b.status === 'Waiting' || b.status === 'Current'

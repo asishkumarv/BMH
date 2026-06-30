@@ -17,8 +17,8 @@ export default function AdminSettings() {
   const fetchData = async () => {
     try {
       const [settingsRes, deptRes] = await Promise.all([
-        axios.get('https://bmh-eitu.onrender.com/settings'),
-        axios.get('https://bmh-eitu.onrender.com/department')
+        axios.get('https://napi.bharatmedicalhallplus.com/settings'),
+        axios.get('https://napi.bharatmedicalhallplus.com/department')
       ]);
 
       const depts = deptRes.data.data || [];
@@ -57,7 +57,7 @@ export default function AdminSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post('https://bmh-eitu.onrender.com/settings', {
+      await axios.post('https://napi.bharatmedicalhallplus.com/settings', {
         key: 'doctor_management_access',
         value: settings
       });

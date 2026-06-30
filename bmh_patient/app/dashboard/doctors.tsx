@@ -47,13 +47,13 @@ export default function FindDoctor() {
         }
         
         // 1. Fetch doctors
-        const docRes = await axios.get('https://bmh-eitu.onrender.com/doctors');
+        const docRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors');
         if (docRes.data.success && docRes.data.data) {
           setDoctors(docRes.data.data);
         }
         
         // 2. Fetch all slots
-        const slotRes = await axios.get('https://bmh-eitu.onrender.com/doctors/slots');
+        const slotRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots');
         if (slotRes.data.success && slotRes.data.data) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -86,7 +86,7 @@ export default function FindDoctor() {
     setSelectedSlot(slot);
     setSelectedToken(null);
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${slot.id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${slot.id}`);
       const bookedTokens = res.data.data.map((b: any) => b.token_number);
       setSlotBookings(bookedTokens);
     } catch (err) {
@@ -119,7 +119,7 @@ export default function FindDoctor() {
     
     setBookingLoading(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/bookings/create', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/bookings/create', {
         slot_id: selectedSlot.id,
         patient_name: bookingName,
         mobile: bookingMobile,

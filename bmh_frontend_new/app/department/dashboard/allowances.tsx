@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
 import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Check, X, Send } from 'lucide-react-native';
@@ -44,13 +45,19 @@ export default function SubAdminAllowancesScreen() {
   const [historyFilterType, setHistoryFilterType] = useState('All');
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('subAdminUser');
+    const init = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('subAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('subAdminUser');
+      }
       if (userStr) {
         const user = JSON.parse(userStr);
         setDepartmentId(user.department_id);
       }
-    }
+    };
+    init();
   }, []);
 
   useEffect(() => {
@@ -60,12 +67,12 @@ export default function SubAdminAllowancesScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let url = 'https://bmh-eitu.onrender.com/wallet';
-      let empUrl = 'https://bmh-eitu.onrender.com/employees';
+      let url = 'https://napi.bharatmedicalhallplus.com/wallet';
+      let empUrl = 'https://napi.bharatmedicalhallplus.com/employees';
       
       if (departmentId) {
         url += `?department_id=${encodeURIComponent(departmentId)}`;
-        empUrl = `https://bmh-eitu.onrender.com/employees/by-department-id/${departmentId}`;
+        empUrl = `https://napi.bharatmedicalhallplus.com/employees/by-department-id/${departmentId}`;
       }
       
       const [walletRes, empRes] = await Promise.all([
@@ -94,7 +101,7 @@ export default function SubAdminAllowancesScreen() {
     
     setAllocating(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/allocate', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/allocate', {
         employee_id: selectedEmployeeId,
         amount: Number(allocAmount),
         note: allocNote,
@@ -123,15 +130,18 @@ export default function SubAdminAllowancesScreen() {
     setProcessingReview(true);
     try {
       let adminStr = 'Sub Admin';
+      let userStr = null;
       if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('subAdminUser');
-        if (userStr) {
-          const u = JSON.parse(userStr);
-          adminStr = `Sub Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
-        }
+        userStr = localStorage.getItem('subAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('subAdminUser');
+      }
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        adminStr = `Sub Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
       }
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/wallet/transaction/${reviewingTx.id}`, { 
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/wallet/transaction/${reviewingTx.id}`, { 
         status: reviewingTx.status,
         approved_by: adminStr,
         payment_mode: reviewingTx.status === 'approved' ? reviewPaymentMode : null,

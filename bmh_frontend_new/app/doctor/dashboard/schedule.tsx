@@ -21,14 +21,14 @@ export default function DoctorSchedule() {
       if (userData) {
         const user = JSON.parse(userData);
         // Get all upcoming and recent slots
-        const resSlots = await axios.get(`https://bmh-eitu.onrender.com/doctors/slots?doctor_id=${user.id}`);
+        const resSlots = await axios.get(`https://napi.bharatmedicalhallplus.com/doctors/slots?doctor_id=${user.id}`);
         if (resSlots.data.success) {
           const slotsData = resSlots.data.data;
           
           // Fetch bookings for each slot
           const slotsWithBookings = await Promise.all(slotsData.map(async (slot: any) => {
             try {
-              const resBookings = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${slot.id}`);
+              const resBookings = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${slot.id}`);
               return { ...slot, bookings: resBookings.data.data || [] };
             } catch (err) {
               return { ...slot, bookings: [] };

@@ -47,7 +47,7 @@ export default function EmployeeDashboardScreen() {
 
   const fetchSummary = async (empId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/employee-dashboard/${empId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-dashboard/${empId}`);
       if (res.data.success) {
         setSummary(res.data.data);
       } else {
@@ -81,7 +81,7 @@ export default function EmployeeDashboardScreen() {
       const location = await Location.getCurrentPositionAsync({});
 
       // Verify Location first
-      const locRes = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-location', {
+      const locRes = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-location', {
         employeeId: user.id,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -103,7 +103,7 @@ export default function EmployeeDashboardScreen() {
 
       if (actionType === 'login' || actionType === 'logout') {
         payload.action = actionType;
-        const res = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-face', payload);
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-face', payload);
         if (res.data.success) {
           setCameraMessage({ text: res.data.message, type: 'success' });
           setTimeout(() => setCameraVisible(false), 2000);
@@ -112,7 +112,7 @@ export default function EmployeeDashboardScreen() {
         }
       } else {
         payload.breakType = actionType;
-        const breakRes = await axios.post('https://bmh-eitu.onrender.com/attendance/break', payload);
+        const breakRes = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/break', payload);
         if (breakRes.data.success) {
            setCameraMessage({ text: breakRes.data.message, type: 'success' });
            setTimeout(() => setCameraVisible(false), 2000);

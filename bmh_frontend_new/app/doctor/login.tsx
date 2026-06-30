@@ -29,7 +29,7 @@ export default function DoctorLoginScreen() {
     
     setLoading(true);
     try {
-      const response = await axios.post('https://bmh-eitu.onrender.com/doctors/login', {
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/doctors/login', {
         emailOrId,
         password,
       });

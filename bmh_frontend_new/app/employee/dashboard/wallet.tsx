@@ -59,8 +59,8 @@ export default function EmployeeWalletScreen() {
     setLoading(true);
     try {
       const [walletRes, handoversRes] = await Promise.all([
-        axios.get(`https://bmh-eitu.onrender.com/wallet/${id}`),
-        axios.get(`https://bmh-eitu.onrender.com/wallet/handovers/${id}`)
+        axios.get(`https://napi.bharatmedicalhallplus.com/wallet/${id}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/wallet/handovers/${id}`)
       ]);
       
       if (walletRes.data.success) {
@@ -80,14 +80,14 @@ export default function EmployeeWalletScreen() {
 
   const fetchPeers = async (id: string) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/employees/peers/${id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/peers/${id}`);
       if (res.data.success) setPeers(res.data.data);
     } catch (error) {}
   };
 
   const fetchBookings = async (id: string) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?booked_by=${id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?booked_by=${id}`);
       if (res.data.success) setBookings(res.data.data);
     } catch (error) {}
   };
@@ -99,7 +99,7 @@ export default function EmployeeWalletScreen() {
 
     setSubmitting(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/usage', { employee_id: employeeId, amount: Number(amount), note });
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/usage', { employee_id: employeeId, amount: Number(amount), note });
       if (res.data.success) {
         Alert.alert('Success', 'Usage logged successfully');
         setUsageModalVisible(false);
@@ -119,7 +119,7 @@ export default function EmployeeWalletScreen() {
 
     setSubmitting(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/request', { employee_id: employeeId, amount: Number(amount), note });
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/request', { employee_id: employeeId, amount: Number(amount), note });
       if (res.data.success) {
         Alert.alert('Success', 'Allocation request sent');
         setRequestModalVisible(false);
@@ -136,7 +136,7 @@ export default function EmployeeWalletScreen() {
   const handleAcceptAllocation = async (txId: string) => {
     if (!employeeId) return;
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/wallet/transaction/${txId}`, { status: 'completed' });
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/wallet/transaction/${txId}`, { status: 'completed' });
       if (res.data.success) fetchData(employeeId);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to accept allocation');
@@ -151,7 +151,7 @@ export default function EmployeeWalletScreen() {
 
     setSubmitting(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/handover/request', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/request', {
         from_employee_id: employeeId,
         to_employee_id: selectedPeerId,
         amount: Number(amount)
@@ -171,7 +171,7 @@ export default function EmployeeWalletScreen() {
 
   const handleAcceptHandover = async (id: string, action: 'Accepted' | 'Rejected') => {
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/handover/accept', { id, action });
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/accept', { id, action });
       if (res.data.success) {
         Alert.alert('Success', `Handover ${action.toLowerCase()}`);
         if(employeeId) fetchData(employeeId);

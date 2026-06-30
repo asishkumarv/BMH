@@ -48,10 +48,10 @@ export default function AdminWalletScreen() {
     setLoading(true);
     try {
       const [walletRes, handoversRes, statsRes, balancesRes] = await Promise.all([
-        axios.get(`https://bmh-eitu.onrender.com/wallet/${id}`),
-        axios.get(`https://bmh-eitu.onrender.com/wallet/handovers/${id}`),
-        axios.get(`https://bmh-eitu.onrender.com/admin/revenue-stats`),
-        axios.get(`https://bmh-eitu.onrender.com/admin/wallet-balances`)
+        axios.get(`https://napi.bharatmedicalhallplus.com/wallet/${id}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/wallet/handovers/${id}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/admin/revenue-stats`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/admin/wallet-balances`)
       ]);
       
       if (walletRes.data.success) {
@@ -75,7 +75,7 @@ export default function AdminWalletScreen() {
 
   const handleAcceptHandover = async (id: string, action: 'Accepted' | 'Rejected') => {
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/wallet/handover/accept', { id, action });
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/accept', { id, action });
       if (res.data.success) {
         Alert.alert('Success', `Handover ${action.toLowerCase()}`);
         if(adminId) fetchData(adminId);

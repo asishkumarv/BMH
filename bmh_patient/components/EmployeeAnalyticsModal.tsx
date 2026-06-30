@@ -30,7 +30,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/employee-analytics?employeeId=${employeeId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${employeeId}`);
       if (res.data.success) {
         setData(res.data);
       }

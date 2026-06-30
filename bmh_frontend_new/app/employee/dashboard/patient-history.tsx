@@ -33,7 +33,7 @@ export default function PatientHistoryEmployee() {
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
 
-      const res = await axios.get(`https://bmh-eitu.onrender.com/doctors/patient-history?${params.toString()}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/doctors/patient-history?${params.toString()}`);
       if (res.data.success) {
         setHistory(res.data.data);
       }

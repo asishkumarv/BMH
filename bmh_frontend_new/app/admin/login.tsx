@@ -29,7 +29,7 @@ export default function AdminLoginScreen() {
     
     setLoading(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/admin/super-admins/login', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/admin/super-admins/login', {
         email,
         password
       });

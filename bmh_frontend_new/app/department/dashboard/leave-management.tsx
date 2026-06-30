@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
@@ -37,8 +38,12 @@ export default function SubAdminLeaveManagement() {
     const init = async () => {
       let deptName = '';
       let numId = '';
-      if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('subAdminUser');
+      let userStr = null;
+        if (Platform.OS === 'web') {
+          userStr = localStorage.getItem('subAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('subAdminUser');
+        }
         if (userStr) {
           const user = JSON.parse(userStr);
           numId = user.department_id;
@@ -57,7 +62,6 @@ export default function SubAdminLeaveManagement() {
             console.error(e);
           }
         }
-      }
       
       if (deptName) {
         fetchRequests(deptName);

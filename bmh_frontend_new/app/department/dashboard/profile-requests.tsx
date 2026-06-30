@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Alert, ScrollView } from 'react-native';
 import axios from 'axios';
@@ -16,19 +17,22 @@ export default function SubAdminProfileRequestsScreen() {
       setLoading(true);
       try {
         let deptName = '';
+        let userStr = null;
         if (Platform.OS === 'web') {
-          const userStr = localStorage.getItem('subAdminUser');
-          if (userStr) {
+          userStr = localStorage.getItem('subAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('subAdminUser');
+        }
+        if (userStr) {
             const parsed = JSON.parse(userStr);
-            const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+            const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
             if (deptRes.data.success) {
               const dept = deptRes.data.data.find((d: any) => String(d.id) === String(parsed.department_id));
               if (dept) deptName = dept.name;
             }
-          }
         }
 
-        const url = deptName ? `https://bmh-eitu.onrender.com/profile/pending-requests?department_name=${deptName}` : 'https://bmh-eitu.onrender.com/profile/pending-requests';
+        const url = deptName ? `https://napi.bharatmedicalhallplus.com/profile/pending-requests?department_name=${deptName}` : 'https://napi.bharatmedicalhallplus.com/profile/pending-requests';
         const res = await axios.get(url);
         if (res.data.success) {
           setRequests(res.data.data);
@@ -46,7 +50,7 @@ export default function SubAdminProfileRequestsScreen() {
   const handleReview = async (id: number, status: 'approved' | 'rejected') => {
     setProcessingId(id);
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/profile/review-request/${id}`, { status });
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/profile/review-request/${id}`, { status });
       if (res.data.success) {
         Alert.alert('Success', `Request ${status} successfully`);
         setRequests(requests.filter(r => r.id !== id));

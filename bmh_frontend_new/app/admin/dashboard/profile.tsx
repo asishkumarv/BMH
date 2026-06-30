@@ -53,7 +53,7 @@ export default function SuperAdminProfileScreen() {
 
     setUpdating(true);
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/admin/super-admins/${user.id}/password`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/super-admins/${user.id}/password`, {
         oldPassword,
         newPassword
       });
@@ -85,7 +85,7 @@ export default function SuperAdminProfileScreen() {
         const newPd = { ...pd, photo: base64Image };
         
         setUpdating(true);
-        const res = await axios.put(`https://bmh-eitu.onrender.com/admin/super-admins/${user.id}/profile`, {
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/super-admins/${user.id}/profile`, {
           profile_data: newPd
         });
         

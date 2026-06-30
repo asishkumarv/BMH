@@ -38,7 +38,7 @@ export default function EmployeePortal() {
     // Fetch employees for quick attendance
     const fetchEmployees = async () => {
       try {
-        const response = await axios.get('https://bmh-eitu.onrender.com/employees');
+        const response = await axios.get('https://napi.bharatmedicalhallplus.com/employees');
         if (response.data.success) {
           setEmployees(response.data.data);
         }
@@ -81,7 +81,7 @@ export default function EmployeePortal() {
       const location = await Location.getCurrentPositionAsync({});
 
       // Verify Location first
-      const locRes = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-location', {
+      const locRes = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-location', {
         employeeId: selectedEmployee.id,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -102,7 +102,7 @@ export default function EmployeePortal() {
         action: actionType
       };
 
-      const res = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-face', payload);
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-face', payload);
       if (res.data.success) {
         setCameraMessage({ text: res.data.message, type: 'success' });
         Toast.show({ type: 'success', text1: 'Success', text2: res.data.message });
@@ -129,7 +129,7 @@ export default function EmployeePortal() {
     }
     setLoggingIn(true);
     try {
-      const response = await axios.post('https://bmh-eitu.onrender.com/employees/login', {
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/employees/login', {
         email,
         password
       });

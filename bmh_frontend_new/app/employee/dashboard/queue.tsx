@@ -59,13 +59,13 @@ export default function PeonLiveQueue() {
   const fetchQueues = async (peonId: number) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const resSlots = await axios.get(`https://bmh-eitu.onrender.com/doctors/slots`);
+      const resSlots = await axios.get(`https://napi.bharatmedicalhallplus.com/doctors/slots`);
       const mySlots = resSlots.data.data.filter((s: any) => 
         s.date.startsWith(today)
       );
 
       const queueData = await Promise.all(mySlots.map(async (slot: any) => {
-        const resBookings = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${slot.id}`);
+        const resBookings = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${slot.id}`);
         return {
           slot,
           bookings: resBookings.data.data
@@ -82,7 +82,7 @@ export default function PeonLiveQueue() {
 
   const updateStatus = async (id: number, status: string) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/bookings/${id}/status`, { status });
+      await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/${id}/status`, { status });
       if (user) fetchQueues(user.id);
     } catch (err) {
       alert('Error updating status');

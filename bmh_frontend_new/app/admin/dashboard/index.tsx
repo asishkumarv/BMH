@@ -29,11 +29,11 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         const [empRes, adminRes, deptRes, revRes, balRes] = await Promise.all([
-          axios.get('https://bmh-eitu.onrender.com/employees'),
-          axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
-          axios.get('https://bmh-eitu.onrender.com/department'),
-          axios.get('https://bmh-eitu.onrender.com/admin/revenue-stats'),
-          axios.get('https://bmh-eitu.onrender.com/admin/wallet-balances')
+          axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+          axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
+          axios.get('https://napi.bharatmedicalhallplus.com/department'),
+          axios.get('https://napi.bharatmedicalhallplus.com/admin/revenue-stats'),
+          axios.get('https://napi.bharatmedicalhallplus.com/admin/wallet-balances')
         ]);
         
         const emps = empRes.data.success ? empRes.data.data : [];

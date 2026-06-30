@@ -33,9 +33,9 @@ export default function DepartmentsScreen() {
     setLoading(true);
     try {
       const [deptRes, adminRes, empRes] = await Promise.all([
-        axios.get('https://bmh-eitu.onrender.com/department'),
-        axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
-        axios.get('https://bmh-eitu.onrender.com/employees')
+        axios.get('https://napi.bharatmedicalhallplus.com/department'),
+        axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees')
       ]);
       if (deptRes.data.success) setDepartments(deptRes.data.data);
       if (adminRes.data.success) setAdmins(adminRes.data.data);
@@ -54,7 +54,7 @@ export default function DepartmentsScreen() {
     }
     setAdding(true);
     try {
-      const response = await axios.post('https://bmh-eitu.onrender.com/department', {
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/department', {
         name: newDeptName,
         description: newDeptDesc
       });
@@ -73,7 +73,7 @@ export default function DepartmentsScreen() {
 
   const handleApproveAdmin = async (adminId: string) => {
     try {
-      const response = await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${adminId}/status`, {
+      const response = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${adminId}/status`, {
         status: 'approved'
       });
       if (response.data.success) {

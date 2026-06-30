@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
 import { Package, Plus, MoreVertical, Check, X, Upload } from 'lucide-react-native';
@@ -52,13 +53,19 @@ export default function SubAdminStationaryScreen() {
   const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('subAdminUser');
+    const init = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('subAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('subAdminUser');
+      }
       if (userStr) {
         const user = JSON.parse(userStr);
         setDepartmentId(user.department_id);
       }
-    }
+    };
+    init();
   }, []);
 
   useEffect(() => {
@@ -69,10 +76,10 @@ export default function SubAdminStationaryScreen() {
     setLoading(true);
     try {
       if (activeTab === 'inventory') {
-        const res = await axios.get('https://bmh-eitu.onrender.com/stationary/items');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
         if (res.data.success) setItems(res.data.data);
       } else {
-        let url = 'https://bmh-eitu.onrender.com/stationary/requests';
+        let url = 'https://napi.bharatmedicalhallplus.com/stationary/requests';
         if (departmentId) {
           url += `?department_id=${encodeURIComponent(departmentId)}`;
         }
@@ -111,7 +118,7 @@ export default function SubAdminStationaryScreen() {
         ? `${newItemName} | ${newDynamicFields.map(f => `${f.key}: ${f.value}`).join(' | ')}`
         : newItemName;
 
-      const res = await axios.post('https://bmh-eitu.onrender.com/stationary/items', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/items', {
         name: finalName,
         stock: parseInt(newItemStock) || 0,
         image: newItemImage
@@ -138,7 +145,7 @@ export default function SubAdminStationaryScreen() {
         return { name: name?.trim(), stock: parseInt(stock?.trim()) || 0, image: '' };
       }).filter(i => i.name);
 
-      const res = await axios.post('https://bmh-eitu.onrender.com/stationary/items/bulk', { items: payloadItems });
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/items/bulk', { items: payloadItems });
       if (res.data.success) {
         setBulkModalVisible(false);
         setCsvText('');
@@ -200,7 +207,7 @@ export default function SubAdminStationaryScreen() {
         ? `${editItemName} | ${editDynamicFields.map(f => `${f.key}: ${f.value}`).join(' | ')}`
         : editItemName;
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/items/${editingItem.id}`, {
         name: finalName,
         stock: parseInt(editItemStock) || 0,
         image: editItemImage,
@@ -224,7 +231,7 @@ export default function SubAdminStationaryScreen() {
     const executeDelete = async () => {
       setSavingEdit(true);
       try {
-        const res = await axios.delete(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`);
+        const res = await axios.delete(`https://napi.bharatmedicalhallplus.com/stationary/items/${editingItem.id}`);
         if (res.data.success) {
           setEditItemModalVisible(false);
           fetchData();
@@ -269,15 +276,18 @@ export default function SubAdminStationaryScreen() {
       }));
 
       let adminStr = 'Sub Admin';
+      let userStr = null;
       if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('subAdminUser');
-        if (userStr) {
-          const u = JSON.parse(userStr);
-          adminStr = `Sub Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
-        }
+        userStr = localStorage.getItem('subAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('subAdminUser');
+      }
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        adminStr = `Sub Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
       }
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/requests/${selectedRequest.id}/approve`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/requests/${selectedRequest.id}/approve`, {
         status,
         approved_items,
         approved_by: adminStr

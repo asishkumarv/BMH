@@ -52,7 +52,7 @@ export default function EmployeeAttendanceHistory() {
       const user = userStr ? JSON.parse(userStr) : null;
       if (!user || !user.id) return;
 
-      let url = `https://bmh-eitu.onrender.com/attendance/employee-analytics?employeeId=${user.id}`;
+      let url = `https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${user.id}`;
       if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       }

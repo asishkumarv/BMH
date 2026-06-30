@@ -42,7 +42,7 @@ export default function AdminTasksScreen() {
 
   const fetchTasks = async () => {
     try {
-      const res = await axios.get('https://bmh-eitu.onrender.com/tasks?user_type=super_admin');
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/tasks?user_type=super_admin');
       if (res.data.success) {
         setTasks(res.data.data);
       }
@@ -56,11 +56,11 @@ export default function AdminTasksScreen() {
   const fetchUsers = async () => {
     try {
       const [empRes, adminRes, superAdminRes, deptRes, globalRes] = await Promise.all([
-        axios.get('https://bmh-eitu.onrender.com/employees'),
-        axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
-        axios.get('https://bmh-eitu.onrender.com/admin/super-admins'),
-        axios.get('https://bmh-eitu.onrender.com/department'),
-        axios.get('https://bmh-eitu.onrender.com/employees/all-users')
+        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+        axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
+        axios.get('https://napi.bharatmedicalhallplus.com/admin/super-admins'),
+        axios.get('https://napi.bharatmedicalhallplus.com/department'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users')
       ]);
       setUsers({
         emps: empRes.data.success ? empRes.data.data : [],
@@ -104,7 +104,7 @@ export default function AdminTasksScreen() {
     }
 
     try {
-      await axios.post('https://bmh-eitu.onrender.com/tasks', {
+      await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
         title,
         description,
         assigner_type: 'super_admin',
@@ -130,7 +130,7 @@ export default function AdminTasksScreen() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/tasks/${selectedTask.id}/status`, {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
         rejection_reason: rejectionReason,
         notes: statusNotes,

@@ -107,7 +107,7 @@ function MyAttendanceHistory() {
       const user = userStr ? JSON.parse(userStr) : null;
       if (!user || !user.id) return;
 
-      let url = `https://bmh-eitu.onrender.com/attendance/employee-analytics?employeeId=${user.id}&userType=sub_admin`;
+      let url = `https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${user.id}&userType=sub_admin`;
       if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       }
@@ -323,7 +323,7 @@ export default function SubAdminAttendanceDashboard() {
       
       let deptName = user.department;
       
-      const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+      const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
       if (deptRes.data.success) {
         const dept = deptRes.data.data.find((d: any) => d.id === user.department_id || d.name === user.department);
         if (dept) {
@@ -336,12 +336,12 @@ export default function SubAdminAttendanceDashboard() {
       }
 
       if (deptName) {
-        const sumRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/summary?department=${deptName}`);
+        const sumRes = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/summary?department=${deptName}`);
         if (sumRes.data.success) {
           setSummary(sumRes.data.summary);
         }
         
-        let url = `https://bmh-eitu.onrender.com/attendance/reports?department=${deptName}`;
+        let url = `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${deptName}`;
         if (!forceClear && startDate && endDate) {
           url += `&startDate=${startDate}&endDate=${endDate}`;
         } else {
@@ -366,7 +366,7 @@ export default function SubAdminAttendanceDashboard() {
       return;
     }
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/department/location', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/department/location', {
         name: userDept,
         lat,
         lng,

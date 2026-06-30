@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import {  View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView , Image } from 'react-native';
 import axios from 'axios';
@@ -29,8 +30,13 @@ export default function SubAdminProfileScreen() {
   const [myRequests, setMyRequests] = useState<any[]>([]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('subAdminUser');
+    const init = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('subAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('subAdminUser');
+      }
       if (userStr) {
         const parsed = JSON.parse(userStr);
         setUser(parsed);
@@ -38,7 +44,7 @@ export default function SubAdminProfileScreen() {
           try { setPd(JSON.parse(parsed.profile_data)); } catch (e) {}
         }
         if (parsed.department_id) {
-          axios.get('https://bmh-eitu.onrender.com/department').then(res => {
+          axios.get('https://napi.bharatmedicalhallplus.com/department').then(res => {
             if (res.data.success) {
               const dept = res.data.data.find((d: any) => String(d.id) === String(parsed.department_id));
               if (dept) setDepartmentName(dept.name);
@@ -47,12 +53,13 @@ export default function SubAdminProfileScreen() {
         }
         fetchMyRequests(parsed.id);
       }
-    }
+    };
+    init();
   }, []);
 
   const fetchMyRequests = async (empId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/profile/my-requests/sub_admin/${empId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/profile/my-requests/sub_admin/${empId}`);
       if (res.data.success) {
         setMyRequests(res.data.data);
       }
@@ -74,7 +81,7 @@ export default function SubAdminProfileScreen() {
 
     setUpdating(true);
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${user.id}/password`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${user.id}/password`, {
         oldPassword,
         newPassword
       });
@@ -112,7 +119,7 @@ export default function SubAdminProfileScreen() {
   const handleRequestProfileUpdate = async () => {
     setRequestingUpdate(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/profile/request-update', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/profile/request-update', {
         user_type: 'sub_admin',
         user_id: user.id,
         department_name: departmentName || user.department_id,
@@ -145,7 +152,7 @@ export default function SubAdminProfileScreen() {
         const newPd = { ...pd, photo: base64Image };
         
         setUpdating(true);
-        const res = await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${user.id}/profile`, {
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${user.id}/profile`, {
           profile_data: newPd
         });
         

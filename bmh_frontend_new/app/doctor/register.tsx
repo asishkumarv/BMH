@@ -31,7 +31,7 @@ export default function DoctorRegisterScreen() {
   React.useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await axios.get('https://bmh-eitu.onrender.com/department');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/department');
         const depts = res.data.data || [];
         setDepartments(depts);
         if (depts.length > 0 && !form.department) {
@@ -54,7 +54,7 @@ export default function DoctorRegisterScreen() {
     
     setLoading(true);
     try {
-      const response = await axios.post('https://bmh-eitu.onrender.com/doctors/register', form);
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/doctors/register', form);
       if (response.data.success) {
         setSuccess(true);
       }

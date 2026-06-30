@@ -4,17 +4,17 @@ let c = fs.readFileSync('c:/Users/Lohitha Asish/Desktop/BMH/bmh_frontend_new/app
 // 1. Remove Roles state and fetch
 c = c.replace(/const \[roles, setRoles\] = useState<[^>]+>\(\[\]\);\n/, '');
 c = c.replace(/axios\.get\('https:\/\/bmh-eitu\.onrender\.com\/roles'\)/, '');
-c = c.replace(/const \[deptRes, roleRes\] = await Promise\.all\(\[\s+axios\.get\('https:\/\/bmh-eitu\.onrender\.com\/department'\),\s+\]\);/, "const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');");
+c = c.replace(/const \[deptRes, roleRes\] = await Promise\.all\(\[\s+axios\.get\('https:\/\/bmh-eitu\.onrender\.com\/department'\),\s+\]\);/, "const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');");
 c = c.replace(/if \(roleRes\.data\.success\) setRoles\(roleRes\.data\.data\);/, '');
 
 // Fix the Promise.all empty array logic
-c = c.replace(/const \[deptRes, roleRes\] = await Promise\.all\(\[\s*axios\.get\('https:\/\/bmh-eitu\.onrender\.com\/department'\),\s*\]\);/, "const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');");
+c = c.replace(/const \[deptRes, roleRes\] = await Promise\.all\(\[\s*axios\.get\('https:\/\/bmh-eitu\.onrender\.com\/department'\),\s*\]\);/, "const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');");
 
 // Oh, the Promise.all had two elements, I replaced the second with empty string above. Let's just do a string replacement for the fetch function.
 c = c.replace(/const fetchData = async \(\) => \{[\s\S]*?fetchData\(\);\n  \}, \[\]\);/m, `React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+        const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
         if (deptRes.data.success) setDepartments(deptRes.data.data);
       } catch (error) {
         console.error(error);
@@ -49,7 +49,7 @@ const handleRegisterReplacement = `const handleRegister = async () => {
 
     setRegistering(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/admin/department-admins', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/admin/department-admins', {
         full_name: fullName,
         email,
         password,

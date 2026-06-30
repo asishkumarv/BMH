@@ -56,14 +56,14 @@ export default function EmployeeStationaryScreen() {
         }
       }
 
-      const itemsRes = await axios.get('https://bmh-eitu.onrender.com/stationary/items');
+      const itemsRes = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
       if (itemsRes.data.success) {
         const activeItems = itemsRes.data.data.filter((i: StationaryItem) => i.status !== 'hold');
         setItems(activeItems);
       }
 
       if (empId) {
-        const reqRes = await axios.get(`https://bmh-eitu.onrender.com/stationary/requests?employee_id=${empId}`);
+        const reqRes = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/requests?employee_id=${empId}`);
         if (reqRes.data.success) {
           setRequests(reqRes.data.data);
         }
@@ -101,7 +101,7 @@ export default function EmployeeStationaryScreen() {
         requested_qty: cart[itemId]
       }));
 
-      const res = await axios.post('https://bmh-eitu.onrender.com/stationary/requests', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/requests', {
         employee_id: employeeId,
         notes,
         items: payloadItems

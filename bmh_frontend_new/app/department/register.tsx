@@ -60,8 +60,8 @@ export default function SubAdminRegisterScreen() {
     const fetchData = async () => {
       try {
         const [deptRes, roleRes] = await Promise.all([
-          axios.get('https://bmh-eitu.onrender.com/department'),
-          axios.get('https://bmh-eitu.onrender.com/roles')
+          axios.get('https://napi.bharatmedicalhallplus.com/department'),
+          axios.get('https://napi.bharatmedicalhallplus.com/roles')
         ]);
         if (deptRes.data.success) setDepartments(deptRes.data.data);
         if (roleRes.data.success) setRoles(roleRes.data.data);
@@ -107,7 +107,7 @@ export default function SubAdminRegisterScreen() {
 
     setRegistering(true);
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/admin/department-admins', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/admin/department-admins', {
         full_name: fullName,
         email,
         password,

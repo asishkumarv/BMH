@@ -18,7 +18,7 @@ export default function AdminProfileRequestsScreen() {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('https://bmh-eitu.onrender.com/profile/pending-requests');
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/profile/pending-requests');
       if (res.data.success) {
         setRequests(res.data.data);
       }
@@ -32,7 +32,7 @@ export default function AdminProfileRequestsScreen() {
   const handleReview = async (id: number, status: 'approved' | 'rejected') => {
     setProcessingId(id);
     try {
-      const res = await axios.put(`https://bmh-eitu.onrender.com/profile/review-request/${id}`, { status });
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/profile/review-request/${id}`, { status });
       if (res.data.success) {
         Alert.alert('Success', `Request ${status} successfully`);
         setRequests(requests.filter(r => r.id !== id));

@@ -17,7 +17,7 @@ export default function MyAppointments() {
 
   const fetchBookings = async (patientId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?patient_id=${patientId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?patient_id=${patientId}`);
       if (res.data.success && res.data.data) {
         setBookings(res.data.data);
       }

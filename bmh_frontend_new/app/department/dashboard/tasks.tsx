@@ -44,7 +44,7 @@ export default function DepartmentTasksScreen() {
       // Find my department name
       let dName = adminUser.department;
       if (!dName) {
-         const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+         const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
          if (deptRes.data.success) {
            const myD = deptRes.data.data.find((d: any) => d.id == adminUser.department_id);
            if (myD) dName = myD.name;
@@ -53,8 +53,8 @@ export default function DepartmentTasksScreen() {
       setMyDeptName(dName);
 
       const [taskRes, usersRes] = await Promise.all([
-        axios.get(`https://bmh-eitu.onrender.com/tasks?user_type=department_admin&user_id=${adminUser.id}&department=${dName}`),
-        axios.get('https://bmh-eitu.onrender.com/employees/all-users')
+        axios.get(`https://napi.bharatmedicalhallplus.com/tasks?user_type=department_admin&user_id=${adminUser.id}&department=${dName}`),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users')
       ]);
 
       if (taskRes.data.success) setTasks(taskRes.data.data);
@@ -89,7 +89,7 @@ export default function DepartmentTasksScreen() {
     }
 
     try {
-      await axios.post('https://bmh-eitu.onrender.com/tasks', {
+      await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
         title,
         description,
         assigner_type: 'department_admin',
@@ -115,7 +115,7 @@ export default function DepartmentTasksScreen() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/tasks/${selectedTask.id}/status`, {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
         rejection_reason: rejectionReason,
         notes: statusNotes,

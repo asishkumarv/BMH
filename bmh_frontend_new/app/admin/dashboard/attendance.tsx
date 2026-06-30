@@ -163,8 +163,8 @@ export default function AdminAttendanceScreen() {
   const fetchReports = async (dept: string, userTypeStr = selectedUserType, forceClear = false) => {
     try {
       let url = dept === 'All' 
-        ? `https://bmh-eitu.onrender.com/attendance/reports?userType=${userTypeStr}`
-        : `https://bmh-eitu.onrender.com/attendance/reports?department=${dept}&userType=${userTypeStr}`;
+        ? `https://napi.bharatmedicalhallplus.com/attendance/reports?userType=${userTypeStr}`
+        : `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${dept}&userType=${userTypeStr}`;
       
       if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
@@ -183,14 +183,14 @@ export default function AdminAttendanceScreen() {
   const fetchData = async (userTypeStr = selectedUserType) => {
     try {
       setLoading(true);
-      const sumRes = await axios.get(`https://bmh-eitu.onrender.com/attendance/summary?userType=${userTypeStr}`);
+      const sumRes = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/summary?userType=${userTypeStr}`);
       if (sumRes.data.success) {
         setSummary(sumRes.data.summary);
       }
 
       await fetchReports(selectedReportDept, userTypeStr);
 
-      const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+      const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
       if (deptRes.data.success) {
         setDepartments(deptRes.data.data);
       }
@@ -211,7 +211,7 @@ export default function AdminAttendanceScreen() {
       return;
     }
     try {
-      const res = await axios.post('https://bmh-eitu.onrender.com/department/location', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/department/location', {
         name: deptName,
         lat,
         lng,
@@ -220,7 +220,7 @@ export default function AdminAttendanceScreen() {
       if (res.data.success) {
         Alert.alert("Success", `Department ${deptName} location updated to Lat: ${lat}, Lng: ${lng}, Radius: ${radius}m`);
         // Refresh departments list so the new coordinates are stored in state
-        const deptRes = await axios.get('https://bmh-eitu.onrender.com/department');
+        const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
         if (deptRes.data.success) {
           setDepartments(deptRes.data.data);
         }
@@ -249,7 +249,7 @@ export default function AdminAttendanceScreen() {
   const handleSaveEdit = async () => {
     setUpdating(true);
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/attendance/admin-update/${editRecord.id}`, {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/attendance/admin-update/${editRecord.id}`, {
         check_in: editCheckIn || null,
         check_out: editCheckOut || null,
         status: editStatus

@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 let MapContainer, TileLayer, Marker, Popup, Polyline, useMap, L;
-if (Platform.OS === 'web') {
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
   require("leaflet/dist/leaflet.css");
   const ReactLeaflet = require("react-leaflet");
   MapContainer = ReactLeaflet.MapContainer;
@@ -96,7 +96,7 @@ export default function CrossPlatformMapLeaflet({
   onMarkerPress,
   linePositions = [],
 }) {
-  if (Platform.OS !== 'web' || !MapContainer) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !MapContainer) {
     return null;
   }
   return (

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, TouchableOpacity, Alert, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -46,15 +47,18 @@ export default function SubAdminDashboard() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        let userStr = null;
         if (Platform.OS === 'web') {
-          const userStr = localStorage.getItem('subAdminUser');
-          if (userStr) {
+          userStr = localStorage.getItem('subAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('subAdminUser');
+        }
+        if (userStr) {
             const parsedUser = JSON.parse(userStr);
             setUser(parsedUser);
             fetchSummary(parsedUser.id);
             fetchMetrics(parsedUser.department_id);
           }
-        }
       } catch (error) {
         console.error('Initialization error', error);
       } finally {
@@ -67,7 +71,7 @@ export default function SubAdminDashboard() {
 
   const fetchMetrics = async (departmentId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/admin/department-admins/${departmentId}/metrics`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${departmentId}/metrics`);
       if (res.data.success) {
         setMetrics(res.data.data);
       }
@@ -78,7 +82,7 @@ export default function SubAdminDashboard() {
 
   const fetchSummary = async (empId: number) => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/attendance/employee-dashboard/${empId}?userType=sub_admin`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-dashboard/${empId}?userType=sub_admin`);
       if (res.data.success) {
         setSummary(res.data.data);
       } else {
@@ -112,7 +116,7 @@ export default function SubAdminDashboard() {
       const location = await Location.getCurrentPositionAsync({});
 
       // Verify Location
-      const locRes = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-location', {
+      const locRes = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-location', {
         employeeId: user.id,
         userType: 'sub_admin',
         latitude: location.coords.latitude,
@@ -136,7 +140,7 @@ export default function SubAdminDashboard() {
 
       if (actionType === 'login' || actionType === 'logout') {
         payload.action = actionType;
-        const res = await axios.post('https://bmh-eitu.onrender.com/attendance/verify-face', payload);
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-face', payload);
         if (res.data.success) {
           setCameraMessage({ text: res.data.message, type: 'success' });
           setTimeout(() => setCameraVisible(false), 2000);
@@ -145,7 +149,7 @@ export default function SubAdminDashboard() {
         }
       } else {
         payload.breakType = actionType;
-        const breakRes = await axios.post('https://bmh-eitu.onrender.com/attendance/break', payload);
+        const breakRes = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/break', payload);
         if (breakRes.data.success) {
            setCameraMessage({ text: breakRes.data.message, type: 'success' });
            setTimeout(() => setCameraVisible(false), 2000);

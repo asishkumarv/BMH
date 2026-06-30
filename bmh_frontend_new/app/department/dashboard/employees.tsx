@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import {  View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView , Image } from 'react-native';
 import { Plus, Search, MoreVertical, Shield, Building, User } from 'lucide-react-native';
@@ -48,19 +49,22 @@ export default function SubAdminEmployeesScreen() {
     const fetchEmployees = async () => {
       try {
         let deptId = null;
+        let userStr = null;
         if (Platform.OS === 'web') {
-          const userStr = localStorage.getItem('subAdminUser');
-          if (userStr) {
+          userStr = localStorage.getItem('subAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('subAdminUser');
+        }
+        if (userStr) {
             const user = JSON.parse(userStr);
             deptId = user.department_id;
             setDepartmentId(deptId);
           }
-        }
 
         if (deptId) {
           const [empRes, roleRes] = await Promise.all([
-            axios.get(`https://bmh-eitu.onrender.com/employees/by-department-id/${deptId}`),
-            axios.get('https://bmh-eitu.onrender.com/roles')
+            axios.get(`https://napi.bharatmedicalhallplus.com/employees/by-department-id/${deptId}`),
+            axios.get('https://napi.bharatmedicalhallplus.com/roles')
           ]);
           
           if (empRes.data.success) setEmployees(empRes.data.data);
@@ -93,7 +97,7 @@ export default function SubAdminEmployeesScreen() {
     
     setAddingRole(true);
     try {
-      const response = await axios.post('https://bmh-eitu.onrender.com/roles', {
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/roles', {
         name: newRoleName,
         departmentId: departmentId.toString()
       });
@@ -111,7 +115,7 @@ export default function SubAdminEmployeesScreen() {
 
   const handleApproveEmployee = async (employeeId: string) => {
     try {
-      const response = await axios.put(`https://bmh-eitu.onrender.com/employees/${employeeId}/status`, {
+      const response = await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${employeeId}/status`, {
         status: 'approved'
       });
       if (response.data.success) {

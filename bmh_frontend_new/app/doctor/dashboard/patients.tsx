@@ -21,7 +21,7 @@ export default function DoctorPatients() {
       const userData = await AsyncStorage.getItem('userData');
       if (userData) {
         const user = JSON.parse(userData);
-        const res = await axios.get(`https://bmh-eitu.onrender.com/doctors/${user.id}/patients`);
+        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/doctors/${user.id}/patients`);
         if (res.data.success) {
           setPatients(res.data.data);
         }
@@ -43,7 +43,7 @@ export default function DoctorPatients() {
 
   const saveEdit = async (consultation_id: number) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/doctors/consultation/${consultation_id}`, {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/consultation/${consultation_id}`, {
         notes: editNotes,
         next_consultation_date: editNextDate || null
       });

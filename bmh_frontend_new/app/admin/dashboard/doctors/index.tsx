@@ -52,7 +52,7 @@ export default function DoctorManagement() {
     setManageTokenSlot(s);
     setSelectedTokens([]);
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${s.id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${s.id}`);
       const mapping: any = {};
       res.data.data.forEach((b: any) => {
         mapping[b.token_number] = b.status;
@@ -90,7 +90,7 @@ export default function DoctorManagement() {
           if (action === 'block' && slotBookingsMap[token_number] === 'VIP Quota') return token_number;
           if (action === 'unblock' && slotBookingsMap[token_number] !== 'VIP Quota') return token_number;
 
-          const res = await axios.post('https://bmh-eitu.onrender.com/bookings/block-token', {
+          const res = await axios.post('https://napi.bharatmedicalhallplus.com/bookings/block-token', {
             slot_id: manageTokenSlot.id,
             token_number,
             action,
@@ -148,7 +148,7 @@ export default function DoctorManagement() {
 
   const fetchBookings = async () => {
     try {
-      let url = 'https://bmh-eitu.onrender.com/bookings?';
+      let url = 'https://napi.bharatmedicalhallplus.com/bookings?';
       if (bDept) url += `department=${bDept}&`;
       if (bDoctor) url += `doctor_id=${bDoctor}&`;
       if (bEmployee) url += `booked_by=${bEmployee}&`;
@@ -157,11 +157,11 @@ export default function DoctorManagement() {
       const res = await axios.get(url);
       setBookings(res.data.data);
       
-      const deptsRes = await axios.get('https://bmh-eitu.onrender.com/department').catch(() => ({data: {data: []}}));
+      const deptsRes = await axios.get('https://napi.bharatmedicalhallplus.com/department').catch(() => ({data: {data: []}}));
       setDepartments(deptsRes.data.data || []);
-      const empRes = await axios.get('https://bmh-eitu.onrender.com/employees').catch(()=>null);
+      const empRes = await axios.get('https://napi.bharatmedicalhallplus.com/employees').catch(()=>null);
       if (empRes?.data?.data) setEmployees(empRes.data.data);
-      const docsRes = await axios.get('https://bmh-eitu.onrender.com/doctors').catch(()=>null);
+      const docsRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors').catch(()=>null);
       if (docsRes?.data?.data) setDoctors(docsRes.data.data);
     } catch (err) {
       console.error(err);
@@ -195,23 +195,23 @@ export default function DoctorManagement() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const deptsRes = await axios.get('https://bmh-eitu.onrender.com/department').catch(() => ({data: {data: []}}));
+      const deptsRes = await axios.get('https://napi.bharatmedicalhallplus.com/department').catch(() => ({data: {data: []}}));
       setDepartments(deptsRes.data.data || []);
       
       if (activeTab === 'Doctors') {
-        const res = await axios.get('https://bmh-eitu.onrender.com/doctors');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/doctors');
         setDoctors(res.data.data);
       } else if (activeTab === 'Slots') {
         const [resSlots, resPeons, resDocs] = await Promise.all([
-          axios.get('https://bmh-eitu.onrender.com/doctors/slots'),
-          axios.get('https://bmh-eitu.onrender.com/doctors/peons'),
-          axios.get('https://bmh-eitu.onrender.com/doctors')
+          axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots'),
+          axios.get('https://napi.bharatmedicalhallplus.com/doctors/peons'),
+          axios.get('https://napi.bharatmedicalhallplus.com/doctors')
         ]);
         setSlots(resSlots.data.data);
         setPeons(resPeons.data.data);
         setDoctors(resDocs.data.data); // Needed for dropdown
       } else if (activeTab === 'Revenue') {
-        const res = await axios.get('https://bmh-eitu.onrender.com/bookings/revenue');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/bookings/revenue');
         setRevenue(res.data.data);
       }
     } catch (err) {
@@ -223,7 +223,7 @@ export default function DoctorManagement() {
 
   const approveDoctor = async (id: string, status: string) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/doctors/${id}/approve`, { status });
+      await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${id}/approve`, { status });
       fetchData();
     } catch (err) {
       alert('Error updating status');
@@ -237,7 +237,7 @@ export default function DoctorManagement() {
     }
     setAdding(true);
     try {
-      await axios.post('https://bmh-eitu.onrender.com/doctors/create', newDoctor);
+      await axios.post('https://napi.bharatmedicalhallplus.com/doctors/create', newDoctor);
       alert('Doctor added successfully!');
       setShowAddForm(false);
       setNewDoctor({
@@ -259,7 +259,7 @@ export default function DoctorManagement() {
     }
     setAddingSlot(true);
     try {
-      await axios.post('https://bmh-eitu.onrender.com/doctors/slots', newSlot);
+      await axios.post('https://napi.bharatmedicalhallplus.com/doctors/slots', newSlot);
       alert('Slot created successfully!');
       setShowAddSlotForm(false);
       setNewSlot({ doctor_id: '', date: '', start_time: '', end_time: '', total_tokens: '', fee: '', assigned_peon_id: '' });

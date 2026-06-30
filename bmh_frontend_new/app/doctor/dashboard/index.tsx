@@ -36,13 +36,13 @@ export default function DoctorDashboard() {
   const fetchQueue = async (doctorId: string) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const resSlots = await axios.get(`https://bmh-eitu.onrender.com/doctors/slots?doctor_id=${doctorId}&date=${today}`);
+      const resSlots = await axios.get(`https://napi.bharatmedicalhallplus.com/doctors/slots?doctor_id=${doctorId}&date=${today}`);
       
       if (resSlots.data.success && resSlots.data.data.length > 0) {
         const mySlot = resSlots.data.data[0];
         setSlot(mySlot);
 
-        const resBookings = await axios.get(`https://bmh-eitu.onrender.com/bookings?slot_id=${mySlot.id}`);
+        const resBookings = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${mySlot.id}`);
         const bookings = resBookings.data.data;
         
         const current = bookings.find((b: any) => b.status === 'Current');
@@ -76,7 +76,7 @@ export default function DoctorDashboard() {
     
     setSaving(true);
     try {
-      await axios.post('https://bmh-eitu.onrender.com/doctors/consultation', {
+      await axios.post('https://napi.bharatmedicalhallplus.com/doctors/consultation', {
         booking_id: currentPatient.booking_id,
         doctor_id: user.id,
         patient_id: currentPatient.patient_id || null, // Might need patient_id in bookings response if foreign key requires it

@@ -55,10 +55,10 @@ export default function EmployeesScreen() {
     const fetchEmployees = async () => {
       try {
         const [empRes, adminRes, deptRes, roleRes] = await Promise.all([
-          axios.get('https://bmh-eitu.onrender.com/employees'),
-          axios.get('https://bmh-eitu.onrender.com/admin/department-admins'),
-          axios.get('https://bmh-eitu.onrender.com/department'),
-          axios.get('https://bmh-eitu.onrender.com/roles')
+          axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+          axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
+          axios.get('https://napi.bharatmedicalhallplus.com/department'),
+          axios.get('https://napi.bharatmedicalhallplus.com/roles')
         ]);
         
         let depts: any[] = [];
@@ -136,7 +136,7 @@ export default function EmployeesScreen() {
     }
     setAddingRole(true);
     try {
-      const response = await axios.post('https://bmh-eitu.onrender.com/roles', {
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/roles', {
         name: newRoleName,
         departmentId: selectedDeptForRole
       });
@@ -154,7 +154,7 @@ export default function EmployeesScreen() {
 
   const handleApproveEmployee = async (employeeId: string) => {
     try {
-      const response = await axios.put(`https://bmh-eitu.onrender.com/employees/${employeeId}/status`, {
+      const response = await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${employeeId}/status`, {
         status: 'approved'
       });
       if (response.data.success) {
@@ -524,20 +524,20 @@ export default function EmployeesScreen() {
                               let newPd = { ...pd, salary: editSalary, shiftIn: editShiftIn, shiftOut: editShiftOut };
                               
                               if (selectedEmployee.role === 'Sub Admin') {
-                                await axios.put(`https://bmh-eitu.onrender.com/admin/department-admins/${selectedEmployee.id}/profile`, {
+                                await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${selectedEmployee.id}/profile`, {
                                   profile_data: newPd,
                                   schedule_in: editShiftIn,
                                   schedule_out: editShiftOut
                                 });
                               } else {
-                                await axios.put(`https://bmh-eitu.onrender.com/employees/${selectedEmployee.id}/profile`, {
+                                await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${selectedEmployee.id}/profile`, {
                                   profile_data: newPd
                                 });
                               }
                               Alert.alert('Success', 'Profile updated successfully');
                               setIsEditingProfile(false);
                               // Refresh
-                              const url = selectedEmployee.role === 'Sub Admin' ? 'https://bmh-eitu.onrender.com/admin/department-admins' : 'https://bmh-eitu.onrender.com/employees';
+                              const url = selectedEmployee.role === 'Sub Admin' ? 'https://napi.bharatmedicalhallplus.com/admin/department-admins' : 'https://napi.bharatmedicalhallplus.com/employees';
                               const empRes = await axios.get(url);
                               if (empRes.data.success) {
                                 let updatedEmps = empRes.data.data;

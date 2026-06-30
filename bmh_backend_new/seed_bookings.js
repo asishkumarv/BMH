@@ -3,7 +3,7 @@ const axios = require('axios');
 async function seedBookings() {
   try {
     console.log("Logging in as employee...");
-    const loginRes = await axios.post('https://bmh-eitu.onrender.com/employees/login', {
+    const loginRes = await axios.post('https://napi.bharatmedicalhallplus.com/employees/login', {
       email: 'asishkumarv@gmail.com',
       password: '123456'
     });
@@ -19,7 +19,7 @@ async function seedBookings() {
     
     const today = new Date().toISOString().split('T')[0];
     console.log("Fetching slots for today:", today);
-    const slotsRes = await axios.get('https://bmh-eitu.onrender.com/doctors/slots');
+    const slotsRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots');
     const allSlots = slotsRes.data.data;
     
     const targetDoctors = ['CARD001', 'CARD002', 'CARD003'];
@@ -56,7 +56,7 @@ async function seedBookings() {
             guardian_name: 'Test Guardian'
           };
           
-          await axios.post('https://bmh-eitu.onrender.com/bookings/create', bookingData, {
+          await axios.post('https://napi.bharatmedicalhallplus.com/bookings/create', bookingData, {
             headers: { Authorization: `Bearer ${token}` }
           });
           console.log(` - Booked token #${i} for Doctor ${slot.doctor_name}`);

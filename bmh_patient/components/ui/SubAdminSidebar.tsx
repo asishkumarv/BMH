@@ -45,7 +45,7 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   React.useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await axios.get('https://bmh-eitu.onrender.com/settings');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
         if (res.data.success && res.data.settings.doctor_management_access) {
           let value = res.data.settings.doctor_management_access;
           if (typeof value === 'string') value = JSON.parse(value);

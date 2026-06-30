@@ -80,7 +80,7 @@ export default function PatientSignUpScreen() {
 
     try {
       setLoading(true);
-      const res = await fetch("https://bmh-eitu.onrender.com/patient/register", {
+      const res = await fetch("https://napi.bharatmedicalhallplus.com/patient/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

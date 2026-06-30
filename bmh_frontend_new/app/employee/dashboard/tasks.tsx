@@ -39,8 +39,8 @@ export default function EmployeeTasksScreen() {
   const fetchInitData = async () => {
     try {
       const [taskRes, usersRes] = await Promise.all([
-        axios.get(`https://bmh-eitu.onrender.com/tasks?user_type=employee&user_id=${empUser.id}`),
-        axios.get('https://bmh-eitu.onrender.com/employees/all-users')
+        axios.get(`https://napi.bharatmedicalhallplus.com/tasks?user_type=employee&user_id=${empUser.id}`),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users')
       ]);
 
       if (taskRes.data.success) setTasks(taskRes.data.data);
@@ -75,7 +75,7 @@ export default function EmployeeTasksScreen() {
     }
 
     try {
-      await axios.post('https://bmh-eitu.onrender.com/tasks', {
+      await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
         title,
         description,
         assigner_type: 'employee',
@@ -101,7 +101,7 @@ export default function EmployeeTasksScreen() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/tasks/${selectedTask.id}/status`, {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
         rejection_reason: rejectionReason,
         notes: statusNotes,

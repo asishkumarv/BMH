@@ -79,7 +79,7 @@ export default function ProfileSettings() {
         ...(password ? { password, confirm_password: confirmPassword } : {})
       };
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/patient/profile/${patient.id}`, payload);
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/patient/profile/${patient.id}`, payload);
       if (res.data.success && res.data.patient) {
         // Update local patient state and AsyncStorage
         const updatedPatient = { ...patient, ...res.data.patient };

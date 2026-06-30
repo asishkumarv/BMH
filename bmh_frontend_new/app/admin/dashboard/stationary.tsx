@@ -59,10 +59,10 @@ export default function AdminStationaryScreen() {
     setLoading(true);
     try {
       if (activeTab === 'inventory') {
-        const res = await axios.get('https://bmh-eitu.onrender.com/stationary/items');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
         if (res.data.success) setItems(res.data.data);
       } else {
-        const res = await axios.get('https://bmh-eitu.onrender.com/stationary/requests');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/requests');
         if (res.data.success) setRequests(res.data.data);
       }
     } catch (error) {
@@ -97,7 +97,7 @@ export default function AdminStationaryScreen() {
         ? `${newItemName} | ${newDynamicFields.map(f => `${f.key}: ${f.value}`).join(' | ')}`
         : newItemName;
 
-      const res = await axios.post('https://bmh-eitu.onrender.com/stationary/items', {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/items', {
         name: finalName,
         stock: parseInt(newItemStock) || 0,
         image: newItemImage
@@ -124,7 +124,7 @@ export default function AdminStationaryScreen() {
         return { name: name?.trim(), stock: parseInt(stock?.trim()) || 0, image: '' };
       }).filter(i => i.name);
 
-      const res = await axios.post('https://bmh-eitu.onrender.com/stationary/items/bulk', { items: payloadItems });
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/items/bulk', { items: payloadItems });
       if (res.data.success) {
         setBulkModalVisible(false);
         setCsvText('');
@@ -186,7 +186,7 @@ export default function AdminStationaryScreen() {
         ? `${editItemName} | ${editDynamicFields.map(f => `${f.key}: ${f.value}`).join(' | ')}`
         : editItemName;
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/items/${editingItem.id}`, {
         name: finalName,
         stock: parseInt(editItemStock) || 0,
         image: editItemImage,
@@ -210,7 +210,7 @@ export default function AdminStationaryScreen() {
     const executeDelete = async () => {
       setSavingEdit(true);
       try {
-        const res = await axios.delete(`https://bmh-eitu.onrender.com/stationary/items/${editingItem.id}`);
+        const res = await axios.delete(`https://napi.bharatmedicalhallplus.com/stationary/items/${editingItem.id}`);
         if (res.data.success) {
           setEditItemModalVisible(false);
           fetchData();
@@ -263,7 +263,7 @@ export default function AdminStationaryScreen() {
         }
       }
 
-      const res = await axios.put(`https://bmh-eitu.onrender.com/stationary/requests/${selectedRequest.id}/approve`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/requests/${selectedRequest.id}/approve`, {
         status,
         approved_items,
         approved_by: adminStr

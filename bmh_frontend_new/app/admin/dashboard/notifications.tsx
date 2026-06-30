@@ -20,7 +20,7 @@ export default function AdminNotificationsScreen() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get(`https://bmh-eitu.onrender.com/notifications?user_type=super_admin&user_id=${adminUser.id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/notifications?user_type=super_admin&user_id=${adminUser.id}`);
       if (res.data.success) {
         setNotifications(res.data.data);
       }
@@ -33,7 +33,7 @@ export default function AdminNotificationsScreen() {
 
   const markAsRead = async (id: string) => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/notifications/${id}/read`);
+      await axios.put(`https://napi.bharatmedicalhallplus.com/notifications/${id}/read`);
       fetchNotifications();
     } catch (e) {
       console.error(e);
@@ -42,7 +42,7 @@ export default function AdminNotificationsScreen() {
 
   const markAllAsRead = async () => {
     try {
-      await axios.put(`https://bmh-eitu.onrender.com/notifications/mark-all-read`, {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/notifications/mark-all-read`, {
         user_type: 'super_admin',
         user_id: adminUser.id
       });

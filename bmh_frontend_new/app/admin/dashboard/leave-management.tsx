@@ -49,7 +49,7 @@ export default function AdminLeaveManagement() {
   const fetchDropdownData = async () => {
     try {
       const [deptRes, empRes, adminRes] = await Promise.all([
-        axios.get(`https://bmh-eitu.onrender.com/department`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/department`),
         axios.get(`${API_URL}/employees`),
         axios.get(`${API_URL}/admin/department-admins`).catch(() => ({ data: { data: [] } }))
       ]);

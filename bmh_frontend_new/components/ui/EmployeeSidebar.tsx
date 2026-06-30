@@ -42,7 +42,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
   React.useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await axios.get('https://bmh-eitu.onrender.com/settings');
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
         let dynamicNavItems = [...NAV_ITEMS];
         
         if (res.data.success && res.data.settings.doctor_management_access) {
