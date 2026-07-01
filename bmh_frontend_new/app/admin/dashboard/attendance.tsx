@@ -133,6 +133,8 @@ export default function AdminAttendanceScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -162,11 +164,12 @@ export default function AdminAttendanceScreen() {
     }
   }, []);
 
-  const fetchReports = async (dept: string, userTypeStr = selectedUserType, forceClear = false) => {
+  const fetchReports = async (dept: string, userTypeStr = selectedUserType, forceClear = false, isLoadMore = false) => {
     try {
+      const currentOffset = isLoadMore ? offset : 0;
       let url = dept === 'All' 
-        ? `https://napi.bharatmedicalhallplus.com/attendance/reports?userType=${userTypeStr}`
-        : `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${dept}&userType=${userTypeStr}`;
+        ? `https://napi.bharatmedicalhallplus.com/attendance/reports?userType=${userTypeStr}&limit=50&offset=${currentOffset}`
+        : `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${dept}&userType=${userTypeStr}&limit=50&offset=${currentOffset}`;
       
       if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
@@ -175,7 +178,13 @@ export default function AdminAttendanceScreen() {
       }
       const res = await axios.get(url);
       if (res.data.success) {
-        setReports(res.data.data);
+        if (isLoadMore) {
+          setReports(prev => [...prev, ...res.data.data]);
+        } else {
+          setReports(res.data.data);
+        }
+        setOffset(currentOffset + 50);
+        setHasMore(res.data.hasMore);
       }
     } catch (e) {
       console.error(e);
@@ -558,6 +567,15 @@ export default function AdminAttendanceScreen() {
             </View>
           ))}
           </View>
+          
+          {hasMore && (
+            <TouchableOpacity 
+              style={{ padding: 12, backgroundColor: Colors.light.primary, borderRadius: 8, alignItems: 'center', marginTop: 15 }} 
+              onPress={() => fetchReports(selectedReportDept, selectedUserType, false, true)}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>Load More</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
 

@@ -78,7 +78,9 @@ exports.getAttendanceSummary = async (req, res) => {
 
 exports.getAdvancedReports = async (req, res) => {
   try {
-    const { department, status, startDate, endDate, employeeId, userType = 'employee' } = req.query;
+    const { department, status, startDate, endDate, employeeId, userType = 'employee', limit, offset } = req.query;
+    const parsedLimit = parseInt(limit, 10) || 50;
+    const parsedOffset = parseInt(offset, 10) || 0;
 
     let query = `
       SELECT 
@@ -115,11 +117,15 @@ exports.getAdvancedReports = async (req, res) => {
       params.push(startDate, endDate);
     }
 
-    query += " ORDER BY a.date DESC, a.timestamp DESC";
+    query += ` ORDER BY a.date DESC, a.timestamp DESC`;
 
     const result = await pool.query(query, params);
+    
+    // Slice for pagination in memory, since we might need total counts or advanced mapping
+    const paginatedRows = result.rows.slice(parsedOffset, parsedOffset + parsedLimit);
+    const hasMore = parsedOffset + parsedLimit < result.rows.length;
 
-    const processedData = result.rows.map(row => {
+    const processedData = paginatedRows.map(row => {
       let late_checkin_mins = 0, early_checkin_mins = 0;
       let late_checkout_mins = 0, early_checkout_mins = 0;
       let extra_break_mins = 0;
@@ -198,7 +204,7 @@ exports.getAdvancedReports = async (req, res) => {
       return { ...rest, status: dynamic_status, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
     });
 
-    res.json({ success: true, data: processedData });
+    res.json({ success: true, data: processedData, hasMore });
   } catch (error) {
     console.error("Advanced reports error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -207,18 +213,26 @@ exports.getAdvancedReports = async (req, res) => {
 
 exports.getEmployeeAnalytics = async (req, res) => {
   try {
-    const { employeeId, startDate, endDate, userType = 'employee' } = req.query;
+    const { employeeId, startDate, endDate, userType = 'employee', limit, offset } = req.query;
+    const parsedLimit = parseInt(limit, 10) || 30;
+    const parsedOffset = parseInt(offset, 10) || 0;
     if (!employeeId) return res.status(400).json({ success: false, message: "Missing employeeId" });
 
     // Fetch employee details
     const tableName = userType === 'sub_admin' ? 'department_admins' : 'employees';
     const deptCol = userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' : 'department';
-    const empResult = await pool.query(`SELECT full_name, email, mobile, ${deptCol}, profile_data FROM ${tableName} WHERE id = $1`, [employeeId]);
+    const extraCols = userType === 'sub_admin' ? ', schedule_in, schedule_out, break_in, break_out' : '';
+    const empResult = await pool.query(`SELECT full_name, email, mobile, ${deptCol}, profile_data${extraCols} FROM ${tableName} WHERE id = $1`, [employeeId]);
     if (empResult.rowCount === 0) return res.status(404).json({ success: false, message: "Employee not found" });
     const emp = empResult.rows[0];
     
     let shiftIn = null, shiftOut = null, breakStart = null, breakEnd = null;
-    if (emp.profile_data) {
+    if (userType === 'sub_admin') {
+      shiftIn = emp.schedule_in;
+      shiftOut = emp.schedule_out;
+      breakStart = emp.break_in;
+      breakEnd = emp.break_out;
+    } else if (emp.profile_data) {
       let pdata = typeof emp.profile_data === 'string' ? JSON.parse(emp.profile_data) : emp.profile_data;
       shiftIn = pdata.shiftIn;
       shiftOut = pdata.shiftOut;
@@ -339,6 +353,9 @@ exports.getEmployeeAnalytics = async (req, res) => {
 
     const earlyPercent = history.length > 0 ? ((earlyCheckInCount / history.length) * 100).toFixed(1) : 0;
     const latePercent = history.length > 0 ? ((lateCheckInCount / history.length) * 100).toFixed(1) : 0;
+    
+    const paginatedHistory = processedHistory.slice(parsedOffset, parsedOffset + parsedLimit);
+    const hasMore = parsedOffset + parsedLimit < processedHistory.length;
 
     res.json({
       success: true,
@@ -350,7 +367,8 @@ exports.getEmployeeAnalytics = async (req, res) => {
         lateCheckInPercent: latePercent,
         totalDaysPresent: history.length
       },
-      history: processedHistory
+      history: paginatedHistory,
+      hasMore
     });
   } catch (error) {
     console.error("Employee analytics error:", error);

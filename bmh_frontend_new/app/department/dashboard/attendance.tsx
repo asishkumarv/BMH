@@ -103,13 +103,15 @@ function MyAttendanceHistory() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     fetchHistory();
   }, []);
 
-  const fetchHistory = async (forceClear = false) => {
-    setLoading(true);
+  const fetchHistory = async (forceClear = false, isLoadMore = false) => {
+    setLoading(!isLoadMore);
     try {
       let userStr = null;
       if (Platform.OS === 'web') {
@@ -120,15 +122,22 @@ function MyAttendanceHistory() {
       const user = userStr ? JSON.parse(userStr) : null;
       if (!user || !user.id) return;
 
-      let url = `https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${user.id}&userType=sub_admin`;
+      const currentOffset = isLoadMore ? offset : 0;
+      let url = `https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${user.id}&userType=sub_admin&limit=30&offset=${currentOffset}`;
       if (!forceClear && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       }
 
       const res = await axios.get(url);
       if (res.data.success) {
-        setReports(res.data.history || []);
+        if (isLoadMore) {
+          setReports(prev => [...prev, ...(res.data.history || [])]);
+        } else {
+          setReports(res.data.history || []);
+        }
         setAnalytics(res.data.analytics);
+        setOffset(currentOffset + 30);
+        setHasMore(res.data.hasMore);
       }
     } catch (err) {
       console.log('Error fetching history', err);
@@ -277,6 +286,14 @@ function MyAttendanceHistory() {
           ))}
         </View>
         </ScrollView>
+        {hasMore && (
+          <TouchableOpacity 
+            style={{ padding: 12, backgroundColor: Colors.light.primary, borderRadius: 8, alignItems: 'center', marginTop: 15 }} 
+            onPress={() => fetchHistory(false, true)}
+          >
+            <Text style={{ color: 'white', fontWeight: 'bold' }}>Load More</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -297,6 +314,8 @@ export default function SubAdminAttendanceDashboard() {
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   // Config state
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
@@ -328,8 +347,8 @@ export default function SubAdminAttendanceDashboard() {
     }
   }, []);
 
-  const fetchData = async (forceClear = false) => {
-    setLoading(true);
+  const fetchData = async (forceClear = false, isLoadMore = false) => {
+    setLoading(!isLoadMore);
     try {
       const userStr = Platform.OS === 'web' ? localStorage.getItem('subAdminUser') : await AsyncStorage.getItem('subAdminUser');
       const user = userStr ? JSON.parse(userStr) : null;
@@ -355,7 +374,8 @@ export default function SubAdminAttendanceDashboard() {
           setSummary(sumRes.data.summary);
         }
         
-        let url = `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${deptName}`;
+        const currentOffset = isLoadMore ? offset : 0;
+        let url = `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${deptName}&limit=50&offset=${currentOffset}`;
         if (!forceClear && startDate && endDate) {
           url += `&startDate=${startDate}&endDate=${endDate}`;
         } else {
@@ -364,7 +384,13 @@ export default function SubAdminAttendanceDashboard() {
         
         const repRes = await axios.get(url);
         if (repRes.data.success) {
-          setReports(repRes.data.data);
+          if (isLoadMore) {
+            setReports(prev => [...prev, ...repRes.data.data]);
+          } else {
+            setReports(repRes.data.data);
+          }
+          setOffset(currentOffset + 50);
+          setHasMore(repRes.data.hasMore);
         }
       }
     } catch (err) {
@@ -641,6 +667,14 @@ export default function SubAdminAttendanceDashboard() {
           ))}
           </View>
         </ScrollView>
+        {hasMore && (
+          <TouchableOpacity 
+            style={{ padding: 12, backgroundColor: Colors.light.primary, borderRadius: 8, alignItems: 'center', marginTop: 15, marginBottom: 15 }} 
+            onPress={() => fetchData(false, true)}
+          >
+            <Text style={{ color: 'white', fontWeight: 'bold' }}>Load More</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <EmployeeAnalyticsModal 
