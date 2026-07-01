@@ -127,15 +127,15 @@ exports.getDepartmentMetrics = async (req, res) => {
     `, [department_id]);
     
     let presentCount = 0;
-    let absentCount = 0;
     attendanceResult.rows.forEach(row => {
       const s = (row.status || '').toLowerCase();
       if (['on duty', 'checked out', 'on break', 'half day', 'present', 'early_checkout', 'late_checkin'].includes(s)) {
         presentCount += parseInt(row.count, 10);
-      } else if (['absent', 'on leave'].includes(s)) {
-        absentCount += parseInt(row.count, 10);
       }
     });
+
+    let absentCount = totalEmployees - presentCount;
+    if (absentCount < 0) absentCount = 0;
 
     res.json({
       success: true,
