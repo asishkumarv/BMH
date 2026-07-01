@@ -84,7 +84,12 @@ export default function PeonLiveQueue() {
         };
       }));
 
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      LayoutAnimation.configureNext({
+        duration: 800,
+        create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+        update: { type: LayoutAnimation.Types.easeInEaseOut },
+        delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      });
       setQueues(queueData);
     } catch (err) {
       console.error(err);
@@ -282,6 +287,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
 
   const scrollAnim = useRef(new Animated.Value(0)).current;
   const [contentHeight, setContentHeight] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
 
   const slideUpAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -289,18 +295,18 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
   // Trigger swipe up transition when current patient changes
   useEffect(() => {
     if (current) {
-      slideUpAnim.setValue(30);
+      slideUpAnim.setValue(50);
       fadeAnim.setValue(0);
       Animated.parallel([
         Animated.timing(slideUpAnim, {
           toValue: 0,
-          duration: 400,
+          duration: 800,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 800,
           useNativeDriver: true,
         })
       ]).start();
@@ -310,11 +316,9 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
   useEffect(() => {
     scrollAnim.setValue(0);
     
-    if (upcomingQueue.length === 0 || contentHeight === 0) return;
+    if (upcomingQueue.length === 0 || contentHeight === 0 || containerHeight === 0) return;
 
-    const viewHeight = isFullscreen ? 200 : 150; 
-
-    if (contentHeight <= viewHeight) return; // Fits without scrolling
+    if (contentHeight <= containerHeight) return; // Fits without scrolling
 
     const duration = upcomingQueue.length * 2000; // 2 seconds per item
 
@@ -343,7 +347,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
     return () => {
       scrollAnim.stopAnimation();
     };
-  }, [upcomingQueue.length, isFullscreen, scrollAnim, contentHeight]);
+  }, [upcomingQueue.length, isFullscreen, scrollAnim, contentHeight, containerHeight]);
 
 
 
@@ -423,6 +427,10 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
               </View>
               <Text style={[styles.waitingName, isFullscreen && { fontSize: 15 * scale }]}>{nextPatient.patient_name}</Text>
             </View>
+            <TouchableOpacity style={[styles.callNextBtn, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 6 * scale }]} onPress={() => updateStatus(nextPatient.booking_id, 'Current')}>
+              <Text style={[styles.callNextBtnText, isFullscreen && { fontSize: 12 * scale }]}>Call Next</Text>
+              <ArrowRight color="white" size={14 * scale} />
+            </TouchableOpacity>
           </View>
         ) : (
           <Text style={[styles.emptyQueueText, isFullscreen && { fontSize: 14 * scale }]}>Queue is empty</Text>
@@ -433,7 +441,10 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
       {upcomingQueue.length > 0 && (
         <View style={[styles.creditsBoardSection, isFullscreen && { paddingBottom: 20 * padScale }]}>
           <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale }]}>UPCOMING TOKENS ({upcomingQueue.length})</Text>
-          <View style={[styles.creditsContainer, isFullscreen && { flex: 1, height: undefined, minHeight: 100 * scale }, { overflow: 'hidden' }]}>
+          <View 
+            style={[styles.creditsContainer, isFullscreen && { flex: 1, maxHeight: 300, height: undefined, minHeight: 100 * scale }, { overflow: 'hidden' }]}
+            onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+          >
             <Animated.View style={{ transform: [{ translateY: scrollAnim }] }}>
               <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
                 {upcomingQueue.map((w: any) => (
