@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
-import { Package, Plus, MoreVertical, Check, X, Upload } from 'lucide-react-native';
+import { Package, Plus, MoreVertical, Check, X, Upload, Search, Trash2, Edit2, AlertCircle, CheckCircle, Clock, XCircle, Info } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import * as ImagePicker from 'expo-image-picker';
+import { Picker } from '@react-native-picker/picker';
 
 type StationaryItem = { id: string; name: string; stock: number; image: string; status: string; created_at: string; };
 type RequestItem = { id: string; item_id: string; name: string; requested_qty: number; approved_qty: number; };
@@ -447,27 +448,52 @@ export default function SubAdminStationaryScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Approver Role</Text>
-                  <select 
-                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
-                    value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
-                  >
-                    <option value="All">All</option>
-                    <option value="Super Admin">Super Admin</option>
-                    <option value="Sub Admin">Sub Admin</option>
-                  </select>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                      value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
+                    >
+                      <option value="All">All</option>
+                      <option value="Super Admin">Super Admin</option>
+                      <option value="Sub Admin">Sub Admin</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={filterRole}
+                      onValueChange={(val: any) => setFilterRole(val)}
+                      style={{ height: 40, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="All" value="All" />
+                      <Picker.Item label="Super Admin" value="Super Admin" />
+                      <Picker.Item label="Sub Admin" value="Sub Admin" />
+                    </Picker>
+                  )}
                 </View>
 
-                <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0', minWidth: 120 }}>
                   <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Status</Text>
-                  <select 
-                    style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
-                    value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-                  >
-                    <option value="All">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
+                      value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                      <option value="All">All</option>
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={filterStatus}
+                      onValueChange={(val: any) => setFilterStatus(val)}
+                      style={{ height: 40, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="All" value="All" />
+                      <Picker.Item label="Pending" value="pending" />
+                      <Picker.Item label="Approved" value="approved" />
+                      <Picker.Item label="Rejected" value="rejected" />
+                    </Picker>
+                  )}
                 </View>
               </View>
 

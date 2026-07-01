@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {  View, Text, StyleSheet, Platform, TextInput, Pressable, Alert, ScrollView , Image } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { Building, Lock, Mail, Phone, Clock, CreditCard, User, Camera } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -25,8 +26,13 @@ export default function EmployeeProfileScreen() {
   const [myRequests, setMyRequests] = useState<any[]>([]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('employeeUser');
+    const loadUser = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
       if (userStr) {
         const parsed = JSON.parse(userStr);
         setUser(parsed);
@@ -35,7 +41,8 @@ export default function EmployeeProfileScreen() {
         }
         fetchMyRequests(parsed.id);
       }
-    }
+    };
+    loadUser();
   }, []);
 
   const fetchMyRequests = async (empId: number) => {
@@ -138,6 +145,8 @@ export default function EmployeeProfileScreen() {
           setUser(updatedUser);
           if (Platform.OS === 'web') {
             localStorage.setItem('employeeUser', JSON.stringify(updatedUser));
+          } else {
+            await AsyncStorage.setItem('employeeUser', JSON.stringify(updatedUser));
           }
           Alert.alert('Success', 'Profile photo updated successfully!');
         }
@@ -396,10 +405,10 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
   
   row: { flexDirection: 'row', gap: 32, alignItems: 'flex-start' },
-  rowMobile: { flexDirection: 'column' },
+  rowMobile: { flexDirection: 'column', width: '100%' },
   leftCol: { flex: 1, minWidth: 350 },
   rightCol: { flex: 1, minWidth: 350 },
-  colMobile: { minWidth: '100%' },
+  colMobile: { width: '100%', minWidth: 'auto', flex: 0 },
 
   card: {
     backgroundColor: Colors.light.card,

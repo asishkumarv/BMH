@@ -184,12 +184,12 @@ export default function EmployeeAttendanceHistory() {
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
           <View style={[styles.table, { minWidth: 800, width: '100%' }]}>
             <View style={styles.tableRowHeader}>
-              <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
-              <Text style={styles.tableCellHeader}>Date</Text>
-              <Text style={styles.tableCellHeader}>Check In</Text>
-              <Text style={styles.tableCellHeader}>Check Out</Text>
-              <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
-              <Text style={styles.tableCellHeader}>Status</Text>
+              <Text style={[styles.tableCellHeader, { width: 80 }]}>In</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
+              <Text style={[styles.tableCellHeader, { width: 100 }]}>Status</Text>
             </View>
           {filteredReports.length === 0 ? (
             <View style={{ padding: 20, alignItems: 'center' }}>
@@ -197,14 +197,14 @@ export default function EmployeeAttendanceHistory() {
             </View>
           ) : filteredReports.map((r, i) => (
             <View key={i} style={styles.tableRow}>
-              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+              <View style={[styles.tableCell, {width: 80, flexDirection: 'row'}]}>
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
               </View>
-              <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
-              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
-              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
-              <View style={[styles.tableCell, { flex: 2 }]}>
+              <Text style={[styles.tableCell, {width: 120}]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, {width: 120}]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, {width: 120}]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCell, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (
                     <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
@@ -215,7 +215,14 @@ export default function EmployeeAttendanceHistory() {
                   <Text style={{ fontSize: 12, color: Colors.light.icon }}>-</Text>
                 )}
               </View>
-              <Text style={styles.tableCell}>{r.status}</Text>
+              <View style={[styles.tableCell, { width: 100 }]}>
+                <Text style={[styles.statusBadge, 
+                  r.status === 'Present' ? {backgroundColor: '#dcfce7', color: '#166534'} :
+                  r.status === 'Late' ? {backgroundColor: '#fef9c3', color: '#854d0e'} :
+                  r.status === 'Absent' ? {backgroundColor: '#fee2e2', color: '#991b1b'} :
+                  {backgroundColor: '#f3f4f6', color: '#374151'}
+                ]}>{r.status}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -242,6 +249,7 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: Colors.light.border, alignItems: 'center' },
   tableCellHeader: { flex: 1, fontWeight: 'bold', color: Colors.light.text },
   tableCell: { flex: 1, color: Colors.light.icon, justifyContent: 'center' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: '600', overflow: 'hidden', textAlign: 'center', alignSelf: 'flex-start' },
   thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
   thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' },
   statsGrid: { flexDirection: 'row', gap: 16, marginBottom: 24, flexWrap: 'wrap' },

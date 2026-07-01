@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { CalendarDays, Send, Clock, CheckCircle2, XCircle, Info } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { API_URL } from '../../../config';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -26,6 +28,9 @@ export default function LeaveManagement() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
   // Cache for monthly summaries
   const [monthlySummaries, setMonthlySummaries] = useState<{[key: string]: any}>({});
   const loadedMonthsRef = React.useRef<Set<string>>(new Set());
@@ -44,7 +49,7 @@ export default function LeaveManagement() {
     try {
       const empData = Platform.OS === 'web' 
         ? localStorage.getItem('employeeUser')
-        : null;
+        : await AsyncStorage.getItem('employeeUser');
 
       if (!empData) return;
       const emp = JSON.parse(empData);
@@ -294,13 +299,33 @@ export default function LeaveManagement() {
                     style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
                   />
                 ) : (
-                  <TextInput
-                    style={styles.input}
-                    value={startDate}
-                    onChangeText={setStartDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={Colors.light.icon}
-                  />
+                  <>
+                    <Pressable onPress={() => setShowStartPicker(true)}>
+                      <View pointerEvents="none">
+                        <TextInput
+                          style={styles.input}
+                          value={startDate}
+                          editable={false}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={Colors.light.icon}
+                        />
+                      </View>
+                    </Pressable>
+                    {showStartPicker && (
+                      <DateTimePicker
+                        value={startDate ? new Date(startDate) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event: any, date?: Date) => {
+                          setShowStartPicker(Platform.OS === 'ios');
+                          if (date) {
+                            const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                            setStartDate(offsetDate.toISOString().split('T')[0]);
+                          }
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
               <View style={styles.formGroup}>
@@ -314,13 +339,33 @@ export default function LeaveManagement() {
                     style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
                   />
                 ) : (
-                  <TextInput
-                    style={styles.input}
-                    value={endDate}
-                    onChangeText={setEndDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={Colors.light.icon}
-                  />
+                  <>
+                    <Pressable onPress={() => setShowEndPicker(true)}>
+                      <View pointerEvents="none">
+                        <TextInput
+                          style={styles.input}
+                          value={endDate}
+                          editable={false}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={Colors.light.icon}
+                        />
+                      </View>
+                    </Pressable>
+                    {showEndPicker && (
+                      <DateTimePicker
+                        value={endDate ? new Date(endDate) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event: any, date?: Date) => {
+                          setShowEndPicker(Platform.OS === 'ios');
+                          if (date) {
+                            const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                            setEndDate(offsetDate.toISOString().split('T')[0]);
+                          }
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
             </View>

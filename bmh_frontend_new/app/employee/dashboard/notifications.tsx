@@ -1,26 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { Colors } from '../../../constants/Colors';
 import axios from 'axios';
 import { Bell, Check, CheckCircle2 } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EmployeeNotificationsScreen() {
   const { isDesktop } = useResponsive();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const empUser = typeof window !== 'undefined' && localStorage.getItem('employeeUser') 
-    ? JSON.parse(localStorage.getItem('employeeUser') || '{}') 
-    : { id: 1 };
+  const [empUser, setEmpUser] = useState<any>({ id: 1 });
 
   useEffect(() => {
-    fetchNotifications();
+    const loadInit = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
+      let userObj = { id: 1 };
+      if (userStr) {
+        userObj = JSON.parse(userStr);
+        setEmpUser(userObj);
+      }
+      await fetchNotifications(userObj);
+    };
+    loadInit();
   }, []);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (user = empUser) => {
     try {
-      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/notifications?user_type=employee&user_id=${empUser.id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/notifications?user_type=employee&user_id=${user.id}`);
       if (res.data.success) {
         setNotifications(res.data.data);
       }

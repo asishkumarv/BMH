@@ -113,7 +113,7 @@ exports.getBookings = async (req, res) => {
       JOIN doctor_slots ds ON pb.slot_id = ds.id
       JOIN doctors d ON ds.doctor_id = d.id
       LEFT JOIN employees e ON pb.booked_by = e.id
-      WHERE 1=1
+      WHERE pb.status != 'VIP Quota'
     `;
     let params = [];
 
@@ -202,7 +202,7 @@ exports.getRevenue = async (req, res) => {
       FROM patient_bookings pb
       JOIN doctor_slots ds ON pb.slot_id = ds.id
       JOIN doctors d ON ds.doctor_id = d.id
-      WHERE pb.status != 'Cancelled'
+      WHERE pb.status NOT IN ('Cancelled', 'VIP Quota')
     `;
     let params = [];
 

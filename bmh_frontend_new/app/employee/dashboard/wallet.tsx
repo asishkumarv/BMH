@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
 import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins } from 'lucide-react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -39,20 +40,26 @@ export default function EmployeeWalletScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    let empId = null;
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('employeeUser');
+    const loadUser = async () => {
+      let empId = null;
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
       if (userStr) {
         const user = JSON.parse(userStr);
         empId = user.id;
         setEmployeeId(empId);
       }
-    }
-    if (empId) {
-      fetchData(empId);
-      fetchPeers(empId);
-      fetchBookings(empId);
-    }
+      if (empId) {
+        fetchData(empId);
+        fetchPeers(empId);
+        fetchBookings(empId);
+      }
+    };
+    loadUser();
   }, []);
 
   const fetchData = async (id: string) => {

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platfor
 import { Package, Plus, Minus, ShoppingCart, Clock } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 type StationaryItem = {
@@ -47,13 +48,16 @@ export default function EmployeeStationaryScreen() {
     setLoading(true);
     try {
       let empId = null;
+      let userStr = null;
       if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('employeeUser');
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          empId = user.id;
-          setEmployeeId(empId);
-        }
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        empId = user.id;
+        setEmployeeId(empId);
       }
 
       const itemsRes = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');

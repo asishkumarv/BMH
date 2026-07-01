@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Platform, ActivityIndicator, TouchableOpacity, 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks } from 'lucide-react-native';
@@ -35,14 +36,20 @@ export default function EmployeeDashboardScreen() {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const userStr = localStorage.getItem('employeeUser');
+    const loadUser = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
       if (userStr) {
         const parsedUser = JSON.parse(userStr);
         setUser(parsedUser);
         fetchSummary(parsedUser.id);
       }
-    }
+    };
+    loadUser();
   }, []);
 
   const fetchSummary = async (empId: number) => {

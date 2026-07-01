@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, Pressa
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { CheckSquare, Plus, Clock, User } from 'lucide-react-native';
 
 export default function EmployeeTasksScreen() {
@@ -22,24 +25,39 @@ export default function EmployeeTasksScreen() {
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState('Moderate');
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerMode, setDatePickerMode] = useState<'date' | 'time'>('date');
+
   // Status update state
   const [statusNotes, setStatusNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
 
   const [globalUsers, setGlobalUsers] = useState<any[]>([]);
 
-  const empUser = typeof window !== 'undefined' && localStorage.getItem('employeeUser') 
-    ? JSON.parse(localStorage.getItem('employeeUser') || '{}') 
-    : { id: 1, full_name: 'Employee', department: '' };
+  const [empUser, setEmpUser] = useState<any>({ id: 1, full_name: 'Employee', department: '' });
 
   useEffect(() => {
-    fetchInitData();
+    const loadInit = async () => {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('employeeUser');
+      } else {
+        userStr = await AsyncStorage.getItem('employeeUser');
+      }
+      let userObj = { id: 1, full_name: 'Employee', department: '' };
+      if (userStr) {
+        userObj = JSON.parse(userStr);
+        setEmpUser(userObj);
+      }
+      await fetchInitData(userObj);
+    };
+    loadInit();
   }, []);
 
-  const fetchInitData = async () => {
+  const fetchInitData = async (user = empUser) => {
     try {
       const [taskRes, usersRes] = await Promise.all([
-        axios.get(`https://napi.bharatmedicalhallplus.com/tasks?user_type=employee&user_id=${empUser.id}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/tasks?user_type=employee&user_id=${user.id}`),
         axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users')
       ]);
 
@@ -276,31 +294,56 @@ export default function EmployeeTasksScreen() {
                   <>
                     <Text style={styles.label}>Select Assignee</Text>
                     <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                      <select 
-                        style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                        value={assigneeId}
-                        onChange={(e) => setAssigneeId(e.target.value)}
-                      >
-                        <option value="">-- Choose Assignee --</option>
-                        {globalUsers.map(e => (
-                          <option key={e.id} value={e.id}>{e.full_name} - {e.department} ({e.role})</option>
-                        ))}
-                      </select>
+                      {Platform.OS === 'web' ? (
+                        <select 
+                          style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                          value={assigneeId}
+                          onChange={(e) => setAssigneeId(e.target.value)}
+                        >
+                          <option value="">-- Choose Assignee --</option>
+                          {globalUsers.map(e => (
+                            <option key={e.id} value={e.id}>{e.full_name} - {e.department} ({e.role})</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Picker
+                          selectedValue={assigneeId}
+                          onValueChange={(val: any) => setAssigneeId(val)}
+                          style={{ width: '100%', height: 50 }}
+                        >
+                          <Picker.Item label="-- Choose Assignee --" value="" />
+                          {globalUsers.map(e => (
+                            <Picker.Item key={e.id} label={`${e.full_name} - ${e.department} (${e.role})`} value={e.id} />
+                          ))}
+                        </Picker>
+                      )}
                     </View>
                   </>
                 )}
 
                 <Text style={styles.label}>Priority</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                  <select 
-                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="High">High</option>
-                  </select>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value)}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Moderate">Moderate</option>
+                      <option value="High">High</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={priority}
+                      onValueChange={(val: any) => setPriority(val)}
+                      style={{ width: '100%', height: 50 }}
+                    >
+                      <Picker.Item label="Low" value="Low" />
+                      <Picker.Item label="Moderate" value="Moderate" />
+                      <Picker.Item label="High" value="High" />
+                    </Picker>
+                  )}
                 </View>
 
                 <Text style={styles.label}>Due Date & Time</Text>
@@ -313,7 +356,38 @@ export default function EmployeeTasksScreen() {
                       onChange={(e) => setDueDate(e.target.value)}
                     />
                   ) : (
-                    <TextInput style={{ padding: 14, fontSize: 15, color: Colors.light.text }} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD HH:MM" />
+                    <>
+                      <Pressable onPress={() => { setDatePickerMode('date'); setShowDatePicker(true); }}>
+                        <View pointerEvents="none">
+                          <TextInput style={{ padding: 14, fontSize: 15, color: Colors.light.text }} value={dueDate} editable={false} placeholder="YYYY-MM-DD HH:MM" placeholderTextColor={Colors.light.icon} />
+                        </View>
+                      </Pressable>
+                      {showDatePicker && (
+                        <DateTimePicker
+                          value={dueDate ? new Date(dueDate) : new Date()}
+                          mode={datePickerMode}
+                          display="default"
+                          onChange={(event: any, date?: Date) => {
+                            if (Platform.OS === 'android') {
+                              setShowDatePicker(false);
+                            }
+                            if (date) {
+                              const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                              const isoString = offsetDate.toISOString();
+                              if (datePickerMode === 'date') {
+                                setDueDate(isoString.split('T')[0] + (dueDate ? ' ' + dueDate.split(' ')[1] : ' 00:00'));
+                                if (Platform.OS === 'android') {
+                                  setDatePickerMode('time');
+                                  setShowDatePicker(true);
+                                }
+                              } else {
+                                setDueDate((dueDate ? dueDate.split(' ')[0] : isoString.split('T')[0]) + ' ' + isoString.split('T')[1].substring(0, 5));
+                              }
+                            }
+                          }}
+                        />
+                      )}
+                    </>
                   )}
                 </View>
               </View>
