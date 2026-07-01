@@ -100,7 +100,7 @@ exports.createBooking = async (req, res) => {
 // Get bookings (Sub-admin view - no revenue, or Employee view)
 exports.getBookings = async (req, res) => {
   try {
-    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id } = req.query;
+    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id, exclude_blocked } = req.query;
     
     let query = `
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
@@ -113,9 +113,13 @@ exports.getBookings = async (req, res) => {
       JOIN doctor_slots ds ON pb.slot_id = ds.id
       JOIN doctors d ON ds.doctor_id = d.id
       LEFT JOIN employees e ON pb.booked_by = e.id
-      WHERE pb.status != 'VIP Quota'
+      WHERE 1=1
     `;
     let params = [];
+
+    if (exclude_blocked === 'true') {
+      query += ` AND pb.status != 'VIP Quota'`;
+    }
 
     if (date) {
       params.push(date);

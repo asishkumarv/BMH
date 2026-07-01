@@ -95,7 +95,7 @@ export default function PatientBooking() {
 
   const fetchMyBookings = async () => {
     try {
-      let url = `https://napi.bharatmedicalhallplus.com/bookings?booked_by=${user.id}`;
+      let url = `https://napi.bharatmedicalhallplus.com/bookings?booked_by=${user.id}&exclude_blocked=true`;
       if (filterDate) url += `&date=${filterDate}`;
       if (filterDoctor) url += `&doctor_id=${filterDoctor}`;
       if (filterPatient) url += `&patient_name=${filterPatient}`;
@@ -429,7 +429,7 @@ export default function PatientBooking() {
             <Text style={styles.backBtnText}>← Back to Slots</Text>
           </TouchableOpacity>
           <Text style={{fontSize: 20, fontWeight: 'bold', color: '#0f172a', marginBottom: 16}}>Select Token for Dr. {selectedSlot.doctor_name}</Text>
-          <Text style={{fontSize: 14, color: '#64748b', marginBottom: 20}}>Tokens marked in red are already booked. Tokens in gold are VIP Quota.</Text>
+          <Text style={{fontSize: 14, color: '#64748b', marginBottom: 20}}>Tokens marked in red are already booked. Tokens in orange are Blocked.</Text>
           
           <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
             {Array.from({length: selectedSlot.total_tokens}, (_, i) => i + 1).map(t => {
@@ -440,14 +440,15 @@ export default function PatientBooking() {
                   key={t}
                   disabled={isBooked}
                   style={{
-                    width: 56, height: 56, borderRadius: 12, justifyContent: 'center', alignItems: 'center',
-                    backgroundColor: isBooked ? '#fecaca' : (isVip ? '#fef3c7' : '#d1fae5'),
-                    borderWidth: 1, borderColor: isBooked ? '#ef4444' : (isVip ? '#f59e0b' : '#10b981'),
+                    width: 56, height: 60, borderRadius: 12, justifyContent: 'center', alignItems: 'center',
+                    backgroundColor: isBooked ? '#fecaca' : (isVip ? '#ffedd5' : '#d1fae5'),
+                    borderWidth: 1, borderColor: isBooked ? '#ef4444' : (isVip ? '#f97316' : '#10b981'),
                     opacity: isBooked ? 0.6 : 1
                   }}
                   onPress={() => setSelectedToken(t)}
                 >
-                  <Text style={{color: isBooked ? '#b91c1c' : (isVip ? '#b45309' : '#047857'), fontWeight: 'bold', fontSize: 18}}>{t}</Text>
+                  <Text style={{color: isBooked ? '#b91c1c' : (isVip ? '#c2410c' : '#047857'), fontWeight: 'bold', fontSize: 18}}>{t}</Text>
+                  {isVip && <Text style={{fontSize: 9, color: '#c2410c', fontWeight: 'bold', marginTop: 2}}>Blocked</Text>}
                 </TouchableOpacity>
               );
             })}

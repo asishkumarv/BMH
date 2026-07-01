@@ -154,7 +154,7 @@ export default function DepartmentDoctorManagement() {
 
   const fetchBookings = async () => {
     try {
-      let url = `https://napi.bharatmedicalhallplus.com/bookings?department=${user.department}&`;
+      let url = `https://napi.bharatmedicalhallplus.com/bookings?department=${user.department}&exclude_blocked=true&`;
       if (bDoctor) url += `doctor_id=${bDoctor}&`;
       if (bEmployee) url += `booked_by=${bEmployee}&`;
       if (bDate) url += `date=${bDate}&`;
@@ -492,7 +492,7 @@ export default function DepartmentDoctorManagement() {
               </TouchableOpacity>
             </View>
             <Text style={{fontSize: 14, color: '#64748b', marginBottom: 15}}>
-              Select multiple tokens to block/unblock (VIP Quota). Tokens in red are patient bookings. Gold are VIP Quota. Selected tokens show a blue outline.
+              Select multiple tokens to block/unblock (VIP Quota). Tokens in red are patient bookings. Orange are VIP Quota. Selected tokens show a blue outline.
             </Text>
             
             <ScrollView contentContainerStyle={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingBottom: 10}}>
@@ -507,15 +507,15 @@ export default function DepartmentDoctorManagement() {
                     key={t}
                     style={{
                       width: 60, height: 60, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
-                      backgroundColor: isBooked ? '#fecaca' : (isVip ? '#fef3c7' : '#d1fae5'),
+                      backgroundColor: isBooked ? '#fecaca' : (isVip ? '#ffedd5' : '#d1fae5'),
                       borderWidth: isSelected ? 3 : 1, 
-                      borderColor: isSelected ? '#3b82f6' : (isBooked ? '#ef4444' : (isVip ? '#f59e0b' : '#10b981')),
+                      borderColor: isSelected ? '#3b82f6' : (isBooked ? '#ef4444' : (isVip ? '#f97316' : '#10b981')),
                       opacity: isBooked ? 0.6 : 1
                     }}
                     onPress={() => handleTokenSelect(t)}
                   >
-                    <Text style={{fontWeight: 'bold', color: isBooked ? '#b91c1c' : (isVip ? '#b45309' : '#047857')}}>{t}</Text>
-                    {isVip && <Text style={{fontSize: 9, color: '#b45309', fontWeight: 'bold', marginTop: 2}}>Blocked</Text>}
+                    <Text style={{fontWeight: 'bold', color: isBooked ? '#b91c1c' : (isVip ? '#c2410c' : '#047857')}}>{t}</Text>
+                    {isVip && <Text style={{fontSize: 9, color: '#c2410c', fontWeight: 'bold', marginTop: 2}}>Blocked</Text>}
                   </TouchableOpacity>
                 );
               })}

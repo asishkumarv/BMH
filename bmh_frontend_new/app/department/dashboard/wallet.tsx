@@ -122,7 +122,7 @@ export default function SubAdminWalletScreen() {
 
   const fetchBookings = async (id: string) => {
     try {
-      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?booked_by=${id}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?booked_by=${id}&exclude_blocked=true`);
       if (res.data.success) setBookings(res.data.data);
     } catch (error) {}
   };
