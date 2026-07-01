@@ -216,7 +216,7 @@ export default function EmployeeRegisterScreen() {
               <Pressable style={[styles.backBtn, { marginBottom: 0 }]} onPress={() => router.back()}>
                 <ArrowLeft color="#1E40AF" size={16} />
                 <Text style={styles.backBtnText}>Back</Text>
-              </Pressable>
+              </TouchableOpacity>
               
               <View style={{ flex: 1, alignItems: 'center', marginRight: 60 }}>
                 <Image source={require('../../assets/CompanyLogo.jpg')} style={{ width: 220, height: 60 }} resizeMode="contain" />
@@ -240,7 +240,7 @@ export default function EmployeeRegisterScreen() {
                       <Text style={styles.photoText}>UPLOAD PIC</Text>
                     </>
                   )}
-                </Pressable>
+                </TouchableOpacity>
               </View>
 
               {/* 1. Personal Identification Data */}
@@ -261,7 +261,7 @@ export default function EmployeeRegisterScreen() {
                     <Text style={styles.label}>Secure Password *</Text>
                     <View style={styles.passwordWrapper}>
                       <TextInput style={styles.inputPassword} placeholder="••••••••" secureTextEntry={!showPassword} placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} />
-                      <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>{showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</Pressable>
+                      <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>{showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</TouchableOpacity>
                     </View>
                     {errors.password ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.password}</Text> : null}
                     {passwordError && !confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
@@ -270,7 +270,7 @@ export default function EmployeeRegisterScreen() {
                     <Text style={styles.label}>Confirm Password *</Text>
                     <View style={styles.passwordWrapper}>
                       <TextInput style={styles.inputPassword} placeholder="••••••••" secureTextEntry={!showConfirmPassword} placeholderTextColor="#94A3B8" value={confirmPassword} onChangeText={setConfirmPassword} />
-                      <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>{showConfirmPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</Pressable>
+                      <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>{showConfirmPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</TouchableOpacity>
                     </View>
                     {errors.confirmPassword ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.confirmPassword}</Text> : null}
                     {passwordError && confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
@@ -405,7 +405,7 @@ export default function EmployeeRegisterScreen() {
 
               <Pressable style={[styles.submitBtn, registering && { opacity: 0.7 }]} onPress={handleRegister} disabled={registering}>
                 <Text style={styles.submitBtnText}>{registering ? 'Registering...' : 'Finalize Account Registration →'}</Text>
-              </Pressable>
+              </TouchableOpacity>
 
               <View style={styles.loginLinkRow}>
                 <Text style={styles.loginLinkText}>Already authenticated within our logs? </Text>

@@ -22,6 +22,8 @@ export default function EmployeeProfileScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [requestingUpdate, setRequestingUpdate] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
 
   const [myRequests, setMyRequests] = useState<any[]>([]);
 
@@ -88,13 +90,35 @@ export default function EmployeeProfileScreen() {
 
   const openEditModal = () => {
     setEditForm({
-      mobile: pd.mobile || '',
-      bloodGroup: pd.bloodGroup || '',
+      full_name: user.full_name || '',
+      email: user.email || '',
+      department: user.department || '',
+      role: user.role || '',
+      mobile: user.mobile || pd.mobile || '',
       emergencyContact: pd.emergencyContact || '',
-      address: pd.address || '',
+      age: pd.age || '',
+      bloodGroup: pd.bloodGroup || '',
+      aadhaar: pd.aadhaar || '',
+      pan: pd.pan || '',
+      esi: pd.esi || '',
+      manager: pd.manager || '',
+      salary: pd.salary || '',
+      empType: pd.empType || '',
+      jobDesc: pd.jobDesc || '',
+      shiftIn: pd.shiftIn || '',
+      shiftOut: pd.shiftOut || '',
+      breakStart: pd.breakStart || '',
+      breakEnd: pd.breakEnd || '',
+      tempAddr1: pd.tempAddr1 || '',
+      tempCity: pd.tempCity || '',
+      tempState: pd.tempState || '',
+      permAddr1: pd.permAddr1 || pd.address || '',
+      permCity: pd.permCity || '',
+      permState: pd.permState || '',
       bankName: pd.bankName || '',
       accountNo: pd.accountNo || '',
-      ifsc: pd.ifsc || ''
+      ifsc: pd.ifsc || '',
+      branch: pd.branch || ''
     });
     setEditModalVisible(true);
   };
@@ -174,34 +198,56 @@ export default function EmployeeProfileScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Request Profile Update</Text>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-              <View>
-                <Text style={styles.label}>Mobile Number</Text>
-                <TextInput style={styles.modalInput} value={editForm.mobile} onChangeText={(t) => setEditForm({...editForm, mobile: t})} />
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Basic Details</Text>
+              <View><Text style={styles.label}>Full Name</Text><TextInput style={styles.modalInput} value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} /></View>
+              <View><Text style={styles.label}>Email</Text><TextInput style={styles.modalInput} value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} /></View>
+              <View><Text style={styles.label}>Mobile Number</Text><TextInput style={styles.modalInput} value={editForm.mobile} onChangeText={(t) => setEditForm({...editForm, mobile: t})} /></View>
+              <View><Text style={styles.label}>Emergency Contact</Text><TextInput style={styles.modalInput} value={editForm.emergencyContact} onChangeText={(t) => setEditForm({...editForm, emergencyContact: t})} /></View>
+              <View><Text style={styles.label}>Age</Text><TextInput style={styles.modalInput} value={editForm.age} onChangeText={(t) => setEditForm({...editForm, age: t})} /></View>
+              <View><Text style={styles.label}>Blood Group</Text><TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} /></View>
+              
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Job Details</Text>
+              <View><Text style={styles.label}>Department</Text>
+                {Platform.OS === 'web' ? (
+                  <select style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none' }} value={editForm.department} onChange={(e) => setEditForm({...editForm, department: e.target.value})}>
+                    <option value="">Select Department</option>
+                    {departments.map((d: any) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                  </select>
+                ) : <TextInput style={styles.modalInput} value={editForm.department} onChangeText={(t) => setEditForm({...editForm, department: t})} />}
               </View>
-              <View>
-                <Text style={styles.label}>Emergency Contact</Text>
-                <TextInput style={styles.modalInput} value={editForm.emergencyContact} onChangeText={(t) => setEditForm({...editForm, emergencyContact: t})} />
+              <View><Text style={styles.label}>Role</Text>
+                {Platform.OS === 'web' ? (
+                  <select style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none' }} value={editForm.role} onChange={(e) => setEditForm({...editForm, role: e.target.value})}>
+                    <option value="">Select Role</option>
+                    {roles.map((r: any) => <option key={r.title} value={r.title}>{r.title}</option>)}
+                  </select>
+                ) : <TextInput style={styles.modalInput} value={editForm.role} onChangeText={(t) => setEditForm({...editForm, role: t})} />}
               </View>
-              <View>
-                <Text style={styles.label}>Blood Group</Text>
-                <TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} />
-              </View>
-              <View>
-                <Text style={styles.label}>Address</Text>
-                <TextInput style={[styles.modalInput, { height: 60 }]} multiline value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} />
-              </View>
-              <View>
-                <Text style={styles.label}>Bank Name</Text>
-                <TextInput style={styles.modalInput} value={editForm.bankName} onChangeText={(t) => setEditForm({...editForm, bankName: t})} />
-              </View>
-              <View>
-                <Text style={styles.label}>Account No</Text>
-                <TextInput style={styles.modalInput} value={editForm.accountNo} onChangeText={(t) => setEditForm({...editForm, accountNo: t})} />
-              </View>
-              <View>
-                <Text style={styles.label}>IFSC Code</Text>
-                <TextInput style={styles.modalInput} value={editForm.ifsc} onChangeText={(t) => setEditForm({...editForm, ifsc: t})} />
-              </View>
+              <View><Text style={styles.label}>Manager Name</Text><TextInput style={styles.modalInput} value={editForm.manager} onChangeText={(t) => setEditForm({...editForm, manager: t})} /></View>
+              <View><Text style={styles.label}>Salary</Text><TextInput style={styles.modalInput} value={editForm.salary} onChangeText={(t) => setEditForm({...editForm, salary: t})} /></View>
+              <View><Text style={styles.label}>Employment Type</Text><TextInput style={styles.modalInput} value={editForm.empType} onChangeText={(t) => setEditForm({...editForm, empType: t})} /></View>
+              <View><Text style={styles.label}>Job Description</Text><TextInput style={styles.modalInput} value={editForm.jobDesc} onChangeText={(t) => setEditForm({...editForm, jobDesc: t})} /></View>
+              <View><Text style={styles.label}>Shift In</Text><TextInput style={styles.modalInput} value={editForm.shiftIn} onChangeText={(t) => setEditForm({...editForm, shiftIn: t})} /></View>
+              <View><Text style={styles.label}>Shift Out</Text><TextInput style={styles.modalInput} value={editForm.shiftOut} onChangeText={(t) => setEditForm({...editForm, shiftOut: t})} /></View>
+              <View><Text style={styles.label}>Break Start</Text><TextInput style={styles.modalInput} value={editForm.breakStart} onChangeText={(t) => setEditForm({...editForm, breakStart: t})} /></View>
+              <View><Text style={styles.label}>Break End</Text><TextInput style={styles.modalInput} value={editForm.breakEnd} onChangeText={(t) => setEditForm({...editForm, breakEnd: t})} /></View>
+
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Identification & Bank</Text>
+              <View><Text style={styles.label}>Aadhaar ID</Text><TextInput style={styles.modalInput} value={editForm.aadhaar} onChangeText={(t) => setEditForm({...editForm, aadhaar: t})} /></View>
+              <View><Text style={styles.label}>PAN Number</Text><TextInput style={styles.modalInput} value={editForm.pan} onChangeText={(t) => setEditForm({...editForm, pan: t})} /></View>
+              <View><Text style={styles.label}>ESI Number</Text><TextInput style={styles.modalInput} value={editForm.esi} onChangeText={(t) => setEditForm({...editForm, esi: t})} /></View>
+              <View><Text style={styles.label}>Bank Name</Text><TextInput style={styles.modalInput} value={editForm.bankName} onChangeText={(t) => setEditForm({...editForm, bankName: t})} /></View>
+              <View><Text style={styles.label}>Account No</Text><TextInput style={styles.modalInput} value={editForm.accountNo} onChangeText={(t) => setEditForm({...editForm, accountNo: t})} /></View>
+              <View><Text style={styles.label}>IFSC Code</Text><TextInput style={styles.modalInput} value={editForm.ifsc} onChangeText={(t) => setEditForm({...editForm, ifsc: t})} /></View>
+              <View><Text style={styles.label}>Branch</Text><TextInput style={styles.modalInput} value={editForm.branch} onChangeText={(t) => setEditForm({...editForm, branch: t})} /></View>
+
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Address Details</Text>
+              <View><Text style={styles.label}>Permanent Address Line 1</Text><TextInput style={styles.modalInput} value={editForm.permAddr1} onChangeText={(t) => setEditForm({...editForm, permAddr1: t})} /></View>
+              <View><Text style={styles.label}>Permanent City</Text><TextInput style={styles.modalInput} value={editForm.permCity} onChangeText={(t) => setEditForm({...editForm, permCity: t})} /></View>
+              <View><Text style={styles.label}>Permanent State</Text><TextInput style={styles.modalInput} value={editForm.permState} onChangeText={(t) => setEditForm({...editForm, permState: t})} /></View>
+              <View><Text style={styles.label}>Temporary Address Line 1</Text><TextInput style={styles.modalInput} value={editForm.tempAddr1} onChangeText={(t) => setEditForm({...editForm, tempAddr1: t})} /></View>
+              <View><Text style={styles.label}>Temporary City</Text><TextInput style={styles.modalInput} value={editForm.tempCity} onChangeText={(t) => setEditForm({...editForm, tempCity: t})} /></View>
+              <View><Text style={styles.label}>Temporary State</Text><TextInput style={styles.modalInput} value={editForm.tempState} onChangeText={(t) => setEditForm({...editForm, tempState: t})} /></View>
             </ScrollView>
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelBtn} onPress={() => setEditModalVisible(false)}>

@@ -40,7 +40,7 @@ export default function PatientHistoryEmployee() {
     const nowStr = new Date().toLocaleDateString('en-GB');
     const printDate = new Date(record.consultation_date).toLocaleDateString('en-GB');
     
-    const html = `
+    const printToken = record.token_number; const printPatient = record.name; const printAge = record.age; const printGender = record.gender; const printMobile = record.mobile; const printCity = record.city; const printDoctor = record.doctor_name; const printDept = record.doctor_department; const printAmount = record.fee; const html = `
       <html>
         <head>
           <style>

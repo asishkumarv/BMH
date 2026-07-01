@@ -110,7 +110,7 @@ exports.reviewProfileUpdate = async (req, res) => {
       const updates = updateRequest.requested_data;
       
       // Update basic columns if they exist in the payload
-      const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email'];
+      const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email', 'department', 'department_id', 'role'];
       let setClauses = [];
       let params = [];
       let paramIndex = 1;

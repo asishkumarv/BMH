@@ -132,10 +132,10 @@ export default function SubAdminEmployeesScreen() {
     return (
       <View style={[styles.tableRow, styles.tableHeader]}>
         <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Name</Text>
-        {isDesktop && <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Email</Text>}
+        {isDesktop && <Text style={[styles.cell, { flex: 2.5, fontWeight: '700', color: Colors.light.icon }]}>Email</Text>}
         <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Department</Text>
         <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Role</Text>
-        <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
+        <Text style={[styles.cell, { width: 180, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
         <View style={{ width: 40 }} />
       </View>
     );
@@ -153,30 +153,30 @@ export default function SubAdminEmployeesScreen() {
             <Text style={styles.adminEmail} numberOfLines={1}>{item.email} • {item.role}</Text>
           </View>
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flexDirection: 'column', gap: 4 }}>
+            <View style={{ flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
               <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : {backgroundColor: '#fee2e2'}]}>
                 <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : {color: '#dc2626'}]}>
                   {item.status}
                 </Text>
               </View>
               {item.status === 'pending' && (
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary, paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
-                    <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Approve</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary, paddingHorizontal: 10, paddingVertical: 4 }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
+                    <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Approve</Text>
                   </Pressable>
-                  <Pressable style={[styles.statusBadge, { backgroundColor: '#ef4444', paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'rejected')}>
-                    <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Reject</Text>
+                  <Pressable style={[styles.statusBadge, { backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 4 }]} onPress={() => handleUpdateStatus(item.id, 'rejected')}>
+                    <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Reject</Text>
                   </Pressable>
                 </View>
               )}
               {item.status === 'approved' && (
-                <Pressable style={[styles.statusBadge, { backgroundColor: '#f97316', paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'deactivated')}>
-                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Deactivate</Text>
+                <Pressable style={[styles.statusBadge, { backgroundColor: '#f97316', paddingHorizontal: 10, paddingVertical: 4 }]} onPress={() => handleUpdateStatus(item.id, 'deactivated')}>
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Deactivate</Text>
                 </Pressable>
               )}
               {(item.status === 'deactivated' || item.status === 'rejected') && (
-                <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary, paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
-                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Approve</Text>
+                <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary, paddingHorizontal: 10, paddingVertical: 4 }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Approve</Text>
                 </Pressable>
               )}
             </View>
@@ -194,10 +194,10 @@ export default function SubAdminEmployeesScreen() {
     return (
       <View style={styles.tableRow}>
         <Text style={[styles.cell, { flex: 2, fontWeight: '600' }]}>{item.full_name}</Text>
-        {isDesktop && <Text style={[styles.cell, { flex: 2, color: Colors.light.icon }]}>{item.email}</Text>}
+        {isDesktop && <Text style={[styles.cell, { flex: 2.5, color: Colors.light.icon }]}>{item.email}</Text>}
         <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
         <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
-        <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <View style={{ width: 180, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : {backgroundColor: '#fee2e2'}]}>
             <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : {color: '#dc2626'}]}>{item.status}</Text>
           </View>
@@ -355,7 +355,7 @@ export default function SubAdminEmployeesScreen() {
 
                     <Text style={styles.sectionLabel}>Personal & Identification</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Email:</Text><Text style={styles.profileVal}>{selectedEmployee.email}</Text></View>
-                    <View style={styles.profileRow}><Text style={styles.profileKey}>Mobile:</Text><Text style={styles.profileVal}>{pd.mobile || 'N/A'}</Text></View>
+                    <View style={styles.profileRow}><Text style={styles.profileKey}>Mobile:</Text><Text style={styles.profileVal}>{(selectedEmployee as any).mobile || pd.mobile || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Age/Blood:</Text><Text style={styles.profileVal}>{pd.age || 'N/A'} yrs / {pd.bloodGroup || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Emergency Contact:</Text><Text style={styles.profileVal}>{pd.emergencyContact || 'N/A'}</Text></View>
                     

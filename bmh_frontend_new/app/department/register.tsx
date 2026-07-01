@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {  View, Text, StyleSheet, Pressable, Platform, TextInput, KeyboardAvoidingView, ScrollView, ActivityIndicator, Alert , Image } from 'react-native';
+import {  View, Text, StyleSheet, Pressable, TouchableOpacity, Platform, TextInput, KeyboardAvoidingView, ScrollView, ActivityIndicator, Alert , Image } from 'react-native';
 import { ArrowLeft, CheckCircle2, Camera, Eye, EyeOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -59,6 +59,7 @@ export default function SubAdminRegisterScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -114,9 +115,20 @@ export default function SubAdminRegisterScreen() {
     setErrorMessage('');
     setPasswordError('');
     setSuccessMessage('');
+    setErrors({});
+    
+    const newErrors: {[key: string]: string} = {};
+    if (!fullName) newErrors.fullName = 'Full Name is required';
+    if (!email) newErrors.email = 'Email is required';
+    if (!mobile) newErrors.mobile = 'Mobile Number is required';
+    if (!password) newErrors.password = 'Password is required';
+    if (!confirmPassword) newErrors.confirmPassword = 'Confirm Password is required';
+    if (!age) newErrors.age = 'Age is required';
+    if (!aadhaar) newErrors.aadhaar = 'Aadhaar ID is required';
+    if (!selectedDept) newErrors.selectedDept = 'Department is required';
 
-    const requiredFields = [fullName, email, password, confirmPassword, mobile, emergencyContact, age, bloodGroup, aadhaar, pan, esi, manager, salary, empType, jobDesc, shiftIn, shiftOut, breakStart, breakEnd, tempAddr1, tempCity, tempState, permAddr1, permCity, permState, ifsc, bankName, branch, accountNo, photo];
-    if (requiredFields.some(field => !field) || !selectedDept) {
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       setErrorMessage('Please fill in all required fields.');
       return;
     }
@@ -235,33 +247,29 @@ export default function SubAdminRegisterScreen() {
                 </Pressable>
               </View>
 
-              {errorMessage ? (
-                <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
-                  <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
-                </View>
-              ) : null}
-              {successMessage ? (
-                <View style={{ padding: 12, backgroundColor: '#D1FAE5', borderRadius: 8, marginBottom: 16 }}>
-                  <Text style={{ color: '#059669', fontWeight: '500', textAlign: 'center' }}>{successMessage}</Text>
-                </View>
-              ) : null}
+
 
               {/* 1. Personal Identification Data */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>1. Personal Identification Data</Text>
                 <View style={styles.gridContainer}>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Full Name *</Text><TextInput style={styles.input} placeholder="Rahul Sharma" placeholderTextColor="#94A3B8" value={fullName} onChangeText={setFullName} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Email Address *</Text><TextInput style={styles.input} placeholder="rahul@example.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Mobile Number *</Text><TextInput style={styles.input} placeholder="10-digit Mobile" placeholderTextColor="#94A3B8" value={mobile} onChangeText={setMobile} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Emergency Contact *</Text><TextInput style={styles.input} placeholder="Family Contact" placeholderTextColor="#94A3B8" value={emergencyContact} onChangeText={setEmergencyContact} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Age *</Text><TextInput style={styles.input} placeholder="Years" placeholderTextColor="#94A3B8" value={age} onChangeText={setAge} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Blood Group *</Text><TextInput style={styles.input} placeholder="O+" placeholderTextColor="#94A3B8" value={bloodGroup} onChangeText={setBloodGroup} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Full Name *</Text><TextInput style={styles.input} placeholder="Rahul Sharma" placeholderTextColor="#94A3B8" value={fullName} onChangeText={setFullName} />
+                    {errors.fullName ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.fullName}</Text> : null}</View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Email Address *</Text><TextInput style={styles.input} placeholder="rahul@example.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} />
+                    {errors.email ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.email}</Text> : null}</View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Mobile Number *</Text><TextInput style={styles.input} placeholder="10-digit Mobile" placeholderTextColor="#94A3B8" value={mobile} onChangeText={setMobile} />
+                    {errors.mobile ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.mobile}</Text> : null}</View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Emergency Contact</Text><TextInput style={styles.input} placeholder="Family Contact" placeholderTextColor="#94A3B8" value={emergencyContact} onChangeText={setEmergencyContact} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Age *</Text><TextInput style={styles.input} placeholder="Years" placeholderTextColor="#94A3B8" value={age} onChangeText={setAge} />
+                    {errors.age ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.age}</Text> : null}</View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Blood Group</Text><TextInput style={styles.input} placeholder="O+" placeholderTextColor="#94A3B8" value={bloodGroup} onChangeText={setBloodGroup} /></View>
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>Secure Password *</Text>
                     <View style={styles.passwordWrapper}>
                       <TextInput style={styles.inputPassword} placeholder="••••••••" secureTextEntry={!showPassword} placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} />
                       <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>{showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</Pressable>
                     </View>
+                    {errors.password ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.password}</Text> : null}
                     {passwordError && !confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                   </View>
                   <View style={styles.inputGroup}>
@@ -270,6 +278,7 @@ export default function SubAdminRegisterScreen() {
                       <TextInput style={styles.inputPassword} placeholder="••••••••" secureTextEntry={!showConfirmPassword} placeholderTextColor="#94A3B8" value={confirmPassword} onChangeText={setConfirmPassword} />
                       <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>{showConfirmPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</Pressable>
                     </View>
+                    {errors.confirmPassword ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.confirmPassword}</Text> : null}
                     {passwordError && confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                   </View>
                 </View>
@@ -279,10 +288,11 @@ export default function SubAdminRegisterScreen() {
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>2. Statutory Documentation & Compliance</Text>
                 <View style={styles.gridContainer}>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Aadhaar ID Card *</Text><TextInput style={styles.input} placeholder="12-digit Aadhaar" placeholderTextColor="#94A3B8" value={aadhaar} onChangeText={setAadhaar} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>PAN Card *</Text><TextInput style={styles.input} placeholder="ABCDE1234F" placeholderTextColor="#94A3B8" value={pan} onChangeText={setPan} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>ESI Insurance ID *</Text><TextInput style={styles.input} placeholder="Enter Insurance No." placeholderTextColor="#94A3B8" value={esi} onChangeText={setEsi} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Reporting Manager *</Text><TextInput style={styles.input} placeholder="Supervisor Name" placeholderTextColor="#94A3B8" value={manager} onChangeText={setManager} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Aadhaar ID Card *</Text><TextInput style={styles.input} placeholder="12-digit Aadhaar" placeholderTextColor="#94A3B8" value={aadhaar} onChangeText={setAadhaar} />
+                    {errors.aadhaar ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.aadhaar}</Text> : null}</View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>PAN Card</Text><TextInput style={styles.input} placeholder="ABCDE1234F" placeholderTextColor="#94A3B8" value={pan} onChangeText={setPan} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>ESI Insurance ID</Text><TextInput style={styles.input} placeholder="Enter Insurance No." placeholderTextColor="#94A3B8" value={esi} onChangeText={setEsi} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Reporting Manager</Text><TextInput style={styles.input} placeholder="Supervisor Name" placeholderTextColor="#94A3B8" value={manager} onChangeText={setManager} /></View>
                 </View>
               </View>
 
@@ -305,7 +315,7 @@ export default function SubAdminRegisterScreen() {
                   
 
                   <View style={styles.inputGroup}><Text style={styles.label}>Monthly Base Salary (₹) *</Text><TextInput style={styles.input} placeholder="Amount in INR" placeholderTextColor="#94A3B8" value={salary} onChangeText={setSalary} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Employment Type *</Text><TextInput style={styles.input} placeholder="Full-time" placeholderTextColor="#94A3B8" value={empType} onChangeText={setEmpType} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Employment Type</Text><TextInput style={styles.input} placeholder="Full-time" placeholderTextColor="#94A3B8" value={empType} onChangeText={setEmpType} /></View>
                   <View style={[styles.inputGroup, { width: '100%' }]}><Text style={styles.label}>Job Description *</Text><TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} multiline placeholder="Detail operational responsibilities..." placeholderTextColor="#94A3B8" value={jobDesc} onChangeText={setJobDesc} /></View>
                 </View>
               </View>
@@ -371,9 +381,9 @@ export default function SubAdminRegisterScreen() {
                 <Text style={styles.sectionTitle}>6. Banking & Payroll Routing</Text>
                 <View style={styles.gridContainer}>
                   <View style={styles.inputGroup}><Text style={styles.label}>IFSC Code *</Text><TextInput style={styles.input} placeholder="SBIN0001234" placeholderTextColor="#94A3B8" value={ifsc} onChangeText={setIfsc} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Bank Name *</Text><TextInput style={styles.input} placeholder="State Bank of India" placeholderTextColor="#94A3B8" value={bankName} onChangeText={setBankName} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Branch Name *</Text><TextInput style={styles.input} placeholder="Main Hub Branch" placeholderTextColor="#94A3B8" value={branch} onChangeText={setBranch} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Account Number *</Text><TextInput style={styles.input} placeholder="Enter Account Number" placeholderTextColor="#94A3B8" value={accountNo} onChangeText={setAccountNo} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Bank Name</Text><TextInput style={styles.input} placeholder="State Bank of India" placeholderTextColor="#94A3B8" value={bankName} onChangeText={setBankName} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Branch Name</Text><TextInput style={styles.input} placeholder="Main Hub Branch" placeholderTextColor="#94A3B8" value={branch} onChangeText={setBranch} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Account Number</Text><TextInput style={styles.input} placeholder="Enter Account Number" placeholderTextColor="#94A3B8" value={accountNo} onChangeText={setAccountNo} /></View>
                 </View>
               </View>
 
@@ -387,9 +397,9 @@ export default function SubAdminRegisterScreen() {
 
               <View style={styles.loginLinkRow}>
                 <Text style={styles.loginLinkText}>Already authenticated within our logs? </Text>
-                <Pressable onPress={() => router.push('/department/login')}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/department/login')}>
                   <Text style={styles.loginLinkAction}>Access System Login</Text>
-                </Pressable>
+                </TouchableOpacity>
               </View>
 
             </View>
