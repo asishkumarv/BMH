@@ -43,6 +43,16 @@ export default function EmployeeProfileScreen() {
         }
         fetchMyRequests(parsed.id);
       }
+      try {
+        const [deptRes, roleRes] = await Promise.all([
+          axios.get('https://napi.bharatmedicalhallplus.com/department'),
+          axios.get('https://napi.bharatmedicalhallplus.com/roles')
+        ]);
+        if (deptRes.data.success) setDepartments(deptRes.data.data);
+        if (roleRes.data.success) setRoles(roleRes.data.data);
+      } catch (err) {
+        console.log('Error fetching metadata', err);
+      }
     };
     loadUser();
   }, []);
@@ -183,6 +193,10 @@ export default function EmployeeProfileScreen() {
     }
   };
 
+  const selectedDeptObj = departments.find((d: any) => d.name === editForm.department);
+  const selectedDeptId = selectedDeptObj ? String(selectedDeptObj.id) : null;
+  const availableRoles = roles.filter((r: any) => r.departmentId === 'all' || r.departmentId === selectedDeptId);
+
   if (!user) return null;
 
   return (
@@ -219,7 +233,7 @@ export default function EmployeeProfileScreen() {
                 {Platform.OS === 'web' ? (
                   <select style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none' }} value={editForm.role} onChange={(e) => setEditForm({...editForm, role: e.target.value})}>
                     <option value="">Select Role</option>
-                    {roles.map((r: any) => <option key={r.title} value={r.title}>{r.title}</option>)}
+                    {availableRoles.map((r: any) => <option key={r.name} value={r.name}>{r.name}</option>)}
                   </select>
                 ) : <TextInput style={styles.modalInput} value={editForm.role} onChangeText={(t) => setEditForm({...editForm, role: t})} />}
               </View>

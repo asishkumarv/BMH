@@ -44,13 +44,17 @@ export default function SubAdminProfileScreen() {
         if (parsed.profile_data) {
           try { setPd(JSON.parse(parsed.profile_data)); } catch (e) {}
         }
-        if (parsed.department_id) {
-          axios.get('https://napi.bharatmedicalhallplus.com/department').then(res => {
-            if (res.data.success) {
-              const dept = res.data.data.find((d: any) => String(d.id) === String(parsed.department_id));
+        try {
+          const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
+          if (deptRes.data.success) {
+            setDepartments(deptRes.data.data);
+            if (parsed.department_id) {
+              const dept = deptRes.data.data.find((d: any) => String(d.id) === String(parsed.department_id));
               if (dept) setDepartmentName(dept.name);
             }
-          }).catch(console.error);
+          }
+        } catch (error) {
+          console.error(error);
         }
         fetchMyRequests(parsed.id);
       }
