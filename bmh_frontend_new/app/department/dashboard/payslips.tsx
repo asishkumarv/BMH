@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { API_URL } from '../../../config';
 import { Download, FileText, CheckCircle } from 'lucide-react-native';
@@ -23,9 +24,12 @@ export default function Payslips() {
 
   const fetchPayslips = async () => {
     try {
-      const empData = Platform.OS === 'web' 
-        ? localStorage.getItem('subAdminUser')
-        : null;
+      let empData = null;
+      if (Platform.OS === 'web') {
+        empData = localStorage.getItem('subAdminUser');
+      } else {
+        empData = await AsyncStorage.getItem('subAdminUser');
+      }
 
       if (!empData) return;
       const emp = JSON.parse(empData);

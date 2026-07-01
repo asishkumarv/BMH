@@ -113,8 +113,8 @@ exports.getDepartmentMetrics = async (req, res) => {
     let completedTasks = 0;
     tasksResult.rows.forEach(row => {
       const statusLower = (row.status || '').toLowerCase();
-      if (statusLower === 'pending') pendingTasks = parseInt(row.count, 10);
-      if (statusLower === 'completed') completedTasks = parseInt(row.count, 10);
+      if (['pending', 'assigned', 'in_progress', 'accepted'].includes(statusLower)) pendingTasks += parseInt(row.count, 10);
+      if (statusLower === 'completed') completedTasks += parseInt(row.count, 10);
     });
 
     // 3. Get attendance count for today
@@ -129,10 +129,10 @@ exports.getDepartmentMetrics = async (req, res) => {
     let presentCount = 0;
     let absentCount = 0;
     attendanceResult.rows.forEach(row => {
-      const s = row.status || '';
-      if (['On Duty', 'Checked Out', 'On Break', 'Half Day', 'Present'].includes(s)) {
+      const s = (row.status || '').toLowerCase();
+      if (['on duty', 'checked out', 'on break', 'half day', 'present', 'early_checkout', 'late_checkin'].includes(s)) {
         presentCount += parseInt(row.count, 10);
-      } else if (['Absent'].includes(s)) {
+      } else if (['absent', 'on leave'].includes(s)) {
         absentCount += parseInt(row.count, 10);
       }
     });

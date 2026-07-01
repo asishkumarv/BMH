@@ -222,6 +222,18 @@ export default function SubAdminDashboard() {
           <Text style={styles.subtitle}>Here is what's happening in your department today.</Text>
         </View>
 
+        <View style={[styles.statsGrid, !isDesktop && styles.statsGridMobile]}>
+          {STATS.map((stat, i) => (
+            <View key={i} style={[styles.statCard, !isDesktop && styles.statCardMobile]}>
+              <View style={[styles.iconBox, { backgroundColor: stat.color + '1A' }]}>
+                <stat.icon color={stat.color} size={24} />
+              </View>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
         {/* My Attendance Actions */}
         <View style={styles.actionSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -237,7 +249,7 @@ export default function SubAdminDashboard() {
               <Animated.View style={{ transform: [{ scale: pulseAnim }], width: isDesktop ? '30%' : '48%', minWidth: 200 }}>
                 <TouchableOpacity style={[styles.cuteActionBtn, { backgroundColor: '#10b981', borderColor: '#34d399' }]} onPress={() => animateButton(() => handleAction('login'))}>
                   <View style={styles.iconCircle}>
-                    <Sun color="#10b981" size={32} />
+                     <Sun color="#10b981" size={32} />
                   </View>
                   <Text style={styles.cuteActionText}>Morning Check In</Text>
                   <Text style={styles.cuteActionSub}>Start your shift</Text>
@@ -289,18 +301,6 @@ export default function SubAdminDashboard() {
               </View>
             ) : null}
           </View>
-        </View>
-
-        <View style={[styles.statsGrid, !isDesktop && styles.statsGridMobile]}>
-          {STATS.map((stat, i) => (
-            <View key={i} style={[styles.statCard, !isDesktop && styles.statCardMobile]}>
-              <View style={[styles.iconBox, { backgroundColor: stat.color + '1A' }]}>
-                <stat.icon color={stat.color} size={24} />
-              </View>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
         </View>
 
         <View style={[styles.chartSection, !isDesktop && styles.chartSectionMobile]}>
