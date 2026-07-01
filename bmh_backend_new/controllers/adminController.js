@@ -122,7 +122,9 @@ exports.getDepartmentMetrics = async (req, res) => {
       SELECT a.status, COUNT(*) 
       FROM attendance a
       JOIN employees e ON a.employee_id = e.id
-      WHERE e.department = (SELECT name FROM departments WHERE id = $1) AND a.date = CURRENT_DATE 
+      WHERE e.department = (SELECT name FROM departments WHERE id = $1) 
+        AND a.date = CURRENT_DATE 
+        AND a.user_type = 'employee'
       GROUP BY a.status
     `, [department_id]);
     

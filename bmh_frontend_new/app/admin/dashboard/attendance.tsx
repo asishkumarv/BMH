@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
-import { Download, MapPin, ChevronDown, ChevronUp, Edit2, X } from 'lucide-react-native';
+import { Download, MapPin, ChevronDown, ChevronUp, Edit2, X, Target } from 'lucide-react-native';
+import * as Location from 'expo-location';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
@@ -103,7 +104,7 @@ const MapPicker = ({ lat, lng, onSelect }: any) => {
 };
 
 export default function AdminAttendanceScreen() {
-  const { isDesktop } = useResponsive();
+  const { isDesktop, isMobile } = useResponsive();
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -124,6 +125,7 @@ export default function AdminAttendanceScreen() {
   const [lng, setLng] = useState('');
   const [radius, setRadius] = useState('2000');
   const [showConfig, setShowConfig] = useState(false);
+  const [mapPickerMode, setMapPickerMode] = useState<'pick'|'fetching'>('pick');
 
   // New states for Reports
   const [selectedReportDept, setSelectedReportDept] = useState('All');
@@ -381,7 +383,7 @@ export default function AdminAttendanceScreen() {
             </View>
           </View>
           
-          <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
+          <View style={{flexDirection: isMobile ? 'column' : 'row', gap: 10, marginTop: 10}}>
             <View style={[styles.input, {backgroundColor: '#f3f4f6', flex: 1, flexDirection: 'row', alignItems: 'center'}]}>
                 <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
                 <Text style={{color: '#6b7280'}}>{lat ? `Lat: ${Number(lat).toFixed(6)}` : 'Latitude'}</Text>
@@ -390,6 +392,32 @@ export default function AdminAttendanceScreen() {
                 <MapPin size={16} color="#6b7280" style={{marginRight: 8}} />
                 <Text style={{color: '#6b7280'}}>{lng ? `Lng: ${Number(lng).toFixed(6)}` : 'Longitude'}</Text>
             </View>
+            <TouchableOpacity 
+              style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: isMobile ? 12 : undefined, borderRadius: 8, justifyContent: 'center', alignItems: 'center'}}
+              onPress={async () => {
+                setMapPickerMode('fetching');
+                try {
+                  const { status } = await Location.requestForegroundPermissionsAsync();
+                  if (status !== 'granted') {
+                    alert('Permission to access location was denied');
+                    return;
+                  }
+                  const location = await Location.getCurrentPositionAsync({});
+                  setLat(location.coords.latitude.toString());
+                  setLng(location.coords.longitude.toString());
+                } catch (error) {
+                  alert('Failed to fetch location');
+                } finally {
+                  setMapPickerMode('pick');
+                }
+              }}
+            >
+              {mapPickerMode === 'fetching' ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={{color: 'white', fontWeight: 'bold'}}>Fetch Current Location</Text>
+              )}
+            </TouchableOpacity>
           </View>
 
           <MapPicker lat={lat} lng={lng} onSelect={(newLat: any, newLng: any) => { setLat(newLat.toString()); setLng(newLng.toString()); }} />
