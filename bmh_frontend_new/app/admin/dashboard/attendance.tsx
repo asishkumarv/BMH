@@ -203,7 +203,7 @@ export default function AdminAttendanceScreen() {
 
       const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
       if (deptRes.data.success) {
-        setDepartments(deptRes.data.data);
+        setDepartments([{ id: 'all_depts', name: 'All Departments' }, ...deptRes.data.data]);
       }
     } catch (error) {
       console.error(error);
@@ -233,7 +233,7 @@ export default function AdminAttendanceScreen() {
         // Refresh departments list so the new coordinates are stored in state
         const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
         if (deptRes.data.success) {
-          setDepartments(deptRes.data.data);
+          setDepartments([{ id: 'all_depts', name: 'All Departments' }, ...deptRes.data.data]);
         }
       } else {
         Alert.alert("Error", "Failed to update location.");

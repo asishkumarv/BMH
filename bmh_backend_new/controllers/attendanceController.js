@@ -27,14 +27,18 @@ exports.verifyLocation = async (req, res) => {
 
     const tableName = userType === 'sub_admin' ? 'department_admins' : 'employees';
     const deptQuery = userType === 'sub_admin' 
-      ? 'SELECT (SELECT name FROM departments WHERE id = department_admins.department_id) as department FROM department_admins WHERE id = $1'
-      : 'SELECT department FROM employees WHERE id = $1';
+      ? 'SELECT (SELECT name FROM departments WHERE id = department_admins.department_id) as department, status FROM department_admins WHERE id = $1'
+      : 'SELECT department, status FROM employees WHERE id = $1';
 
     const empRes = await pool.query(deptQuery, [employeeId]);
     if (empRes.rowCount === 0) {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
+    
+    if (empRes.rows[0].status !== 'approved') {
+      return res.status(403).json({ success: false, message: "Account is not active. Please contact administrator." });
+    }
     const departmentName = empRes.rows[0].department;
 
     const deptRes = await pool.query('SELECT allowed_latitude, allowed_longitude, allowed_radius FROM departments WHERE name = $1', [departmentName]);
@@ -89,11 +93,15 @@ exports.verifyFaceAndMarkAttendance = async (req, res) => {
       ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
       : 'department';
 
-    const empRes = await pool.query(`SELECT id, profile_data, schedule_in, schedule_out, ${deptQuery}, image FROM ${tableName} WHERE id = $1`, [employeeId]);
+    const empRes = await pool.query(`SELECT id, profile_data, schedule_in, schedule_out, ${deptQuery}, image, status FROM ${tableName} WHERE id = $1`, [employeeId]);
     if (!empRes.rowCount) {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
+    
+    if (empRes.rows[0].status !== 'approved') {
+      return res.status(403).json({ success: false, message: "Account is not active. Please contact administrator." });
+    }
     const profileDataStr = empRes.rows[0].profile_data;
     let registeredImgBase64 = null;
     

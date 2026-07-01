@@ -136,7 +136,7 @@ export default function PatientBooking() {
     
     let csvContent = "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode\n";
     myBookings.forEach((b) => {
-      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString()},${b.start_time},${b.status},${b.payment_mode}\n`;
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.status},${b.payment_mode}\n`;
     });
     
     if (Platform.OS === 'web') {
@@ -259,7 +259,7 @@ export default function PatientBooking() {
     const printDept = b ? b.department : (selectedSlot?.doctor_department || 'General');
     const printAmount = b ? b.fee : selectedSlot?.fee;
     const printMode = b ? b.payment_mode : paymentMode;
-    const printDate = b ? new Date(b.date).toLocaleDateString() : new Date(selectedSlot?.date).toLocaleDateString();
+    const printDate = b ? new Date(b.date).toLocaleDateString('en-GB') : new Date(selectedSlot?.date).toLocaleDateString('en-GB');
     const printTime = b ? b.start_time : selectedSlot?.start_time;
     const bookingId = b ? (b.booking_id || b.id) : null;
     
@@ -274,74 +274,83 @@ export default function PatientBooking() {
       } catch(e) { console.error('Failed to update print count'); }
     }
     
-    const nowStr = new Date().toLocaleString();
+    const nowStr = new Date().toLocaleDateString('en-GB');
 
     const html = `
       <html>
         <head>
           <style>
-            @page { margin: 0; size: 58mm auto; }
-            body { font-family: monospace; width: 50mm; margin: 0; padding: 5px; color: #000; font-size: 11px; }
-            .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
-            .title { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
-            .subtitle { font-size: 10px; line-height: 1.2; }
-            .token-box { text-align: center; margin: 5px 0; border: 1px dashed #000; padding: 5px; border-radius: 4px; background: #fff; color: #000; }
-            .token-label { font-size: 11px; font-weight: bold; margin-bottom: 2px; }
-            .token-number { font-size: 28px; font-weight: bold; line-height: 1; }
-            .detail-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
-            .detail-label { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
-            .footer { margin-top: 10px; text-align: center; font-size: 10px; padding-top: 5px; }
+            @page { margin: 0; size: auto; }
+            body { font-family: monospace; width: 72mm; margin: 0; margin-left: 15px; margin-top: 15px; padding: 2px; color: #000; font-size: 12px; line-height: 1.3; }
+            .header { text-align: center; margin-bottom: 2px; }
+            .title { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
+            .subtitle { font-size: 9px; line-height: 1.2; }
+            .dotted-line { border-bottom: 1px dashed #000; margin: 4px 0; }
+            .ticket-title { text-align: center; font-weight: bold; text-decoration: underline; margin: 4px 0 8px 0; font-size: 13px; }
+            
+            .row { display: flex; align-items: flex-start; margin-bottom: 4px; }
+            .row-spaced { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+            
+            .label { display: inline-block; width: 75px; }
+            .colon { margin-right: 6px; }
+            
+            .box { border: 1px solid #000; padding: 2px 6px; font-weight: bold; font-size: 14px; margin: 0 4px; }
+            
+            .footer-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 15px; }
+            .print-info { font-size: 9px; }
+            .bmh { font-weight: bold; font-size: 14px; margin-right: 10px; }
           </style>
         </head>
         <body>
           <div class="header">
             <div class="title">BHARAT HEALTHCARE</div>
             <div class="subtitle">
-              HOSPITAL ROAD, BARIPADA, MAYURBHANJ, ODISHA 757001.<br/>
-              REGD NO MBJ/CE/03/2019, MOBILE NO 8093110888
+              HOSPITAL ROAD , BARIPADA, MAYURBHANJ, ODISHA, PIN NO : 757001<br/>
+              REGD. NO : MBJ/CE/03/2019, MOBILE NO : 8093110888
+            </div>
+          </div>
+          <div class="dotted-line"></div>
+          <div class="ticket-title">TEMPORARY APPOINTMENT TICKET</div>
+          
+          <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 8px; font-size: 11px;">
+            <div style="display: flex; align-items: center; margin-right: 15px;">Slno : <span class="box">${printToken}</span></div>
+            <div>Appt date : ${printDate}</div>
+          </div>
+          
+          <div class="row">
+            <span class="label">Name</span><span class="colon">:</span><span style="text-transform: uppercase;">${printPatient}</span>
+          </div>
+          
+          <div class="row-spaced">
+            <div>
+              <span class="label">Age / Sex</span><span class="colon">:</span><span style="text-transform: uppercase;">${printAge} Yrs / ${printGender}</span>
+            </div>
+            <div>
+              <span>MobNo : ${printMobile}</span>
             </div>
           </div>
           
-          <div class="token-box">
-            <div class="token-label">TOKEN NUMBER</div>
-            <div class="token-number">#${printToken}</div>
+          <div class="row">
+            <span class="label">Address</span><span class="colon">:</span><span style="text-transform: uppercase;">${printCity || ''}</span>
           </div>
           
-          <div class="detail-row">
-            <span class="detail-label">APPT Date:</span>
-            <span>${printDate} ${printTime}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Patient:</span>
-            <span>${printPatient}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Age/Sex, Mob:</span>
-            <span>${printAge}y/${printGender}, ${printMobile}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Address:</span>
-            <span>${printCity || 'N/A'}</span>
-          </div>
-          <div class="divider"></div>
-          <div class="detail-row">
-            <span class="detail-label">Doctor:</span>
-            <span>Dr. ${printDoctor}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Dept:</span>
-            <span>${printDept}</span>
-          </div>
-          <div class="divider"></div>
-          <div class="detail-row">
-            <span class="detail-label">Amount:</span>
-            <span style="font-weight:bold;">Rs. ${printAmount} (${printMode})</span>
+          <div style="border-bottom: 1px solid #000; margin: 6px 0; width: 35px;"></div>
+          
+          <div class="row">
+            <span class="label">Doctor</span><span class="colon">:</span><span style="text-transform: uppercase;">DR ${printDoctor}</span>
           </div>
           
-          <div class="footer">
-            Printed: ${nowStr} (p${currentPrintCount})<br/>
-            Thank you.
+          <div class="row">
+            <span class="label">Department</span><span class="colon">:</span><span style="text-transform: uppercase;">${printDept}</span>
+          </div>
+          
+          <div class="row" style="margin-top: 4px;">
+            <span class="label">Amount</span><span class="colon">:</span><span style="margin-left: 30px; font-weight: bold;">${printAmount}</span>
+          </div>
+          
+          <div class="footer-row">
+            <div class="print-info">Printed: ${nowStr} (p${currentPrintCount})</div>
+            <div class="bmh">BMH</div>
           </div>
         </body>
       </html>
@@ -451,7 +460,7 @@ export default function PatientBooking() {
                 <View style={styles.slotDetails}>
                   <View style={styles.slotDetailRow}>
                     <Calendar size={16} color="#64748b" />
-                    <Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString()}</Text>
+                    <Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text>
                   </View>
                   <View style={styles.slotDetailRow}>
                     <Clock size={16} color="#64748b" />
@@ -510,7 +519,7 @@ export default function PatientBooking() {
           <View style={styles.selectedSlotBanner}>
             <Text style={styles.bannerTitle}>Booking Token #{selectedToken} With</Text>
             <Text style={styles.bannerDoctor}>Dr. {selectedSlot.doctor_name}</Text>
-            <Text style={styles.bannerTime}>{new Date(selectedSlot.date).toLocaleDateString()} at {selectedSlot.start_time}</Text>
+            <Text style={styles.bannerTime}>{new Date(selectedSlot.date).toLocaleDateString('en-GB')} at {selectedSlot.start_time}</Text>
           </View>
           
           <Text style={styles.formLabel}>Patient Full Name *</Text>
@@ -695,7 +704,7 @@ export default function PatientBooking() {
                     <Text style={{fontSize: 12, color: '#64748b'}}>{b.department}</Text>
                   </View>
                   <View style={styles.tableCell}>
-                    <Text>{new Date(b.date).toLocaleDateString()}</Text>
+                    <Text>{new Date(b.date).toLocaleDateString('en-GB')}</Text>
                     <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
                   </View>
                   <Text style={styles.tableCell}>{b.payment_mode}</Text>

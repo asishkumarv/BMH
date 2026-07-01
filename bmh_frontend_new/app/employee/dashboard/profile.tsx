@@ -10,7 +10,7 @@ import { Edit2 } from 'lucide-react-native';
 import { Modal } from 'react-native';
 
 export default function EmployeeProfileScreen() {
-  const { isDesktop } = useResponsive();
+  const { isMobile } = useResponsive();
   const [user, setUser] = useState<any>(null);
   const [pd, setPd] = useState<any>({});
   
@@ -162,7 +162,7 @@ export default function EmployeeProfileScreen() {
   if (!user) return null;
 
   return (
-    <ScrollView style={[styles.container, !isDesktop && styles.containerMobile]} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
         <Text style={styles.subtitle}>View your corporate credentials and manage your account.</Text>
@@ -215,10 +215,10 @@ export default function EmployeeProfileScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.row, !isDesktop && styles.rowMobile]}>
+      <View style={styles.row}>
         {/* Left Column: Password Management */}
-        <View style={[styles.leftCol, !isDesktop && styles.colMobile]}>
-          <View style={[styles.card, !isDesktop && styles.cardMobile]}>
+        <View style={styles.leftCol}>
+          <View style={styles.card}>
             <Pressable style={styles.profileHeaderRow} onPress={handlePickImage} disabled={updating}>
               {pd.photo && pd.photo.length > 5 && pd.photo !== 'null' ? (
                 <View style={[styles.avatar, { overflow: 'hidden' }]}>
@@ -305,8 +305,8 @@ export default function EmployeeProfileScreen() {
         </View>
 
         {/* Right Column: Profile Metadata */}
-        <View style={[styles.rightCol, !isDesktop && styles.colMobile]}>
-          <View style={[styles.card, !isDesktop && styles.cardMobile]}>
+        <View style={styles.rightCol}>
+          <View style={styles.card}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Text style={styles.sectionTitle}>Employee Information</Text>
               <Pressable style={styles.editBtn} onPress={openEditModal}>
@@ -404,10 +404,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: Colors.light.icon, marginTop: 8 },
   
-  row: { flexDirection: 'row', gap: 32, alignItems: 'flex-start' },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 32, alignItems: 'flex-start' },
   rowMobile: { flexDirection: 'column', width: '100%' },
-  leftCol: { flex: 1, minWidth: 350 },
-  rightCol: { flex: 1, minWidth: 350 },
+  leftCol: { flex: 1, minWidth: 320 },
+  rightCol: { flex: 1, minWidth: 320 },
   colMobile: { width: '100%', minWidth: 'auto', flex: 0 },
 
   card: {

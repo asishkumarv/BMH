@@ -113,16 +113,16 @@ export default function SubAdminEmployeesScreen() {
     }
   };
 
-  const handleApproveEmployee = async (employeeId: string) => {
+  const handleUpdateStatus = async (employeeId: string, newStatus: string) => {
     try {
       const response = await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${employeeId}/status`, {
-        status: 'approved'
+        status: newStatus
       });
       if (response.data.success) {
-        setEmployees(employees.map(e => e.id === employeeId ? { ...e, status: 'approved' } : e));
+        setEmployees(employees.map(e => e.id === employeeId ? { ...e, status: newStatus } : e));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to approve employee');
+      Alert.alert('Error', `Failed to update status to ${newStatus}`);
       console.error(error);
     }
   };
@@ -135,7 +135,7 @@ export default function SubAdminEmployeesScreen() {
         {isDesktop && <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Email</Text>}
         <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Department</Text>
         <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Role</Text>
-        <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
+        <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
         <View style={{ width: 40 }} />
       </View>
     );
@@ -153,10 +153,32 @@ export default function SubAdminEmployeesScreen() {
             <Text style={styles.adminEmail} numberOfLines={1}>{item.email} • {item.role}</Text>
           </View>
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : styles.statusPending]}>
-              <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : styles.textPending]}>
-                {item.status}
-              </Text>
+            <View style={{ flexDirection: 'column', gap: 4 }}>
+              <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : {backgroundColor: '#fee2e2'}]}>
+                <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : {color: '#dc2626'}]}>
+                  {item.status}
+                </Text>
+              </View>
+              {item.status === 'pending' && (
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary, paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
+                    <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Approve</Text>
+                  </Pressable>
+                  <Pressable style={[styles.statusBadge, { backgroundColor: '#ef4444', paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'rejected')}>
+                    <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Reject</Text>
+                  </Pressable>
+                </View>
+              )}
+              {item.status === 'approved' && (
+                <Pressable style={[styles.statusBadge, { backgroundColor: '#f97316', paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'deactivated')}>
+                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Deactivate</Text>
+                </Pressable>
+              )}
+              {(item.status === 'deactivated' || item.status === 'rejected') && (
+                <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary, paddingHorizontal: 6, paddingVertical: 2 }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
+                  <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Approve</Text>
+                </Pressable>
+              )}
             </View>
             <Pressable 
               style={styles.actionBtnMobile} 
@@ -175,20 +197,29 @@ export default function SubAdminEmployeesScreen() {
         {isDesktop && <Text style={[styles.cell, { flex: 2, color: Colors.light.icon }]}>{item.email}</Text>}
         <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
         <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          {item.status === 'pending' ? (
-            <Pressable 
-              style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]}
-              onPress={() => handleApproveEmployee(item.id)}
-            >
-              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Approve</Text>
+        <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : {backgroundColor: '#fee2e2'}]}>
+            <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : {color: '#dc2626'}]}>{item.status}</Text>
+          </View>
+          {item.status === 'pending' && (
+            <>
+              <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
+                <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Approve</Text>
+              </Pressable>
+              <Pressable style={[styles.statusBadge, { backgroundColor: '#ef4444' }]} onPress={() => handleUpdateStatus(item.id, 'rejected')}>
+                <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Reject</Text>
+              </Pressable>
+            </>
+          )}
+          {item.status === 'approved' && (
+            <Pressable style={[styles.statusBadge, { backgroundColor: '#f97316' }]} onPress={() => handleUpdateStatus(item.id, 'deactivated')}>
+              <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Deactivate</Text>
             </Pressable>
-          ) : (
-            <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : styles.statusPending]}>
-              <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : styles.textPending]}>
-                {item.status}
-              </Text>
-            </View>
+          )}
+          {(item.status === 'deactivated' || item.status === 'rejected') && (
+            <Pressable style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(item.id, 'approved')}>
+              <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Approve</Text>
+            </Pressable>
           )}
         </View>
         <Pressable 

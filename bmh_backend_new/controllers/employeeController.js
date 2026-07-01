@@ -81,7 +81,7 @@ exports.updateEmployeeStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    if (status !== 'approved') {
+    if (!['approved', 'rejected', 'deactivated'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 

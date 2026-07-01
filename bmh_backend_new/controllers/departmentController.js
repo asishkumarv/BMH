@@ -38,10 +38,17 @@ exports.updateLocation = async (req, res) => {
   try {
     const { name, lat, lng, radius } = req.body;
     if (!name || !lat || !lng || !radius) return res.status(400).json({ success: false, message: 'Missing fields' });
-    await pool.query(
-      'UPDATE departments SET allowed_latitude = $1, allowed_longitude = $2, allowed_radius = $3 WHERE name = $4',
-      [lat, lng, radius, name]
-    );
+    if (name === 'All Departments') {
+      await pool.query(
+        'UPDATE departments SET allowed_latitude = $1, allowed_longitude = $2, allowed_radius = $3',
+        [lat, lng, radius]
+      );
+    } else {
+      await pool.query(
+        'UPDATE departments SET allowed_latitude = $1, allowed_longitude = $2, allowed_radius = $3 WHERE name = $4',
+        [lat, lng, radius, name]
+      );
+    }
     res.json({ success: true, message: 'Updated' });
   } catch (e) {
     console.error(e);
