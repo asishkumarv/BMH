@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { API_URL } from '../../../config';
+import CustomDropdown from '../../../components/ui/CustomDropdown';
 
 type Employee = {
   id: string;
@@ -168,7 +169,7 @@ export default function EmployeesScreen() {
 
   const getDeptName = (deptId: string) => {
     if (deptId === 'all') return 'All Departments';
-    return departments.find(d => d.id === deptId)?.name || 'Unknown';
+    return departments.find(d => String(d.id) === String(deptId))?.name || 'Unknown';
   };
 
   const renderHeader = () => {
@@ -325,27 +326,17 @@ export default function EmployeesScreen() {
                 </Pressable>
               </View>
               
-              <Text style={styles.label}>Assign to Department</Text>
-              <View style={styles.deptOptionsGrid}>
-                <Pressable 
-                  style={[styles.deptOption, selectedDeptForRole === 'all' && styles.deptOptionSelected]}
-                  onPress={() => setSelectedDeptForRole('all')}
-                >
-                  <Text style={[styles.deptOptionText, selectedDeptForRole === 'all' && styles.deptOptionTextSelected]}>
-                    All Departments (Global)
-                  </Text>
-                </Pressable>
-                {departments.map(dept => (
-                  <Pressable 
-                    key={dept.id}
-                    style={[styles.deptOption, selectedDeptForRole === dept.id && styles.deptOptionSelected]}
-                    onPress={() => setSelectedDeptForRole(dept.id)}
-                  >
-                    <Text style={[styles.deptOptionText, selectedDeptForRole === dept.id && styles.deptOptionTextSelected]}>
-                      {dept.name}
-                    </Text>
-                  </Pressable>
-                ))}
+              <Text style={[styles.label, { marginTop: 15, marginBottom: 5 }]}>Assign to Department</Text>
+              <View style={{ zIndex: 1000, marginBottom: 15 }}>
+                <CustomDropdown
+                  options={[
+                    { label: 'All Departments (Global)', value: 'all' },
+                    ...departments.map(d => ({ label: d.name, value: d.id }))
+                  ]}
+                  value={selectedDeptForRole}
+                  onChange={(val) => setSelectedDeptForRole(val)}
+                  placeholder="Select Department"
+                />
               </View>
             </View>
 

@@ -10,6 +10,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { COMPANY_LOGO_BASE64 } from './logoBase64';
 
 export default function PatientBooking() {
   const { isMobile } = useResponsive();
@@ -252,49 +253,69 @@ export default function PatientBooking() {
       <html>
         <head>
           <style>
-            body { font-family: sans-serif; padding: 20px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px; margin-bottom: 20px; }
-            .title { font-size: 28px; font-weight: bold; color: #0f172a; margin-bottom: 5px; }
-            .subtitle { font-size: 16px; color: #64748b; }
-            .token-box { text-align: center; margin: 30px 0; padding: 20px; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
-            .token-label { font-size: 18px; color: #475569; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-            .token-number { font-size: 64px; font-weight: bold; color: #10b981; }
-            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .detail-item { background: #f1f5f9; padding: 15px; border-radius: 8px; }
-            .detail-label { font-size: 12px; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
-            .detail-value { font-size: 16px; font-weight: 600; color: #0f172a; }
-            .footer { margin-top: 40px; text-align: center; font-size: 14px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+            @page { margin: 0; size: 80mm auto; }
+            body { font-family: monospace; width: 300px; margin: 0; padding: 10px; color: #000; }
+            .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+            .title { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+            .subtitle { font-size: 14px; }
+            .token-box { text-align: center; margin: 15px 0; border: 2px dashed #000; padding: 10px; border-radius: 8px; background: #fff; color: #000; }
+            .token-label { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+            .token-number { font-size: 56px; font-weight: bold; line-height: 1; }
+            .detail-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+            .detail-label { font-weight: bold; }
+            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+            .footer { margin-top: 20px; text-align: center; font-size: 12px; border-top: 1px dashed #000; padding-top: 10px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="title">BMH Hospital</div>
-            <div class="subtitle">Official Patient Booking Receipt</div>
+            <img src="${COMPANY_LOGO_BASE64}" style="max-height: 50px; margin-bottom: 5px; max-width: 250px; object-fit: contain;" alt="Company Logo" />
+            <div class="subtitle">Patient Booking Receipt</div>
           </div>
+          
           <div class="token-box">
-            <div class="token-label">Token Number</div>
+            <div class="token-label">TOKEN NUMBER</div>
             <div class="token-number">#${successToken}</div>
           </div>
-          <div class="details-grid">
-            <div class="detail-item">
-              <div class="detail-label">Patient Name</div>
-              <div class="detail-value">${patientName} (${gender}, ${age}y)</div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-label">Doctor</div>
-              <div class="detail-value">Dr. ${selectedSlot.doctor_name} <br/><span style="font-size: 13px; color: #64748b; font-weight: normal">${selectedSlot.doctor_department || 'General'}</span></div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-label">Date & Time</div>
-              <div class="detail-value">${new Date(selectedSlot.date).toLocaleDateString()} | ${selectedSlot.start_time}</div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-label">Fee & Payment</div>
-              <div class="detail-value">₹${selectedSlot.fee} (${paymentMode})</div>
-            </div>
+          
+          <div class="detail-row">
+            <span class="detail-label">Patient:</span>
+            <span>${patientName}</span>
           </div>
+          <div class="detail-row">
+            <span class="detail-label">Age/Gender:</span>
+            <span>${age}y / ${gender}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="detail-row">
+            <span class="detail-label">Doctor:</span>
+            <span>Dr. ${selectedSlot.doctor_name}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Dept:</span>
+            <span>${selectedSlot.doctor_department || 'General'}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="detail-row">
+            <span class="detail-label">Date:</span>
+            <span>${new Date(selectedSlot.date).toLocaleDateString()}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Time:</span>
+            <span>${selectedSlot.start_time}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="detail-row">
+            <span class="detail-label">Amount:</span>
+            <span style="font-weight:bold; font-size:16px;">Rs. ${selectedSlot.fee}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Mode:</span>
+            <span>${paymentMode}</span>
+          </div>
+          
           <div class="footer">
-            Thank you for choosing BMH Hospital. Please wait in the lobby until your token number is called.
+            Thank you.<br/>Please wait for your token to be called.
           </div>
         </body>
       </html>

@@ -92,7 +92,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
               <ActivityIndicator size="large" color="#3b82f6" />
             </View>
           ) : data ? (
-            <ScrollView style={{ flex: 1 }}>
+            <ScrollView>
               {/* Analytics Summary */}
               <View style={styles.statsGrid}>
                 <View style={styles.statCard}>
@@ -148,17 +148,15 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                           {(!row.late_checkin_mins && !row.early_checkout_mins && !row.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
                         </View>
                         <View style={[styles.tableCell, { flex: 2 }]}>
-                          <ScrollView>
-                            {row.breaks && row.breaks.length > 0 ? (
-                              row.breaks.map((b: any, bi: number) => (
-                                <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
-                                  {b.break_type}: {new Date(b.timestamp).toLocaleTimeString()}
-                                </Text>
-                              ))
-                            ) : (
-                              <Text style={{ fontSize: 12, color: '#9ca3af' }}>No breaks</Text>
-                            )}
-                          </ScrollView>
+                          {row.breaks && row.breaks.length > 0 ? (
+                            row.breaks.map((b: any, bi: number) => (
+                              <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
+                                {b.break_type}: {new Date(b.timestamp).toLocaleTimeString()}
+                              </Text>
+                            ))
+                          ) : (
+                            <Text style={{ fontSize: 12, color: '#9ca3af' }}>No breaks</Text>
+                          )}
                         </View>
                       </View>
                     ))}

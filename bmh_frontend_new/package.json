@@ -62,5 +62,12 @@
     "web": "expo start --web",
     "build": "expo export -p web"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": ["@react-native-community/checkbox"]
+      }
+    }
+  }
 }

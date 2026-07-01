@@ -6,6 +6,7 @@ import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../constants/Colors';
 import { useResponsive } from '../../hooks/useResponsive';
+import CustomDropdown from '../../components/ui/CustomDropdown';
 
 export default function EmployeeRegisterScreen() {
   const router = useRouter();
@@ -114,8 +115,9 @@ export default function EmployeeRegisterScreen() {
     setPasswordError('');
     setSuccessMessage('');
     
-    if (!fullName || !email || !selectedDept || !selectedRole || !password) {
-      setErrorMessage('Please fill in required fields, select a department, and a role.');
+    const requiredFields = [fullName, email, password, confirmPassword, mobile, emergencyContact, age, bloodGroup, aadhaar, pan, esi, manager, salary, empType, jobDesc, shiftIn, shiftOut, breakStart, breakEnd, tempAddr1, tempCity, tempState, permAddr1, permCity, permState, ifsc, bankName, branch, accountNo, photo];
+    if (requiredFields.some(field => !field) || !selectedDept || !selectedRole) {
+      setErrorMessage('Please fill in all required fields.');
       return;
     }
     if (password !== confirmPassword) {
@@ -230,10 +232,10 @@ export default function EmployeeRegisterScreen() {
                 <View style={styles.gridContainer}>
                   <View style={styles.inputGroup}><Text style={styles.label}>Full Name *</Text><TextInput style={styles.input} placeholder="Rahul Sharma" placeholderTextColor="#94A3B8" value={fullName} onChangeText={setFullName} /></View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Email Address *</Text><TextInput style={styles.input} placeholder="rahul@example.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Mobile Number</Text><TextInput style={styles.input} placeholder="10-digit Mobile" placeholderTextColor="#94A3B8" value={mobile} onChangeText={setMobile} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Emergency Contact</Text><TextInput style={styles.input} placeholder="Family Contact" placeholderTextColor="#94A3B8" value={emergencyContact} onChangeText={setEmergencyContact} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Age</Text><TextInput style={styles.input} placeholder="Years" placeholderTextColor="#94A3B8" value={age} onChangeText={setAge} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Blood Group</Text><TextInput style={styles.input} placeholder="O+" placeholderTextColor="#94A3B8" value={bloodGroup} onChangeText={setBloodGroup} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Mobile Number *</Text><TextInput style={styles.input} placeholder="10-digit Mobile" placeholderTextColor="#94A3B8" value={mobile} onChangeText={setMobile} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Emergency Contact *</Text><TextInput style={styles.input} placeholder="Family Contact" placeholderTextColor="#94A3B8" value={emergencyContact} onChangeText={setEmergencyContact} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Age *</Text><TextInput style={styles.input} placeholder="Years" placeholderTextColor="#94A3B8" value={age} onChangeText={setAge} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Blood Group *</Text><TextInput style={styles.input} placeholder="O+" placeholderTextColor="#94A3B8" value={bloodGroup} onChangeText={setBloodGroup} /></View>
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>Secure Password *</Text>
                     <View style={styles.passwordWrapper}>
@@ -257,10 +259,10 @@ export default function EmployeeRegisterScreen() {
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>2. Statutory Documentation & Compliance</Text>
                 <View style={styles.gridContainer}>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Aadhaar ID Card</Text><TextInput style={styles.input} placeholder="12-digit Aadhaar" placeholderTextColor="#94A3B8" value={aadhaar} onChangeText={setAadhaar} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>PAN Card</Text><TextInput style={styles.input} placeholder="ABCDE1234F" placeholderTextColor="#94A3B8" value={pan} onChangeText={setPan} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>ESI Insurance ID</Text><TextInput style={styles.input} placeholder="Enter Insurance No." placeholderTextColor="#94A3B8" value={esi} onChangeText={setEsi} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Reporting Manager</Text><TextInput style={styles.input} placeholder="Supervisor Name" placeholderTextColor="#94A3B8" value={manager} onChangeText={setManager} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Aadhaar ID Card *</Text><TextInput style={styles.input} placeholder="12-digit Aadhaar" placeholderTextColor="#94A3B8" value={aadhaar} onChangeText={setAadhaar} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>PAN Card *</Text><TextInput style={styles.input} placeholder="ABCDE1234F" placeholderTextColor="#94A3B8" value={pan} onChangeText={setPan} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>ESI Insurance ID *</Text><TextInput style={styles.input} placeholder="Enter Insurance No." placeholderTextColor="#94A3B8" value={esi} onChangeText={setEsi} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Reporting Manager *</Text><TextInput style={styles.input} placeholder="Supervisor Name" placeholderTextColor="#94A3B8" value={manager} onChangeText={setManager} /></View>
                 </View>
               </View>
 
@@ -282,37 +284,34 @@ export default function EmployeeRegisterScreen() {
                   <View style={[styles.inputGroup, { width: '100%' }]}>
                     <Text style={styles.label}>Department *</Text>
                     {loadingData ? <ActivityIndicator size="small" /> : (
-                      <View style={styles.optionsGrid}>
-                        {departments.length === 0 && <Text style={{ color: '#94A3B8' }}>No departments available.</Text>}
-                        {departments.map(dept => (
-                          <Pressable key={dept.id} style={[styles.optionBadge, String(selectedDept) === String(dept.id) && styles.optionBadgeSelected]} onPress={() => { setSelectedDept(String(dept.id)); setSelectedRole(''); }}>
-                            <Text style={[styles.optionBadgeText, String(selectedDept) === String(dept.id) && styles.optionBadgeTextSelected]}>{dept.name}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
+                      <CustomDropdown 
+                        options={departments.map(d => ({ label: d.name, value: String(d.id) }))}
+                        value={String(selectedDept)}
+                        onChange={(val) => { setSelectedDept(val); setSelectedRole(''); }}
+                        placeholder="Select Department"
+                      />
                     )}
                   </View>
 
                   {selectedDept ? (
-                    <View style={[styles.inputGroup, { width: '100%' }]}>
+                    <View style={[styles.inputGroup, { width: '100%', zIndex: 900 }]}>
                       <Text style={styles.label}>Role *</Text>
                       {availableRoles.length === 0 ? (
                         <Text style={{ color: '#94A3B8', fontSize: 13, paddingVertical: 10 }}>No roles available for this department. Please contact Admin.</Text>
                       ) : (
-                        <View style={styles.optionsGrid}>
-                          {availableRoles.map(role => (
-                            <Pressable key={role.id} style={[styles.optionBadge, selectedRole === role.id && styles.optionBadgeSelected]} onPress={() => setSelectedRole(role.id)}>
-                              <Text style={[styles.optionBadgeText, selectedRole === role.id && styles.optionBadgeTextSelected]}>{role.name}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
+                        <CustomDropdown 
+                          options={availableRoles.map(r => ({ label: r.name, value: String(r.id) }))}
+                          value={String(selectedRole)}
+                          onChange={(val) => setSelectedRole(val)}
+                          placeholder="Select Role"
+                        />
                       )}
                     </View>
                   ) : null}
 
-                  <View style={styles.inputGroup}><Text style={styles.label}>Monthly Base Salary (₹)</Text><TextInput style={styles.input} placeholder="Amount in INR" placeholderTextColor="#94A3B8" value={salary} onChangeText={setSalary} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Employment Type</Text><TextInput style={styles.input} placeholder="Full-time" placeholderTextColor="#94A3B8" value={empType} onChangeText={setEmpType} /></View>
-                  <View style={[styles.inputGroup, { width: '100%' }]}><Text style={styles.label}>Job Description</Text><TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} multiline placeholder="Detail operational responsibilities..." placeholderTextColor="#94A3B8" value={jobDesc} onChangeText={setJobDesc} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Monthly Base Salary (₹) *</Text><TextInput style={styles.input} placeholder="Amount in INR" placeholderTextColor="#94A3B8" value={salary} onChangeText={setSalary} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Employment Type *</Text><TextInput style={styles.input} placeholder="Full-time" placeholderTextColor="#94A3B8" value={empType} onChangeText={setEmpType} /></View>
+                  <View style={[styles.inputGroup, { width: '100%' }]}><Text style={styles.label}>Job Description *</Text><TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} multiline placeholder="Detail operational responsibilities..." placeholderTextColor="#94A3B8" value={jobDesc} onChangeText={setJobDesc} /></View>
                 </View>
               </View>
 
@@ -321,7 +320,7 @@ export default function EmployeeRegisterScreen() {
                 <Text style={styles.sectionTitle}>4. Shift Architecture & Operational Timings</Text>
                 <View style={styles.gridContainer}>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Shift Clock-In</Text>
+                    <Text style={styles.label}>Shift Clock-In *</Text>
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={shiftIn} onChange={(e) => setShiftIn(e.target.value)} />
                     ) : (
@@ -329,7 +328,7 @@ export default function EmployeeRegisterScreen() {
                     )}
                   </View>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Shift Clock-Out</Text>
+                    <Text style={styles.label}>Shift Clock-Out *</Text>
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={shiftOut} onChange={(e) => setShiftOut(e.target.value)} />
                     ) : (
@@ -337,7 +336,7 @@ export default function EmployeeRegisterScreen() {
                     )}
                   </View>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Break Commences</Text>
+                    <Text style={styles.label}>Break Commences *</Text>
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={breakStart} onChange={(e) => setBreakStart(e.target.value)} />
                     ) : (
@@ -345,7 +344,7 @@ export default function EmployeeRegisterScreen() {
                     )}
                   </View>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Break Concludes</Text>
+                    <Text style={styles.label}>Break Concludes *</Text>
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={breakEnd} onChange={(e) => setBreakEnd(e.target.value)} />
                     ) : (
@@ -376,10 +375,10 @@ export default function EmployeeRegisterScreen() {
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>6. Banking & Payroll Routing</Text>
                 <View style={styles.gridContainer}>
-                  <View style={styles.inputGroup}><Text style={styles.label}>IFSC Code</Text><TextInput style={styles.input} placeholder="SBIN0001234" placeholderTextColor="#94A3B8" value={ifsc} onChangeText={setIfsc} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Bank Name</Text><TextInput style={styles.input} placeholder="State Bank of India" placeholderTextColor="#94A3B8" value={bankName} onChangeText={setBankName} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Branch Name</Text><TextInput style={styles.input} placeholder="Main Hub Branch" placeholderTextColor="#94A3B8" value={branch} onChangeText={setBranch} /></View>
-                  <View style={styles.inputGroup}><Text style={styles.label}>Account Number</Text><TextInput style={styles.input} placeholder="Enter Account Number" placeholderTextColor="#94A3B8" value={accountNo} onChangeText={setAccountNo} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>IFSC Code *</Text><TextInput style={styles.input} placeholder="SBIN0001234" placeholderTextColor="#94A3B8" value={ifsc} onChangeText={setIfsc} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Bank Name *</Text><TextInput style={styles.input} placeholder="State Bank of India" placeholderTextColor="#94A3B8" value={bankName} onChangeText={setBankName} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Branch Name *</Text><TextInput style={styles.input} placeholder="Main Hub Branch" placeholderTextColor="#94A3B8" value={branch} onChangeText={setBranch} /></View>
+                  <View style={styles.inputGroup}><Text style={styles.label}>Account Number *</Text><TextInput style={styles.input} placeholder="Enter Account Number" placeholderTextColor="#94A3B8" value={accountNo} onChangeText={setAccountNo} /></View>
                 </View>
               </View>
 
