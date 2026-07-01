@@ -40,22 +40,37 @@ export default function AdminRegisterScreen() {
   };
 
   const [registering, setRegistering] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const validatePassword = (pass: string) => {
+    const hasCapital = /[A-Z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const isLongEnough = pass.length >= 6;
+    if (!hasCapital || !hasNumber || !hasSpecial || !isLongEnough) {
+        return 'Password must be at least 6 characters long and include a capital letter, a number, and a special character.';
+    }
+    return null;
+  }
 
   const handleRegister = async () => {
+    setErrorMessage('');
+    setPasswordError('');
+    setSuccessMessage('');
+
     if (!fullName || !email || !password) {
-      if (Platform.OS === 'web') {
-        window.alert('Please fill all required fields');
-      } else {
-        Alert.alert('Error', 'Please fill all required fields');
-      }
+      setErrorMessage('Please fill all required fields');
       return;
     }
     if (password !== confirmPassword) {
-      if (Platform.OS === 'web') {
-        window.alert('Passwords do not match');
-      } else {
-        Alert.alert('Error', 'Passwords do not match');
-      }
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    const passErr = validatePassword(password);
+    if (passErr) {
+      setPasswordError(passErr);
       return;
     }
 
@@ -73,20 +88,13 @@ export default function AdminRegisterScreen() {
       });
       
       if (res.data.success) {
-        if (Platform.OS === 'web') {
-          window.alert('Admin registered successfully!');
-        } else {
-          Alert.alert('Success', 'Admin registered successfully!');
-        }
-        router.replace('/admin/login' as any);
+        setSuccessMessage('Admin registered successfully! You can login after approval.');
+        setTimeout(() => {
+          router.replace('/admin/login' as any);
+        }, 3000);
       }
     } catch (error: any) {
-      const msg = error.response?.data?.message || 'Registration failed';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Error', msg);
-      }
+      setErrorMessage(error.response?.data?.message || 'Registration failed');
     } finally {
       setRegistering(false);
     }
@@ -156,6 +164,17 @@ export default function AdminRegisterScreen() {
                 </Pressable>
               </View>
 
+              {errorMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
+                </View>
+              ) : null}
+              {successMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#D1FAE5', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#059669', fontWeight: '500', textAlign: 'center' }}>{successMessage}</Text>
+                </View>
+              ) : null}
+
               <View style={styles.gridContainer}>
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Full Name</Text>
@@ -187,6 +206,7 @@ export default function AdminRegisterScreen() {
                       {showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}
                     </Pressable>
                   </View>
+                  {passwordError && !confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                 </View>
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Confirm Password</Text>
@@ -196,6 +216,7 @@ export default function AdminRegisterScreen() {
                       {showConfirmPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}
                     </Pressable>
                   </View>
+                  {passwordError && confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                 </View>
               </View>
 

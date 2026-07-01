@@ -26,6 +26,8 @@ export default function DoctorRegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [departments, setDepartments] = useState<any[]>([]);
 
   React.useEffect(() => {
@@ -44,14 +46,32 @@ export default function DoctorRegisterScreen() {
     fetchDepartments();
   }, []);
 
+  const validatePassword = (pass: string) => {
+    const hasCapital = /[A-Z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const isLongEnough = pass.length >= 6;
+    if (!hasCapital || !hasNumber || !hasSpecial || !isLongEnough) {
+        return 'Password must be at least 6 characters long and include a capital letter, a number, and a special character.';
+    }
+    return null;
+  }
+
   const handleRegister = async () => {
+    setErrorMessage('');
+    setPasswordError('');
+
     if (!form.full_name || !form.email || !form.password || !form.department) {
-      const msg = 'Please fill in all required fields (*)';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      setErrorMessage('Please fill in all required fields (*)');
       return;
     }
     
+    const passErr = validatePassword(form.password);
+    if (passErr) {
+      setPasswordError(passErr);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await axios.post('https://napi.bharatmedicalhallplus.com/doctors/register', form);
@@ -59,9 +79,7 @@ export default function DoctorRegisterScreen() {
         setSuccess(true);
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Registration failed. Please try again.';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      setErrorMessage(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -131,6 +149,12 @@ export default function DoctorRegisterScreen() {
                 </View>
               </View>
 
+              {errorMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
               <View style={styles.gridContainer}>
 
                 <View style={styles.inputGroup}>
@@ -151,6 +175,7 @@ export default function DoctorRegisterScreen() {
                       {showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}
                     </Pressable>
                   </View>
+                  {passwordError ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                 </View>
 
                 <View style={styles.inputGroup}>

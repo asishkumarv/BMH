@@ -540,8 +540,8 @@ export default function SubAdminAllowancesScreen() {
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20}} style={{width: '100%'}}>
             <View style={[styles.modalContent, !isDesktop && { padding: 20 }, isDesktop && { width: 600, maxHeight: '80%' }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <Text style={styles.modalTitle}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 12 }}>
+              <Text style={[styles.modalTitle, { flex: 1, flexWrap: 'wrap' }]}>
                 {selectedWalletForLogs ? `Employee Details & Logs` : 'Logs'}
               </Text>
               <View style={{ flexDirection: 'row', gap: 12 }}>

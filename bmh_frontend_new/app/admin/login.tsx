@@ -14,16 +14,14 @@ export default function AdminLoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    setErrorMessage('');
     if (!email || !password) {
-      if (Platform.OS === 'web') {
-        window.alert('Please fill all required fields');
-      } else {
-        Alert.alert('Error', 'Please fill all required fields');
-      }
+      setErrorMessage('Please fill all required fields');
       return;
     }
     
@@ -49,11 +47,7 @@ export default function AdminLoginScreen() {
       }
     } catch (error: any) {
       const msg = error.response?.data?.message || 'Login failed';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Error', msg);
-      }
+      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
@@ -104,6 +98,12 @@ export default function AdminLoginScreen() {
                   <Text style={styles.pageSubtitle}>Enter your credentials to access the dashboard.</Text>
                 </View>
               </View>
+
+              {errorMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
+                </View>
+              ) : null}
 
               <View style={styles.gridContainer}>
                 <View style={[styles.inputGroup, { width: '100%' }]}>

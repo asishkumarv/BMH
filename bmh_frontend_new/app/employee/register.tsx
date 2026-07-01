@@ -55,6 +55,9 @@ export default function EmployeeRegisterScreen() {
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [registering, setRegistering] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -95,13 +98,33 @@ export default function EmployeeRegisterScreen() {
     }
   };
 
+  const validatePassword = (pass: string) => {
+    const hasCapital = /[A-Z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const isLongEnough = pass.length >= 6;
+    if (!hasCapital || !hasNumber || !hasSpecial || !isLongEnough) {
+        return 'Password must be at least 6 characters long and include a capital letter, a number, and a special character.';
+    }
+    return null;
+  }
+
   const handleRegister = async () => {
+    setErrorMessage('');
+    setPasswordError('');
+    setSuccessMessage('');
+    
     if (!fullName || !email || !selectedDept || !selectedRole || !password) {
-      Alert.alert('Error', 'Please fill in required fields, select a department, and a role.');
+      setErrorMessage('Please fill in required fields, select a department, and a role.');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    const passErr = validatePassword(password);
+    if (passErr) {
+      setPasswordError(passErr);
       return;
     }
 
@@ -123,11 +146,13 @@ export default function EmployeeRegisterScreen() {
         profile_data
       });
       if (res.data.success) {
-        Alert.alert('Success', 'Registered successfully!');
-        router.replace('/employee/login' as any);
+        setSuccessMessage('Successfully registered! You can login after admin approval.');
+        setTimeout(() => {
+          router.replace('/employee/login' as any);
+        }, 3000);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Registration failed');
+      setErrorMessage(error.response?.data?.message || 'Registration failed');
     } finally {
       setRegistering(false);
     }
@@ -215,6 +240,7 @@ export default function EmployeeRegisterScreen() {
                       <TextInput style={styles.inputPassword} placeholder="••••••••" secureTextEntry={!showPassword} placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} />
                       <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>{showPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</Pressable>
                     </View>
+                    {passwordError && !confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                   </View>
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>Confirm Password *</Text>
@@ -222,6 +248,7 @@ export default function EmployeeRegisterScreen() {
                       <TextInput style={styles.inputPassword} placeholder="••••••••" secureTextEntry={!showConfirmPassword} placeholderTextColor="#94A3B8" value={confirmPassword} onChangeText={setConfirmPassword} />
                       <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>{showConfirmPassword ? <EyeOff color="#94A3B8" size={18} /> : <Eye color="#94A3B8" size={18} />}</Pressable>
                     </View>
+                    {passwordError && confirmPassword ? <Text style={{ color: '#DC2626', fontSize: 12, marginTop: 4 }}>{passwordError}</Text> : null}
                   </View>
                 </View>
               </View>
@@ -236,6 +263,17 @@ export default function EmployeeRegisterScreen() {
                   <View style={styles.inputGroup}><Text style={styles.label}>Reporting Manager</Text><TextInput style={styles.input} placeholder="Supervisor Name" placeholderTextColor="#94A3B8" value={manager} onChangeText={setManager} /></View>
                 </View>
               </View>
+
+              {errorMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
+                </View>
+              ) : null}
+              {successMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#D1FAE5', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#059669', fontWeight: '500', textAlign: 'center' }}>{successMessage}</Text>
+                </View>
+              ) : null}
 
               {/* 3. Organizational & Payroll Allocation */}
               <View style={styles.sectionCard}>

@@ -18,6 +18,7 @@ export default function EmployeePortal() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,8 +124,9 @@ export default function EmployeePortal() {
   };
 
   const handleLogin = async () => {
+    setErrorMessage('');
     if (!email || !password) {
-      alert('Please enter email and password');
+      setErrorMessage('Please enter email and password');
       return;
     }
     setLoggingIn(true);
@@ -143,7 +145,7 @@ export default function EmployeePortal() {
         router.replace('/employee/dashboard' as any);
       }
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Login failed');
+      setErrorMessage(error.response?.data?.message || 'Login failed');
     } finally {
       setLoggingIn(false);
     }
@@ -313,6 +315,11 @@ export default function EmployeePortal() {
 
               {/* Login Form */}
               <View style={styles.loginForm}>
+                {errorMessage ? (
+                  <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
+                    <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Email Address</Text>
                   <TextInput style={styles.input} placeholder="name@hospital.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} autoCapitalize="none" />

@@ -5,6 +5,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import axios from 'axios';
 import { CheckSquare, Plus, Clock, User, CheckCircle, XCircle } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 
 export default function AdminTasksScreen() {
   const { isDesktop } = useResponsive();
@@ -98,7 +99,9 @@ export default function AdminTasksScreen() {
         const emp = users.emps.find(e => String(e.id) === assigneeId);
         if (emp) finalDept = emp.department;
       } else if (assigneeType === 'department_admin') {
-        const admin = users.admins.find(a => String(a.id) === assigneeId);
+        const rawId = assigneeId.replace('SA-', '');
+        finalAssigneeId = rawId;
+        const admin = users.admins.find(a => String(a.id) === rawId);
         if (admin) {
            const d = users.depts.find(d => d.id === admin.department_id);
            if (d) finalDept = d.name;
@@ -325,16 +328,29 @@ export default function AdminTasksScreen() {
               <>
                 <Text style={styles.label}>Select Department (Optional)</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                  <select 
-                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                    value={selectedDeptId}
-                    onChange={(e) => { setSelectedDeptId(e.target.value); setAssigneeId(''); }}
-                  >
-                    <option value="">-- All Departments --</option>
-                    {users.depts.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                      value={selectedDeptId}
+                      onChange={(e) => { setSelectedDeptId(e.target.value); setAssigneeId(''); }}
+                    >
+                      <option value="">-- All Departments --</option>
+                      {users.depts.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={selectedDeptId}
+                      onValueChange={(val: string) => { setSelectedDeptId(val); setAssigneeId(''); }}
+                      style={{ height: 50, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="-- All Departments --" value="" />
+                      {users.depts.map(d => (
+                        <Picker.Item key={d.id} label={d.name} value={String(d.id)} />
+                      ))}
+                    </Picker>
+                  )}
                 </View>
               </>
             )}
@@ -343,41 +359,76 @@ export default function AdminTasksScreen() {
               <>
                 <Text style={styles.label}>Select Assignee</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                  <select 
-                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                    value={assigneeId}
-                    onChange={(e) => setAssigneeId(e.target.value)}
-                  >
-                    <option value="">-- Choose Assignee --</option>
-                    {assigneeType === 'super_admin' && users.superAdmins.map(sa => (
-                      <option key={sa.id} value={sa.id}>{sa.full_name} ({sa.email})</option>
-                    ))}
-                    {(assigneeType === 'employee' || assigneeType === 'department_admin') && globalUsers
-                      .filter(u => u.type === assigneeType)
-                      .filter(u => {
-                        if (!selectedDeptId) return true;
-                        const d = users.depts.find(dept => String(dept.id) === String(selectedDeptId));
-                        return d && u.department === d.name;
-                      })
-                      .map(u => (
-                        <option key={u.id} value={u.id}>{u.full_name} - {u.department} ({u.role})</option>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                      value={assigneeId}
+                      onChange={(e) => setAssigneeId(e.target.value)}
+                    >
+                      <option value="">-- Choose Assignee --</option>
+                      {assigneeType === 'super_admin' && users.superAdmins.map(sa => (
+                        <option key={sa.id} value={sa.id}>{sa.full_name} ({sa.email})</option>
                       ))}
-                  </select>
+                      {(assigneeType === 'employee' || assigneeType === 'department_admin') && globalUsers
+                        .filter(u => u.type === assigneeType)
+                        .filter(u => {
+                          if (!selectedDeptId) return true;
+                          const d = users.depts.find(dept => String(dept.id) === String(selectedDeptId));
+                          return d && u.department === d.name;
+                        })
+                        .map(u => (
+                          <option key={u.id} value={u.id}>{u.full_name} - {u.department} ({u.role})</option>
+                        ))}
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={assigneeId}
+                      onValueChange={(val: string) => setAssigneeId(val)}
+                      style={{ height: 50, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="-- Choose Assignee --" value="" />
+                      {assigneeType === 'super_admin' && users.superAdmins.map(sa => (
+                        <Picker.Item key={sa.id} label={`${sa.full_name} (${sa.email})`} value={String(sa.id)} />
+                      ))}
+                      {(assigneeType === 'employee' || assigneeType === 'department_admin') && globalUsers
+                        .filter(u => u.type === assigneeType)
+                        .filter(u => {
+                          if (!selectedDeptId) return true;
+                          const d = users.depts.find(dept => String(dept.id) === String(selectedDeptId));
+                          return d && u.department === d.name;
+                        })
+                        .map(u => (
+                          <Picker.Item key={u.id} label={`${u.full_name} - ${u.department} (${u.role})`} value={String(u.id)} />
+                        ))}
+                    </Picker>
+                  )}
                 </View>
               </>
             )}
 
             <Text style={styles.label}>Priority</Text>
             <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-              <select 
-                style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-              >
-                <option value="Low">Low</option>
-                <option value="Moderate">Moderate</option>
-                <option value="High">High</option>
-              </select>
+              {Platform.OS === 'web' ? (
+                <select 
+                  style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="High">High</option>
+                </select>
+              ) : (
+                <Picker
+                  selectedValue={priority}
+                  onValueChange={(val: string) => setPriority(val)}
+                  style={{ height: 50, color: Colors.light.text }}
+                >
+                  <Picker.Item label="Low" value="Low" />
+                  <Picker.Item label="Moderate" value="Moderate" />
+                  <Picker.Item label="High" value="High" />
+                </Picker>
+              )}
             </View>
 
             <Text style={styles.label}>Due Date & Time</Text>

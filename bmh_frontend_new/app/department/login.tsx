@@ -14,11 +14,13 @@ export default function SubAdminLoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    setErrorMessage('');
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill all required fields');
+      setErrorMessage('Please fill all required fields');
       return;
     }
     
@@ -45,7 +47,7 @@ export default function SubAdminLoginScreen() {
         });
       }
     } catch (error: any) {
-      Alert.alert('Login Failed', error.response?.data?.message || 'Invalid credentials');
+      setErrorMessage(error.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -96,6 +98,12 @@ export default function SubAdminLoginScreen() {
                   <Text style={styles.pageSubtitle}>Enter your credentials to access your department dashboard.</Text>
                 </View>
               </View>
+
+              {errorMessage ? (
+                <View style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#DC2626', fontWeight: '500', textAlign: 'center' }}>{errorMessage}</Text>
+                </View>
+              ) : null}
 
               <View style={styles.gridContainer}>
                 <View style={[styles.inputGroup, { width: '100%' }]}>
