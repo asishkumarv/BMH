@@ -286,7 +286,7 @@ exports.getAllPatientHistory = async (req, res) => {
     
     let query = `
       SELECT p.id, p.name, p.mobile, p.email, p.age, p.gender, 
-             c.id as consultation_id, c.next_consultation_date, COALESCE(c.created_at, pb.created_at) as consultation_date,
+             c.id as consultation_id, c.next_consultation_date, COALESCE(c.created_at, pb.created_at) as consultation_date, pb.token_number, ds.fee, pb.payment_mode, p.city, pb.id as booking_id, pb.print_count, ds.start_time,
              d.full_name as doctor_name, d.department as doctor_department
              ${role !== 'Employee' ? ', c.notes' : ''}
       FROM patient_bookings pb

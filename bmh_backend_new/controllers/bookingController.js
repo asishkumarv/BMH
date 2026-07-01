@@ -104,7 +104,7 @@ exports.getBookings = async (req, res) => {
     
     let query = `
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
-             p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name,
+             p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name, p.age, p.gender, pb.print_count,
              ds.date, ds.start_time, ds.end_time, ds.fee,
              d.full_name as doctor_name, d.department,
              e.full_name as booked_by_name
@@ -280,5 +280,22 @@ exports.blockToken = async (req, res) => {
   } catch (error) {
     console.error('Block Token Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.incrementPrintCount = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'UPDATE patient_bookings SET print_count = print_count + 1 WHERE id = $1 RETURNING print_count',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+    res.json({ success: true, print_count: result.rows[0].print_count });
+  } catch (error) {
+    console.error('Error incrementing print count:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };

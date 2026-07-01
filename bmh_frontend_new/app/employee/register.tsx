@@ -86,7 +86,7 @@ export default function EmployeeRegisterScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.2,
       base64: true,
     });
 
@@ -154,7 +154,11 @@ export default function EmployeeRegisterScreen() {
         }, 3000);
       }
     } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || 'Registration failed');
+      if (error.response?.status === 413) {
+        setErrorMessage('Profile Photo is too large. Please select a smaller image.');
+      } else {
+        setErrorMessage(error.response?.data?.message || 'Registration failed');
+      }
     } finally {
       setRegistering(false);
     }

@@ -8,4 +8,6 @@ router.get('/', bookingController.getBookings);
 router.put('/:id/status', bookingController.updateBookingStatus);
 router.get('/revenue', bookingController.getRevenue);
 
+router.put('/:id/print-count', bookingController.incrementPrintCount);
+
 module.exports = router;

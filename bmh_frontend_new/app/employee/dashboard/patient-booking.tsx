@@ -248,74 +248,100 @@ export default function PatientBooking() {
     }
   };
 
-  const handlePrintReceipt = async () => {
+  const handlePrintReceipt = async (b: any = null) => {
+    const printToken = b ? b.token_number : successToken;
+    const printPatient = b ? (b.patient_name || b.name) : patientName;
+    const printAge = b ? b.age : age;
+    const printGender = b ? b.gender : gender;
+    const printMobile = b ? b.mobile : mobile;
+    const printCity = b ? b.city : city;
+    const printDoctor = b ? b.doctor_name : selectedSlot?.doctor_name;
+    const printDept = b ? b.department : (selectedSlot?.doctor_department || 'General');
+    const printAmount = b ? b.fee : selectedSlot?.fee;
+    const printMode = b ? b.payment_mode : paymentMode;
+    const printDate = b ? new Date(b.date).toLocaleDateString() : new Date(selectedSlot?.date).toLocaleDateString();
+    const printTime = b ? b.start_time : selectedSlot?.start_time;
+    const bookingId = b ? (b.booking_id || b.id) : null;
+    
+    let currentPrintCount = 1;
+    if (bookingId) {
+      try {
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/${bookingId}/print-count`);
+        if (res.data.success) {
+           currentPrintCount = res.data.print_count;
+           if (b) { b.print_count = currentPrintCount; }
+        }
+      } catch(e) { console.error('Failed to update print count'); }
+    }
+    
+    const nowStr = new Date().toLocaleString();
+
     const html = `
       <html>
         <head>
           <style>
-            @page { margin: 0; size: 80mm auto; }
-            body { font-family: monospace; width: 300px; margin: 0; padding: 10px; color: #000; }
-            .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-            .title { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-            .subtitle { font-size: 14px; }
-            .token-box { text-align: center; margin: 15px 0; border: 2px dashed #000; padding: 10px; border-radius: 8px; background: #fff; color: #000; }
-            .token-label { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
-            .token-number { font-size: 56px; font-weight: bold; line-height: 1; }
-            .detail-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+            @page { margin: 0; size: 58mm auto; }
+            body { font-family: monospace; width: 50mm; margin: 0; padding: 5px; color: #000; font-size: 11px; }
+            .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
+            .title { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+            .subtitle { font-size: 10px; line-height: 1.2; }
+            .token-box { text-align: center; margin: 5px 0; border: 1px dashed #000; padding: 5px; border-radius: 4px; background: #fff; color: #000; }
+            .token-label { font-size: 11px; font-weight: bold; margin-bottom: 2px; }
+            .token-number { font-size: 28px; font-weight: bold; line-height: 1; }
+            .detail-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
             .detail-label { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
-            .footer { margin-top: 20px; text-align: center; font-size: 12px; border-top: 1px dashed #000; padding-top: 10px; }
+            .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
+            .footer { margin-top: 10px; text-align: center; font-size: 10px; padding-top: 5px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <img src="${COMPANY_LOGO_BASE64}" style="max-height: 50px; margin-bottom: 5px; max-width: 250px; object-fit: contain;" alt="Company Logo" />
-            <div class="subtitle">Patient Booking Receipt</div>
+            <div class="title">BHARAT HEALTHCARE</div>
+            <div class="subtitle">
+              HOSPITAL ROAD, BARIPADA, MAYURBHANJ, ODISHA 757001.<br/>
+              REGD NO MBJ/CE/03/2019, MOBILE NO 8093110888
+            </div>
           </div>
           
           <div class="token-box">
             <div class="token-label">TOKEN NUMBER</div>
-            <div class="token-number">#${successToken}</div>
+            <div class="token-number">#${printToken}</div>
           </div>
           
           <div class="detail-row">
-            <span class="detail-label">Patient:</span>
-            <span>${patientName}</span>
+            <span class="detail-label">APPT Date:</span>
+            <span>${printDate} ${printTime}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Age/Gender:</span>
-            <span>${age}y / ${gender}</span>
+            <span class="detail-label">Patient:</span>
+            <span>${printPatient}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Age/Sex, Mob:</span>
+            <span>${printAge}y/${printGender}, ${printMobile}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Address:</span>
+            <span>${printCity || 'N/A'}</span>
           </div>
           <div class="divider"></div>
           <div class="detail-row">
             <span class="detail-label">Doctor:</span>
-            <span>Dr. ${selectedSlot.doctor_name}</span>
+            <span>Dr. ${printDoctor}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Dept:</span>
-            <span>${selectedSlot.doctor_department || 'General'}</span>
-          </div>
-          <div class="divider"></div>
-          <div class="detail-row">
-            <span class="detail-label">Date:</span>
-            <span>${new Date(selectedSlot.date).toLocaleDateString()}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Time:</span>
-            <span>${selectedSlot.start_time}</span>
+            <span>${printDept}</span>
           </div>
           <div class="divider"></div>
           <div class="detail-row">
             <span class="detail-label">Amount:</span>
-            <span style="font-weight:bold; font-size:16px;">Rs. ${selectedSlot.fee}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Mode:</span>
-            <span>${paymentMode}</span>
+            <span style="font-weight:bold;">Rs. ${printAmount} (${printMode})</span>
           </div>
           
           <div class="footer">
-            Thank you.<br/>Please wait for your token to be called.
+            Printed: ${nowStr} (p${currentPrintCount})<br/>
+            Thank you.
           </div>
         </body>
       </html>
@@ -369,7 +395,7 @@ export default function PatientBooking() {
           </View>
           
           <View style={{flexDirection: 'row', gap: 16, width: '100%'}}>
-            <TouchableOpacity style={[styles.btn, {flex: 1, backgroundColor: '#3b82f6', flexDirection: 'row', justifyContent: 'center'}]} onPress={handlePrintReceipt}>
+            <TouchableOpacity style={[styles.btn, {flex: 1, backgroundColor: '#3b82f6', flexDirection: 'row', justifyContent: 'center'}]} onPress={() => handlePrintReceipt(null)}>
               <Printer color="white" size={20} style={{marginRight: 8}} />
               <Text style={styles.btnText}>Print Receipt</Text>
             </TouchableOpacity>
@@ -655,6 +681,7 @@ export default function PatientBooking() {
                 <Text style={styles.tableCellHeader}>Date/Time</Text>
                 <Text style={styles.tableCellHeader}>Payment</Text>
                 <Text style={styles.tableCellHeader}>Status</Text>
+                <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
               </View>
               {myBookings.map((b, i) => (
                 <View key={i} style={styles.tableRow}>
@@ -673,6 +700,7 @@ export default function PatientBooking() {
                   </View>
                   <Text style={styles.tableCell}>{b.payment_mode}</Text>
                   <Text style={styles.tableCell}>{b.status}</Text>
+                  <TouchableOpacity onPress={() => handlePrintReceipt(b)} style={{flex: 0.5, alignItems: 'center'}}><Printer color="#3b82f6" size={20}/></TouchableOpacity>
                 </View>
               ))}
               {myBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found.</Text>}
