@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Animated, Easing, Modal, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Animated, Easing, Modal, Image, UIManager, LayoutAnimation } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
@@ -80,6 +84,7 @@ export default function PeonLiveQueue() {
         };
       }));
 
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setQueues(queueData);
     } catch (err) {
       console.error(err);
@@ -117,7 +122,6 @@ export default function PeonLiveQueue() {
 
   const toggleFullscreen = (slotId: number | 'all' | null) => {
     if (slotId === 'all') {
-      // Open selection modal instead of immediately going fullscreen
       setShowFSModal(true);
       return;
     }
@@ -168,7 +172,6 @@ export default function PeonLiveQueue() {
   if (fullscreenMode) {
     const fsQueues = queues.filter(q => selectedSlotsForFS.includes(q.slot.id));
     
-    // Dynamic Grid Layout Logic
     const n = fsQueues.length;
     let columns = 1;
     let rows = 1;
@@ -182,7 +185,6 @@ export default function PeonLiveQueue() {
 
     return (
       <View style={styles.fullScreenContainer}>
-        {/* Fullscreen Header Logo */}
         <View style={styles.fsTopBar}>
           <Image source={require('../../../assets/CompanyLogo.jpg')} style={styles.fsLogo} />
         </View>
@@ -210,7 +212,6 @@ export default function PeonLiveQueue() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Fullscreen Selection Modal */}
       <Modal visible={showFSModal} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -279,27 +280,48 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
   const upcomingQueue = waiting.slice(1);
   const palette = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-  const scrollAnim = React.useRef(new Animated.Value(0)).current;
+  const scrollAnim = useRef(new Animated.Value(0)).current;
+  const [contentHeight, setContentHeight] = useState(0);
 
-  React.useEffect(() => {
+  const slideUpAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Trigger swipe up transition when current patient changes
+  useEffect(() => {
+    if (current) {
+      slideUpAnim.setValue(30);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(slideUpAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+  }, [current?.booking_id]);
+
+  useEffect(() => {
     scrollAnim.setValue(0);
     
-    if (upcomingQueue.length === 0) return;
+    if (upcomingQueue.length === 0 || contentHeight === 0) return;
 
-    // Roughly estimate content height (e.g., 60px per item)
-    // If we have very few items, no need to scroll if they fit, but we'll scroll anyway to meet the "marquee" requirement
-    const itemHeight = isFullscreen ? 80 : 60; 
-    const totalHeight = upcomingQueue.length * itemHeight;
-    const viewHeight = isFullscreen ? 200 : 150; // Approximated container height
+    const viewHeight = isFullscreen ? 200 : 150; 
 
-    if (totalHeight <= viewHeight) return; // Fits without scrolling
+    if (contentHeight <= viewHeight) return; // Fits without scrolling
 
     const duration = upcomingQueue.length * 2000; // 2 seconds per item
 
     const startAnimation = () => {
       Animated.sequence([
         Animated.timing(scrollAnim, {
-          toValue: -totalHeight,
+          toValue: -contentHeight,
           duration: duration,
           easing: Easing.linear,
           useNativeDriver: true,
@@ -321,7 +343,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
     return () => {
       scrollAnim.stopAnimation();
     };
-  }, [upcomingQueue.length, isFullscreen, scrollAnim]);
+  }, [upcomingQueue.length, isFullscreen, scrollAnim, contentHeight]);
 
 
 
@@ -336,34 +358,36 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
   return (
     <View style={[styles.card, isMobile && { width: '100%' }, isFullscreen && styles.fsCard, isFullscreen && { borderColor: docColor }]}>
       {/* Doctor Details Header */}
-      <View style={[styles.cardHeader, isFullscreen && { paddingVertical: 15 * padScale, paddingHorizontal: 20 * padScale }]}>
+      <View style={[styles.cardHeader, { backgroundColor: docColor }, isFullscreen && { paddingVertical: 15 * padScale, paddingHorizontal: 20 * padScale }]}>
         <View style={styles.docInfoRow}>
-          <Stethoscope color={docColor} size={24 * scale} />
-          <Text style={[styles.docName, isFullscreen && { fontSize: 20 * scale }]}>Dr. {slot.doctor_name}</Text>
+          <Stethoscope color="#ffffff" size={24 * scale} />
+          <Text style={[styles.docName, { color: '#ffffff' }, isFullscreen && { fontSize: 20 * scale }]}>Dr. {slot.doctor_name}</Text>
         </View>
-        <View style={[styles.badgeRow, { alignItems: 'center', justifyContent: 'space-between', flex: 1 }]}>
-          <View style={{flexDirection: 'row', gap: 8}}>
-            <View style={styles.roleBadge}>
-              <Text style={[styles.badgeText, isFullscreen && { fontSize: 12 * scale }]}>{slot.doctor_role || 'Doctor'}</Text>
+        <View style={[styles.badgeRow, { alignItems: 'flex-start', justifyContent: 'space-between', flex: 1 }]}>
+          <View style={{flexDirection: 'row', gap: 6, flex: 1, flexWrap: 'wrap', paddingRight: 8}}>
+            <View style={[styles.roleBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[styles.badgeText, { color: '#ffffff' }, isFullscreen && { fontSize: 12 * scale }]} numberOfLines={1} ellipsizeMode="tail">{slot.doctor_role || 'Doctor'}</Text>
             </View>
-            <View style={styles.deptBadge}>
-              <Text style={[styles.badgeTextDept, isFullscreen && { fontSize: 12 * scale }]}>{slot.doctor_department || 'General'}</Text>
+            <View style={[styles.deptBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[styles.badgeTextDept, { color: '#ffffff' }, isFullscreen && { fontSize: 12 * scale }]} numberOfLines={1} ellipsizeMode="tail">{slot.doctor_department || 'General'}</Text>
             </View>
           </View>
-          {!isFullscreen && (
-            <View style={{flexDirection: 'row', gap: 6}}>
-              {palette.map(c => (
-                <TouchableOpacity 
-                  key={c} 
-                  onPress={() => updateDocColor(slot.doctor_id, c)}
-                  style={{width: 16, height: 16, borderRadius: 8, backgroundColor: c, borderWidth: docColor === c ? 2 : 0, borderColor: '#0f172a'}} 
-                />
-              ))}
-            </View>
-          )}
-          <TouchableOpacity onPress={() => toggleFullscreen(isFullscreen ? null : slot.id)} style={{ marginLeft: 10 }}>
-            {isFullscreen ? <Minimize2 color="#64748b" size={24} /> : <Maximize2 color="#64748b" size={20} />}
-          </TouchableOpacity>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+            {!isFullscreen && (
+              <View style={{flexDirection: 'row', gap: 4, backgroundColor: 'rgba(255,255,255,0.5)', padding: 4, borderRadius: 12}}>
+                {palette.map(c => (
+                  <TouchableOpacity 
+                    key={c} 
+                    onPress={() => updateDocColor(slot.doctor_id, c)}
+                    style={{width: 14, height: 14, borderRadius: 7, backgroundColor: c, borderWidth: docColor === c ? 2 : 0, borderColor: '#0f172a'}} 
+                  />
+                ))}
+              </View>
+            )}
+            <TouchableOpacity onPress={() => toggleFullscreen(isFullscreen ? null : slot.id)} style={{ marginLeft: 6 }}>
+              {isFullscreen ? <Minimize2 color="#ffffff" size={24} /> : <Maximize2 color="#ffffff" size={20} />}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -371,7 +395,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
       <View style={styles.currentSection}>
         <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale }]}>PRESENT CONSULTING PATIENT</Text>
         {current ? (
-          <View style={[styles.currentPatientBox, isFullscreen && { padding: 12 * padScale }, { borderColor: docColor + '40', backgroundColor: docColor + '10' }]}>
+          <Animated.View style={[styles.currentPatientBox, isFullscreen && { padding: 12 * padScale }, { borderColor: docColor + '40', backgroundColor: docColor + '10' }, { transform: [{ translateY: slideUpAnim }], opacity: fadeAnim }]}>
             <View style={{flex: 1}}>
               <Text style={[styles.currentToken, isFullscreen && { fontSize: 20 * scale }, { color: docColor }]}>#{current.token_number}</Text>
               <Text style={[styles.currentName, isFullscreen && { fontSize: 16 * scale }]}>{current.patient_name}</Text>
@@ -380,7 +404,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
               <CheckCircle color="white" size={14 * scale} />
               <Text style={[styles.completeBtnText, isFullscreen && { fontSize: 12 * scale }]}>Complete</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         ) : (
           <View style={styles.emptyBox}>
             <Text style={[styles.emptyText, isFullscreen && { fontSize: 14 * scale }]}>No patient in cabin</Text>
@@ -399,10 +423,6 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
               </View>
               <Text style={[styles.waitingName, isFullscreen && { fontSize: 15 * scale }]}>{nextPatient.patient_name}</Text>
             </View>
-            <TouchableOpacity style={[styles.callNextBtn, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 6 * scale }]} onPress={() => updateStatus(nextPatient.booking_id, 'Current')}>
-              <Text style={[styles.callNextBtnText, isFullscreen && { fontSize: 12 * scale }]}>Call Next</Text>
-              <ArrowRight color="white" size={14 * scale} />
-            </TouchableOpacity>
           </View>
         ) : (
           <Text style={[styles.emptyQueueText, isFullscreen && { fontSize: 14 * scale }]}>Queue is empty</Text>
@@ -415,14 +435,16 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
           <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale }]}>UPCOMING TOKENS ({upcomingQueue.length})</Text>
           <View style={[styles.creditsContainer, isFullscreen && { flex: 1, height: undefined, minHeight: 100 * scale }, { overflow: 'hidden' }]}>
             <Animated.View style={{ transform: [{ translateY: scrollAnim }] }}>
-              {upcomingQueue.map((w: any) => (
-                <View key={`1-${w.booking_id}`} style={[styles.creditItem, isFullscreen && { paddingVertical: 8 * scale }]}>
-                  <View style={[styles.waitingTokenBadge, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 4 * scale }, { backgroundColor: docColor + '20' }]}>
-                    <Text style={[styles.waitingTokenText, isFullscreen && { fontSize: 14 * scale }, { color: docColor }]}>#{w.token_number}</Text>
+              <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
+                {upcomingQueue.map((w: any) => (
+                  <View key={`1-${w.booking_id}`} style={[styles.creditItem, isFullscreen && { paddingVertical: 8 * scale }]}>
+                    <View style={[styles.waitingTokenBadge, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 4 * scale }, { backgroundColor: docColor + '20' }]}>
+                      <Text style={[styles.waitingTokenText, isFullscreen && { fontSize: 14 * scale }, { color: docColor }]}>#{w.token_number}</Text>
+                    </View>
+                    <Text style={[styles.waitingName, isFullscreen && { fontSize: 15 * scale }]}>{w.patient_name}</Text>
                   </View>
-                  <Text style={[styles.waitingName, isFullscreen && { fontSize: 15 * scale }]}>{w.patient_name}</Text>
-                </View>
-              ))}
+                ))}
+              </View>
               {upcomingQueue.map((w: any) => (
                 <View key={`2-${w.booking_id}`} style={[styles.creditItem, isFullscreen && { paddingVertical: 8 * scale }]}>
                   <View style={[styles.waitingTokenBadge, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 4 * scale }, { backgroundColor: docColor + '20' }]}>

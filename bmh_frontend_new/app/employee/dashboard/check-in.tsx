@@ -42,16 +42,27 @@ export default function CheckInPatientScreen() {
 
   const fetchQueues = async (empId: number) => {
     try {
-      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employee/doctor-slots-bookings/${empId}`);
-      if (res.data.success) {
-        setQueues(res.data.data);
-        
-        // Extract unique doctors for the filter dropdown
-        const docs = Array.from(new Set(res.data.data.map((q: any) => q.slot.doctor_name)));
-        setDoctorsList(docs);
-      }
+      const today = new Date().toISOString().split('T')[0];
+      const resSlots = await axios.get(`https://napi.bharatmedicalhallplus.com/doctors/slots`);
+      const mySlots = resSlots.data.data.filter((s: any) => 
+        s.date.startsWith(today)
+      );
+
+      const queueData = await Promise.all(mySlots.map(async (slot: any) => {
+        const resBookings = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${slot.id}`);
+        return {
+          slot,
+          bookings: resBookings.data.data
+        };
+      }));
+
+      setQueues(queueData);
+      
+      // Extract unique doctors for the filter dropdown
+      const docs = Array.from(new Set(queueData.map((q: any) => q.slot.doctor_name)));
+      setDoctorsList(docs);
     } catch (err) {
-      console.log("Error fetching queues:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }

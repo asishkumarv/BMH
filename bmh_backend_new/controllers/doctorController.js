@@ -221,6 +221,22 @@ exports.saveConsultation = async (req, res) => {
     // Optionally mark booking as Completed if not already
     await pool.query('UPDATE patient_bookings SET status = $1 WHERE id = $2 AND status != $1', ['Completed', booking_id]);
 
+    // Auto-advance queue: find the next 'Waiting' token and make it 'Current'
+    const bRes = await pool.query('SELECT slot_id FROM patient_bookings WHERE id = $1', [booking_id]);
+    if (bRes.rowCount > 0) {
+      const slot_id = bRes.rows[0].slot_id;
+      
+      const nextWaiting = await pool.query(`
+        SELECT id FROM patient_bookings 
+        WHERE slot_id = $1 AND status = 'Waiting'
+        ORDER BY token_number ASC LIMIT 1
+      `, [slot_id]);
+
+      if (nextWaiting.rowCount > 0) {
+        await pool.query('UPDATE patient_bookings SET status = $1 WHERE id = $2', ['Current', nextWaiting.rows[0].id]);
+      }
+    }
+
     res.json({ success: true, message: 'Consultation notes saved successfully' });
   } catch (error) {
     console.error('Save Consultation Error:', error);
