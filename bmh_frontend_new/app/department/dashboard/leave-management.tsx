@@ -77,23 +77,11 @@ export default function SubAdminLeaveManagement() {
 
   const fetchEmployees = async (dept: string, numId: string) => {
     try {
-      const [empRes, adminRes] = await Promise.all([
-        axios.get(`${API_URL}/employees`),
-        axios.get(`${API_URL}/admin/department-admins`).catch(() => ({ data: { data: [] } }))
-      ]);
+      const empRes = await axios.get(`${API_URL}/employees`);
       let allUsers: any[] = [];
       if (empRes.data && empRes.data.success) {
         const emps = (empRes.data.data || []).map((e: any) => ({ ...e, user_type: 'employee' }));
         allUsers = [...allUsers, ...emps];
-      }
-      if (adminRes.data && adminRes.data.data) {
-        const admins = (adminRes.data.data || []).map((a: any) => ({
-          ...a,
-          department: dept, // since they are in this dept
-          role: 'Sub Admin',
-          user_type: 'sub_admin'
-        }));
-        allUsers = [...allUsers, ...admins];
       }
       
       setEmployees(allUsers.filter((e: any) => 
@@ -128,7 +116,12 @@ export default function SubAdminLeaveManagement() {
       const res = await fetch(`${API_URL}/leave/settings?department=${dept}`);
       if (res.ok) {
         const data = await res.json();
-        setEmployeeSettings((data.employeeSettings || []).filter((r: any) => r.department && r.department.toLowerCase() === dept.toLowerCase()));
+        setEmployeeSettings((data.employeeSettings || []).filter((r: any) => 
+          r.department && 
+          r.department.toLowerCase() === dept.toLowerCase() &&
+          r.user_type !== 'sub_admin' &&
+          r.role !== 'Sub Admin'
+        ));
       }
     } catch (e) { console.error(e); }
   };
@@ -316,7 +309,7 @@ export default function SubAdminLeaveManagement() {
                   style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                 >
                   <option value="">Select an Employee...</option>
-                  {employees.map(e => <option key={`employee-${e.id}`} value={e.id}>{e.full_name} ({e.department || 'Dept'})</option>)}
+                  {employees.map(e => <option key={`employee-${e.id}`} value={e.id}>{e.full_name} ({e.role || 'Employee'})</option>)}
                 </select>
               ) : (
                 <View style={[styles.input, { paddingHorizontal: 0, justifyContent: 'center' }]}>
@@ -340,7 +333,7 @@ export default function SubAdminLeaveManagement() {
                     style={{ width: '100%', height: 50 }}
                   >
                     <Picker.Item label="Select an Employee..." value="" />
-                    {employees.map(e => <Picker.Item key={`employee-${e.id}`} label={`${e.full_name} (${e.department || 'Dept'})`} value={e.id.toString()} />)}
+                    {employees.map(e => <Picker.Item key={`employee-${e.id}`} label={`${e.full_name} (${e.role || 'Employee'})`} value={e.id.toString()} />)}
                   </Picker>
                 </View>
               )}

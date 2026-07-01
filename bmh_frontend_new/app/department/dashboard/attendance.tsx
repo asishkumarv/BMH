@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Download, MapPin, ChevronDown, ChevronUp, Clock, Coffee, CheckCircle, AlertTriangle } from 'lucide-react-native';
+import { Picker } from '@react-native-picker/picker';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -79,7 +80,18 @@ const Dropdown = ({ options, value, onChange }: any) => {
       </View>
     );
   }
-  return <Text>Filter</Text>;
+  return (
+    <View style={{ padding: 0, justifyContent: 'center', minWidth: 140, backgroundColor: '#f9fafb', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden' }}>
+      <Picker
+        selectedValue={value}
+        onValueChange={(itemValue) => onChange(itemValue)}
+      >
+        {options.map((o: any) => (
+          <Picker.Item key={o} label={o} value={o} />
+        ))}
+      </Picker>
+    </View>
+  );
 };
 
 function MyAttendanceHistory() {
@@ -226,14 +238,14 @@ function MyAttendanceHistory() {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 800, width: '100%' }]}>
+          <View style={[styles.table, { minWidth: 1000, width: '100%' }]}>
             <View style={styles.tableRowHeader}>
-              <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
-              <Text style={styles.tableCellHeader}>Date</Text>
-              <Text style={styles.tableCellHeader}>Check In</Text>
-              <Text style={styles.tableCellHeader}>Check Out</Text>
-              <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
-              <Text style={styles.tableCellHeader}>Status</Text>
+              <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
             </View>
           {filteredReports.length === 0 ? (
             <View style={{ padding: 20, alignItems: 'center' }}>
@@ -241,14 +253,14 @@ function MyAttendanceHistory() {
             </View>
           ) : filteredReports.map((r, i) => (
             <View key={i} style={styles.tableRow}>
-              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+              <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
               </View>
-              <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
-              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
-              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
-              <View style={[styles.tableCell, { flex: 2 }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCellView, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (
                     <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
@@ -259,7 +271,7 @@ function MyAttendanceHistory() {
                   <Text style={{ fontSize: 12, color: Colors.light.icon }}>-</Text>
                 )}
               </View>
-              <Text style={styles.tableCell}>{r.status}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
             </View>
           ))}
         </View>
@@ -407,8 +419,8 @@ export default function SubAdminAttendanceDashboard() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Text style={styles.header}>{userDept} Attendance</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 15 }}>
+        <Text style={[styles.header, { marginBottom: 0 }]}>{userDept} Attendance</Text>
         <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 4 }}>
           <TouchableOpacity 
             style={[styles.tabBtn, activeTab === 'department' && styles.tabBtnActive]} 
@@ -549,17 +561,17 @@ export default function SubAdminAttendanceDashboard() {
         </View>
         
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 800 }]}>
+          <View style={[styles.table, { minWidth: 1000 }]}>
             <View style={styles.tableRowHeader}>
-            <Text style={[styles.tableCellHeader, {flex: 0.5}]}>In</Text>
-            <Text style={styles.tableCellHeader}>Name</Text>
-            <Text style={styles.tableCellHeader}>Date</Text>
-            <Text style={styles.tableCellHeader}>Check In</Text>
-            <Text style={styles.tableCellHeader}>Check Out</Text>
-            <Text style={styles.tableCellHeader}>Deviation</Text>
-            <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
-            <Text style={styles.tableCellHeader}>Status</Text>
-          </View>
+            <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
+            <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
+            <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
+            </View>
           {reports.map((r, i) => (
             <TouchableOpacity 
               key={i} 
@@ -569,25 +581,25 @@ export default function SubAdminAttendanceDashboard() {
                 setModalVisible(true);
               }}
             >
-              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+              <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
               </View>
-              <View style={[styles.tableCell, { justifyContent: 'center' }]}>
-                <Text style={{fontWeight: '500', color: '#1f2937'}}>{r.full_name}</Text>
-                <Text style={{fontSize: 12, color: '#6b7280'}}>{r.email || 'N/A'}</Text>
-                <Text style={{fontSize: 12, color: '#6b7280'}}>{r.mobile || 'N/A'}</Text>
+              <View style={[styles.tableCellView, { width: 250 }]}>
+                <Text style={{fontWeight: '700', color: Colors.light.text}}>{r.full_name}</Text>
+                <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>
+                <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>
               </View>
-              <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
-              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-              <View style={[styles.tableCell, { justifyContent: 'center' }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCellView, { width: 120 }]}>
                 {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
                 {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
                 {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
-              <View style={[styles.tableCell, {flex: 1.5}]}>
+              <View style={[styles.tableCellView, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (
                     <Text key={bi} style={{fontSize: 11, color: '#6b7280'}}>
@@ -596,7 +608,7 @@ export default function SubAdminAttendanceDashboard() {
                   ))
                 ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
               </View>
-              <Text style={styles.tableCell}>{r.status}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
             </TouchableOpacity>
           ))}
           </View>
@@ -630,10 +642,11 @@ const styles = StyleSheet.create({
   exportButton: { flexDirection: 'row', backgroundColor: '#10b981', padding: 10, borderRadius: 6, alignItems: 'center' },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   table: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, overflow: 'hidden' },
-  tableRowHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  tableCellHeader: { flex: 1, fontWeight: 'bold', color: '#374151' },
-  tableCell: { flex: 1, color: '#4b5563', justifyContent: 'center' },
+  tableRowHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  tableCellHeader: { padding: 16, fontSize: 13, fontWeight: '700', color: Colors.light.icon, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', alignItems: 'center' },
+  tableCell: { padding: 16, fontSize: 14, color: Colors.light.text, fontWeight: '500' },
+  tableCellView: { padding: 16, justifyContent: 'center' },
   thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
   thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' },
   tabBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6 },

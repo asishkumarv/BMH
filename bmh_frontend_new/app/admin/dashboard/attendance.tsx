@@ -475,50 +475,51 @@ export default function AdminAttendanceScreen() {
         </View>
 
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 800 }]}>
+          <View style={[styles.table, { minWidth: 1200 }]}>
           <View style={styles.tableRowHeader}>
-            <Text style={[styles.tableCellHeader, {flex: 0.5}]}>In</Text>
-            <Text style={styles.tableCellHeader}>Name</Text>
-            <Text style={styles.tableCellHeader}>Dept</Text>
-            <Text style={styles.tableCellHeader}>Date</Text>
-            <Text style={styles.tableCellHeader}>Check In</Text>
-            <Text style={styles.tableCellHeader}>Check Out</Text>
-            <Text style={styles.tableCellHeader}>Deviation</Text>
-            <Text style={[styles.tableCellHeader, {flex: 1.5}]}>Breaks</Text>
-            <Text style={styles.tableCellHeader}>Status</Text>
-            <Text style={[styles.tableCellHeader, {flex: 0.8, textAlign: 'center'}]}>Action</Text>
+            <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
+            <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
+            <Text style={[styles.tableCellHeader, { width: 150 }]}>Dept</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
+            <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
+            <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Action</Text>
           </View>
           {filteredReports.map((r, i) => (
             <View key={i} style={styles.tableRow}>
-              <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+              <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
               </View>
-              <View style={[styles.tableCell, { justifyContent: 'center' }]}>
-                <Text style={{fontWeight: '500', color: '#1f2937'}}>{r.full_name}</Text>
-                <Text style={{fontSize: 12, color: '#6b7280'}}>{r.email || 'N/A'}</Text>
+              <View style={[styles.tableCellView, { width: 250 }]}>
+                <Text style={{fontWeight: '700', color: Colors.light.text}}>{r.full_name}</Text>
+                <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>
+                <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>
               </View>
-              <Text style={styles.tableCell}>{r.department}</Text>
-              <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
-              <Text style={styles.tableCell}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-              <Text style={styles.tableCell}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-              <View style={[styles.tableCell, { justifyContent: 'center' }]}>
+              <Text style={[styles.tableCell, { width: 150 }]}>{r.department}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCellView, { width: 120 }]}>
                 {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
                 {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
                 {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
-              <View style={[styles.tableCell, {flex: 1.5}]}>
+              <View style={[styles.tableCellView, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (
-                    <Text key={bi} style={{fontSize: 11, color: '#6b7280'}}>
+                    <Text key={bi} style={{fontSize: 11, color: Colors.light.icon}}>
                       {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </Text>
                   ))
-                ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
+                ) : <Text style={{fontSize: 11, color: Colors.light.icon}}>-</Text>}
               </View>
-              <Text style={styles.tableCell}>{r.status}</Text>
-              <View style={[styles.tableCell, { flex: 0.8, alignItems: 'center', gap: 5 }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
+              <View style={[styles.tableCellView, { width: 100, alignItems: 'center', gap: 5 }]}>
                 <TouchableOpacity style={styles.actionBtnText} onPress={() => openEditModal(r)}>
                   <Edit2 size={16} color={Colors.light.primary} />
                 </TouchableOpacity>
@@ -641,10 +642,11 @@ const styles = StyleSheet.create({
   settingsBtnText: { color: Colors.light.primary, fontWeight: '600' },
   buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   table: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, overflow: 'hidden' },
-  tableRowHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  tableRow: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderColor: '#e5e7eb', alignItems: 'center' },
-  tableCellHeader: { flex: 1, fontWeight: 'bold', color: '#374151' },
-  tableCell: { flex: 1, color: '#4b5563', justifyContent: 'center' },
+  tableRowHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  tableCellHeader: { padding: 16, fontSize: 13, fontWeight: '700', color: Colors.light.icon, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', alignItems: 'center' },
+  tableCell: { padding: 16, fontSize: 14, color: Colors.light.text, fontWeight: '500' },
+  tableCellView: { padding: 16, justifyContent: 'center' },
   actionBtnText: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 },
   userTypeToggle: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4 },
   toggleBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },

@@ -4,6 +4,8 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import axios from 'axios';
 import { CheckSquare, Plus, Clock, User } from 'lucide-react-native';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function DepartmentTasksScreen() {
   const { isDesktop } = useResponsive();
@@ -20,6 +22,9 @@ export default function DepartmentTasksScreen() {
   const [assigneeType, setAssigneeType] = useState('employee');
   const [assigneeId, setAssigneeId] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
 
   // Status update state
   const [statusNotes, setStatusNotes] = useState('');
@@ -157,12 +162,12 @@ export default function DepartmentTasksScreen() {
           <User color={Colors.light.icon} size={16} />
           <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} ({task.assignee_type.replace('_', ' ')} #{task.assignee_id}) - {task.department || 'N/A'}</Text>
         </View>
-        {task.due_date && (
+        {task.due_date ? (
           <View style={styles.metaItem}>
             <Clock color={Colors.light.icon} size={16} />
             <Text style={styles.metaText}>Due: {new Date(task.due_date).toLocaleString()}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {task.status === 'rejected' && (
@@ -303,31 +308,56 @@ export default function DepartmentTasksScreen() {
                   <>
                     <Text style={styles.label}>Select Assignee</Text>
                     <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                      <select 
-                        style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                        value={assigneeId}
-                        onChange={(e) => setAssigneeId(e.target.value)}
-                      >
-                        <option value="">-- Choose Assignee --</option>
-                        {globalUsers.map(e => (
-                          <option key={e.id} value={e.id}>{e.full_name} - {e.department} ({e.role})</option>
-                        ))}
-                      </select>
+                      {Platform.OS === 'web' ? (
+                        <select 
+                          style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                          value={assigneeId}
+                          onChange={(e) => setAssigneeId(e.target.value)}
+                        >
+                          <option value="">-- Choose Assignee --</option>
+                          {globalUsers.map(e => (
+                            <option key={e.id} value={e.id}>{e.full_name} - {e.department} ({e.role})</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Picker
+                          selectedValue={assigneeId}
+                          onValueChange={(val) => setAssigneeId(val)}
+                          style={{ width: '100%', height: 50 }}
+                        >
+                          <Picker.Item label="-- Choose Assignee --" value="" />
+                          {globalUsers.map(e => (
+                            <Picker.Item key={e.id} label={`${e.full_name} - ${e.department} (${e.role})`} value={e.id.toString()} />
+                          ))}
+                        </Picker>
+                      )}
                     </View>
                   </>
                 )}
 
                 <Text style={styles.label}>Priority</Text>
                 <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                  <select 
-                    style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="High">High</option>
-                  </select>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value)}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Moderate">Moderate</option>
+                      <option value="High">High</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={priority}
+                      onValueChange={(val) => setPriority(val)}
+                      style={{ width: '100%', height: 50 }}
+                    >
+                      <Picker.Item label="Low" value="Low" />
+                      <Picker.Item label="Moderate" value="Moderate" />
+                      <Picker.Item label="High" value="High" />
+                    </Picker>
+                  )}
                 </View>
 
                 <Text style={styles.label}>Due Date & Time</Text>
@@ -340,7 +370,42 @@ export default function DepartmentTasksScreen() {
                       onChange={(e) => setDueDate(e.target.value)}
                     />
                   ) : (
-                    <TextInput style={{ padding: 14, fontSize: 15, color: Colors.light.text }} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD HH:MM" />
+                    <>
+                      <Pressable onPress={() => { setTempDate(new Date()); setShowDatePicker(true); }} style={{ padding: 14 }}>
+                        <Text style={{ fontSize: 15, color: dueDate ? Colors.light.text : Colors.light.icon }}>
+                          {dueDate || 'Select Date and Time'}
+                        </Text>
+                      </Pressable>
+                      {showDatePicker && (
+                        <DateTimePicker
+                          value={tempDate}
+                          mode="date"
+                          display="default"
+                          onChange={(event: any, date?: Date) => {
+                            setShowDatePicker(false);
+                            if (date && event.type !== 'dismissed') {
+                              setTempDate(date);
+                              setShowTimePicker(true);
+                            }
+                          }}
+                        />
+                      )}
+                      {showTimePicker && (
+                        <DateTimePicker
+                          value={tempDate}
+                          mode="time"
+                          display="default"
+                          onChange={(event: any, date?: Date) => {
+                            setShowTimePicker(false);
+                            if (date && event.type !== 'dismissed') {
+                              setTempDate(date);
+                              const formattedStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                              setDueDate(formattedStr);
+                            }
+                          }}
+                        />
+                      )}
+                    </>
                   )}
                 </View>
               </View>

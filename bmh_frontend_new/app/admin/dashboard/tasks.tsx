@@ -4,6 +4,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import axios from 'axios';
 import { CheckSquare, Plus, Clock, User, CheckCircle, XCircle } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function AdminTasksScreen() {
   const { isDesktop } = useResponsive();
@@ -30,6 +31,10 @@ export default function AdminTasksScreen() {
   const [users, setUsers] = useState<{emps: any[], admins: any[], superAdmins: any[], depts: any[]}>({ emps: [], admins: [], superAdmins: [], depts: [] });
   const [globalUsers, setGlobalUsers] = useState<any[]>([]);
   const [priority, setPriority] = useState('Moderate');
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
 
   const adminUser = typeof window !== 'undefined' && localStorage.getItem('superAdminUser') 
     ? JSON.parse(localStorage.getItem('superAdminUser') || '{}') 
@@ -385,7 +390,42 @@ export default function AdminTasksScreen() {
                   onChange={(e) => setDueDate(e.target.value)}
                 />
               ) : (
-                <TextInput style={{ padding: 14, fontSize: 15, color: Colors.light.text }} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD HH:MM" />
+                <>
+                  <Pressable onPress={() => { setTempDate(new Date()); setShowDatePicker(true); }} style={{ padding: 14 }}>
+                    <Text style={{ fontSize: 15, color: dueDate ? Colors.light.text : Colors.light.icon }}>
+                      {dueDate || 'Select Date and Time'}
+                    </Text>
+                  </Pressable>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={tempDate}
+                      mode="date"
+                      display="default"
+                      onChange={(event: any, date?: Date) => {
+                        setShowDatePicker(false);
+                        if (date && event.type !== 'dismissed') {
+                          setTempDate(date);
+                          setShowTimePicker(true);
+                        }
+                      }}
+                    />
+                  )}
+                  {showTimePicker && (
+                    <DateTimePicker
+                      value={tempDate}
+                      mode="time"
+                      display="default"
+                      onChange={(event: any, date?: Date) => {
+                        setShowTimePicker(false);
+                        if (date && event.type !== 'dismissed') {
+                          setTempDate(date);
+                          const formattedStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                          setDueDate(formattedStr);
+                        }
+                      }}
+                    />
+                  )}
+                </>
               )}
             </View>
               </View>
