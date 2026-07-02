@@ -189,22 +189,28 @@ exports.getDepartmentPeers = async (req, res) => {
 };
 
 exports.getAllUsers = async (req, res) => {
-  try {
-    const empResult = await pool.query(
-      "SELECT id::text as id, full_name, email, role, department, 'employee' as type FROM employees WHERE status = 'approved'"
-    );
+    try {
+      const empResult = await pool.query(
+        "SELECT id::text as id, full_name, email, role, department, 'employee' as type FROM employees WHERE status = 'approved'"
+      );
+  
+      const adminResult = await pool.query(
+        `SELECT 'SA-' || da.id as id, da.full_name, da.email, 'subadmin' as role, d.name as department, 'department_admin' as type
+         FROM department_admins da
+         JOIN departments d ON da.department_id = d.id
+         WHERE da.status = 'approved'`
+      );
 
-    const adminResult = await pool.query(
-      `SELECT 'SA-' || da.id as id, da.full_name, da.email, 'subadmin' as role, d.name as department, 'department_admin' as type
-       FROM department_admins da
-       JOIN departments d ON da.department_id = d.id
-       WHERE da.status = 'approved'`
-    );
-
-    const users = [...empResult.rows, ...adminResult.rows];
-
-    res.json({ success: true, data: users });
-  } catch (error) {
+      const doctorResult = await pool.query(
+        `SELECT 'DOC-' || id as id, full_name, email, 'doctor' as role, department, 'doctor' as type
+         FROM doctors
+         WHERE status = 'Approved'`
+      );
+  
+      const users = [...empResult.rows, ...adminResult.rows, ...doctorResult.rows];
+  
+      res.json({ success: true, data: users });
+    } catch (error) {
     console.error('Error fetching all users:', error);
     res.status(500).json({ success: false, message: 'Server error fetching all users' });
   }

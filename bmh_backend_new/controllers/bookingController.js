@@ -101,6 +101,8 @@ exports.createBooking = async (req, res) => {
           let refUserId = null;
           if (String(reference_id).startsWith('SA-')) {
             refUserId = parseInt(String(reference_id).replace('SA-', ''), 10);
+          } else if (String(reference_id).startsWith('DOC-')) {
+            refUserId = parseInt(String(reference_id).replace('DOC-', ''), 10);
           } else {
             refUserId = parseInt(reference_id, 10);
           }
