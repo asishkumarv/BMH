@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../../constants/Colors';
@@ -366,36 +366,37 @@ export default function DoctorManagement() {
       </View>
 
       {showAddForm ? (
-        <ScrollView style={styles.card}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView style={styles.card} contentContainerStyle={{ padding: 24 }}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setShowAddForm(false)}>
             <Text style={styles.backBtnText}>← Back to List</Text>
           </TouchableOpacity>
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Create New Doctor Profile</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Full Name *</Text>
               <TextInput style={styles.input} value={newDoctor.full_name} onChangeText={(t) => setNewDoctor({...newDoctor, full_name: t})} placeholder="Dr. John Doe" />
             </View>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Email *</Text>
               <TextInput style={styles.input} value={newDoctor.email} onChangeText={(t) => setNewDoctor({...newDoctor, email: t})} placeholder="doctor@bmh.com" keyboardType="email-address" autoCapitalize="none" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Mobile</Text>
               <TextInput style={styles.input} value={newDoctor.mobile} onChangeText={(t) => setNewDoctor({...newDoctor, mobile: t})} placeholder="10-digit number" keyboardType="phone-pad" />
             </View>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Password *</Text>
               <TextInput style={styles.input} value={newDoctor.password} onChangeText={(t) => setNewDoctor({...newDoctor, password: t})} placeholder="Auto-gen or type" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Department *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -410,18 +411,18 @@ export default function DoctorManagement() {
                 </Picker>
               </View>
             </View>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Role</Text>
               <TextInput style={styles.input} value={newDoctor.role} onChangeText={(t) => setNewDoctor({...newDoctor, role: t})} placeholder="Doctor / Head of Dept" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Experience (Years)</Text>
               <TextInput style={styles.input} value={newDoctor.experience} onChangeText={(t) => setNewDoctor({...newDoctor, experience: t})} placeholder="e.g. 5" keyboardType="numeric" />
             </View>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Gender</Text>
               <TextInput style={styles.input} value={newDoctor.gender} onChangeText={(t) => setNewDoctor({...newDoctor, gender: t})} placeholder="Male / Female" />
             </View>
@@ -434,15 +435,17 @@ export default function DoctorManagement() {
             {adding ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Create Doctor</Text>}
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       ) : showAddSlotForm ? (
-        <ScrollView style={styles.card}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView style={styles.card} contentContainerStyle={{ padding: 24 }}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setShowAddSlotForm(false)}>
             <Text style={styles.backBtnText}>← Back to List</Text>
           </TouchableOpacity>
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Configure Doctor Slot</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Department</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -460,7 +463,7 @@ export default function DoctorManagement() {
                 </Picker>
               </View>
             </View>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Select Doctor *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -479,7 +482,7 @@ export default function DoctorManagement() {
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Date (YYYY-MM-DD) *</Text>
               {Platform.OS === 'web' ? (
                 <input 
@@ -509,7 +512,7 @@ export default function DoctorManagement() {
                 </>
               )}
             </View>
-            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Assigned Peon (Optional)</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -542,7 +545,7 @@ export default function DoctorManagement() {
               </View>
 
               <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>Start Time *</Text>
                   <View style={styles.pickerContainer}>
                     <Picker
@@ -561,7 +564,7 @@ export default function DoctorManagement() {
                     </Picker>
                   </View>
                 </View>
-                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>End Time *</Text>
                   <View style={styles.pickerContainer}>
                     <Picker
@@ -583,7 +586,7 @@ export default function DoctorManagement() {
               </View>
 
               <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>Total Tokens *</Text>
                   <TextInput style={styles.input} value={config.total_tokens} onChangeText={(t) => {
                     const newConfigs = [...newSlot.slotConfigs];
@@ -591,7 +594,7 @@ export default function DoctorManagement() {
                     setNewSlot({...newSlot, slotConfigs: newConfigs});
                   }} placeholder="e.g. 20" keyboardType="numeric" />
                 </View>
-                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>Fee (₹) *</Text>
                   <TextInput style={styles.input} value={config.fee} onChangeText={(t) => {
                     const newConfigs = [...newSlot.slotConfigs];
@@ -613,6 +616,7 @@ export default function DoctorManagement() {
             {addingSlot ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Create Slot</Text>}
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       ) : (
         <>
           <View style={styles.tabContainer}>
@@ -917,26 +921,26 @@ export default function DoctorManagement() {
             </View>
             {editDoctor && (
               <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-                <View style={styles.formGroup}>
+                <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>Full Name *</Text>
                   <TextInput style={styles.input} value={editDoctor.full_name} onChangeText={(t) => setEditDoctor({...editDoctor, full_name: t})} />
                 </View>
-                <View style={styles.formRow}>
-                  <View style={styles.formGroup}>
+                <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Email</Text>
                     <TextInput style={styles.input} value={editDoctor.email} onChangeText={(t) => setEditDoctor({...editDoctor, email: t})} keyboardType="email-address" />
                   </View>
-                  <View style={styles.formGroup}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Phone *</Text>
                     <TextInput style={styles.input} value={editDoctor.phone_number} onChangeText={(t) => setEditDoctor({...editDoctor, phone_number: t})} keyboardType="phone-pad" />
                   </View>
                 </View>
-                <View style={styles.formRow}>
-                  <View style={styles.formGroup}>
+                <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Department</Text>
                     <TextInput style={styles.input} value={editDoctor.department} onChangeText={(t) => setEditDoctor({...editDoctor, department: t})} />
                   </View>
-                  <View style={styles.formGroup}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Experience (Years)</Text>
                     <TextInput style={styles.input} value={String(editDoctor.experience || '')} onChangeText={(t) => setEditDoctor({...editDoctor, experience: parseInt(t) || 0})} keyboardType="numeric" />
                   </View>
@@ -962,7 +966,7 @@ export default function DoctorManagement() {
               </TouchableOpacity>
             </View>
             <View style={styles.modalForm}>
-              <View style={styles.formGroup}>
+              <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                 <Text style={styles.label}>Select Peon (Optional)</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
@@ -1011,7 +1015,7 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 16 },
   backBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 16 },
   formRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  formCol: { flex: 1 },
+  formCol: { },
   label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
   input: { 
     backgroundColor: '#f8fafc', 
@@ -1021,7 +1025,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, 
     fontSize: 14, 
     color: '#1e293b',
-    height: 50,
+    minHeight: 50,
+    justifyContent: 'center',
   },
   pickerContainer: { 
     backgroundColor: '#f8fafc', 
@@ -1065,7 +1070,7 @@ const styles = StyleSheet.create({
   modalHeaderContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e293b' },
   modalForm: { marginTop: 10 },
-  formGroup: { marginBottom: 16, flex: 1 },
+  formGroup: { marginBottom: 16 },
   submitBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   submitBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image, Platform } from 'react-native';
-import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search } from 'lucide-react-native';
+import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search, User } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -147,11 +147,12 @@ export default function PatientBooking() {
     setBulkOriginalSlot(slot);
     setRescheduleLoading(true);
     try {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 1);
-      const url = `https://napi.bharatmedicalhallplus.com/doctors/slots?doctor_id=${slot.doctor_id}&date=${futureDate.toISOString().split('T')[0]}`;
+      const url = `https://napi.bharatmedicalhallplus.com/doctors/slots?doctor_id=${slot.doctor_id}`;
       const res = await axios.get(url);
-      setRescheduleSlots(res.data.data || []);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const validSlots = (res.data.data || []).filter((s: any) => new Date(s.date) >= today && s.id !== slot.id);
+      setRescheduleSlots(validSlots);
     } catch(e) {
       console.error(e);
     } finally {

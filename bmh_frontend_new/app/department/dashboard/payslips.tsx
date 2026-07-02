@@ -304,7 +304,7 @@ export default function Payslips() {
                            <>
                              <View style={styles.psRow}>
                                <Text style={styles.psLabel}>Extra Leave Deduction:</Text>
-                               <View style={{ alignItems: 'flex-end' }}>
+                               <View style={{ alignItems: 'flex-end', flex: 1, paddingLeft: 16 }}>
                                  <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{d.leaves?.total_deduction || 0}</Text>
                                  <Text style={styles.psSubtext}>
                                    {d.leaves?.total_taken} taken, {d.leaves?.free_limit} free, {d.leaves?.penalized} penalized @ ₹{d.leaves?.penalty_per_day}/day
@@ -314,7 +314,7 @@ export default function Payslips() {
 
                              <View style={styles.psRow}>
                                <Text style={styles.psLabel}>Late Check-in Deduction:</Text>
-                               <View style={{ alignItems: 'flex-end' }}>
+                               <View style={{ alignItems: 'flex-end', flex: 1, paddingLeft: 16 }}>
                                  <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{d.late_checkins?.total_deduction || 0}</Text>
                                  <Text style={styles.psSubtext}>
                                    {d.late_checkins?.total_occurrences} late, {d.late_checkins?.free_limit} free, {d.late_checkins?.penalized} penalized @ ₹{d.late_checkins?.penalty_per_instance}/instance
@@ -324,7 +324,7 @@ export default function Payslips() {
 
                              <View style={styles.psRow}>
                                <Text style={styles.psLabel}>Early Check-out Deduction:</Text>
-                               <View style={{ alignItems: 'flex-end' }}>
+                               <View style={{ alignItems: 'flex-end', flex: 1, paddingLeft: 16 }}>
                                  <Text style={[styles.psValue, { color: Colors.light.error }]}>- ₹{d.early_checkouts?.total_deduction || 0}</Text>
                                  <Text style={styles.psSubtext}>
                                    {d.early_checkouts?.total_occurrences} early, {d.early_checkouts?.free_limit} free, {d.early_checkouts?.penalized} penalized @ ₹{d.early_checkouts?.penalty_per_instance}/instance
@@ -333,7 +333,7 @@ export default function Payslips() {
                              </View>
                              <View style={styles.psRow}>
                                <Text style={styles.psLabel}>Appreciation / Extra Work:</Text>
-                               <View style={{ alignItems: 'flex-end' }}>
+                               <View style={{ alignItems: 'flex-end', flex: 1, paddingLeft: 16 }}>
                                  <Text style={[styles.psValue, { color: '#10B981' }]}>+ ₹{parseFloat(ps.appreciation_amount || 0) + parseFloat(ps.extra_working_amount || 0)}</Text>
                                  <Text style={styles.psSubtext}>Appreciation: ₹{ps.appreciation_amount || 0}, Extra: ₹{ps.extra_working_amount || 0}</Text>
                                </View>
@@ -399,11 +399,11 @@ const styles = StyleSheet.create({
   downloadBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   downloadBtnText: { color: 'white', marginLeft: 6, fontSize: 13, fontWeight: '700' },
   psDetails: { gap: 12 },
-  psRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  psRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'nowrap', marginBottom: 8 },
   psLabel: { fontSize: 15, color: Colors.light.icon, fontWeight: '500' },
   psValue: { fontSize: 15, fontWeight: '700', color: Colors.light.text },
   psTotalRow: { marginTop: 8, paddingTop: 16, borderTopWidth: 2, borderTopColor: Colors.light.background },
   psTotalLabel: { fontSize: 16, fontWeight: '800', color: Colors.light.text },
   psTotalValue: { fontSize: 24, fontWeight: '800', color: Colors.light.primary },
-  psSubtext: { fontSize: 12, color: Colors.light.icon, marginTop: 4 },
+  psSubtext: { fontSize: 12, color: Colors.light.icon, marginTop: 4, textAlign: 'right', flexWrap: 'wrap' },
 });

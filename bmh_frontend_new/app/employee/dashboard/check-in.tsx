@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Search, UserCheck, Stethoscope, Activity } from 'lucide-react-native';
@@ -131,16 +132,18 @@ export default function CheckInPatientScreen() {
 
         <View style={styles.filterBox}>
           <Stethoscope color="#94a3b8" size={20} />
-          <select 
-            style={Object.assign({}, styles.selectInput, { border: 'none', outline: 'none' }) as any}
-            value={doctorFilter}
-            onChange={(e: any) => setDoctorFilter(e.target.value)}
-          >
-            <option value="">All Doctors</option>
-            {doctorsList.map((doc: any) => (
-              <option key={doc} value={doc}>Dr. {doc}</option>
-            ))}
-          </select>
+          <View style={{flex: 1, justifyContent: 'center'}}>
+            <Picker 
+              selectedValue={doctorFilter}
+              onValueChange={(itemValue) => setDoctorFilter(itemValue)}
+              style={styles.selectInput}
+            >
+              <Picker.Item label="All Doctors" value="" />
+              {doctorsList.map((doc: any) => (
+                <Picker.Item key={doc} label={`Dr. ${doc}`} value={doc} />
+              ))}
+            </Picker>
+          </View>
         </View>
       </View>
 

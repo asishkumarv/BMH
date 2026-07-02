@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -829,26 +829,26 @@ export default function DepartmentDoctorManagement() {
             </View>
             {editDoctor && (
               <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-                <View style={styles.formGroup}>
+                <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>Full Name *</Text>
                   <TextInput style={styles.input} value={editDoctor.full_name} onChangeText={(t) => setEditDoctor({...editDoctor, full_name: t})} />
                 </View>
-                <View style={styles.formRow}>
-                  <View style={styles.formGroup}>
+                <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Email</Text>
                     <TextInput style={styles.input} value={editDoctor.email} onChangeText={(t) => setEditDoctor({...editDoctor, email: t})} keyboardType="email-address" />
                   </View>
-                  <View style={styles.formGroup}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Phone *</Text>
                     <TextInput style={styles.input} value={editDoctor.phone_number} onChangeText={(t) => setEditDoctor({...editDoctor, phone_number: t})} keyboardType="phone-pad" />
                   </View>
                 </View>
-                <View style={styles.formRow}>
-                  <View style={styles.formGroup}>
+                <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Department</Text>
                     <TextInput style={styles.input} value={editDoctor.department} onChangeText={(t) => setEditDoctor({...editDoctor, department: t})} />
                   </View>
-                  <View style={styles.formGroup}>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Experience (Years)</Text>
                     <TextInput style={styles.input} value={String(editDoctor.experience || '')} onChangeText={(t) => setEditDoctor({...editDoctor, experience: parseInt(t) || 0})} keyboardType="numeric" />
                   </View>
@@ -888,7 +888,7 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 16 },
   backBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 16 },
   formRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  formCol: { flex: 1 },
+  formCol: { },
   label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
   input: { 
     backgroundColor: '#f8fafc', 
@@ -898,7 +898,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, 
     fontSize: 14, 
     color: '#1e293b',
-    height: 50,
+    minHeight: 50,
+    justifyContent: 'center',
   },
   pickerContainer: { 
     backgroundColor: '#f8fafc', 
@@ -942,7 +943,7 @@ const styles = StyleSheet.create({
   modalHeaderContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e293b' },
   modalForm: { marginTop: 10 },
-  formGroup: { marginBottom: 16, flex: 1 },
+  formGroup: { marginBottom: 16 },
   submitBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   submitBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
 
