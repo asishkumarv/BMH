@@ -172,7 +172,7 @@ exports.createSlot = async (req, res) => {
     await pool.query(
       `INSERT INTO doctor_slots (doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id]
+      [doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id || null]
     );
     res.json({ success: true, message: 'Slot created successfully' });
   } catch (error) {
