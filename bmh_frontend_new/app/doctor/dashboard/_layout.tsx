@@ -39,6 +39,7 @@ export default function DoctorLayout() {
     { name: 'Dashboard', icon: LayoutDashboard, route: '/doctor/dashboard' },
     { name: 'My Schedule', icon: Calendar, route: '/doctor/dashboard/schedule' },
     { name: 'Patients', icon: Users, route: '/doctor/dashboard/patients' },
+    { name: 'Wallet', icon: Activity, route: '/doctor/dashboard/wallet' },
   ];
 
   return (

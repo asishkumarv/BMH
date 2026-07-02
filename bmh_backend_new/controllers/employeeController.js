@@ -206,8 +206,13 @@ exports.getAllUsers = async (req, res) => {
          FROM doctors
          WHERE status = 'Approved'`
       );
+
+      const superAdminResult = await pool.query(
+        `SELECT 'ADMIN-' || id as id, full_name, email, 'super_admin' as role, 'Management' as department, 'super_admin' as type
+         FROM super_admins`
+      );
   
-      const users = [...empResult.rows, ...adminResult.rows, ...doctorResult.rows];
+      const users = [...empResult.rows, ...adminResult.rows, ...doctorResult.rows, ...superAdminResult.rows];
   
       res.json({ success: true, data: users });
     } catch (error) {

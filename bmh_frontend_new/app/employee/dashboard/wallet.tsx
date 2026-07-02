@@ -87,8 +87,12 @@ export default function EmployeeWalletScreen() {
 
   const fetchPeers = async (id: string) => {
     try {
-      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/peers/${id}`);
-      if (res.data.success) setPeers(res.data.data);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/all-users`);
+      if (res.data.success) {
+        // filter out self
+        const filtered = res.data.data.filter((p: any) => p.id !== id);
+        setPeers(filtered);
+      }
     } catch (error) {}
   };
 

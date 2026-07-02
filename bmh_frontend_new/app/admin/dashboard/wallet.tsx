@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Alert, ScrollView, Modal, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users } from 'lucide-react-native';
+import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users, HandCoins } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
+type Peer = { id: string; full_name: string; };
 type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; };
 
 export default function AdminWalletScreen() {
@@ -17,6 +18,12 @@ export default function AdminWalletScreen() {
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminId, setAdminId] = useState<string | null>(null);
+
+  const [handoverModalVisible, setHandoverModalVisible] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [selectedPeerId, setSelectedPeerId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [peers, setPeers] = useState<Peer[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -33,6 +40,7 @@ export default function AdminWalletScreen() {
           const aId = `ADMIN-${user.id}`;
           setAdminId(aId);
           fetchData(aId);
+          fetchPeers(aId);
         } else {
           setLoading(false);
         }
@@ -43,6 +51,15 @@ export default function AdminWalletScreen() {
     };
     init();
   }, []);
+
+  const fetchPeers = async (id: string) => {
+    try {
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/all-users`);
+      if (res.data.success) {
+        setPeers(res.data.data.filter((p: any) => p.id !== id));
+      }
+    } catch (error) {}
+  };
 
   const fetchData = async (id: string) => {
     setLoading(true);
@@ -73,6 +90,32 @@ export default function AdminWalletScreen() {
     }
   };
 
+  const handleRequestHandover = async () => {
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return Alert.alert('Error', 'Invalid amount');
+    if (Number(amount) > Number(cashInHand)) return Alert.alert('Error', 'Insufficient cash in hand');
+    if (!selectedPeerId) return Alert.alert('Error', 'Please select someone to hand over to');
+    if (!adminId) return;
+
+    setSubmitting(true);
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/request', {
+        from_employee_id: adminId,
+        to_employee_id: selectedPeerId,
+        amount: Number(amount)
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Handover requested successfully');
+        setHandoverModalVisible(false);
+        setAmount(''); setSelectedPeerId('');
+        fetchData(adminId);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to request handover');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleAcceptHandover = async (id: string, action: 'Accepted' | 'Rejected') => {
     try {
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/accept', { id, action });
@@ -94,6 +137,12 @@ export default function AdminWalletScreen() {
         <View>
           <Text style={styles.title}>Super Admin Vault</Text>
           <Text style={styles.subtitle}>Manage cash handed over from departments and track revenue.</Text>
+        </View>
+        <View style={styles.headerButtons}>
+          <Pressable style={[styles.primaryBtn, {backgroundColor: '#16a34a'}]} onPress={() => {setAmount(cashInHand); setHandoverModalVisible(true)}}>
+            <HandCoins size={18} color="#FFF" />
+            <Text style={styles.primaryBtnText}>Handover Cash</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -210,6 +259,45 @@ export default function AdminWalletScreen() {
 
         </ScrollView>
       )}
+
+      <Modal visible={handoverModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, !isDesktop && styles.modalContentMobile]}>
+            <Text style={styles.modalTitle}>Handover Cash</Text>
+            
+            <Text style={styles.inputLabel}>Select Person</Text>
+            <View style={styles.peerList}>
+              {peers.map(p => (
+                <Pressable 
+                  key={p.id} 
+                  style={[styles.peerItem, selectedPeerId === p.id && styles.peerItemActive]}
+                  onPress={() => setSelectedPeerId(p.id)}
+                >
+                  <Text style={[styles.peerName, selectedPeerId === p.id && styles.peerNameActive]}>{p.full_name}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Amount to Handover</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 500"
+              keyboardType="numeric"
+              value={amount}
+              onChangeText={setAmount}
+            />
+
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => {setHandoverModalVisible(false); setSelectedPeerId('');}}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.modalSubmitBtn, submitting && styles.btnDisabled]} onPress={handleRequestHandover} disabled={submitting}>
+                {submitting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.modalSubmitText}>Submit</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -242,5 +330,25 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 12, color: Colors.light.icon, marginTop: 4 },
   historyAmount: { fontSize: 16, fontWeight: '700' },
   tag: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginTop: 8 },
-  tagText: { fontSize: 12, color: Colors.light.icon, fontWeight: '600' }
+  tagText: { fontSize: 12, color: Colors.light.icon, fontWeight: '600' },
+  headerButtons: { flexDirection: 'row', gap: 12 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 8 },
+  primaryBtnText: { color: '#FFF', fontWeight: '600', fontSize: 16 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  modalContent: { backgroundColor: '#FFF', padding: 32, borderRadius: 24, width: '100%', maxWidth: 500 },
+  modalContentMobile: { padding: 24 },
+  modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.light.text, marginBottom: 24 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: Colors.light.text, marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 12, padding: 16, fontSize: 16, marginBottom: 24 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
+  modalCancelBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  modalCancelText: { color: Colors.light.icon, fontWeight: '600', fontSize: 16 },
+  modalSubmitBtn: { backgroundColor: Colors.light.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  modalSubmitText: { color: '#FFF', fontWeight: '600', fontSize: 16 },
+  btnDisabled: { opacity: 0.7 },
+  peerList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
+  peerItem: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: 'transparent' },
+  peerItemActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  peerName: { color: '#64748B', fontWeight: '500' },
+  peerNameActive: { color: '#2563EB', fontWeight: '600' }
 });

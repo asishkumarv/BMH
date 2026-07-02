@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
 import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins } from 'lucide-react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -11,14 +11,10 @@ type Handover = { id: string; from_name: string; to_name: string; from_employee_
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
 type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
 
-export default function SubAdminWalletScreen() {
+export default function DoctorWalletScreen() {
   const { isDesktop } = useResponsive();
-  const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Cash');
+  const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Allowance');
 
-  // Allowances
-  const [balance, setBalance] = useState('0.00');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  
   // Cash
   const [cashInHand, setCashInHand] = useState('0.00');
   const [handovers, setHandovers] = useState<Handover[]>([]);
@@ -27,7 +23,6 @@ export default function SubAdminWalletScreen() {
 
   const [loading, setLoading] = useState(true);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
-  const [departmentId, setDepartmentId] = useState<string | null>(null);
 
   // Modals
   const [usageModalVisible, setUsageModalVisible] = useState(false);
@@ -41,61 +36,46 @@ export default function SubAdminWalletScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
-      let empId = null;
-      let deptId = null;
-      let userStr = null;
-      if (Platform.OS === 'web') {
-        userStr = localStorage.getItem('subAdminUser');
-      } else {
-        userStr = await AsyncStorage.getItem('subAdminUser');
-      }
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        empId = `SA-${user.id}`;
-        deptId = user.department_id;
-        setEmployeeId(empId);
-        setDepartmentId(deptId);
-      }
-      if (empId) {
-        fetchData(empId, deptId);
-        fetchPeers(empId);
-        fetchBookings(empId);
-      } else {
-        setLoading(false);
+    const loadUser = async () => {
+      try {
+        let userStr = null;
+        if (Platform.OS === 'web') {
+          userStr = localStorage.getItem('userData');
+        } else {
+          userStr = await AsyncStorage.getItem('userData');
+        }
+        let empId = null;
+        
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          empId = `DOC-${user.id}`;
+          setEmployeeId(empId);
+        }
+        if (empId) {
+          fetchData(empId);
+          fetchPeers(empId);
+          fetchBookings(empId);
+        }
+      } catch (error) {
+        console.error(error);
       }
     };
-    init();
+    loadUser();
   }, []);
 
-  const [walletBalances, setWalletBalances] = useState<any[]>([]);
-
-  const fetchData = async (id: string, deptId: any) => {
+  const fetchData = async (id: string) => {
     setLoading(true);
     try {
-      const reqs = [
+      const [walletRes, handoversRes] = await Promise.all([
         axios.get(`https://napi.bharatmedicalhallplus.com/wallet/${id}`),
         axios.get(`https://napi.bharatmedicalhallplus.com/wallet/handovers/${id}`)
-      ];
-      if (deptId) {
-        reqs.push(axios.get(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${deptId}/wallet-balances`));
-      }
-
-      const results = await Promise.all(reqs);
-      const walletRes = results[0];
-      const handoversRes = results[1];
-      const balancesRes = results[2];
+      ]);
       
       if (walletRes.data.success) {
-        setBalance(walletRes.data.data.wallet?.balance || '0.00');
         setCashInHand(walletRes.data.data.wallet?.cash_in_hand || '0.00');
-        setTransactions(walletRes.data.data.transactions || []);
       }
       if (handoversRes.data.success) {
         setHandovers(handoversRes.data.data || []);
-      }
-      if (balancesRes && balancesRes.data.success) {
-        setWalletBalances(balancesRes.data.data || []);
       }
     } catch (error) {
       console.error('Error fetching wallet:', error);
@@ -134,7 +114,7 @@ export default function SubAdminWalletScreen() {
         Alert.alert('Success', 'Usage logged successfully');
         setUsageModalVisible(false);
         setAmount(''); setNote('');
-        fetchData(employeeId, departmentId);
+        fetchData(employeeId);
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to log usage');
@@ -154,7 +134,7 @@ export default function SubAdminWalletScreen() {
         Alert.alert('Success', 'Allocation request sent');
         setRequestModalVisible(false);
         setAmount(''); setNote('');
-        fetchData(employeeId, departmentId);
+        fetchData(employeeId);
       }
     } catch (error: any) {
       Alert.alert('Error', 'Failed to request allocation');
@@ -167,7 +147,7 @@ export default function SubAdminWalletScreen() {
     if (!employeeId) return;
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/wallet/transaction/${txId}`, { status: 'completed' });
-      if (res.data.success) fetchData(employeeId, departmentId);
+      if (res.data.success) fetchData(employeeId);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to accept allocation');
     }
@@ -190,7 +170,7 @@ export default function SubAdminWalletScreen() {
         Alert.alert('Success', 'Handover requested successfully');
         setHandoverModalVisible(false);
         setAmount(''); setSelectedPeerId('');
-        fetchData(employeeId, departmentId);
+        fetchData(employeeId);
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to request handover');
@@ -204,7 +184,7 @@ export default function SubAdminWalletScreen() {
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/accept', { id, action });
       if (res.data.success) {
         Alert.alert('Success', `Handover ${action.toLowerCase()}`);
-        if(employeeId) fetchData(employeeId, departmentId);
+        if(employeeId) fetchData(employeeId);
       }
     } catch (error) {
       Alert.alert('Error', `Failed to ${action.toLowerCase()}`);
@@ -223,17 +203,8 @@ export default function SubAdminWalletScreen() {
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>My Wallet</Text>
-          <Text style={styles.subtitle}>Manage allowances and collected cash.</Text>
+          <Text style={styles.subtitle}>Track cash handovers.</Text>
         </View>
-        <View style={styles.headerButtons}>
-          <Pressable style={[styles.tabBtn, activeTab === 'Allowance' && styles.tabBtnActive]} onPress={() => setActiveTab('Allowance')}>
-            <Wallet size={18} color={activeTab === 'Allowance' ? '#FFF' : Colors.light.primary} />
-            <Text style={[styles.tabBtnText, activeTab === 'Allowance' && styles.tabBtnTextActive]}>Allowances</Text>
-          </Pressable>
-          <Pressable style={[styles.tabBtn, activeTab === 'Cash' && styles.tabBtnActive]} onPress={() => setActiveTab('Cash')}>
-            <Banknote size={18} color={activeTab === 'Cash' ? '#FFF' : Colors.light.primary} />
-            <Text style={[styles.tabBtnText, activeTab === 'Cash' && styles.tabBtnTextActive]}>Cash Collections</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -266,73 +237,7 @@ export default function SubAdminWalletScreen() {
             </View>
           )}
 
-          {activeTab === 'Allowance' ? (
-            <>
-              <View style={[styles.balanceCard, !isDesktop && { flexDirection: 'column', alignItems: 'center' }]}>
-                <View style={styles.balanceIconWrapper}>
-                  <Wallet size={32} color={Colors.light.primary} />
-                </View>
-                <View style={[{flex: 1}, !isDesktop && { alignItems: 'center' }]}>
-                  <Text style={styles.balanceLabel}>Current Allowance Balance</Text>
-                  <Text style={styles.balanceAmount}>₹{balance}</Text>
-                </View>
-                <View style={[{flexDirection: 'row', gap: 8}, !isDesktop && { width: '100%', justifyContent: 'center' }]}>
-                   <Pressable style={[styles.secondaryBtn, !isDesktop && {flex: 1, justifyContent: 'center'}]} onPress={() => setRequestModalVisible(true)}>
-                     <Text style={styles.secondaryBtnText}>Request Funds</Text>
-                   </Pressable>
-                   <Pressable style={[styles.primaryBtn, !isDesktop && {flex: 1, justifyContent: 'center'}]} onPress={() => setUsageModalVisible(true)}>
-                     <Text style={styles.primaryBtnText}>Log Usage</Text>
-                   </Pressable>
-                </View>
-              </View>
-
-              {pendingAllocations.length > 0 && (
-                <View style={styles.pendingSection}>
-                  <Text style={styles.sectionTitle}>Pending Allocations</Text>
-                  {pendingAllocations.map(tx => (
-                    <View key={tx.id} style={styles.pendingCard}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.pendingAmount}>₹{tx.amount}</Text>
-                        {tx.note ? <Text style={styles.pendingNote}>Note: {tx.note}</Text> : null}
-                        <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
-                      </View>
-                      <Pressable style={styles.acceptBtn} onPress={() => handleAcceptAllocation(tx.id)}>
-                        <CheckCircle2 size={16} color="#FFF" />
-                        <Text style={styles.acceptBtnText}>Accept</Text>
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>Transaction History</Text>
-              {transactions.map(tx => (
-                <View key={tx.id} style={styles.txCard}>
-                  <View style={[styles.txIconWrapper, { backgroundColor: tx.type === 'usage' ? '#fee2e2' : '#dcfce7' }]}>
-                    {tx.type === 'usage' ? <ArrowUpRight size={20} color="#ef4444" /> : <ArrowDownRight size={20} color="#22c55e" />}
-                  </View>
-                  <View style={styles.txDetails}>
-                    <Text style={styles.txType}>
-                      {tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}
-                    </Text>
-                    <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
-                    {tx.note ? <Text style={styles.txNote}>{tx.note}</Text> : null}
-                  </View>
-                  <View style={styles.txAmountSection}>
-                    <Text style={[styles.txAmount, { color: tx.type === 'usage' ? '#ef4444' : '#22c55e' }]}>
-                      {tx.type === 'usage' ? '-' : '+'}₹{tx.amount}
-                    </Text>
-                    <Text style={[styles.txStatus, { 
-                      color: tx.status === 'completed' ? '#22c55e' : tx.status === 'pending' ? '#eab308' : '#ef4444',
-                      backgroundColor: tx.status === 'completed' ? '#dcfce7' : tx.status === 'pending' ? '#fef08a' : '#fee2e2'
-                    }]}>
-                      {tx.status}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </>
-          ) : (
+          {true ? (
             <>
               <View style={[styles.balanceCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }, !isDesktop && { flexDirection: 'column', alignItems: 'center' }]}>
                 <View style={[styles.balanceIconWrapper, { backgroundColor: '#dcfce7' }]}>
@@ -402,30 +307,6 @@ export default function SubAdminWalletScreen() {
                   </View>
                 </View>
               ))}
-
-              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>Department Cash Holdings</Text>
-              <View style={styles.table}>
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Name / ID</Text>
-                  <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>Role</Text>
-                  <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Cash in Hand</Text>
-                </View>
-                {walletBalances.map((item, idx) => (
-                  <View key={idx} style={styles.tableRow}>
-                    <View style={{ flex: 2 }}>
-                      <Text style={{ fontWeight: '500', color: Colors.light.text }}>{item.full_name}</Text>
-                      <Text style={{ fontSize: 12, color: Colors.light.icon }}>{item.employee_id}</Text>
-                    </View>
-                    <Text style={[styles.tableCell, { flex: 1 }]}>{item.role}</Text>
-                    <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#059669' }]}>
-                      ₹{item.cash_in_hand}
-                    </Text>
-                  </View>
-                ))}
-                {walletBalances.length === 0 && (
-                  <Text style={{ padding: 16, textAlign: 'center', color: Colors.light.icon }}>No balances found.</Text>
-                )}
-              </View>
             </>
           )}
 
@@ -531,11 +412,6 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: 12 },
   tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: '#e2e8f0' },
   tabBtnActive: { backgroundColor: Colors.light.primary },
-  closeModalBtnText: { color: Colors.light.text, fontWeight: '600' },
-  table: { backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: Colors.light.border, overflow: 'hidden' },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
-  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border, alignItems: 'center' },
-  tableCell: { color: Colors.light.text, fontSize: 14 },
   tabBtnText: { color: Colors.light.primary, fontWeight: '600' },
   tabBtnTextActive: { color: '#FFF' },
   primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
