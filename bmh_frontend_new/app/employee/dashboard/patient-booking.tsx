@@ -332,7 +332,7 @@ export default function PatientBooking() {
           
           <div class="row-spaced">
             <div>
-              <span class="label">Age/Sex</span><span class="colon">:</span><span style="text-transform: uppercase;">${printAge} Yrs / ${printGender}</span>
+              <span class="label">Age/Sex</span><span class="colon">:</span><span style="text-transform: uppercase;">${printAge}Y/${printGender}</span>
             </div>
             <div>
               <span>MobNo:${printMobile}</span>
