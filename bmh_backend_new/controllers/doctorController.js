@@ -366,3 +366,21 @@ exports.getAllPatientHistory = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
+
+exports.assignPeonToSlot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assigned_peon_id } = req.body;
+    
+    await pool.query(
+      `UPDATE doctor_slots SET assigned_peon_id = $1 WHERE id = $2`,
+      [assigned_peon_id || null, id]
+    );
+    
+    res.json({ success: true, message: 'Peon reassigned successfully' });
+  } catch (error) {
+    console.error('Assign Peon Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
