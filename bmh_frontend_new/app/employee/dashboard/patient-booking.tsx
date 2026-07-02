@@ -38,6 +38,8 @@ export default function PatientBooking() {
   const [bloodGroup, setBloodGroup] = useState('');
   const [reasonForVisit, setReasonForVisit] = useState('');
   const [reference, setReference] = useState('');
+  const [referenceId, setReferenceId] = useState('');
+  const [referenceUserType, setReferenceUserType] = useState('');
   const [pr, setPr] = useState('');
   const [allStaff, setAllStaff] = useState<any[]>([]);
   const [city, setCity] = useState('');
@@ -291,6 +293,13 @@ export default function PatientBooking() {
       return;
     }
     
+    if (selectedToken && vipTokens.includes(selectedToken)) {
+      if (!referenceId) {
+        alert('Please select a reference from the dropdown for a blocked token booking.');
+        return;
+      }
+    }
+    
     setBookingLoading(true);
     try {
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/bookings/create', {
@@ -306,6 +315,8 @@ export default function PatientBooking() {
         pin_code: pinCode,
         guardian_name: guardianName,
         reference,
+        reference_id: referenceId || null,
+        reference_user_type: referenceUserType || null,
         pr,
         booked_by: user.id,
         payment_mode: paymentMode,
@@ -334,6 +345,8 @@ export default function PatientBooking() {
     setBloodGroup('');
     setReasonForVisit('');
     setReference('');
+    setReferenceId('');
+    setReferenceUserType('');
     setPr('');
     setCity('');
     setPinCode('');
@@ -733,12 +746,12 @@ export default function PatientBooking() {
           <View style={[styles.row, isMobile && { flexDirection: 'column' }, { zIndex: 50, elevation: 50, position: 'relative' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0, position: 'relative', zIndex: 10 }}>
               <Text style={styles.formLabel}>Reference (Search or Enter Name)</Text>
-              <TextInput style={styles.input} value={reference} onChangeText={setReference} placeholder="e.g. Dr. John - Cardiology" returnKeyType="next" blurOnSubmit={false} />
+              <TextInput style={styles.input} value={reference} onChangeText={(text) => { setReference(text); setReferenceId(''); setReferenceUserType(''); }} placeholder="e.g. Dr. John - Cardiology" returnKeyType="next" blurOnSubmit={false} />
               {reference.length > 0 && allStaff.filter(s => s.full_name && (s.full_name.toLowerCase().includes(reference.toLowerCase()) || (s.department && s.department.toLowerCase().includes(reference.toLowerCase())) || (s.type && s.type.toLowerCase().includes(reference.toLowerCase())))).length > 0 && !reference.includes('(') && (
                 <View style={{position: 'absolute', top: 70, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, maxHeight: 150, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5}}>
                   <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
                     {allStaff.filter(s => s.full_name && (s.full_name.toLowerCase().includes(reference.toLowerCase()) || (s.department && s.department.toLowerCase().includes(reference.toLowerCase())) || (s.type && s.type.toLowerCase().includes(reference.toLowerCase())))).slice(0, 10).map((s, i) => (
-                      <TouchableOpacity key={i} style={{padding: 12, borderBottomWidth: 1, borderColor: '#f1f5f9'}} onPress={() => setReference(`${s.full_name} (${s.department || s.type})`)}>
+                      <TouchableOpacity key={i} style={{padding: 12, borderBottomWidth: 1, borderColor: '#f1f5f9'}} onPress={() => { setReference(`${s.full_name} (${s.department || s.type})`); setReferenceId(s.id); setReferenceUserType(s.type); }}>
                         <Text style={{fontWeight: 'bold', color: '#1e293b'}}>{s.full_name}</Text>
                         <Text style={{fontSize: 12, color: '#64748b'}}>{s.type} {s.department ? `- ${s.department}` : ''}</Text>
                       </TouchableOpacity>

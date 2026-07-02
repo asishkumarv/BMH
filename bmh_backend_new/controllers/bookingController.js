@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 // Create a patient booking
 exports.createBooking = async (req, res) => {
   try {
-    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number, blood_group, city, pin_code, guardian_name, reason_for_visit, reference, pr } = req.body;
+    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number, blood_group, city, pin_code, guardian_name, reason_for_visit, reference, pr, reference_id, reference_user_type } = req.body;
     
     await pool.query('BEGIN');
 
@@ -39,7 +39,12 @@ exports.createBooking = async (req, res) => {
     }
 
     // 2. Check slot token availability and explicitly validate token_number
-    const slotRes = await pool.query('SELECT total_tokens, fee FROM doctor_slots WHERE id = $1', [slot_id]);
+    const slotRes = await pool.query(`
+      SELECT s.total_tokens, s.fee, s.date, s.start_time, d.full_name as doctor_name 
+      FROM doctor_slots s 
+      JOIN doctors d ON s.doctor_id = d.id 
+      WHERE s.id = $1
+    `, [slot_id]);
     if (slotRes.rowCount === 0) throw new Error('Slot not found');
     const total_tokens = slotRes.rows[0].total_tokens;
     const fee = slotRes.rows[0].fee;
@@ -70,6 +75,42 @@ exports.createBooking = async (req, res) => {
          WHERE id = $7`,
         [patient_id, booked_by, payment_mode, reason_for_visit || null, reference || null, pr || null, existingToken.rows[0].id]
       );
+      
+      // Notifications for Blocked Token booking
+      try {
+        let bookerName = 'Employee';
+        const bookerRes = await pool.query('SELECT full_name FROM employees WHERE id = $1', [booked_by]);
+        if (bookerRes.rowCount > 0) bookerName = bookerRes.rows[0].full_name;
+
+        const slotDate = new Date(slotRes.rows[0].date).toLocaleDateString('en-GB');
+        const message = `Blocked Token Booked: Token #${token_number} for Dr. ${slotRes.rows[0].doctor_name} on ${slotDate} at ${slotRes.rows[0].start_time}. Patient: ${patient_name}. Referred by: ${reference || 'N/A'}. Booked by: ${bookerName}.`;
+
+        // Notify Super Admin
+        await pool.query(
+          `INSERT INTO notifications (user_type, user_id, message) VALUES ('super_admin', 1, $1)`,
+          [message]
+        );
+
+        // Notify Referred Employee
+        if (reference_id && reference_user_type) {
+          let refUserId = null;
+          if (String(reference_id).startsWith('SA-')) {
+            refUserId = parseInt(String(reference_id).replace('SA-', ''), 10);
+          } else {
+            refUserId = parseInt(reference_id, 10);
+          }
+
+          if (refUserId && !isNaN(refUserId)) {
+            await pool.query(
+              `INSERT INTO notifications (user_type, user_id, message) VALUES ($1, $2, $3)`,
+              [reference_user_type, refUserId, message]
+            );
+          }
+        }
+      } catch (notifErr) {
+        console.error('Failed to insert notifications for blocked token booking', notifErr);
+      }
+      
     } else {
       await pool.query(
         `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit, reference, pr)
