@@ -314,15 +314,15 @@ export default function PatientBooking() {
           <div class="header">
             <div class="title">BHARAT HEALTHCARE</div>
             <div class="subtitle">
-              HOSPITAL ROAD,BARIPADA,MAYURBHANJ,ODISHA,PIN NO: 757001<br/>
-              REGD. NO: MBJ/CE/03/2019,MOBILE NO: 8093110888
+              HOSPITAL ROAD,BARIPADA,MAYURBHANJ,ODISHA,PIN. 757001<br/>
+              REGD. NO: MBJ/CE/03/2019,MOBILE NO:8093110888
             </div>
           </div>
           <div class="dotted-line"></div>
           <div class="ticket-title">TEMPORARY APPOINTMENT TICKET</div>
           
           <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 8px; font-size: 11px;">
-            <div style="display: flex; align-items: center; margin-right: 15px; font-weight: bold;">P id : ${printPatientId || "New"} &nbsp; Slno : <span class="box">${printToken}</span></div>
+            <div style="display: flex; align-items: center; margin-right: 15px; font-weight: bold;">Pid:${printPatientId || "New"} &nbsp; Slno: <span class="box">${printToken}</span></div>
             <div>Appt date:${printDate}</div>
           </div>
           
@@ -342,8 +342,6 @@ export default function PatientBooking() {
           <div class="row">
             <span class="label">Address</span><span class="colon">:</span><span style="text-transform: uppercase;">${printCity || ''}</span>
           </div>
-          
-          <div style="border-bottom: 1px solid #000; margin: 6px 0; width: 35px;"></div>
           
           <div class="row">
             <span class="label">Doctor</span><span class="colon">:</span><span style="text-transform: uppercase;">DR ${printDoctor}</span>

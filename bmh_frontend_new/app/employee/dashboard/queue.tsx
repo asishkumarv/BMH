@@ -396,8 +396,8 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
       </View>
 
       {/* Present Consulting */}
-      <View style={styles.currentSection}>
-        <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale }]}>PRESENT CONSULTING PATIENT</Text>
+      <View style={[styles.currentSection, isFullscreen && { paddingVertical: 8 * padScale }]}>
+        <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale, marginBottom: 4 * padScale }]}>PRESENT CONSULTING PATIENT</Text>
         {current ? (
           <Animated.View style={[styles.currentPatientBox, isFullscreen && { padding: 12 * padScale }, { borderColor: docColor + '40', backgroundColor: docColor + '10' }, { transform: [{ translateY: slideUpAnim }], opacity: fadeAnim }]}>
             <View style={{flex: 1}}>
@@ -406,7 +406,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
             </View>
             <TouchableOpacity style={[styles.completeBtn, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 6 * scale, borderRadius: 20 }]} onPress={() => updateStatus(current.booking_id, 'Completed')}>
               <CheckCircle color="white" size={14 * scale} />
-              <Text style={[styles.completeBtnText, isFullscreen && { fontSize: 12 * scale }]}>Complete</Text>
+              <Text style={[styles.completeBtnText, isFullscreen && { fontSize: 12 * scale }]}>In cabin</Text>
             </TouchableOpacity>
           </Animated.View>
         ) : (
@@ -417,8 +417,8 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
       </View>
 
       {/* Immediate Next Patient */}
-      <View style={styles.nextPatientSection}>
-        <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale }]}>NEXT PATIENT</Text>
+      <View style={[styles.nextPatientSection, isFullscreen && { paddingVertical: 8 * padScale }]}>
+        <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale, marginBottom: 4 * padScale }]}>NEXT PATIENT</Text>
         {nextPatient ? (
           <View style={[styles.nextPatientBox, isFullscreen && { paddingVertical: 8 * padScale }]}>
             <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
@@ -439,10 +439,10 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
 
       {/* Paginated Upcoming Tokens */}
       {upcomingQueue.length > 0 && (
-        <View style={[styles.creditsBoardSection, isFullscreen && { paddingBottom: 20 * padScale }]}>
-          <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale }]}>UPCOMING TOKENS ({upcomingQueue.length})</Text>
+        <View style={[styles.creditsBoardSection, isFullscreen && { paddingTop: 8 * padScale, paddingBottom: 16 * padScale }]}>
+          <Text style={[styles.sectionLabel, isFullscreen && { fontSize: 11 * scale, marginBottom: 4 * padScale }]}>UPCOMING TOKENS ({upcomingQueue.length})</Text>
           <View 
-            style={[styles.creditsContainer, isFullscreen && { flex: 1, maxHeight: 300, height: undefined, minHeight: 100 * scale }, { overflow: 'hidden' }]}
+            style={[styles.creditsContainer, isFullscreen && { flex: 1, height: undefined }, { overflow: 'hidden' }]}
             onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
           >
             <Animated.View style={{ transform: [{ translateY: scrollAnim }] }}>
