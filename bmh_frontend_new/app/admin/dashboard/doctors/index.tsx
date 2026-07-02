@@ -39,7 +39,8 @@ export default function DoctorManagement() {
   // Add Slot Form State
   const [showAddSlotForm, setShowAddSlotForm] = useState(false);
   const [newSlot, setNewSlot] = useState({
-    doctor_id: '', date: '', start_time: '', end_time: '', total_tokens: '', fee: '', assigned_peon_id: ''
+    doctor_id: '', date: '', assigned_peon_id: '', 
+    slotConfigs: [{ start_time: '', end_time: '', total_tokens: '', fee: '' }]
   });
   const [addingSlot, setAddingSlot] = useState(false);
   
@@ -253,19 +254,39 @@ export default function DoctorManagement() {
   };
 
   const handleAddSlot = async () => {
-    if(!newSlot.doctor_id || !newSlot.date || !newSlot.start_time || !newSlot.end_time || !newSlot.total_tokens || !newSlot.fee) {
-      alert("Please fill all required fields");
+    if(!newSlot.doctor_id || !newSlot.date || newSlot.slotConfigs.length === 0) {
+      alert("Please select doctor and date");
+      return;
+    }
+    const invalidConfigs = newSlot.slotConfigs.some(c => !c.start_time || !c.end_time || !c.total_tokens || !c.fee);
+    if (invalidConfigs) {
+      alert("Please fill all required fields for each slot");
       return;
     }
     setAddingSlot(true);
     try {
-      await axios.post('https://napi.bharatmedicalhallplus.com/doctors/slots', newSlot);
-      alert('Slot created successfully!');
-      setShowAddSlotForm(false);
-      setNewSlot({ doctor_id: '', date: '', start_time: '', end_time: '', total_tokens: '', fee: '', assigned_peon_id: '' });
+      const results = await Promise.allSettled(newSlot.slotConfigs.map(async (config) => {
+        return axios.post('https://napi.bharatmedicalhallplus.com/doctors/slots', {
+          doctor_id: newSlot.doctor_id,
+          date: newSlot.date,
+          assigned_peon_id: newSlot.assigned_peon_id,
+          ...config
+        });
+      }));
+
+      const successes = results.filter(r => r.status === 'fulfilled');
+      const fails = results.filter(r => r.status === 'rejected');
+
+      if (fails.length === 0) {
+        alert('All slots created successfully!');
+        setShowAddSlotForm(false);
+        setNewSlot({ doctor_id: '', date: '', assigned_peon_id: '', slotConfigs: [{ start_time: '', end_time: '', total_tokens: '', fee: '' }] });
+      } else {
+        alert(`Created ${successes.length} slots. Failed to create ${fails.length} slots. Please check for overlap.`);
+      }
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error creating slot');
+      alert(err.response?.data?.message || 'Error creating slots');
     } finally {
       setAddingSlot(false);
     }
@@ -297,29 +318,29 @@ export default function DoctorManagement() {
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Create New Doctor Profile</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Full Name *</Text>
               <TextInput style={styles.input} value={newDoctor.full_name} onChangeText={(t) => setNewDoctor({...newDoctor, full_name: t})} placeholder="Dr. John Doe" />
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Email *</Text>
               <TextInput style={styles.input} value={newDoctor.email} onChangeText={(t) => setNewDoctor({...newDoctor, email: t})} placeholder="doctor@bmh.com" keyboardType="email-address" autoCapitalize="none" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Mobile</Text>
               <TextInput style={styles.input} value={newDoctor.mobile} onChangeText={(t) => setNewDoctor({...newDoctor, mobile: t})} placeholder="10-digit number" keyboardType="phone-pad" />
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Password *</Text>
               <TextInput style={styles.input} value={newDoctor.password} onChangeText={(t) => setNewDoctor({...newDoctor, password: t})} placeholder="Auto-gen or type" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Department *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -334,18 +355,18 @@ export default function DoctorManagement() {
                 </Picker>
               </View>
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Role</Text>
               <TextInput style={styles.input} value={newDoctor.role} onChangeText={(t) => setNewDoctor({...newDoctor, role: t})} placeholder="Doctor / Head of Dept" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Experience (Years)</Text>
               <TextInput style={styles.input} value={newDoctor.experience} onChangeText={(t) => setNewDoctor({...newDoctor, experience: t})} placeholder="e.g. 5" keyboardType="numeric" />
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Gender</Text>
               <TextInput style={styles.input} value={newDoctor.gender} onChangeText={(t) => setNewDoctor({...newDoctor, gender: t})} placeholder="Male / Female" />
             </View>
@@ -366,7 +387,7 @@ export default function DoctorManagement() {
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Configure Doctor Slot</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Department</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -384,7 +405,7 @@ export default function DoctorManagement() {
                 </Picker>
               </View>
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Select Doctor *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -403,7 +424,7 @@ export default function DoctorManagement() {
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Date (YYYY-MM-DD) *</Text>
               {Platform.OS === 'web' ? (
                 <input 
@@ -433,7 +454,7 @@ export default function DoctorManagement() {
                 </>
               )}
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
+            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
               <Text style={styles.label}>Assigned Peon (Optional)</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -450,49 +471,88 @@ export default function DoctorManagement() {
             </View>
           </View>
 
-          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
-              <Text style={styles.label}>Start Time *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={newSlot.start_time}
-                  onValueChange={(val) => setNewSlot({...newSlot, start_time: val})}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Time" value="" />
-                  {TIME_SLOTS.map((t, i) => (
-                    <Picker.Item key={i} label={t} value={t} />
-                  ))}
-                </Picker>
+          {newSlot.slotConfigs.map((config, index) => (
+            <View key={index} style={{borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16}}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
+                <Text style={{fontWeight: 'bold', color: '#1e293b'}}>Slot #{index + 1}</Text>
+                {newSlot.slotConfigs.length > 1 && (
+                  <TouchableOpacity onPress={() => {
+                    const newConfigs = [...newSlot.slotConfigs];
+                    newConfigs.splice(index, 1);
+                    setNewSlot({...newSlot, slotConfigs: newConfigs});
+                  }}>
+                    <XCircle color="#ef4444" size={20} />
+                  </TouchableOpacity>
+                )}
               </View>
-            </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
-              <Text style={styles.label}>End Time *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={newSlot.end_time}
-                  onValueChange={(val) => setNewSlot({...newSlot, end_time: val})}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Time" value="" />
-                  {TIME_SLOTS.map((t, i) => (
-                    <Picker.Item key={i} label={t} value={t} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-          </View>
 
-          <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
-              <Text style={styles.label}>Total Tokens (Token Range) *</Text>
-              <TextInput style={styles.input} value={newSlot.total_tokens} onChangeText={(t) => setNewSlot({...newSlot, total_tokens: t})} placeholder="e.g. 20" keyboardType="numeric" />
+              <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                  <Text style={styles.label}>Start Time *</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={config.start_time}
+                      onValueChange={(val) => {
+                        const newConfigs = [...newSlot.slotConfigs];
+                        newConfigs[index].start_time = val;
+                        setNewSlot({...newSlot, slotConfigs: newConfigs});
+                      }}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Select Time" value="" />
+                      {TIME_SLOTS.map((t, i) => (
+                        <Picker.Item key={i} label={t} value={t} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                  <Text style={styles.label}>End Time *</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={config.end_time}
+                      onValueChange={(val) => {
+                        const newConfigs = [...newSlot.slotConfigs];
+                        newConfigs[index].end_time = val;
+                        setNewSlot({...newSlot, slotConfigs: newConfigs});
+                      }}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Select Time" value="" />
+                      {TIME_SLOTS.map((t, i) => (
+                        <Picker.Item key={i} label={t} value={t} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+
+              <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
+                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                  <Text style={styles.label}>Total Tokens *</Text>
+                  <TextInput style={styles.input} value={config.total_tokens} onChangeText={(t) => {
+                    const newConfigs = [...newSlot.slotConfigs];
+                    newConfigs[index].total_tokens = t;
+                    setNewSlot({...newSlot, slotConfigs: newConfigs});
+                  }} placeholder="e.g. 20" keyboardType="numeric" />
+                </View>
+                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                  <Text style={styles.label}>Fee (₹) *</Text>
+                  <TextInput style={styles.input} value={config.fee} onChangeText={(t) => {
+                    const newConfigs = [...newSlot.slotConfigs];
+                    newConfigs[index].fee = t;
+                    setNewSlot({...newSlot, slotConfigs: newConfigs});
+                  }} placeholder="e.g. 500" keyboardType="numeric" />
+                </View>
+              </View>
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0 }]}>
-              <Text style={styles.label}>Consultation Fee (₹) *</Text>
-              <TextInput style={styles.input} value={newSlot.fee} onChangeText={(t) => setNewSlot({...newSlot, fee: t})} placeholder="e.g. 500" keyboardType="numeric" />
-            </View>
-          </View>
+          ))}
+
+          <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#3b82f6', marginBottom: 16}]} onPress={() => {
+            setNewSlot({...newSlot, slotConfigs: [...newSlot.slotConfigs, { start_time: '', end_time: '', total_tokens: '', fee: '' }]});
+          }}>
+            <Text style={styles.saveBtnText}>+ Add Another Slot Time</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.saveBtn} onPress={handleAddSlot} disabled={addingSlot}>
             {addingSlot ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Create Slot</Text>}

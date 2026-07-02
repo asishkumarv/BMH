@@ -18,6 +18,13 @@ export default function PatientBooking() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
+  // Booking Filters
+  const [slotSearchQuery, setSlotSearchQuery] = useState('');
+  const [slotFilterDate, setSlotFilterDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [showSlotDatePicker, setShowSlotDatePicker] = useState(false);
+
   // Booking Form State
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [slotBookings, setSlotBookings] = useState<number[]>([]);
@@ -118,11 +125,9 @@ export default function PatientBooking() {
     try {
       let url = `https://napi.bharatmedicalhallplus.com/bookings?status=Booked&exclude_blocked=true`;
       
-      // If a specific department filter is selected, use it, else default to user's department
+      // If a specific department filter is selected, use it
       if (rescheduleFilterDepartment) {
         url += `&department=${encodeURIComponent(rescheduleFilterDepartment)}`;
-      } else if (user.department) {
-        url += `&department=${encodeURIComponent(user.department)}`;
       }
 
       if (rescheduleFilterDate) url += `&date=${rescheduleFilterDate}`;
@@ -205,10 +210,6 @@ export default function PatientBooking() {
         const res = await axios.get('https://napi.bharatmedicalhallplus.com/doctors');
         if (res.data.success && res.data.data) {
           let docs = res.data.data;
-          // Only show doctors from this employee's department if applicable
-          if (user && user.department) {
-            docs = docs.filter((d: any) => d.department === user.department);
-          }
           const formatted = docs.map((d: any) => ({ id: d.id, name: d.full_name || d.name }));
           setUniqueDoctors(formatted);
         }
@@ -544,8 +545,57 @@ export default function PatientBooking() {
           {!selectedSlot ? (
         <View>
           <Text style={styles.sectionTitle}>Select an Available Slot</Text>
+          <View style={{flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16}}>
+            <TextInput 
+              style={[styles.input, {flex: 1}]}
+              placeholder="Search by Doctor or Dept"
+              value={slotSearchQuery}
+              onChangeText={setSlotSearchQuery}
+            />
+            <View style={{flex: 1}}>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  value={slotFilterDate}
+                  onChange={(e) => setSlotFilterDate(e.target.value)}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 14, fontSize: 14, color: '#1e293b', width: '100%' } as any}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setShowSlotDatePicker(true)}>
+                    <TextInput style={styles.input} value={slotFilterDate} editable={false} placeholder="Select Date" />
+                  </TouchableOpacity>
+                  {showSlotDatePicker && (
+                    <DateTimePicker
+                      value={slotFilterDate ? new Date(slotFilterDate) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowSlotDatePicker(false);
+                        if (selectedDate) {
+                          setSlotFilterDate(selectedDate.toISOString().split('T')[0]);
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+          </View>
           <View style={styles.grid}>
-            {slots.map((s, i) => (
+            {slots.filter((s) => {
+              const slotDateStr = s.date.split('T')[0];
+              const todayStr = new Date().toISOString().split('T')[0];
+              if (slotDateStr < todayStr) return false;
+              if (slotFilterDate && slotDateStr !== slotFilterDate) return false;
+              if (slotSearchQuery) {
+                const query = slotSearchQuery.toLowerCase();
+                const docName = (s.doctor_name || '').toLowerCase();
+                const dept = (s.doctor_department || '').toLowerCase();
+                if (!docName.includes(query) && !dept.includes(query)) return false;
+              }
+              return true;
+            }).map((s, i) => (
               <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleSelectSlot(s)}>
                 <View style={[styles.slotHeader, {alignItems: 'flex-start'}]}>
                   <View style={{flexDirection: 'row', flex: 1, gap: 12}}>
@@ -680,7 +730,7 @@ export default function PatientBooking() {
             </View>
           </View>
 
-          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }, { zIndex: 50, elevation: 50, position: 'relative' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0, position: 'relative', zIndex: 10 }}>
               <Text style={styles.formLabel}>Reference (Search or Enter Name)</Text>
               <TextInput style={styles.input} value={reference} onChangeText={setReference} placeholder="e.g. Dr. John - Cardiology" returnKeyType="next" blurOnSubmit={false} />

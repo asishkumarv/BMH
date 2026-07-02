@@ -106,7 +106,7 @@ exports.getBookings = async (req, res) => {
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
              p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name, p.age, p.gender, pb.print_count,
              ds.date, ds.start_time, ds.end_time, ds.fee,
-             d.full_name as doctor_name, d.department,
+             d.id as doctor_id, d.full_name as doctor_name, d.department,
              e.full_name as booked_by_name
       FROM patient_bookings pb
       LEFT JOIN patients p ON pb.patient_id = p.id
