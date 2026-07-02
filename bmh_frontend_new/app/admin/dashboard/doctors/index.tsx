@@ -880,9 +880,6 @@ export default function DoctorManagement() {
       </ScrollView>
       </>
       )}
-    </View>
-  );
-}
 
       {/* Edit Doctor Modal */}
       <Modal visible={!!editDoctor} animationType="slide" transparent={true} onRequestClose={() => setEditDoctor(null)}>
@@ -928,6 +925,10 @@ export default function DoctorManagement() {
           </View>
         </View>
       </Modal>
+
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: '#f8fafc' },
