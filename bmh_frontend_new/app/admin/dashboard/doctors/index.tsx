@@ -40,6 +40,10 @@ export default function DoctorManagement() {
 
   // Add Slot Form State
   const [showAddSlotForm, setShowAddSlotForm] = useState(false);
+  const [reassignSlot, setReassignSlot] = useState<any>(null);
+  const [reassignPeonId, setReassignPeonId] = useState('');
+  const [updatingPeon, setUpdatingPeon] = useState(false);
+
   const [newSlot, setNewSlot] = useState({
     doctor_id: '', date: '', assigned_peon_id: '', 
     slotConfigs: [{ start_time: '', end_time: '', total_tokens: '', fee: '' }]
@@ -230,6 +234,23 @@ export default function DoctorManagement() {
       fetchData();
     } catch (err) {
       alert('Error updating status');
+    }
+  };
+
+  
+  const handleReassignPeon = async () => {
+    setUpdatingPeon(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${reassignSlot.id}/peon`, { assigned_peon_id: reassignPeonId });
+      if (res.data.success) {
+        Alert.alert('Success', res.data.message);
+        setReassignSlot(null);
+        fetchData();
+      }
+    } catch(e) {
+      Alert.alert('Error', 'Failed to reassign peon');
+    } finally {
+      setUpdatingPeon(false);
     }
   };
 
@@ -742,6 +763,9 @@ export default function DoctorManagement() {
                       <TouchableOpacity style={{backgroundColor: '#3b82f6', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => handleManageTokens(s)}>
                         <Text style={{color: 'white', fontSize: 12}}>Tokens</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity style={{backgroundColor: '#10b981', padding: 6, borderRadius: 6, alignItems: 'center', marginTop: 4}} onPress={() => { setReassignSlot(s); setReassignPeonId(s.assigned_peon_id || ''); }}>
+                        <Text style={{color: 'white', fontSize: 12}}>Reassign</Text>
+                      </TouchableOpacity>
                     </Text>
                   </View>
                 ))}
@@ -922,6 +946,41 @@ export default function DoctorManagement() {
                 </TouchableOpacity>
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* Reassign Peon Modal */}
+      <Modal visible={!!reassignSlot} animationType="slide" transparent={true} onRequestClose={() => setReassignSlot(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderContainer}>
+              <Text style={styles.modalTitle}>Reassign Peon</Text>
+              <TouchableOpacity onPress={() => setReassignSlot(null)}>
+                <X color="#64748b" size={24} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalForm}>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Select Peon (Optional)</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={reassignPeonId}
+                    onValueChange={(val) => setReassignPeonId(val)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="None" value="" />
+                    {peons.map((p: any) => (
+                      <Picker.Item key={p.id} label={p.full_name} value={p.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleReassignPeon} disabled={updatingPeon}>
+                {updatingPeon ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Confirm Reassign</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

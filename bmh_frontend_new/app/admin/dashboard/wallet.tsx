@@ -7,7 +7,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 type Peer = { id: string; full_name: string; };
-type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; };
+type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; };
 
 export default function AdminWalletScreen() {
   const { isDesktop } = useResponsive();
@@ -22,6 +22,7 @@ export default function AdminWalletScreen() {
   const [handoverModalVisible, setHandoverModalVisible] = useState(false);
   const [amount, setAmount] = useState('');
   const [selectedPeerId, setSelectedPeerId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [peers, setPeers] = useState<Peer[]>([]);
 
@@ -266,17 +267,32 @@ export default function AdminWalletScreen() {
             <Text style={styles.modalTitle}>Handover Cash</Text>
             
             <Text style={styles.inputLabel}>Select Person</Text>
-            <View style={styles.peerList}>
-              {peers.map(p => (
-                <Pressable 
-                  key={p.id} 
-                  style={[styles.peerItem, selectedPeerId === p.id && styles.peerItemActive]}
-                  onPress={() => setSelectedPeerId(p.id)}
-                >
-                  <Text style={[styles.peerName, selectedPeerId === p.id && styles.peerNameActive]}>{p.full_name}</Text>
-                </Pressable>
-              ))}
-            </View>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Search name..." 
+                value={searchQuery}
+                onChangeText={setSearchQuery} 
+              />
+              <View style={{ maxHeight: 200, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, marginTop: 8, marginBottom: 16 }}>
+                <ScrollView nestedScrollEnabled>
+                  {peers.filter((p: any) => p.full_name && p.full_name.toLowerCase().includes(searchQuery.toLowerCase())).map((p: any) => (
+                    <Pressable 
+                      key={p.id} 
+                      style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: selectedPeerId === p.id ? '#eff6ff' : 'transparent' }}
+                      onPress={() => setSelectedPeerId(p.id)}
+                    >
+                      <Text style={{ color: selectedPeerId === p.id ? '#2563eb' : '#334155', fontWeight: selectedPeerId === p.id ? '600' : '400' }}>{p.full_name}</Text>
+                      {(p.role || p.department) && (
+                        <Text style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
+                          {p.role || 'Unknown Role'} {p.department ? `• ${p.department}` : ''}
+                        </Text>
+                      )}
+                      
+                    </Pressable>
+                  ))}
+                  {peers.length === 0 && <Text style={{padding: 12, color: '#64748b'}}>No persons found.</Text>}
+                </ScrollView>
+              </View>
 
             <Text style={styles.inputLabel}>Amount to Handover</Text>
             <TextInput

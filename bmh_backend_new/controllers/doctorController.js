@@ -217,21 +217,14 @@ exports.getSlots = async (req, res) => {
 // Available Peons
 exports.getAvailablePeons = async (req, res) => {
   try {
-    const { date, department } = req.query;
+    const { date } = req.query;
     
-    // Find all employees where lower(role) in ('peon', 'poen')
-    // and who are not on approved leave on that date
     let query = `
       SELECT e.id, e.full_name, e.department
       FROM employees e
-      WHERE LOWER(e.role) IN ('peon', 'poen')
+      WHERE LOWER(e.role) IN ('peon', 'poen', 'nurse staff')
     `;
     let params = [];
-
-    if (department) {
-      params.push(department);
-      query += ` AND e.department = $${params.length}`;
-    }
 
     if (date) {
       params.push(date);
