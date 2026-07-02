@@ -318,29 +318,29 @@ export default function DoctorManagement() {
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Create New Doctor Profile</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Full Name *</Text>
               <TextInput style={styles.input} value={newDoctor.full_name} onChangeText={(t) => setNewDoctor({...newDoctor, full_name: t})} placeholder="Dr. John Doe" />
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Email *</Text>
               <TextInput style={styles.input} value={newDoctor.email} onChangeText={(t) => setNewDoctor({...newDoctor, email: t})} placeholder="doctor@bmh.com" keyboardType="email-address" autoCapitalize="none" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Mobile</Text>
               <TextInput style={styles.input} value={newDoctor.mobile} onChangeText={(t) => setNewDoctor({...newDoctor, mobile: t})} placeholder="10-digit number" keyboardType="phone-pad" />
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Password *</Text>
               <TextInput style={styles.input} value={newDoctor.password} onChangeText={(t) => setNewDoctor({...newDoctor, password: t})} placeholder="Auto-gen or type" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Department *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -355,18 +355,18 @@ export default function DoctorManagement() {
                 </Picker>
               </View>
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Role</Text>
               <TextInput style={styles.input} value={newDoctor.role} onChangeText={(t) => setNewDoctor({...newDoctor, role: t})} placeholder="Doctor / Head of Dept" />
             </View>
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Experience (Years)</Text>
               <TextInput style={styles.input} value={newDoctor.experience} onChangeText={(t) => setNewDoctor({...newDoctor, experience: t})} placeholder="e.g. 5" keyboardType="numeric" />
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Gender</Text>
               <TextInput style={styles.input} value={newDoctor.gender} onChangeText={(t) => setNewDoctor({...newDoctor, gender: t})} placeholder="Male / Female" />
             </View>
@@ -387,7 +387,7 @@ export default function DoctorManagement() {
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Configure Doctor Slot</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Department</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -405,7 +405,7 @@ export default function DoctorManagement() {
                 </Picker>
               </View>
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Select Doctor *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -424,7 +424,7 @@ export default function DoctorManagement() {
           </View>
 
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Date (YYYY-MM-DD) *</Text>
               {Platform.OS === 'web' ? (
                 <input 
@@ -454,7 +454,7 @@ export default function DoctorManagement() {
                 </>
               )}
             </View>
-            <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+            <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
               <Text style={styles.label}>Assigned Peon (Optional)</Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -487,7 +487,7 @@ export default function DoctorManagement() {
               </View>
 
               <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
                   <Text style={styles.label}>Start Time *</Text>
                   <View style={styles.pickerContainer}>
                     <Picker
@@ -506,7 +506,7 @@ export default function DoctorManagement() {
                     </Picker>
                   </View>
                 </View>
-                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
                   <Text style={styles.label}>End Time *</Text>
                   <View style={styles.pickerContainer}>
                     <Picker
@@ -528,7 +528,7 @@ export default function DoctorManagement() {
               </View>
 
               <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
                   <Text style={styles.label}>Total Tokens *</Text>
                   <TextInput style={styles.input} value={config.total_tokens} onChangeText={(t) => {
                     const newConfigs = [...newSlot.slotConfigs];
@@ -536,7 +536,7 @@ export default function DoctorManagement() {
                     setNewSlot({...newSlot, slotConfigs: newConfigs});
                   }} placeholder="e.g. 20" keyboardType="numeric" />
                 </View>
-                <View style={[styles.formCol, isMobile && { flex: 0, marginBottom: 16 }]}>
+                <View style={[styles.formCol, isMobile && { marginBottom: 16 }]}>
                   <Text style={styles.label}>Fee (₹) *</Text>
                   <TextInput style={styles.input} value={config.fee} onChangeText={(t) => {
                     const newConfigs = [...newSlot.slotConfigs];

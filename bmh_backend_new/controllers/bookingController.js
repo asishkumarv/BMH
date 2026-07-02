@@ -151,7 +151,7 @@ exports.getBookings = async (req, res) => {
     const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id, exclude_blocked, status } = req.query;
     
     let query = `
-      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
+      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit, pb.pr, pb.reference,
              p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name, p.age, p.gender, pb.print_count,
              ds.date, ds.start_time, ds.end_time, ds.fee,
              d.id as doctor_id, d.full_name as doctor_name, d.department,

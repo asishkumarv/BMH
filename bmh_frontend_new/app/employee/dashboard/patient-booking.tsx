@@ -880,6 +880,7 @@ export default function PatientBooking() {
                 <Text style={styles.tableCellHeader}>Patient</Text>
                 <Text style={styles.tableCellHeader}>Doctor</Text>
                 <Text style={styles.tableCellHeader}>Date/Time</Text>
+                <Text style={styles.tableCellHeader}>PR / Ref</Text>
                 <Text style={styles.tableCellHeader}>Payment</Text>
                 <Text style={styles.tableCellHeader}>Status</Text>
                 <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
@@ -898,6 +899,10 @@ export default function PatientBooking() {
                   <View style={styles.tableCell}>
                     <Text>{new Date(b.date).toLocaleDateString('en-GB')}</Text>
                     <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
+                  </View>
+                  <View style={styles.tableCell}>
+                    <Text>{b.pr || '-'}</Text>
+                    <Text style={{fontSize: 12, color: '#64748b'}}>{b.reference || ''}</Text>
                   </View>
                   <Text style={styles.tableCell}>{b.payment_mode}</Text>
                   <Text style={styles.tableCell}>{b.status}</Text>
@@ -1023,37 +1028,42 @@ export default function PatientBooking() {
               </View>
 
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: isMobile ? 800 : '100%' }}>
-                <View style={styles.tableRowHeader}>
-                  <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
-                  <Text style={styles.tableCellHeader}>Patient</Text>
-                  <Text style={styles.tableCellHeader}>Doctor</Text>
-                  <Text style={styles.tableCellHeader}>Date/Time</Text>
-                  <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
-                </View>
-                {rescheduleBookings.map((b, i) => (
-                  <View key={i} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
-                    <View style={styles.tableCell}>
-                      <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
-                      <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
-                    </View>
-                    <View style={styles.tableCell}>
-                      <Text>{b.doctor_name}</Text>
-                      <Text style={{fontSize: 12, color: '#64748b'}}>{b.department}</Text>
-                    </View>
-                    <View style={styles.tableCell}>
-                      <Text>{new Date(b.date).toLocaleDateString('en-GB')}</Text>
-                      <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => handleSelectReschedule(b)} style={{flex: 0.5, alignItems: 'center'}}>
-                      <Text style={{color: Colors.light.primary, fontWeight: 'bold'}}>Reschedule</Text>
-                    </TouchableOpacity>
+                <View style={{ minWidth: isMobile ? 800 : '100%' }}>
+                  <View style={styles.tableRowHeader}>
+                    <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                    <Text style={styles.tableCellHeader}>Patient</Text>
+                    <Text style={styles.tableCellHeader}>Doctor</Text>
+                    <Text style={styles.tableCellHeader}>Date/Time</Text>
+                    <Text style={styles.tableCellHeader}>PR / Ref</Text>
+                    <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
                   </View>
-                ))}
-                {rescheduleBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found to reschedule.</Text>}
-              </View>
-            </ScrollView>
+                  {rescheduleBookings.map((b, i) => (
+                    <View key={i} style={styles.tableRow}>
+                      <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                      <View style={styles.tableCell}>
+                        <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text>{b.doctor_name}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{b.department}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text>{new Date(b.date).toLocaleDateString('en-GB')}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text>{b.pr || '-'}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{b.reference || ''}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleSelectReschedule(b)} style={{flex: 0.5, alignItems: 'center'}}>
+                        <Text style={{color: Colors.light.primary, fontWeight: 'bold'}}>Reschedule</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {rescheduleBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found to reschedule.</Text>}
+                </View>
+              </ScrollView>
             </View>
           )}
         </View>

@@ -108,9 +108,11 @@ export default function PatientHistoryEmployee() {
             <span class="label">Department</span><span class="colon">:</span><span style="text-transform: uppercase;">${printDept}</span>
           </div>
           
+          ${parseInt(printAmount) > 0 ? `
           <div class="row" style="margin-top: 4px;">
             <span class="label">Amount</span><span class="colon">:</span><span style="margin-left: 30px; font-weight: bold;">${printAmount}</span>
           </div>
+          ` : ''}
           
           <div class="footer-row">
             <div class="print-info">Printed: ${nowStr} (p${currentPrintCount})</div>

@@ -102,56 +102,6 @@ export default function DoctorWalletScreen() {
     } catch (error) {}
   };
 
-  const handleLogUsage = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return Alert.alert('Error', 'Invalid amount');
-    if (Number(amount) > Number(balance)) return Alert.alert('Error', 'Insufficient balance');
-    if (!employeeId) return;
-
-    setSubmitting(true);
-    try {
-      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/usage', { employee_id: employeeId, amount: Number(amount), note });
-      if (res.data.success) {
-        Alert.alert('Success', 'Usage logged successfully');
-        setUsageModalVisible(false);
-        setAmount(''); setNote('');
-        fetchData(employeeId);
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to log usage');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleRequestAllocation = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return Alert.alert('Error', 'Invalid amount');
-    if (!employeeId) return;
-
-    setSubmitting(true);
-    try {
-      const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/request', { employee_id: employeeId, amount: Number(amount), note });
-      if (res.data.success) {
-        Alert.alert('Success', 'Allocation request sent');
-        setRequestModalVisible(false);
-        setAmount(''); setNote('');
-        fetchData(employeeId);
-      }
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to request allocation');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleAcceptAllocation = async (txId: string) => {
-    if (!employeeId) return;
-    try {
-      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/wallet/transaction/${txId}`, { status: 'completed' });
-      if (res.data.success) fetchData(employeeId);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to accept allocation');
-    }
-  };
 
   const handleRequestHandover = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return Alert.alert('Error', 'Invalid amount');
@@ -191,7 +141,7 @@ export default function DoctorWalletScreen() {
     }
   };
 
-  const pendingAllocations = transactions.filter(t => t.type === 'allocation_granted' && t.status === 'pending');
+
   const incomingHandovers = handovers.filter(h => h.to_employee_id == employeeId && h.status === 'Pending');
 
   // Bookings calculations
@@ -204,7 +154,6 @@ export default function DoctorWalletScreen() {
         <View>
           <Text style={styles.title}>My Wallet</Text>
           <Text style={styles.subtitle}>Track cash handovers.</Text>
-        </View>
         </View>
       </View>
 
@@ -237,7 +186,7 @@ export default function DoctorWalletScreen() {
             </View>
           )}
 
-          {true ? (
+          <>
             <>
               <View style={[styles.balanceCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }, !isDesktop && { flexDirection: 'column', alignItems: 'center' }]}>
                 <View style={[styles.balanceIconWrapper, { backgroundColor: '#dcfce7' }]}>
@@ -308,7 +257,7 @@ export default function DoctorWalletScreen() {
                 </View>
               ))}
             </>
-          )}
+          </>
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -349,48 +298,6 @@ export default function DoctorWalletScreen() {
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalSubmitBtn, submitting && styles.btnDisabled]} onPress={handleRequestHandover} disabled={submitting}>
-                {submitting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.modalSubmitText}>Submit Request</Text>}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Usage Modal */}
-      <Modal visible={usageModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, !isDesktop && styles.modalContentMobile]}>
-            <Text style={styles.modalTitle}>Log Allowance Usage</Text>
-            <Text style={styles.inputLabel}>Amount Used</Text>
-            <TextInput style={styles.input} placeholder="e.g. 150" keyboardType="numeric" value={amount} onChangeText={setAmount} />
-            <Text style={styles.inputLabel}>Note / Reason</Text>
-            <TextInput style={[styles.input, { height: 80 }]} placeholder="e.g. Bought pens for reception" multiline value={note} onChangeText={setNote} />
-            <View style={styles.modalButtons}>
-              <Pressable style={styles.modalCancelBtn} onPress={() => setUsageModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={[styles.modalSubmitBtn, submitting && styles.btnDisabled]} onPress={handleLogUsage} disabled={submitting}>
-                {submitting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.modalSubmitText}>Submit</Text>}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Request Modal */}
-      <Modal visible={requestModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, !isDesktop && styles.modalContentMobile]}>
-            <Text style={styles.modalTitle}>Request Funds</Text>
-            <Text style={styles.inputLabel}>Amount</Text>
-            <TextInput style={styles.input} placeholder="e.g. 500" keyboardType="numeric" value={amount} onChangeText={setAmount} />
-            <Text style={styles.inputLabel}>Reason for Request</Text>
-            <TextInput style={[styles.input, { height: 80 }]} placeholder="e.g. Need to buy printer ink" multiline value={note} onChangeText={setNote} />
-            <View style={styles.modalButtons}>
-              <Pressable style={styles.modalCancelBtn} onPress={() => setRequestModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={[styles.modalSubmitBtn, submitting && styles.btnDisabled]} onPress={handleRequestAllocation} disabled={submitting}>
                 {submitting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.modalSubmitText}>Submit Request</Text>}
               </Pressable>
             </View>
