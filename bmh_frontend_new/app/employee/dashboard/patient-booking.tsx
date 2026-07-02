@@ -65,7 +65,7 @@ export default function PatientBooking() {
             setCity(p.city || '');
             setPinCode(p.pin_code || '');
             setGuardianName(p.guardian_name || '');
-            setSuccessPatientId(p.patient_id || null);
+            setSuccessPatientId(p.patient_id || p.id || null);
             setAutofilled(true);
           } else {
             setAutofilled(false);

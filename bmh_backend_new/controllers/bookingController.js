@@ -89,7 +89,7 @@ exports.createBooking = async (req, res) => {
     }
 
     await pool.query('COMMIT');
-    res.json({ success: true, message: 'Booking successful', token_number });
+    res.json({ success: true, message: 'Booking successful', token_number, patient_id });
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('Create Booking Error:', error);
