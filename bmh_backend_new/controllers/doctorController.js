@@ -222,7 +222,7 @@ exports.getAvailablePeons = async (req, res) => {
     let query = `
       SELECT e.id, e.full_name, e.department
       FROM employees e
-      WHERE LOWER(e.role) IN ('peon', 'poen', 'nurse staff')
+      WHERE LOWER(e.role) IN ('peon', 'poen', 'nurse staff', 'staff nurse')
     `;
     let params = [];
 
