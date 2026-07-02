@@ -85,11 +85,16 @@ exports.createBooking = async (req, res) => {
         const slotDate = new Date(slotRes.rows[0].date).toLocaleDateString('en-GB');
         const message = `Blocked Token Booked: Token #${token_number} for Dr. ${slotRes.rows[0].doctor_name} on ${slotDate} at ${slotRes.rows[0].start_time}. Patient: ${patient_name}. Referred by: ${reference || 'N/A'}. Booked by: ${bookerName}.`;
 
-        // Notify Super Admin
-        await pool.query(
-          `INSERT INTO notifications (user_type, user_id, message) VALUES ('super_admin', 1, $1)`,
-          [message]
-        );
+        // Notify all Super Admins
+        const superAdminsRes = await pool.query('SELECT id FROM super_admins');
+        const superAdminIds = superAdminsRes.rows.map(sa => sa.id);
+        
+        for (const saId of superAdminIds) {
+          await pool.query(
+            `INSERT INTO notifications (user_type, user_id, message) VALUES ('super_admin', $1, $2)`,
+            [saId, message]
+          );
+        }
 
         // Notify Referred Employee
         if (reference_id && reference_user_type) {
