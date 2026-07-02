@@ -82,6 +82,44 @@ exports.createDoctor = async (req, res) => {
   }
 };
 
+// Update Doctor Details
+exports.updateDoctor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { full_name, email, phone_number, department, experience, gender, description } = req.body;
+    
+    await pool.query(
+      `UPDATE doctors 
+       SET full_name = $1, email = $2, phone_number = $3, department = $4, experience = $5, gender = $6, description = $7
+       WHERE id = $8`,
+      [full_name, email, phone_number, department, experience, gender, description, id]
+    );
+
+    res.json({ success: true, message: 'Doctor updated successfully' });
+  } catch (error) {
+    console.error('Update Doctor Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// Toggle Doctor Status
+exports.updateDoctorStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'Approved' or 'Inactive'
+    
+    await pool.query(
+      `UPDATE doctors SET status = $1 WHERE id = $2`,
+      [status, id]
+    );
+
+    res.json({ success: true, message: `Doctor status updated to ${status}` });
+  } catch (error) {
+    console.error('Update Doctor Status Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 // Get list of doctors
 exports.getDoctors = async (req, res) => {
   try {
@@ -126,6 +164,11 @@ exports.createSlot = async (req, res) => {
   try {
     const { doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id } = req.body;
     
+    // Check doctor status
+    const docRes = await pool.query('SELECT status FROM doctors WHERE id = $1', [doctor_id]);
+    if (docRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Doctor not found' });
+    if (docRes.rows[0].status === 'Inactive') return res.status(403).json({ success: false, message: 'Cannot create slots for deactivated doctors' });
+
     await pool.query(
       `INSERT INTO doctor_slots (doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -142,7 +185,9 @@ exports.getSlots = async (req, res) => {
   try {
     const { doctor_id, date } = req.query;
     let query = `
-      SELECT ds.*, d.full_name as doctor_name, d.department as doctor_department, d.role as doctor_role, d.profile_photo as doctor_photo, e.full_name as peon_name
+      SELECT ds.*, 
+             (SELECT COUNT(*) FROM patient_bookings pb WHERE pb.slot_id = ds.id AND pb.status != 'Cancelled') as booked_count,
+             d.full_name as doctor_name, d.department as doctor_department, d.role as doctor_role, d.profile_photo as doctor_photo, e.full_name as peon_name
       FROM doctor_slots ds
       JOIN doctors d ON ds.doctor_id = d.id
       LEFT JOIN employees e ON ds.assigned_peon_id = e.id

@@ -6,6 +6,8 @@ router.post('/register', doctorController.registerDoctor);
 router.post('/login', doctorController.loginDoctor);
 router.post('/create', doctorController.createDoctor);
 router.get('/', doctorController.getDoctors);
+router.put('/:id', doctorController.updateDoctor);
+router.put('/:id/status', doctorController.updateDoctorStatus);
 router.put('/:id/approve', doctorController.approveDoctor);
 router.post('/slots', doctorController.createSlot);
 router.get('/slots', doctorController.getSlots);

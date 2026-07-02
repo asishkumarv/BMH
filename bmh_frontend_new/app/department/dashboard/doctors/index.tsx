@@ -29,6 +29,8 @@ export default function DepartmentDoctorManagement() {
 
   // Add Doctor Form State
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editDoctor, setEditDoctor] = useState<any>(null);
+  const [updating, setUpdating] = useState(false);
   const [newDoctor, setNewDoctor] = useState({
     full_name: '', email: '', mobile: '', password: '', 
     department: '', role: 'Doctor', experience: '', gender: 'Male', description: ''
@@ -225,6 +227,38 @@ export default function DepartmentDoctorManagement() {
     } catch (err) {
       alert('Error updating status');
     }
+  };
+
+  const handleUpdateDoctor = async () => {
+    if (!editDoctor.full_name || !editDoctor.phone_number) return Alert.alert('Error', 'Name and Phone required');
+    setUpdating(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${editDoctor.id}`, editDoctor);
+      if (res.data.success) {
+        Alert.alert('Success', res.data.message);
+        setEditDoctor(null);
+        fetchData();
+      }
+    } catch(e) {
+      Alert.alert('Error', 'Failed to update doctor');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleToggleStatus = async (doc: any) => {
+    const newStatus = doc.status === 'Inactive' ? 'Approved' : 'Inactive';
+    Alert.alert('Confirm', `Are you sure you want to ${newStatus === 'Inactive' ? 'deactivate' : 'activate'} Dr. ${doc.full_name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Yes', onPress: async () => {
+          try {
+            await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${doc.id}/status`, { status: newStatus });
+            fetchData();
+          } catch(e) {
+            Alert.alert('Error', 'Failed to update status');
+          }
+      }}
+    ]);
   };
 
   const handleAddDoctor = async () => {
@@ -630,18 +664,24 @@ export default function DepartmentDoctorManagement() {
                     <Text style={[styles.tableCell, {color: d.status === 'Approved' ? '#10b981' : '#f59e0b', fontWeight: 'bold'}]}>
                       {d.status}
                     </Text>
-                    <View style={[styles.tableCell, {flexDirection: 'row', gap: 10}]}>
-                      {d.status === 'Pending' && (
-                        <>
-                          <TouchableOpacity onPress={() => approveDoctor(d.id, 'Approved')}>
-                            <CheckCircle color="#10b981" size={20} />
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => approveDoctor(d.id, 'Rejected')}>
-                            <XCircle color="#ef4444" size={20} />
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
+                      <View style={[styles.tableCell, {flexDirection: 'row', gap: 10, flexWrap: 'wrap'}]}>
+                        {d.status === 'Pending' && (
+                          <>
+                            <TouchableOpacity onPress={() => approveDoctor(d.id, 'Approved')}>
+                              <CheckCircle color="#10b981" size={20} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => approveDoctor(d.id, 'Rejected')}>
+                              <XCircle color="#ef4444" size={20} />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                        <TouchableOpacity style={{backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4}} onPress={() => setEditDoctor(d)}>
+                          <Text style={{fontSize: 12, color: '#334155'}}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={{backgroundColor: d.status === 'Inactive' ? '#dcfce7' : '#fee2e2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4}} onPress={() => handleToggleStatus(d)}>
+                          <Text style={{fontSize: 12, color: d.status === 'Inactive' ? '#166534' : '#991b1b'}}>{d.status === 'Inactive' ? 'Activate' : 'Deactivate'}</Text>
+                        </TouchableOpacity>
+                      </View>
                   </View>
                 ))}
                 {doctors.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No doctors found in your department.</Text>}
@@ -776,6 +816,52 @@ export default function DepartmentDoctorManagement() {
       </ScrollView>
       </>
       )}
+
+      {/* Edit Doctor Modal */}
+      <Modal visible={!!editDoctor} animationType="slide" transparent={true} onRequestClose={() => setEditDoctor(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderContainer}>
+              <Text style={styles.modalTitle}>Edit Doctor</Text>
+              <TouchableOpacity onPress={() => setEditDoctor(null)}>
+                <X color="#64748b" size={24} />
+              </TouchableOpacity>
+            </View>
+            {editDoctor && (
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Full Name *</Text>
+                  <TextInput style={styles.input} value={editDoctor.full_name} onChangeText={(t) => setEditDoctor({...editDoctor, full_name: t})} />
+                </View>
+                <View style={styles.formRow}>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput style={styles.input} value={editDoctor.email} onChangeText={(t) => setEditDoctor({...editDoctor, email: t})} keyboardType="email-address" />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Phone *</Text>
+                    <TextInput style={styles.input} value={editDoctor.phone_number} onChangeText={(t) => setEditDoctor({...editDoctor, phone_number: t})} keyboardType="phone-pad" />
+                  </View>
+                </View>
+                <View style={styles.formRow}>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Department</Text>
+                    <TextInput style={styles.input} value={editDoctor.department} onChangeText={(t) => setEditDoctor({...editDoctor, department: t})} />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Experience (Years)</Text>
+                    <TextInput style={styles.input} value={String(editDoctor.experience || '')} onChangeText={(t) => setEditDoctor({...editDoctor, experience: parseInt(t) || 0})} keyboardType="numeric" />
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.submitBtn} onPress={handleUpdateDoctor} disabled={updating}>
+                  {updating ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Update Doctor</Text>}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -853,4 +939,11 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: 'white', borderRadius: 16, padding: 24, width: '90%', maxWidth: 500, maxHeight: '80%' },
   modalHeader: { fontSize: 20, fontWeight: 'bold', color: '#1e293b' },
+  modalHeaderContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e293b' },
+  modalForm: { marginTop: 10 },
+  formGroup: { marginBottom: 16, flex: 1 },
+  submitBtn: { backgroundColor: Colors.light.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+  submitBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+
 });
