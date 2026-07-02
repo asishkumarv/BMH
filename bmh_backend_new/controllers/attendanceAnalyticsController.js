@@ -12,40 +12,43 @@ exports.getAttendanceSummary = async (req, res) => {
       queryParams.push(department);
     }
 
+    const deptJoinFilter = department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : "";
+    const deptSelect = userType === 'sub_admin' ? '(SELECT name FROM departments d WHERE d.id = e.department_id) as department' : 'e.department';
+
     // 1. Total employees
     const empResult = await pool.query(`
-      SELECT COUNT(*) AS total_employees
+      SELECT e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}
       FROM ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e
       ${deptFilter}
     `, queryParams);
 
     // 2. Present (On Duty today)
     const presentResult = await pool.query(`
-      SELECT COUNT(DISTINCT a.employee_id) AS total_present
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, a.timestamp as check_in, a.checkout_timestamp as check_out
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE AND a.status = 'On Duty'
-      ${department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : ""}
+      ${deptJoinFilter}
     `, queryParams);
 
     // 3. On Leave today (assuming a leaves table exists or treating 'Leave' status)
     const leaveResult = await pool.query(`
-      SELECT COUNT(DISTINCT a.employee_id) AS total_on_leave
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE AND a.status = 'Leave'
-      ${department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : ""}
+      ${deptJoinFilter}
     `, queryParams);
 
     // 4. On Break
     const breakResult = await pool.query(`
-      SELECT COUNT(DISTINCT bl.employee_id) AS employees_on_break
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}
       FROM break_logs bl
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON bl.employee_id = e.id AND bl.user_type = '${userType}'
       WHERE bl.break_type = 'Break In'
         AND bl.status = 'On Break'
         AND DATE(bl.timestamp) = CURRENT_DATE
-        ${department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : ""}
+        ${deptJoinFilter}
         AND NOT EXISTS (
           SELECT 1 FROM break_logs bo
           WHERE bo.employee_id = bl.employee_id
@@ -55,19 +58,48 @@ exports.getAttendanceSummary = async (req, res) => {
         )
     `, queryParams);
 
-    const total_employees = Number(empResult.rows[0].total_employees);
-    const total_present = Number(presentResult.rows[0].total_present);
-    const total_on_leave = Number(leaveResult.rows[0].total_on_leave);
-    const total_absent = total_employees - total_present - total_on_leave;
+    // 5. Late Check-ins
+    const lateResult = await pool.query(`
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, a.timestamp as check_in, a.late_duration as deviation
+      FROM attendance a
+      JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
+      WHERE a.date = CURRENT_DATE 
+        AND a.late_duration IS NOT NULL AND a.late_duration != '' AND a.late_duration != '0h 0m'
+      ${deptJoinFilter}
+    `, queryParams);
+
+    // 6. Early Check-outs
+    const earlyResult = await pool.query(`
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, a.checkout_timestamp as check_out, a.early_checkout_duration as deviation
+      FROM attendance a
+      JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
+      WHERE a.date = CURRENT_DATE 
+        AND a.early_checkout_duration IS NOT NULL AND a.early_checkout_duration != '' AND a.early_checkout_duration != '0h 0m'
+      ${deptJoinFilter}
+    `, queryParams);
+
+    // Calculate Absent Employees
+    const presentIds = new Set(presentResult.rows.map(r => r.id));
+    const leaveIds = new Set(leaveResult.rows.map(r => r.id));
+    const absent_list = empResult.rows.filter(e => !presentIds.has(e.id) && !leaveIds.has(e.id));
 
     return res.json({
       success: true,
       summary: {
-        total_employees,
-        total_present,
-        total_absent,
-        total_on_leave,
-        employees_on_break: Number(breakResult.rows[0].employees_on_break)
+        total_employees: empResult.rowCount,
+        total_employees_list: empResult.rows,
+        total_present: presentResult.rowCount,
+        present_list: presentResult.rows,
+        total_absent: absent_list.length,
+        absent_list: absent_list,
+        total_on_leave: leaveResult.rowCount,
+        on_leave_list: leaveResult.rows,
+        employees_on_break: breakResult.rowCount,
+        break_list: breakResult.rows,
+        late_checkins_count: lateResult.rowCount,
+        late_checkins_list: lateResult.rows,
+        early_checkouts_count: earlyResult.rowCount,
+        early_checkouts_list: earlyResult.rows
       }
     });
   } catch (error) {

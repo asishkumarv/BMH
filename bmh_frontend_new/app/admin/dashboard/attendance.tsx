@@ -132,6 +132,9 @@ export default function AdminAttendanceScreen() {
   };
 
   const [summary, setSummary] = useState<any>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryModalType, setSummaryModalType] = useState('');
+  const [summaryModalData, setSummaryModalData] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   
@@ -292,6 +295,45 @@ export default function AdminAttendanceScreen() {
     }
   };
 
+  const handleSummaryClick = (type: string, data: any[]) => {
+    setSummaryModalType(type);
+    setSummaryModalData(data || []);
+    setShowSummaryModal(true);
+  };
+
+  const handleExportSummaryCSV = () => {
+    if (!summaryModalData || summaryModalData.length === 0) return;
+    
+    let csvContent = 'Name,Email,Mobile,Department';
+    if (summaryModalType === 'Late Check-ins') csvContent += ',Check In,Deviation\n';
+    else if (summaryModalType === 'Early Check-outs') csvContent += ',Check Out,Deviation\n';
+    else if (summaryModalType === 'Present Today') csvContent += ',Check In,Check Out\n';
+    else csvContent += '\n';
+
+    summaryModalData.forEach((r) => {
+      let row = `${r.name},${r.email || ''},${r.mobile || ''},${r.department || ''}`;
+      if (summaryModalType === 'Late Check-ins') {
+        const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
+        row += `,${checkIn},${r.deviation || ''}`;
+      } else if (summaryModalType === 'Early Check-outs') {
+        const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
+        row += `,${checkOut},${r.deviation || ''}`;
+      } else if (summaryModalType === 'Present Today') {
+        const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
+        const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
+        row += `,${checkIn},${checkOut}`;
+      }
+      csvContent += row + '\n';
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `${summaryModalType.replace(/\s+/g, '_').toLowerCase()}_report.csv`);
+    a.click();
+  };
+
   const handleExportCSV = () => {
     if (!reports || reports.length === 0) return;
     
@@ -356,23 +398,31 @@ export default function AdminAttendanceScreen() {
       </View>
       
       {/* Summary Cards */}
-      <View style={styles.summaryGrid}>
-        <View style={[styles.card, {backgroundColor: '#E3F2FD'}]}>
+      <View style={[styles.summaryGrid, {flexWrap: 'wrap'}]}>
+        <TouchableOpacity style={[styles.card, {backgroundColor: '#E3F2FD', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Total Employees', summary?.total_employees_list || [])}>
           <Text style={styles.cardValue}>{summary?.total_employees || 0}</Text>
           <Text style={styles.cardLabel}>Total Employees</Text>
-        </View>
-        <View style={[styles.card, {backgroundColor: '#E8F5E9'}]}>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.card, {backgroundColor: '#E8F5E9', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Present Today', summary?.present_list || [])}>
           <Text style={styles.cardValue}>{summary?.total_present || 0}</Text>
           <Text style={styles.cardLabel}>Present Today</Text>
-        </View>
-        <View style={[styles.card, {backgroundColor: '#FFEBEE'}]}>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFEBEE', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Absent Today', summary?.absent_list || [])}>
           <Text style={styles.cardValue}>{summary?.total_absent || 0}</Text>
           <Text style={styles.cardLabel}>Absent Today</Text>
-        </View>
-        <View style={[styles.card, {backgroundColor: '#FFF3E0'}]}>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFF3E0', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Currently on Break', summary?.break_list || [])}>
           <Text style={styles.cardValue}>{summary?.employees_on_break || 0}</Text>
           <Text style={styles.cardLabel}>Currently on Break</Text>
-        </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFF9C4', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Late Check-ins', summary?.late_checkins_list || [])}>
+          <Text style={styles.cardValue}>{summary?.late_checkins_count || 0}</Text>
+          <Text style={styles.cardLabel}>Late Check-ins</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFCDD2', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Early Check-outs', summary?.early_checkouts_list || [])}>
+          <Text style={styles.cardValue}>{summary?.early_checkouts_count || 0}</Text>
+          <Text style={styles.cardLabel}>Early Check-outs</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Config Section */}
@@ -674,13 +724,66 @@ export default function AdminAttendanceScreen() {
               )}
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={updating}>
+              <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={updating}>
               <Text style={styles.buttonText}>{updating ? 'Saving...' : 'Save Changes'}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
+        {/* Summary Details Modal */}
+        <Modal visible={showSummaryModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, {maxWidth: 800, maxHeight: '80%'}]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{summaryModalType}</Text>
+                <TouchableOpacity onPress={() => setShowSummaryModal(false)}>
+                  <X color="#6b7280" size={24} />
+                </TouchableOpacity>
+              </View>
+              <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10}}>
+                <TouchableOpacity style={[styles.exportButton, {marginTop: 0}]} onPress={handleExportSummaryCSV}>
+                  <Download size={16} color="white" />
+                  <Text style={styles.buttonText}> Export CSV</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                <View style={[styles.tableRowHeader, {backgroundColor: '#f3f4f6'}]}>
+                  <Text style={[styles.tableCellHeader, {flex: 2}]}>NAME</Text>
+                  <Text style={[styles.tableCellHeader, {flex: 2}]}>DEPARTMENT</Text>
+                  {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Present Today') && <Text style={[styles.tableCellHeader, {flex: 2}]}>CHECK IN</Text>}
+                  {(summaryModalType === 'Early Check-outs' || summaryModalType === 'Present Today') && <Text style={[styles.tableCellHeader, {flex: 2}]}>CHECK OUT</Text>}
+                  {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Early Check-outs') && <Text style={[styles.tableCellHeader, {flex: 2}]}>DEVIATION</Text>}
+                </View>
+                {summaryModalData.map((emp: any, i: number) => (
+                  <View key={i} style={[styles.tableRow, {paddingVertical: 12}]}>
+                    <View style={{flex: 2, flexDirection: 'row', alignItems: 'center', paddingLeft: 16}}>
+                      <View style={[styles.thumbPlaceholder, {marginRight: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: '#d1d5db', justifyContent: 'center', alignItems: 'center'}]}>
+                        <Text style={{color: 'white', fontWeight: 'bold'}}>{(emp.name || '?').charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View>
+                        <Text style={{fontWeight: '600', color: '#111827'}}>{emp.name}</Text>
+                        <Text style={{fontSize: 12, color: '#6b7280'}}>{emp.mobile}</Text>
+                      </View>
+                    </View>
+                    <Text style={{flex: 2, color: '#374151', padding: 16}}>{emp.department || '-'}</Text>
+                    {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Present Today') && (
+                      <Text style={{flex: 2, color: '#374151', padding: 16}}>{emp.check_in ? new Date(emp.check_in).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '-'}</Text>
+                    )}
+                    {(summaryModalType === 'Early Check-outs' || summaryModalType === 'Present Today') && (
+                      <Text style={{flex: 2, color: '#374151', padding: 16}}>{emp.check_out ? new Date(emp.check_out).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '-'}</Text>
+                    )}
+                    {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Early Check-outs') && (
+                      <Text style={{flex: 2, color: '#ef4444', fontWeight: '500', padding: 16}}>{emp.deviation}</Text>
+                    )}
+                  </View>
+                ))}
+                {summaryModalData.length === 0 && (
+                  <Text style={{textAlign: 'center', padding: 20, color: '#6b7280'}}>No records found.</Text>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
     </ScrollView>
   );
 }
