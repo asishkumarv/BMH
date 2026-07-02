@@ -231,7 +231,8 @@ export default function EmployeeWalletScreen() {
                 <View key={h.id} style={styles.pendingCard}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.pendingAmount}>₹{h.amount}</Text>
-                    <Text style={styles.pendingNote}>From: {h.from_name}</Text>
+                    <Text style={styles.pendingNote}>From: {h.from_name} ({h.from_employee_id})</Text>
+                    <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>{h.from_role} • {h.from_department}</Text>
                     <Text style={styles.txDate}>{new Date(h.created_at).toLocaleString()}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -367,7 +368,10 @@ export default function EmployeeWalletScreen() {
                 <View key={h.id} style={styles.txCard}>
                   <View style={styles.txDetails}>
                     <Text style={styles.txType}>
-                      {h.from_employee_id == employeeId ? `Handed to ${h.to_name}` : `Received from ${h.from_name}`}
+                      {h.from_employee_id == employeeId ? `Handed to ${h.to_name} (${h.to_employee_id})` : `Received from ${h.from_name} (${h.from_employee_id})`}
+                    </Text>
+                    <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>
+                      {h.from_employee_id == employeeId ? `${h.to_role} • ${h.to_department}` : `${h.from_role} • ${h.from_department}`}
                     </Text>
                     <Text style={styles.txDate}>{new Date(h.created_at).toLocaleString()}</Text>
                   </View>

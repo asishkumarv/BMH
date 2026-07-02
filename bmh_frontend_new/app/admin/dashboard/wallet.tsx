@@ -187,7 +187,8 @@ export default function AdminWalletScreen() {
                 <View key={h.id} style={styles.pendingCard}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.pendingAmount}>₹{h.amount}</Text>
-                    <Text style={styles.pendingNote}>From: {h.from_name}</Text>
+                    <Text style={styles.pendingNote}>From: {h.from_name} ({h.from_employee_id})</Text>
+                    <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>{h.from_role} • {h.from_department}</Text>
                     <Text style={styles.txDate}>{new Date(h.created_at).toLocaleString()}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -242,8 +243,9 @@ export default function AdminWalletScreen() {
               <View key={h.id} style={styles.historyCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View>
-                    <Text style={styles.historyPeer}>From: {h.from_name}</Text>
-                    <Text style={styles.historyDate}>{new Date(h.created_at).toLocaleString()}</Text>
+                    <Text style={styles.historyPeer}>From: {h.from_name} ({h.from_employee_id})</Text>
+                      {h.from_role && <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>{h.from_role} • {h.from_department}</Text>}
+                      <Text style={styles.historyDate}>{new Date(h.created_at).toLocaleString()}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={[styles.historyAmount, { color: h.status === 'Accepted' ? '#10B981' : '#ef4444' }]}>
