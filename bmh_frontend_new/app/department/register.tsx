@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../constants/Colors';
 import { useResponsive } from '../../hooks/useResponsive';
 import CustomDropdown from '../../components/ui/CustomDropdown';
+import CustomTimePicker from '../../components/ui/CustomTimePicker';
 
 export default function SubAdminRegisterScreen() {
   const router = useRouter();
@@ -329,7 +330,7 @@ export default function SubAdminRegisterScreen() {
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={shiftIn} onChange={(e) => setShiftIn(e.target.value)} />
                     ) : (
-                      <TextInput style={styles.input} placeholder="09:00" placeholderTextColor="#94A3B8" value={shiftIn} onChangeText={setShiftIn} />
+                      <CustomTimePicker value={shiftIn} onChange={setShiftIn} placeholder="09:00" />
                     )}
                   </View>
                   <View style={styles.inputGroup}>
@@ -337,7 +338,7 @@ export default function SubAdminRegisterScreen() {
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={shiftOut} onChange={(e) => setShiftOut(e.target.value)} />
                     ) : (
-                      <TextInput style={styles.input} placeholder="17:00" placeholderTextColor="#94A3B8" value={shiftOut} onChangeText={setShiftOut} />
+                      <CustomTimePicker value={shiftOut} onChange={setShiftOut} placeholder="17:00" />
                     )}
                   </View>
                   <View style={styles.inputGroup}>
@@ -345,7 +346,7 @@ export default function SubAdminRegisterScreen() {
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={breakStart} onChange={(e) => setBreakStart(e.target.value)} />
                     ) : (
-                      <TextInput style={styles.input} placeholder="13:00" placeholderTextColor="#94A3B8" value={breakStart} onChangeText={setBreakStart} />
+                      <CustomTimePicker value={breakStart} onChange={setBreakStart} placeholder="13:00" />
                     )}
                   </View>
                   <View style={styles.inputGroup}>
@@ -353,7 +354,7 @@ export default function SubAdminRegisterScreen() {
                     {Platform.OS === 'web' ? (
                       <input type="time" style={styles.webInput} value={breakEnd} onChange={(e) => setBreakEnd(e.target.value)} />
                     ) : (
-                      <TextInput style={styles.input} placeholder="14:00" placeholderTextColor="#94A3B8" value={breakEnd} onChangeText={setBreakEnd} />
+                      <CustomTimePicker value={breakEnd} onChange={setBreakEnd} placeholder="14:00" />
                     )}
                   </View>
                 </View>

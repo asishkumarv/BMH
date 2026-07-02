@@ -8,6 +8,8 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import * as ImagePicker from 'expo-image-picker';
 import { Edit2 } from 'lucide-react-native';
 import { Modal } from 'react-native';
+import CustomDropdown from '../../../components/ui/CustomDropdown';
+import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 
 export default function SubAdminProfileScreen() {
   const { isDesktop } = useResponsive();
@@ -103,7 +105,7 @@ export default function SubAdminProfileScreen() {
     }
   };
 
-  const openEditModal = () => {
+      const openEditModal = () => {
     setEditForm({
       full_name: user.full_name || '',
       email: user.email || '',
@@ -119,6 +121,10 @@ export default function SubAdminProfileScreen() {
       salary: pd.salary || '',
       empType: pd.empType || '',
       jobDesc: pd.jobDesc || '',
+      shiftIn: pd.shiftIn || '',
+      shiftOut: pd.shiftOut || '',
+      breakStart: pd.breakStart || '',
+      breakEnd: pd.breakEnd || '',
       tempAddr1: pd.tempAddr1 || '',
       tempCity: pd.tempCity || '',
       tempState: pd.tempState || '',
@@ -196,8 +202,8 @@ export default function SubAdminProfileScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <View style={{ flex: 1, minWidth: 200 }}>
             <Text style={styles.title}>Sub Admin Profile</Text>
             <Text style={styles.subtitle}>Manage your department administration account</Text>
           </View>
@@ -213,7 +219,7 @@ export default function SubAdminProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Request Profile Update</Text>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+            <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, zIndex: 1 }} style={{ zIndex: 1 }}>
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Basic Details</Text>
               <View><Text style={styles.label}>Full Name</Text><TextInput style={styles.modalInput} value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} /></View>
               <View><Text style={styles.label}>Email</Text><TextInput style={styles.modalInput} value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} /></View>
@@ -223,18 +229,22 @@ export default function SubAdminProfileScreen() {
               <View><Text style={styles.label}>Blood Group</Text><TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} /></View>
               
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Job Details</Text>
-              <View><Text style={styles.label}>Department</Text>
+              <View style={{ zIndex: 2000 }}><Text style={styles.label}>Department</Text>
                 {Platform.OS === 'web' ? (
                   <select style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none' }} value={editForm.department_id} onChange={(e) => setEditForm({...editForm, department_id: e.target.value})}>
                     <option value="">Select Department</option>
                     {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                ) : <TextInput style={styles.modalInput} value={editForm.department_id} onChangeText={(t) => setEditForm({...editForm, department_id: t})} />}
+                ) : <CustomDropdown options={departments.map((d: any) => ({ label: d.name, value: String(d.id) }))} value={String(editForm.department_id)} onChange={(val: any) => setEditForm({...editForm, department_id: val})} placeholder="Select Department" />}
               </View>
               <View><Text style={styles.label}>Manager Name</Text><TextInput style={styles.modalInput} value={editForm.manager} onChangeText={(t) => setEditForm({...editForm, manager: t})} /></View>
               <View><Text style={styles.label}>Salary</Text><TextInput style={styles.modalInput} value={editForm.salary} onChangeText={(t) => setEditForm({...editForm, salary: t})} /></View>
               <View><Text style={styles.label}>Employment Type</Text><TextInput style={styles.modalInput} value={editForm.empType} onChangeText={(t) => setEditForm({...editForm, empType: t})} /></View>
               <View><Text style={styles.label}>Job Description</Text><TextInput style={styles.modalInput} value={editForm.jobDesc} onChangeText={(t) => setEditForm({...editForm, jobDesc: t})} /></View>
+              <View><Text style={styles.label}>Shift In</Text><CustomTimePicker value={editForm.shiftIn} onChange={(t) => setEditForm({...editForm, shiftIn: t})} placeholder="09:00" /></View>
+              <View><Text style={styles.label}>Shift Out</Text><CustomTimePicker value={editForm.shiftOut} onChange={(t) => setEditForm({...editForm, shiftOut: t})} placeholder="17:00" /></View>
+              <View><Text style={styles.label}>Break Start</Text><CustomTimePicker value={editForm.breakStart} onChange={(t) => setEditForm({...editForm, breakStart: t})} placeholder="13:00" /></View>
+              <View><Text style={styles.label}>Break End</Text><CustomTimePicker value={editForm.breakEnd} onChange={(t) => setEditForm({...editForm, breakEnd: t})} placeholder="14:00" /></View>
 
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Identification & Bank</Text>
               <View><Text style={styles.label}>Aadhaar ID</Text><TextInput style={styles.modalInput} value={editForm.aadhaar} onChangeText={(t) => setEditForm({...editForm, aadhaar: t})} /></View>

@@ -6,6 +6,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { API_URL } from '../../../config';
 import CustomDropdown from '../../../components/ui/CustomDropdown';
+import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 
 type Employee = {
   id: string;
@@ -50,6 +51,8 @@ export default function EmployeesScreen() {
   const [editSalary, setEditSalary] = useState('');
   const [editShiftIn, setEditShiftIn] = useState('');
   const [editShiftOut, setEditShiftOut] = useState('');
+    const [editBreakStart, setEditBreakStart] = useState('');
+    const [editBreakEnd, setEditBreakEnd] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
@@ -359,7 +362,7 @@ export default function EmployeesScreen() {
               </View>
               
               <Text style={[styles.label, { marginTop: 15, marginBottom: 5 }]}>Assign to Department</Text>
-              <View style={{ zIndex: 1000, marginBottom: 15 }}>
+              <View style={{ zIndex: 1000, elevation: 1000, marginBottom: 15 }}>
                 <CustomDropdown
                   options={[
                     { label: 'All Departments (Global)', value: 'all' },
@@ -421,6 +424,8 @@ export default function EmployeesScreen() {
                     setEditSalary(pd.salary || '');
                     setEditShiftIn(pd.shiftIn || (selectedEmployee as any).schedule_in || '');
                     setEditShiftOut(pd.shiftOut || (selectedEmployee as any).schedule_out || '');
+                      setEditBreakStart(pd.breakStart || '');
+                      setEditBreakEnd(pd.breakEnd || '');
                     setIsEditingProfile(true);
                   }
                 }}>
@@ -528,23 +533,33 @@ export default function EmployeesScreen() {
                             <TextInput style={styles.input} keyboardType="numeric" value={editSalary} onChangeText={setEditSalary} />
                           </View>
                           <View style={{ flexDirection: 'row', gap: 12 }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift In (HH:MM)</Text>
-                              <TextInput style={styles.input} placeholder="09:00" value={editShiftIn} onChangeText={setEditShiftIn} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift In (HH:MM)</Text>
+                                <CustomTimePicker value={editShiftIn} onChange={setEditShiftIn} placeholder="09:00" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift Out (HH:MM)</Text>
+                                <CustomTimePicker value={editShiftOut} onChange={setEditShiftOut} placeholder="17:00" />
+                              </View>
                             </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift Out (HH:MM)</Text>
-                              <TextInput style={styles.input} placeholder="17:00" value={editShiftOut} onChangeText={setEditShiftOut} />
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Break Start (HH:MM)</Text>
+                                <CustomTimePicker value={editBreakStart} onChange={setEditBreakStart} placeholder="13:00" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Break End (HH:MM)</Text>
+                                <CustomTimePicker value={editBreakEnd} onChange={setEditBreakEnd} placeholder="14:00" />
+                              </View>
                             </View>
                           </View>
-                        </View>
                         <Pressable 
                           style={[styles.submitBtn, {marginTop: 12}]} 
                           disabled={savingProfile}
                           onPress={async () => {
                             setSavingProfile(true);
                             try {
-                              let newPd = { ...pd, salary: editSalary, shiftIn: editShiftIn, shiftOut: editShiftOut };
+                              let newPd = { ...pd, salary: editSalary, shiftIn: editShiftIn, shiftOut: editShiftOut, breakStart: editBreakStart, breakEnd: editBreakEnd };
                               
                               if (selectedEmployee.role === 'Sub Admin') {
                                 await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${selectedEmployee.id}/profile`, {

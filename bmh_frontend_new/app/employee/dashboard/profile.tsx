@@ -8,6 +8,8 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import * as ImagePicker from 'expo-image-picker';
 import { Edit2 } from 'lucide-react-native';
 import { Modal } from 'react-native';
+import CustomDropdown from '../../../components/ui/CustomDropdown';
+import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 
 export default function EmployeeProfileScreen() {
   const { isMobile } = useResponsive();
@@ -211,7 +213,7 @@ export default function EmployeeProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Request Profile Update</Text>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
+            <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, zIndex: 1 }} style={{ zIndex: 1 }}>
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Basic Details</Text>
               <View><Text style={styles.label}>Full Name</Text><TextInput style={styles.modalInput} value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} /></View>
               <View><Text style={styles.label}>Email</Text><TextInput style={styles.modalInput} value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} /></View>
@@ -221,30 +223,30 @@ export default function EmployeeProfileScreen() {
               <View><Text style={styles.label}>Blood Group</Text><TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} /></View>
               
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Job Details</Text>
-              <View><Text style={styles.label}>Department</Text>
+              <View style={{ zIndex: 2000 }}><Text style={styles.label}>Department</Text>
                 {Platform.OS === 'web' ? (
                   <select style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none' }} value={editForm.department} onChange={(e) => setEditForm({...editForm, department: e.target.value})}>
                     <option value="">Select Department</option>
                     {departments.map((d: any) => <option key={d.name} value={d.name}>{d.name}</option>)}
                   </select>
-                ) : <TextInput style={styles.modalInput} value={editForm.department} onChangeText={(t) => setEditForm({...editForm, department: t})} />}
+                ) : <CustomDropdown options={departments.map((d: any) => ({ label: d.name, value: d.name }))} value={editForm.department} onChange={(val: any) => setEditForm({...editForm, department: val})} placeholder="Select Department" />}
               </View>
-              <View><Text style={styles.label}>Role</Text>
+              <View style={{ zIndex: 1900 }}><Text style={styles.label}>Role</Text>
                 {Platform.OS === 'web' ? (
                   <select style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none' }} value={editForm.role} onChange={(e) => setEditForm({...editForm, role: e.target.value})}>
                     <option value="">Select Role</option>
                     {availableRoles.map((r: any) => <option key={r.name} value={r.name}>{r.name}</option>)}
                   </select>
-                ) : <TextInput style={styles.modalInput} value={editForm.role} onChangeText={(t) => setEditForm({...editForm, role: t})} />}
+                ) : <CustomDropdown options={availableRoles.map((r: any) => ({ label: r.name, value: r.name }))} value={editForm.role} onChange={(val: any) => setEditForm({...editForm, role: val})} placeholder="Select Role" />}
               </View>
               <View><Text style={styles.label}>Manager Name</Text><TextInput style={styles.modalInput} value={editForm.manager} onChangeText={(t) => setEditForm({...editForm, manager: t})} /></View>
               <View><Text style={styles.label}>Salary</Text><TextInput style={styles.modalInput} value={editForm.salary} onChangeText={(t) => setEditForm({...editForm, salary: t})} /></View>
               <View><Text style={styles.label}>Employment Type</Text><TextInput style={styles.modalInput} value={editForm.empType} onChangeText={(t) => setEditForm({...editForm, empType: t})} /></View>
               <View><Text style={styles.label}>Job Description</Text><TextInput style={styles.modalInput} value={editForm.jobDesc} onChangeText={(t) => setEditForm({...editForm, jobDesc: t})} /></View>
-              <View><Text style={styles.label}>Shift In</Text><TextInput style={styles.modalInput} value={editForm.shiftIn} onChangeText={(t) => setEditForm({...editForm, shiftIn: t})} /></View>
-              <View><Text style={styles.label}>Shift Out</Text><TextInput style={styles.modalInput} value={editForm.shiftOut} onChangeText={(t) => setEditForm({...editForm, shiftOut: t})} /></View>
-              <View><Text style={styles.label}>Break Start</Text><TextInput style={styles.modalInput} value={editForm.breakStart} onChangeText={(t) => setEditForm({...editForm, breakStart: t})} /></View>
-              <View><Text style={styles.label}>Break End</Text><TextInput style={styles.modalInput} value={editForm.breakEnd} onChangeText={(t) => setEditForm({...editForm, breakEnd: t})} /></View>
+              <View><Text style={styles.label}>Shift In</Text><CustomTimePicker value={editForm.shiftIn} onChange={(t) => setEditForm({...editForm, shiftIn: t})} placeholder="09:00" /></View>
+              <View><Text style={styles.label}>Shift Out</Text><CustomTimePicker value={editForm.shiftOut} onChange={(t) => setEditForm({...editForm, shiftOut: t})} placeholder="17:00" /></View>
+              <View><Text style={styles.label}>Break Start</Text><CustomTimePicker value={editForm.breakStart} onChange={(t) => setEditForm({...editForm, breakStart: t})} placeholder="13:00" /></View>
+              <View><Text style={styles.label}>Break End</Text><CustomTimePicker value={editForm.breakEnd} onChange={(t) => setEditForm({...editForm, breakEnd: t})} placeholder="14:00" /></View>
 
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginTop: 10, color: '#334155' }}>Identification & Bank</Text>
               <View><Text style={styles.label}>Aadhaar ID</Text><TextInput style={styles.modalInput} value={editForm.aadhaar} onChangeText={(t) => setEditForm({...editForm, aadhaar: t})} /></View>

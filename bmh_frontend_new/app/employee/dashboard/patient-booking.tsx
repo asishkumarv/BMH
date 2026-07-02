@@ -10,7 +10,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COMPANY_LOGO_BASE64 } from './logoBase64';
+// import { COMPANY_LOGO_BASE64 } from './_logoBase64';
 
 export default function PatientBooking() {
   const { isMobile } = useResponsive();
@@ -36,6 +36,7 @@ export default function PatientBooking() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [bookingLoading, setBookingLoading] = useState(false);
   const [successToken, setSuccessToken] = useState<number | null>(null);
+  const [successPatientId, setSuccessPatientId] = useState<string | null>(null);
   const [autofilled, setAutofilled] = useState(false);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function PatientBooking() {
             setCity(p.city || '');
             setPinCode(p.pin_code || '');
             setGuardianName(p.guardian_name || '');
+            setSuccessPatientId(p.patient_id || null);
             setAutofilled(true);
           } else {
             setAutofilled(false);
@@ -66,7 +68,11 @@ export default function PatientBooking() {
         setAutofilled(false);
       }
     };
-    lookupPatient();
+    
+    const timeoutId = setTimeout(() => {
+      if (mobile.length >= 10) lookupPatient();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [mobile]);
 
   // Refs for Input Navigation
@@ -211,6 +217,7 @@ export default function PatientBooking() {
       
       if (res.data.success) {
         setSuccessToken(res.data.token_number);
+          if (res.data.patient_id) setSuccessPatientId(res.data.patient_id);
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Booking failed');
@@ -233,6 +240,7 @@ export default function PatientBooking() {
     setPinCode('');
     setGuardianName('');
     setSuccessToken(null);
+      setSuccessPatientId(null);
   };
 
   const handleSelectSlot = async (s: any) => {
@@ -251,6 +259,7 @@ export default function PatientBooking() {
   const handlePrintReceipt = async (b: any = null) => {
     const printToken = b ? b.token_number : successToken;
     const printPatient = b ? (b.patient_name || b.name) : patientName;
+      const printPatientId = b ? b.patient_id : successPatientId;
     const printAge = b ? b.age : age;
     const printGender = b ? b.gender : gender;
     const printMobile = b ? b.mobile : mobile;
@@ -305,16 +314,16 @@ export default function PatientBooking() {
           <div class="header">
             <div class="title">BHARAT HEALTHCARE</div>
             <div class="subtitle">
-              HOSPITAL ROAD , BARIPADA, MAYURBHANJ, ODISHA, PIN NO : 757001<br/>
-              REGD. NO : MBJ/CE/03/2019, MOBILE NO : 8093110888
+              HOSPITAL ROAD,BARIPADA,MAYURBHANJ,ODISHA,PIN NO: 757001<br/>
+              REGD. NO: MBJ/CE/03/2019,MOBILE NO: 8093110888
             </div>
           </div>
           <div class="dotted-line"></div>
           <div class="ticket-title">TEMPORARY APPOINTMENT TICKET</div>
           
           <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 8px; font-size: 11px;">
-            <div style="display: flex; align-items: center; margin-right: 15px;">Slno : <span class="box">${printToken}</span></div>
-            <div>Appt date : ${printDate}</div>
+            <div style="display: flex; align-items: center; margin-right: 15px; font-weight: bold;">P id : ${printPatientId || "New"} &nbsp; Slno : <span class="box">${printToken}</span></div>
+            <div>Appt date:${printDate}</div>
           </div>
           
           <div class="row">
@@ -323,10 +332,10 @@ export default function PatientBooking() {
           
           <div class="row-spaced">
             <div>
-              <span class="label">Age / Sex</span><span class="colon">:</span><span style="text-transform: uppercase;">${printAge} Yrs / ${printGender}</span>
+              <span class="label">Age/Sex</span><span class="colon">:</span><span style="text-transform: uppercase;">${printAge} Yrs / ${printGender}</span>
             </div>
             <div>
-              <span>MobNo : ${printMobile}</span>
+              <span>MobNo:${printMobile}</span>
             </div>
           </div>
           
