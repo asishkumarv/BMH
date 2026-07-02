@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 // Create a patient booking
 exports.createBooking = async (req, res) => {
   try {
-    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number, blood_group, city, pin_code, guardian_name, reason_for_visit } = req.body;
+    const { slot_id, patient_name, mobile, email, age, gender, booked_by, payment_mode, token_number, blood_group, city, pin_code, guardian_name, reason_for_visit, reference, pr } = req.body;
     
     await pool.query('BEGIN');
 
@@ -66,15 +66,15 @@ exports.createBooking = async (req, res) => {
     if (isOverride) {
       await pool.query(
         `UPDATE patient_bookings 
-         SET patient_id = $1, booked_by = $2, payment_mode = $3, status = 'Booked', reason_for_visit = $4, created_at = NOW()
-         WHERE id = $5`,
-        [patient_id, booked_by, payment_mode, reason_for_visit || null, existingToken.rows[0].id]
+         SET patient_id = $1, booked_by = $2, payment_mode = $3, status = 'Booked', reason_for_visit = $4, reference = $5, pr = $6, created_at = NOW()
+         WHERE id = $7`,
+        [patient_id, booked_by, payment_mode, reason_for_visit || null, reference || null, pr || null, existingToken.rows[0].id]
       );
     } else {
       await pool.query(
-        `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit)
-         VALUES ($1, $2, $3, $4, $5, 'Booked', $6)`,
-        [slot_id, patient_id, token_number, booked_by, payment_mode, reason_for_visit || null]
+        `INSERT INTO patient_bookings (slot_id, patient_id, token_number, booked_by, payment_mode, status, reason_for_visit, reference, pr)
+         VALUES ($1, $2, $3, $4, $5, 'Booked', $6, $7, $8)`,
+        [slot_id, patient_id, token_number, booked_by, payment_mode, reason_for_visit || null, reference || null, pr || null]
       );
     }
 
@@ -100,7 +100,7 @@ exports.createBooking = async (req, res) => {
 // Get bookings (Sub-admin view - no revenue, or Employee view)
 exports.getBookings = async (req, res) => {
   try {
-    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id, exclude_blocked } = req.query;
+    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id, exclude_blocked, status } = req.query;
     
     let query = `
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode, pb.reason_for_visit,
@@ -143,11 +143,15 @@ exports.getBookings = async (req, res) => {
     }
     if (patient_name) {
       params.push(`%${patient_name}%`);
-      query += ` AND p.name ILIKE $${params.length}`;
+      query += ` AND (p.name ILIKE $${params.length} OR p.mobile ILIKE $${params.length})`;
     }
     if (patient_id) {
       params.push(patient_id);
       query += ` AND pb.patient_id = $${params.length}`;
+    }
+    if (status) {
+      params.push(status);
+      query += ` AND pb.status = $${params.length}`;
     }
 
     query += ' ORDER BY ds.date DESC, ds.start_time ASC, pb.token_number ASC';
@@ -297,5 +301,38 @@ exports.incrementPrintCount = async (req, res) => {
   } catch (error) {
     console.error('Error incrementing print count:', error);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Reschedule Booking
+exports.rescheduleBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_slot_id, new_token_number } = req.body;
+
+    if (!new_slot_id || !new_token_number) {
+      return res.status(400).json({ success: false, message: 'new_slot_id and new_token_number are required' });
+    }
+
+    // Check if new_token_number is already booked in new_slot_id
+    const checkQuery = await pool.query(
+      `SELECT id FROM patient_bookings WHERE slot_id = $1 AND token_number = $2 AND status != 'Cancelled'`,
+      [new_slot_id, new_token_number]
+    );
+
+    if (checkQuery.rowCount > 0) {
+      return res.status(400).json({ success: false, message: 'The requested token is already booked for this slot' });
+    }
+
+    // Update the booking
+    await pool.query(
+      `UPDATE patient_bookings SET slot_id = $1, token_number = $2, status = 'Booked' WHERE id = $3`,
+      [new_slot_id, new_token_number, id]
+    );
+
+    res.json({ success: true, message: 'Booking rescheduled successfully' });
+  } catch (error) {
+    console.error('Reschedule Booking Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

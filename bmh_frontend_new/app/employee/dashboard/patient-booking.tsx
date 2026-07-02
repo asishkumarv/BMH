@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image, Platform } from 'react-native';
-import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer } from 'lucide-react-native';
+import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -30,6 +30,9 @@ export default function PatientBooking() {
   const [gender, setGender] = useState('Male');
   const [bloodGroup, setBloodGroup] = useState('');
   const [reasonForVisit, setReasonForVisit] = useState('');
+  const [reference, setReference] = useState('');
+  const [pr, setPr] = useState('');
+  const [allStaff, setAllStaff] = useState<any[]>([]);
   const [city, setCity] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [guardianName, setGuardianName] = useState('');
@@ -93,6 +96,88 @@ export default function PatientBooking() {
   const [filterPatient, setFilterPatient] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [uniqueDoctors, setUniqueDoctors] = useState<any[]>([]);
+
+  // Reschedule State
+  const [rescheduleBookings, setRescheduleBookings] = useState<any[]>([]);
+  const [rescheduleSelectedBooking, setRescheduleSelectedBooking] = useState<any>(null);
+  const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([]);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleFilterDate, setRescheduleFilterDate] = useState('');
+  const [rescheduleFilterDoctor, setRescheduleFilterDoctor] = useState('');
+  const [rescheduleFilterPatient, setRescheduleFilterPatient] = useState('');
+  const [rescheduleFilterDepartment, setRescheduleFilterDepartment] = useState('');
+  const [rescheduleShowDatePicker, setRescheduleShowDatePicker] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'Reschedule' && user) {
+      fetchRescheduleBookings();
+    }
+  }, [activeTab, user, rescheduleFilterDate, rescheduleFilterDoctor, rescheduleFilterPatient, rescheduleFilterDepartment]);
+
+  const fetchRescheduleBookings = async () => {
+    try {
+      let url = `https://napi.bharatmedicalhallplus.com/bookings?status=Booked&exclude_blocked=true`;
+      
+      // If a specific department filter is selected, use it, else default to user's department
+      if (rescheduleFilterDepartment) {
+        url += `&department=${encodeURIComponent(rescheduleFilterDepartment)}`;
+      } else if (user.department) {
+        url += `&department=${encodeURIComponent(user.department)}`;
+      }
+
+      if (rescheduleFilterDate) url += `&date=${rescheduleFilterDate}`;
+      if (rescheduleFilterDoctor) url += `&doctor_id=${rescheduleFilterDoctor}`;
+      if (rescheduleFilterPatient) url += `&patient_name=${rescheduleFilterPatient}`;
+
+      const res = await axios.get(url);
+      setRescheduleBookings(res.data.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSelectReschedule = async (booking: any) => {
+    setRescheduleSelectedBooking(booking);
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const validSlots = res.data.data.filter((s: any) => {
+        const slotDate = new Date(s.date);
+        return slotDate >= today && s.doctor_id === booking.doctor_id;
+      });
+      setRescheduleSlots(validSlots);
+    } catch (err) {
+      console.error('Failed to load slots for reschedule', err);
+    }
+  };
+
+  const handleConfirmReschedule = async (slot: any) => {
+    setRescheduleLoading(true);
+    try {
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${slot.id}`);
+      const booked = res.data.data.filter((b: any) => b.status !== 'VIP Quota' && b.status !== 'Cancelled').map((b: any) => b.token_number);
+      let new_token = 1;
+      while (booked.includes(new_token)) {
+        new_token++;
+      }
+      
+      const reshRes = await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/${rescheduleSelectedBooking.booking_id}/reschedule`, {
+        new_slot_id: slot.id,
+        new_token_number: new_token
+      });
+
+      if (reshRes.data.success) {
+        alert('Rescheduled Successfully to Token #' + new_token);
+        setRescheduleSelectedBooking(null);
+        fetchRescheduleBookings();
+      }
+    } catch(err: any) {
+      alert(err.response?.data?.message || 'Reschedule failed');
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'My Bookings' && user) {
@@ -185,6 +270,15 @@ export default function PatientBooking() {
       } finally {
         setLoading(false);
       }
+      
+      try {
+        const staffRes = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
+        if (staffRes.data.success) {
+          setAllStaff(staffRes.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to load staff for reference', err);
+      }
     };
     
     loadUserAndSlots();
@@ -210,6 +304,8 @@ export default function PatientBooking() {
         city,
         pin_code: pinCode,
         guardian_name: guardianName,
+        reference,
+        pr,
         booked_by: user.id,
         payment_mode: paymentMode,
         token_number: selectedToken
@@ -236,6 +332,8 @@ export default function PatientBooking() {
     setAge('');
     setBloodGroup('');
     setReasonForVisit('');
+    setReference('');
+    setPr('');
     setCity('');
     setPinCode('');
     setGuardianName('');
@@ -351,9 +449,10 @@ export default function PatientBooking() {
             <span class="label">Department</span><span class="colon">:</span><span style="text-transform: uppercase;">${printDept}</span>
           </div>
           
+          ${parseInt(printAmount) > 0 ? `
           <div class="row" style="margin-top: 4px;">
             <span class="label">Amount</span><span class="colon">:</span><span style="margin-left: 30px; font-weight: bold;">${printAmount}</span>
-          </div>
+          </div>` : ''}
           
           <div class="footer-row">
             <div class="print-info">Printed: ${nowStr} (p${currentPrintCount})</div>
@@ -429,7 +528,7 @@ export default function PatientBooking() {
       <Text style={styles.header}>Patient Booking</Text>
       
       <View style={styles.tabContainer}>
-        {['New Booking', 'My Bookings'].map(tab => (
+        {['New Booking', 'My Bookings', 'Reschedule'].map(tab => (
           <TouchableOpacity 
             key={tab} 
             style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -577,7 +676,30 @@ export default function PatientBooking() {
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Email Address (Optional)</Text>
-              <TextInput ref={emailRef} style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" returnKeyType="done" onSubmitEditing={handleBooking} />
+              <TextInput ref={emailRef} style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" returnKeyType="done" />
+            </View>
+          </View>
+
+          <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
+            <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0, position: 'relative', zIndex: 10 }}>
+              <Text style={styles.formLabel}>Reference (Search or Enter Name)</Text>
+              <TextInput style={styles.input} value={reference} onChangeText={setReference} placeholder="e.g. Dr. John - Cardiology" returnKeyType="next" blurOnSubmit={false} />
+              {reference.length > 0 && allStaff.filter(s => s.full_name && (s.full_name.toLowerCase().includes(reference.toLowerCase()) || (s.department && s.department.toLowerCase().includes(reference.toLowerCase())) || (s.type && s.type.toLowerCase().includes(reference.toLowerCase())))).length > 0 && !reference.includes('(') && (
+                <View style={{position: 'absolute', top: 70, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, maxHeight: 150, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5}}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                    {allStaff.filter(s => s.full_name && (s.full_name.toLowerCase().includes(reference.toLowerCase()) || (s.department && s.department.toLowerCase().includes(reference.toLowerCase())) || (s.type && s.type.toLowerCase().includes(reference.toLowerCase())))).slice(0, 10).map((s, i) => (
+                      <TouchableOpacity key={i} style={{padding: 12, borderBottomWidth: 1, borderColor: '#f1f5f9'}} onPress={() => setReference(`${s.full_name} (${s.department || s.type})`)}>
+                        <Text style={{fontWeight: 'bold', color: '#1e293b'}}>{s.full_name}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{s.type} {s.department ? `- ${s.department}` : ''}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.formLabel}>PR</Text>
+              <TextInput style={styles.input} value={pr} onChangeText={setPr} placeholder="PR Details" returnKeyType="next" />
             </View>
           </View>
           
@@ -624,7 +746,7 @@ export default function PatientBooking() {
         </View>
       )}
         </View>
-      ) : (
+      ) : activeTab === 'My Bookings' ? (
         <View style={styles.card}>
           <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
             <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>My Booked Patients</Text>
@@ -721,10 +843,159 @@ export default function PatientBooking() {
               ))}
               {myBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found.</Text>}
             </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
+      ) : activeTab === 'Reschedule' ? (
+        <View style={styles.card}>
+          <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 16}}>Reschedule Bookings</Text>
+          {rescheduleSelectedBooking ? (
+            <View>
+              <TouchableOpacity onPress={() => setRescheduleSelectedBooking(null)} style={{marginBottom: 16}}>
+                <Text style={{color: Colors.light.primary, fontWeight: '600'}}>← Back to List</Text>
+              </TouchableOpacity>
+              <Text style={styles.sectionTitle}>Select New Slot for {rescheduleSelectedBooking.patient_name}</Text>
+              {rescheduleSlots.length === 0 ? (
+                <Text style={{color: '#64748b'}}>No future slots available for this doctor.</Text>
+              ) : (
+                <View style={styles.grid}>
+                  {rescheduleSlots.map((s, i) => (
+                    <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleConfirmReschedule(s)} disabled={rescheduleLoading}>
+                      <View style={[styles.slotHeader, {alignItems: 'flex-start'}]}>
+                        <View style={{flexDirection: 'row', flex: 1, gap: 12}}>
+                          {s.doctor_photo ? (
+                            <Image source={{uri: s.doctor_photo}} style={{width: 48, height: 48, borderRadius: 24, backgroundColor: '#f1f5f9'}} />
+                          ) : (
+                            <View style={{width: 48, height: 48, borderRadius: 24, backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center'}}>
+                              <Users size={24} color="#64748b" />
+                            </View>
+                          )}
+                          <View style={{flex: 1}}>
+                            <Text style={styles.doctorName}>Dr. {s.doctor_name}</Text>
+                            <Text style={{color: '#64748b', fontSize: 12}}>{s.doctor_department}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.slotDetails}>
+                        <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text></View>
+                        <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
+                      </View>
+                      <View style={styles.selectBtn}><Text style={styles.selectBtnText}>{rescheduleLoading ? 'Rescheduling...' : 'Select Slot'}</Text></View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          ) : (
+            <View>
+              <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }]}>
+                <View style={[styles.filterCol, {flex: 1}]}>
+                  <Text style={styles.label}>Patient Name/Mobile</Text>
+                  <View style={styles.inputIconContainer}>
+                    <Search color="#94a3b8" size={20} style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, styles.inputWithIcon]}
+                      placeholder="Search patient or phone..."
+                      value={rescheduleFilterPatient}
+                      onChangeText={setRescheduleFilterPatient}
+                    />
+                  </View>
+                </View>
+                <View style={[styles.filterCol, {flex: 1}]}>
+                  <Text style={styles.label}>Department</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="E.g. Cardiology"
+                    value={rescheduleFilterDepartment}
+                    onChangeText={setRescheduleFilterDepartment}
+                  />
+                </View>
+                <View style={[styles.filterCol, {flex: 1}]}>
+                  <Text style={styles.label}>Date Filter</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="date"
+                      value={rescheduleFilterDate}
+                      onChange={(e) => setRescheduleFilterDate(e.target.value)}
+                      style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, color: '#1e293b' } as any}
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity onPress={() => setRescheduleShowDatePicker(true)}>
+                        <TextInput style={styles.input} value={rescheduleFilterDate} editable={false} placeholder="Select Date" />
+                      </TouchableOpacity>
+                      {rescheduleShowDatePicker && (
+                        <DateTimePicker
+                          value={rescheduleFilterDate ? new Date(rescheduleFilterDate) : new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={(event, selectedDate) => {
+                            setRescheduleShowDatePicker(false);
+                            if (selectedDate) setRescheduleFilterDate(selectedDate.toISOString().split('T')[0]);
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
+                <View style={[styles.filterCol, {minWidth: 150}]}>
+                  <Text style={styles.label}>Doctor Filter</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={rescheduleFilterDoctor}
+                      onValueChange={(val) => setRescheduleFilterDoctor(val)}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="All Doctors" value="" />
+                      {uniqueDoctors.map((d: any) => (
+                        <Picker.Item key={d.id} label={d.name} value={d.id} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+                <View style={[styles.filterCol, {minWidth: 150, justifyContent: 'flex-end'}]}>
+                  <TouchableOpacity style={styles.clearBtn} onPress={() => { setRescheduleFilterDate(''); setRescheduleFilterDoctor(''); setRescheduleFilterPatient(''); setRescheduleFilterDepartment(''); }}>
+                    <Text style={styles.clearBtnText}>Clear Filters</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ minWidth: isMobile ? 800 : '100%' }}>
+                <View style={styles.tableRowHeader}>
+                  <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                  <Text style={styles.tableCellHeader}>Patient</Text>
+                  <Text style={styles.tableCellHeader}>Doctor</Text>
+                  <Text style={styles.tableCellHeader}>Date/Time</Text>
+                  <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
+                </View>
+                {rescheduleBookings.map((b, i) => (
+                  <View key={i} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                    <View style={styles.tableCell}>
+                      <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
+                      <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
+                    </View>
+                    <View style={styles.tableCell}>
+                      <Text>{b.doctor_name}</Text>
+                      <Text style={{fontSize: 12, color: '#64748b'}}>{b.department}</Text>
+                    </View>
+                    <View style={styles.tableCell}>
+                      <Text>{new Date(b.date).toLocaleDateString('en-GB')}</Text>
+                      <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleSelectReschedule(b)} style={{flex: 0.5, alignItems: 'center'}}>
+                      <Text style={{color: Colors.light.primary, fontWeight: 'bold'}}>Reschedule</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {rescheduleBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found to reschedule.</Text>}
+              </View>
+            </ScrollView>
+            </View>
+          )}
         </View>
-      )}
-    </ScrollView>
+      ) : null}
+      </ScrollView>
   );
 }
 
@@ -768,6 +1039,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     height: 50,
   },
+  inputIconContainer: { position: 'relative' },
+  inputIcon: { position: 'absolute', left: 12, top: 15, zIndex: 1 },
+  inputWithIcon: { paddingLeft: 40 },
   row: { flexDirection: 'row', marginBottom: 16 },
   
   toggleRow: { flexDirection: 'row', backgroundColor: '#f8fafc', borderRadius: 8, padding: 4, borderWidth: 1, borderColor: '#e2e8f0' },
