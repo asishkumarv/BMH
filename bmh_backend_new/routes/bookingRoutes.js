@@ -9,7 +9,8 @@ router.put('/:id/status', bookingController.updateBookingStatus);
 router.get('/revenue', bookingController.getRevenue);
 
 router.put('/:id/print-count', bookingController.incrementPrintCount);
-router.put('/:id/reschedule', bookingController.rescheduleBooking);
 router.put('/bulk/reschedule', bookingController.bulkRescheduleSlot);
+router.put('/:id/reschedule', bookingController.rescheduleBooking);
+
 
 module.exports = router;

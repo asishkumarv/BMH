@@ -111,6 +111,7 @@ export default function PatientBooking() {
   const [rescheduleSelectedBooking, setRescheduleSelectedBooking] = useState<any>(null);
   const [rescheduleMode, setRescheduleMode] = useState<'single' | 'bulk'>('single');
   const [bulkOriginalSlot, setBulkOriginalSlot] = useState<any>(null);
+  const [bulkRefreshKey, setBulkRefreshKey] = useState(0);
   const [bulkDoctorFilter, setBulkDoctorFilter] = useState('');
   const [bulkDateFilter, setBulkDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [bulkAvailableSlots, setBulkAvailableSlots] = useState<any[]>([]);
@@ -141,7 +142,7 @@ export default function PatientBooking() {
       };
       fetchBulkSlots();
     }
-  }, [activeTab, rescheduleMode, bulkDoctorFilter, bulkDateFilter]);
+  }, [activeTab, rescheduleMode, bulkDoctorFilter, bulkDateFilter, bulkRefreshKey]);
 
   const handleSelectBulkSlot = async (slot: any) => {
     setBulkOriginalSlot(slot);
@@ -690,6 +691,7 @@ export default function PatientBooking() {
                   <Text style={styles.feeText}>₹{s.fee}</Text>
                 </View>
                 <View style={styles.slotDetails}>
+                                <View style={styles.slotDetailRow}><User color="#64748b" size={16} /><Text style={[styles.slotDetailText, {fontWeight: 'bold', color: '#1e293b'}]}>Dr. {s.doctor_name}</Text></View>
                   <View style={styles.slotDetailRow}>
                     <Calendar size={16} color="#64748b" />
                     <Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text>
@@ -1008,8 +1010,10 @@ export default function PatientBooking() {
                         {rescheduleSlots.map((s: any, i: number) => (
                           <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleConfirmBulkReschedule(s)} disabled={rescheduleLoading}>
                             <View style={styles.slotDetails}>
-                              <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text></View>
-                              <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
+                                <View style={styles.slotDetailRow}><User color="#64748b" size={16} /><Text style={[styles.slotDetailText, {fontWeight: 'bold', color: '#1e293b'}]}>Dr. {s.doctor_name}</Text></View>
+                              <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text>
+                  </View>
+                  <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
                             </View>
                             <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
                               <Text style={{fontSize: 13, color: '#3b82f6', fontWeight: '500'}}>Available: {s.total_tokens - (s.booked_count || 0)}/{s.total_tokens}</Text>
@@ -1048,8 +1052,10 @@ export default function PatientBooking() {
                       {bulkAvailableSlots.map((s: any, i: number) => (
                         <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleSelectBulkSlot(s)}>
                           <View style={styles.slotDetails}>
-                            <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text></View>
-                            <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
+                                <View style={styles.slotDetailRow}><User color="#64748b" size={16} /><Text style={[styles.slotDetailText, {fontWeight: 'bold', color: '#1e293b'}]}>Dr. {s.doctor_name}</Text></View>
+                            <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text>
+                  </View>
+                  <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
                           </View>
                           <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
                             <Text style={{fontSize: 13, color: '#64748b'}}>Booked: {s.booked_count || 0}</Text>
@@ -1090,8 +1096,10 @@ export default function PatientBooking() {
                         </View>
                       </View>
                       <View style={styles.slotDetails}>
-                        <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text></View>
-                        <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
+                                <View style={styles.slotDetailRow}><User color="#64748b" size={16} /><Text style={[styles.slotDetailText, {fontWeight: 'bold', color: '#1e293b'}]}>Dr. {s.doctor_name}</Text></View>
+                        <View style={styles.slotDetailRow}><Calendar color="#64748b" size={16} /><Text style={styles.slotDetailText}>{new Date(s.date).toLocaleDateString('en-GB')}</Text>
+                  </View>
+                  <View style={styles.slotDetailRow}><Clock color="#64748b" size={16} /><Text style={styles.slotDetailText}>{s.start_time} - {s.end_time}</Text></View>
                       </View>
                       <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
                         <Text style={{fontSize: 13, color: '#3b82f6', fontWeight: '500'}}>Available: {s.total_tokens - (s.booked_count || 0)}/{s.total_tokens}</Text>
