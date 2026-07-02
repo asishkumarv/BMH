@@ -304,14 +304,25 @@ export default function AdminAttendanceScreen() {
   const handleExportSummaryCSV = () => {
     if (!summaryModalData || summaryModalData.length === 0) return;
     
-    let csvContent = 'Name,Email,Mobile,Department';
+    let csvContent = `"${summaryModalType} List - ${new Date().toLocaleDateString()}"\n\n`;
+    csvContent += 'Employee ID,Name,Role,Email,Mobile,Department';
     if (summaryModalType === 'Late Check-ins') csvContent += ',Check In,Deviation\n';
     else if (summaryModalType === 'Early Check-outs') csvContent += ',Check Out,Deviation\n';
     else if (summaryModalType === 'Present Today') csvContent += ',Check In,Check Out\n';
     else csvContent += '\n';
 
     summaryModalData.forEach((r) => {
-      let row = `${r.name},${r.email || ''},${r.mobile || ''},${r.department || ''}`;
+      let pd: any = {};
+      try {
+        if (typeof r.profile_data === 'string') {
+          pd = JSON.parse(r.profile_data);
+        } else if (r.profile_data) {
+          pd = r.profile_data;
+        }
+      } catch (e) {}
+      const empId = r.employee_id || pd.empId || `EMP-${r.id}`;
+
+      let row = `${empId},${r.name},${r.role || ''},${r.email || ''},${r.mobile || ''},${r.department || ''}`;
       if (summaryModalType === 'Late Check-ins') {
         const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
         row += `,${checkIn},${r.deviation || ''}`;
@@ -330,7 +341,7 @@ export default function AdminAttendanceScreen() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.setAttribute('href', url);
-    a.setAttribute('download', `${summaryModalType.replace(/\s+/g, '_').toLowerCase()}_report.csv`);
+    a.setAttribute('download', `${summaryModalType.replace(/\s+/g, '_').toLowerCase()}_report_${new Date().toISOString().split('T')[0]}.csv`);
     a.click();
   };
 

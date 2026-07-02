@@ -14,17 +14,19 @@ exports.getAttendanceSummary = async (req, res) => {
 
     const deptJoinFilter = department ? (userType === 'sub_admin' ? "AND e.department_id = (SELECT id FROM departments WHERE name = $1 LIMIT 1)" : "AND e.department = $1") : "";
     const deptSelect = userType === 'sub_admin' ? '(SELECT name FROM departments d WHERE d.id = e.department_id) as department' : 'e.department';
+    const roleSelect = userType === 'sub_admin' ? "'Sub Admin' as role" : 'e.role';
+    const empIdSelect = userType === 'sub_admin' ? "'-' as employee_id" : 'e.employee_id';
 
     // 1. Total employees
     const empResult = await pool.query(`
-      SELECT e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}
+      SELECT e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, ${roleSelect}, ${empIdSelect}, e.profile_data
       FROM ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e
       ${deptFilter}
     `, queryParams);
 
     // 2. Present (On Duty today)
     const presentResult = await pool.query(`
-      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, a.timestamp as check_in, a.checkout_timestamp as check_out
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, ${roleSelect}, ${empIdSelect}, e.profile_data, a.timestamp as check_in, a.checkout_timestamp as check_out
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE AND a.status = 'On Duty'
@@ -33,7 +35,7 @@ exports.getAttendanceSummary = async (req, res) => {
 
     // 3. On Leave today (assuming a leaves table exists or treating 'Leave' status)
     const leaveResult = await pool.query(`
-      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, ${roleSelect}, ${empIdSelect}, e.profile_data
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE AND a.status = 'Leave'
@@ -42,7 +44,7 @@ exports.getAttendanceSummary = async (req, res) => {
 
     // 4. On Break
     const breakResult = await pool.query(`
-      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, ${roleSelect}, ${empIdSelect}, e.profile_data
       FROM break_logs bl
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON bl.employee_id = e.id AND bl.user_type = '${userType}'
       WHERE bl.break_type = 'Break In'
@@ -60,7 +62,7 @@ exports.getAttendanceSummary = async (req, res) => {
 
     // 5. Late Check-ins
     const lateResult = await pool.query(`
-      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, a.timestamp as check_in, a.late_duration as deviation
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, ${roleSelect}, ${empIdSelect}, e.profile_data, a.timestamp as check_in, a.late_duration as deviation
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE 
@@ -70,7 +72,7 @@ exports.getAttendanceSummary = async (req, res) => {
 
     // 6. Early Check-outs
     const earlyResult = await pool.query(`
-      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, a.checkout_timestamp as check_out, a.early_checkout_duration as deviation
+      SELECT DISTINCT ON (e.id) e.id, e.full_name as name, e.email, e.mobile, ${deptSelect}, ${roleSelect}, ${empIdSelect}, e.profile_data, a.checkout_timestamp as check_out, a.early_checkout_duration as deviation
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
       WHERE a.date = CURRENT_DATE 
