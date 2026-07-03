@@ -22,7 +22,6 @@ const NAV_ITEMS = [
 const PHARMACY_ITEMS = [
   { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-orders' },
   { name: 'Purchase Orderlist', route: '/dashboard/pharmacy/purchase-orderlist' },
-  { name: 'Sales order', route: '/dashboard/pharmacy/sales-order' },
   { name: 'Sales Invoice Manager', route: '/dashboard/pharmacy/sales-invoices' },
   { name: 'Ecogreen Sales invocie', route: '/dashboard/pharmacy/ecogreen-invoices' },
 ];
@@ -57,7 +56,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
           }
         }
         
-        // Fetch user to check role for Peon Queue
+        // Fetch user to check role for Peon Queue and explicit ID access
         let userDataStr = null;
         if (Platform.OS === 'web') {
           userDataStr = localStorage.getItem('employeeUser');
@@ -71,6 +70,17 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
           if (r === 'peon' || r === 'poen' || r === 'nurse staff'|| r === 'staff nurse') {
             dynamicNavItems.splice(1, 0, { name: 'Live Queue', icon: Users, route: '/employee/dashboard/queue' });
             dynamicNavItems.splice(2, 0, { name: 'Check In', icon: User, route: '/employee/dashboard/check-in' });
+          }
+
+          // Check sales_order_access for specific user ID
+          if (res.data.success && res.data.settings.sales_order_access) {
+            let soa = res.data.settings.sales_order_access;
+            if (typeof soa === 'string') soa = JSON.parse(soa);
+            const empId = u.id?.toString();
+            if (empId && soa[empId] === true) {
+              dynamicNavItems.push({ name: 'Create Sales Order', icon: Package, route: '/employee/dashboard/pharmacy/sales-order' });
+              dynamicNavItems.push({ name: 'Sales Orders List', icon: FileText, route: '/employee/dashboard/pharmacy/sales-order-list' });
+            }
           }
         }
         

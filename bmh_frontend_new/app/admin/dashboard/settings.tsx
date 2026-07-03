@@ -6,7 +6,9 @@ import { ShieldCheck } from 'lucide-react-native';
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState<Record<string, { sub_admin: boolean, employee: boolean }>>({});
+  const [salesOrderAccess, setSalesOrderAccess] = useState<Record<string, boolean>>({});
   const [departments, setDepartments] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -16,13 +18,16 @@ export default function AdminSettings() {
 
   const fetchData = async () => {
     try {
-      const [settingsRes, deptRes] = await Promise.all([
+      const [settingsRes, deptRes, empRes] = await Promise.all([
         axios.get('https://napi.bharatmedicalhallplus.com/settings'),
-        axios.get('https://napi.bharatmedicalhallplus.com/department')
+        axios.get('https://napi.bharatmedicalhallplus.com/department'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees')
       ]);
 
       const depts = deptRes.data.data || [];
       setDepartments(depts);
+      const emps = empRes.data.data || empRes.data || [];
+      setEmployees(Array.isArray(emps) ? emps : []);
 
       let currentSettings: any = {};
       if (settingsRes.data.success && settingsRes.data.settings.doctor_management_access) {
@@ -47,6 +52,14 @@ export default function AdminSettings() {
       
       setSettings(initSettings);
 
+      let currentSalesOrderAccess = {};
+      if (settingsRes.data.success && settingsRes.data.settings.sales_order_access) {
+        let value = settingsRes.data.settings.sales_order_access;
+        if (typeof value === 'string') value = JSON.parse(value);
+        currentSalesOrderAccess = value;
+      }
+      setSalesOrderAccess(currentSalesOrderAccess);
+
     } catch (err) {
       console.error('Failed to fetch settings or departments', err);
     } finally {
@@ -57,10 +70,16 @@ export default function AdminSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post('https://napi.bharatmedicalhallplus.com/settings', {
-        key: 'doctor_management_access',
-        value: settings
-      });
+      await Promise.all([
+        axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+          key: 'doctor_management_access',
+          value: settings
+        }),
+        axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+          key: 'sales_order_access',
+          value: salesOrderAccess
+        })
+      ]);
       alert('Settings saved successfully');
     } catch (err) {
       console.error('Failed to save settings', err);
@@ -77,6 +96,13 @@ export default function AdminSettings() {
         ...prev[deptName],
         [field]: value
       }
+    }));
+  };
+
+  const toggleSalesOrderAccess = (empId: string, value: boolean) => {
+    setSalesOrderAccess(prev => ({
+      ...prev,
+      [empId]: value
     }));
   };
 
@@ -136,11 +162,43 @@ export default function AdminSettings() {
         {departments.length === 0 && (
           <Text style={{textAlign: 'center', padding: 20, color: '#64748b'}}>No departments found.</Text>
         )}
-
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Save Configuration</Text>}
-        </TouchableOpacity>
       </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <ShieldCheck size={24} color={Colors.light.primary} />
+          <Text style={styles.cardTitle}>Sales Order & Item Master Access</Text>
+        </View>
+        <Text style={styles.description}>
+          Control which employees have access to the Sales Order and Item Master features.
+        </Text>
+
+        {employees.map((emp, index) => {
+          const empId = emp.id?.toString() || index.toString();
+          return (
+            <View key={empId} style={styles.settingRow}>
+              <View style={{flex: 1}}>
+                <Text style={styles.settingTitle}>{emp.name || 'Unknown Employee'}</Text>
+                <Text style={styles.settingDesc}>{emp.role || 'Employee'}</Text>
+              </View>
+              <Switch 
+                value={salesOrderAccess[empId] || false} 
+                onValueChange={(v) => toggleSalesOrderAccess(empId, v)} 
+                trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
+                thumbColor={salesOrderAccess[empId] ? Colors.light.primary : '#f8fafc'}
+              />
+            </View>
+          );
+        })}
+
+        {employees.length === 0 && (
+          <Text style={{textAlign: 'center', padding: 20, color: '#64748b'}}>No employees found.</Text>
+        )}
+      </View>
+
+      <TouchableOpacity style={[styles.saveBtn, { marginBottom: 40 }]} onPress={handleSave} disabled={saving}>
+        {saving ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Save Configuration</Text>}
+      </TouchableOpacity>
     </ScrollView>
   );
 }

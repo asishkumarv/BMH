@@ -1,496 +1,533 @@
-import React, { useState, useEffect } from "react";
-import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  Alert, Image, useWindowDimensions, Platform, SafeAreaView, ActivityIndicator
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { ItemMasterModal } from './ItemMasterModal';
+import { useTokenManager } from './useTokenManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import { useRouter } from 'expo-router';
-import { Picker } from "@react-native-picker/picker";
-import { LinearGradient } from "expo-linear-gradient";
 
-const BRAND = {
-  deep: '#1E3A8A', primary: '#2456C7', bg: '#F4F7FC', surface: '#FFFFFF',
-  ink: '#0F1F3D', muted: '#6B7A99', border: '#E3E9F4',
-  danger: '#E54848', success: '#10B981', warn: '#F59E0B', gold: '#C9A646',
-};
-export default function OrderForm() {
+export default function SalesOrder() {
   const router = useRouter();
-
-  const [customerName, setCustomerName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [address, setAddress] = useState("");
-  const [landmark, setLandmark] = useState("");
-  const [pinCode, setPinCode] = useState("");
-
- const [orderItems, setOrderItems] = useState([
-  { id: Date.now(), medicineId: "", name: "", quantity: "1", mrp: "", rate: "" },
-]);
-
-  const [paymentMode, setPaymentMode] = useState("cod");
-  const [deliveryType, setDeliveryType] = useState("local");
+  const apiKey = useTokenManager();
+  
+  const [itemMasterVisible, setItemMasterVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-     const [loadingCount, setLoadingCount] = useState(0);
-
-  const [prescriptionRequired, setPrescriptionRequired] = useState(false);
-  const [prescriptionImage, setPrescriptionImage] = useState(null);
-  const [customFields, setCustomFields] = useState([]);
-const [customValues, setCustomValues] = useState({});
-const { width: SCREEN_WIDTH } = useWindowDimensions();
-  // Thresholds for responsiveness
-  const isDesktop = SCREEN_WIDTH > 800;
-  const isMobile = SCREEN_WIDTH <= 800;
-
-  const MAX_CONTENT_WIDTH = 1100;
-
-
-  const [medicines, setMedicines] = useState([]);
-
-useEffect(() => {
-  const fetchMedicines = async () => {
-    try {
-      const res = await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/medicine/all"
-      );
-      const data = await res.json();
-
-      if (Array.isArray(data)) {
-        // Optional: show only medicines with stock > 0
-        const available = data.filter((m) => m.stock > 0);
-        setMedicines(available);
-      }
-    } catch (err) {
-      console.log("Medicine fetch error", err);
-    }
-  };
-
-  fetchMedicines();
-}, []);
-useEffect(() => {
-  const fetchCustomFields = async () => {
-    try {
-      const res = await fetch("https://hospitaldatabasemanagement.onrender.com/CreateSalesorderfields/all");
-      const data = await res.json();
-      if (data.success) {
-        setCustomFields(data.fields || []);
-
-        // Initialize values as empty string
-        const initialValues = {};
-        data.fields.forEach(f => { initialValues[f.field_key] = ""; });
-        setCustomValues(initialValues);
-      }
-    } catch (err) {
-      console.error("Error fetching custom fields:", err);
-    }
-  };
-
-  fetchCustomFields();
-}, []);
- const showAlert = (title, message, buttons) => {
-   if (Platform.OS === "web") {
-     const confirmDelete = window.confirm(`${title}\n\n${message}`);
-     if (confirmDelete && buttons?.[1]?.onPress) {
-       buttons[1].onPress();
-     }
-   } else {
-     Alert.alert(title, message, buttons);
-   }
- };
-
- useEffect(() => {
-             let interval;
-             if (loading) {
-               setLoadingCount(0);
-               interval = setInterval(() => setLoadingCount((c) => c + 1), 1000);
-             } else clearInterval(interval);
-             return () => clearInterval(interval);
-           }, [loading]);
-  const addOrderItem = () => {
-    setOrderItems([
-      ...orderItems,
-      { id: Date.now(), name: "", quantity: "1", mrp: "", rate: "" },
-    ]);
-  };
-
-  const removeOrderItem = (id) => {
-    if (orderItems.length > 1) {
-      setOrderItems(orderItems.filter((i) => i.id !== id));
-    }
-  };
-const handleMobileChange = (text) => {
-  // Remove any non-digits
-  const cleaned = text.replace(/[^0-9]/g, "");
   
-  // Limit to 10 digits
-  const limited = cleaned.slice(0, 10);
-  
-  // Update state
-  setMobile(limited);
-};
- const updateOrderItem = (id, field, value) => {
-  setOrderItems(prevItems =>
-    prevItems.map(item => item.id === id ? { ...item, [field]: value } : item)
-  );
-};
+  const [formData, setFormData] = useState({
+    ipNo: "",
+    mobileNo: "",
+    patientName: "",
+    patientAddress: "",
+    patientEmail: "",
+    counterSale: "1",
+    ordDate: new Date().toISOString().split('T')[0],
+    ordTime: new Date().toTimeString().split(' ')[0],
+    userId: "",
+    actCode: "GC01",
+    actName: "",
+    drCode: "GD01",
+    drName: "",
+    drAddress: "",
+    drRegNo: "",
+    drOfficeCode: "-",
+    dmanCode: "-",
+    orderTotal: "0.00",
+    orderDiscPer: "0.00",
+    refNo: Math.floor(Math.random() * 10000),
+    orderId: Math.floor(Math.random() * 1000),
+    remark: "",
+    urgentFlag: 0,
+    ordConversionFlag: 0,
+    dcConversionFlag: 0,
+    ordRefNo: 0,
+    sysName: "BMH-SYS",
+    sysIp: "127.0.0.1",
+    sysUser: ""
+  });
 
-  const pickPrescription = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.7,
+  const [items, setItems] = useState([]);
+  
+  useEffect(() => {
+    const fetchUser = async () => {
+      let userDataStr = null;
+      if (Platform.OS === 'web') {
+        userDataStr = localStorage.getItem('employeeUser');
+      } else {
+        userDataStr = await AsyncStorage.getItem('employeeUser');
+      }
+      if (userDataStr) {
+        const u = JSON.parse(userDataStr);
+        setFormData(prev => ({ ...prev, userId: u.name || "Employee", sysUser: u.name || "Employee" }));
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.altKey && (e.key === '+' || e.key === '=')) {
+      e.preventDefault();
+      setItemMasterVisible(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [handleKeyDown]);
+
+  const updateField = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleItemSelect = (item) => {
+    const newItem = {
+      itemSeq: items.length + 1,
+      itemcode: item.c_item_code,
+      itemName: item.itemName,
+      batchNo: item.batchNo,
+      pack: item.itemQtyPerBox || 1,
+      totalLooseQty: 1, // Default to 1 pack/loose
+      totalLooseSchQty: 0,
+      serviceQty: 0,
+      saleRate: item.saleRate || 0,
+      discPer: "0.00",
+      schDiscPer: "0.00",
+      mrp: item.mrp || 0
+    };
+    setItems([...items, newItem]);
+    setItemMasterVisible(false);
+    recalculateTotal([...items, newItem]);
+  };
+
+  const updateItemQty = (index, qty) => {
+    const newItems = [...items];
+    newItems[index].totalLooseQty = parseInt(qty) || 0;
+    setItems(newItems);
+    recalculateTotal(newItems);
+  };
+
+  const recalculateTotal = (currentItems) => {
+    let total = 0;
+    currentItems.forEach(item => {
+      total += (parseFloat(item.saleRate) || 0) * (parseInt(item.totalLooseQty) || 0);
     });
-
-    if (!result.canceled) {
-      setPrescriptionImage(result.assets[0].uri);
-    }
+    setFormData(prev => ({ ...prev, orderTotal: total.toFixed(2) }));
   };
 
-  /* GRAND TOTAL */
-  const grandTotal = orderItems.reduce((sum, i) => {
-    let qty = Number(i.quantity || 0);
-    let rate = Number(i.rate || 0);
-    return sum + qty * rate;
-  }, 0);
+  const handleSubmit = async () => {
+    if (items.length === 0) {
+      alert("Please add at least one item to the sales order.");
+      return;
+    }
 
-const handleSubmit = async () => {
-  if (!customerName || !mobile || !address || !pinCode) {
-    showAlert("Missing Information", "Please fill all required fields.");
-    return;
-  }
-
-  if (orderItems.some((i) => !i.name.trim())) {
-    showAlert("Missing Items", "Add at least one valid order item.");
-    return;
-  }
-
-  try {
-    const formData = new FormData();
-
-    formData.append("customer_name", customerName);
-    formData.append("mobile", mobile);
-    formData.append("address", address);
-    formData.append("landmark", landmark);
-    formData.append("pincode", pinCode);
-    formData.append("payment_mode", paymentMode);
-    formData.append("delivery_type", deliveryType);
-    formData.append("prescription_required", String(prescriptionRequired));
-
-    // FORMAT ITEMS
-    const formattedItems = orderItems.map((i) => ({
-      medicine_id: i.medicineId || null, // null if not selected
-      item_name: i.name || "",           // always send name
-      quantity: Number(i.quantity || 0),
-      mrp: Number(i.mrp || 0),
-      rate: Number(i.rate || 0),
-      total: Number(i.quantity || 0) * Number(i.rate || 0),
+    setLoading(true);
+    
+    // Format items to match payload exactly
+    const materialInfo = items.map(item => ({
+      itemSeq: item.itemSeq,
+      itemcode: item.itemcode,
+      totalLooseQty: item.totalLooseQty,
+      totalLooseSchQty: item.totalLooseSchQty,
+      serviceQty: item.serviceQty,
+      saleRate: item.saleRate.toString(),
+      discPer: item.discPer,
+      schDiscPer: item.schDiscPer
     }));
 
-    formData.append("items", JSON.stringify(formattedItems));
-    formData.append("total_amount", String(grandTotal));
+    const payload = {
+      ...formData,
+      materialInfo
+    };
 
-    if (prescriptionRequired && prescriptionImage) {
-      formData.append("prescription", {
-        uri: prescriptionImage,
-        name: "prescription.jpg",
-        type: "image/jpeg",
-      });
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/sales-order', payload);
+      alert("Sales order saved successfully!");
+      router.push('/employee/dashboard/pharmacy/sales-order-list');
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save sales order. The endpoint might not exist yet.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const res = await fetch(
-      "https://hospitaldatabasemanagement.onrender.com/salesorders/create",
-      {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: formData,
-      }
-    );
+  const removeItem = (index) => {
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+    recalculateTotal(newItems);
+  };
 
-    const data = await res.json();
+  return (
+    <View style={styles.container}>
+      <ItemMasterModal 
+        visible={itemMasterVisible} 
+        onClose={() => setItemMasterVisible(false)}
+        onSelectItem={handleItemSelect}
+        apiKey={apiKey}
+      />
 
-    if (data.success) {
-      showAlert("Success", "Order Created Successfully!");
-      // Reset form
-      setCustomerName("");
-      setMobile("");
-      setAddress("");
-      setLandmark("");
-      setPinCode("");
-      setOrderItems([{ id: Date.now(), name: "", medicineId: null, quantity: "1", mrp: "", rate: "" }]);
-      setPaymentMode("cod");
-      setDeliveryType("local");
-      setPrescriptionRequired(false);
-      setPrescriptionImage(null);
-      router.back();
-    } else {
-      showAlert("Error", data.error || "Something went wrong");
-    }
-  } catch (error) {
-    console.error("API Error:", error);
-    showAlert("Error", "Could not create order.");
-  }
-};
-  if (loading)
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text>Loading{loadingCount}s</Text>
+      {/* Top Orange Bar */}
+      <View style={styles.topBar}>
+        <View style={styles.searchRow}>
+          <Text style={styles.topText}>Search for Srno. </Text>
+          <TextInput style={[styles.input, styles.compactInput, { width: 50 }]} value="001" editable={false} />
+          <TextInput style={[styles.input, styles.compactInput, { width: 40 }]} value="26" editable={false} />
+          <TextInput style={[styles.input, styles.compactInput, { width: 40 }]} value="6" editable={false} />
+          <TextInput style={[styles.input, styles.compactInput, { width: 60 }]} value={formData.refNo.toString()} editable={false} />
+        </View>
+        <Text style={styles.viewModeText}>V I E W   M O D E</Text>
       </View>
-    );
-return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={[styles.mainWrapper, { maxWidth: MAX_CONTENT_WIDTH }]}>
-          
-          {/* HEADER */}
-          <LinearGradient colors={['#0B1F4F', '#152E6E', '#1E3A8A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerContainer}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.circleBack}>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>Create Sales Order</Text>
-              <Text style={styles.headerSub}>Generate new invoice for medicine/services</Text>
-            </View>
-          </LinearGradient>
 
-          {/* SECTION 1: CUSTOMER & ADDRESS */}
-          <View style={isDesktop ? styles.desktopGrid : styles.mobileStack}>
-            <View style={styles.gridColumn}>
-              <View style={styles.sectionHeader}>
-                <Feather name="user" size={18} color="#2563eb" />
-                <Text style={styles.sectionTitle}>Customer Information</Text>
-              </View>
-              <Text style={styles.fieldLabel}>Full Name</Text>
-              <TextInput style={styles.input} placeholder="John Doe" value={customerName} onChangeText={setCustomerName} />
-              
-              <Text style={styles.fieldLabel}>Mobile Number</Text>
-              <View style={[styles.input, styles.phoneInputRow]}>
-                <Text style={styles.prefix}>+91 </Text>
-                <TextInput
-                  style={styles.flexInput}
-                  placeholder="00000 00000"
-                  value={mobile}
-                  onChangeText={handleMobileChange}
-                  keyboardType="number-pad"
-                  maxLength={10}
+      {/* Main Header (Teal) */}
+      <View style={styles.mainHeader}>
+        <Text style={styles.mainTitle}>Sales Order</Text>
+        <Text style={styles.headerValue}>1</Text>
+        <View style={styles.headerInfoGroup}>
+          <Text style={styles.headerLabel}>Date </Text>
+          <TextInput style={[styles.input, styles.compactInput, { width: 80, backgroundColor: '#d1d5db' }]} value={formData.ordDate} editable={false} />
+          <TextInput style={[styles.input, styles.compactInput, { width: 60, backgroundColor: '#d1d5db' }]} value={formData.ordTime} editable={false} />
+        </View>
+        <View style={styles.headerInfoGroup}>
+          <Text style={styles.headerLabel}>Tran. No. </Text>
+          <Text style={styles.headerValueLight}>001/26/6/{formData.refNo}</Text>
+        </View>
+      </View>
+
+      {/* Form Area with Watermark */}
+      <View style={styles.formArea}>
+        <View style={styles.watermarkContainer}>
+          <Text style={styles.watermarkText}>BMH</Text>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.colLeft}>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Customer</Text>
+              <TextInput style={[styles.input, {width: 60}]} value={formData.actCode} onChangeText={t => updateField('actCode', t)} />
+              <TextInput style={[styles.input, {flex: 1}]} value={formData.patientName} onChangeText={t => updateField('patientName', t)} placeholder="Name" />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Branch</Text>
+              <TextInput style={[styles.input, {flex: 1}]} value="BHARAT MEDICAL HALL [001]" editable={false} />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Address</Text>
+              <TextInput style={[styles.input, {flex: 1}]} value={formData.patientAddress} onChangeText={t => updateField('patientAddress', t)} />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Phone</Text>
+              <TextInput style={[styles.input, {flex: 1}]} />
+              <Text style={[styles.fieldLabel, {width: 50, textAlign: 'right', paddingRight: 5}]}>Mobile</Text>
+              <TextInput style={[styles.input, {flex: 1}]} value={formData.mobileNo} onChangeText={t => updateField('mobileNo', t)} />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>E-mail</Text>
+              <TextInput style={[styles.input, {flex: 1}]} value={formData.patientEmail} onChangeText={t => updateField('patientEmail', t)} />
+            </View>
+          </View>
+          
+          <View style={styles.colMiddle}>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Professional</Text>
+              <TextInput style={[styles.input, {width: 50}]} value={formData.drCode} onChangeText={t => updateField('drCode', t)} />
+              <Text style={styles.fieldLabel}>Rep By</Text>
+              <TextInput style={[styles.input, {flex: 1}]} value={formData.drName} onChangeText={t => updateField('drName', t)} />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Office Location</Text>
+              <TextInput style={[styles.input, {flex: 1}]} value={formData.drOfficeCode} onChangeText={t => updateField('drOfficeCode', t)} />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Reg. No.</Text>
+              <TextInput style={[styles.input, {width: 80}]} value={formData.drRegNo} onChangeText={t => updateField('drRegNo', t)} />
+              <Text style={[styles.fieldLabel, {marginLeft: 10}]}>Ref Dt</Text>
+              <TextInput style={[styles.input, {flex: 1}]} placeholder="00-00-0000" />
+            </View>
+          </View>
+
+          <View style={styles.colRight}>
+            <View style={styles.approxValueBox}>
+              <Text style={styles.approxValueTitle}>Approx Value</Text>
+              <Text style={styles.approxValueAmt}>{formData.orderTotal}</Text>
+            </View>
+            <View style={styles.paymentModes}>
+              <Text style={styles.paymentRadio}>◉ CASH</Text>
+              <Text style={styles.paymentRadio}>○ CARD</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Table Header */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.th, { width: 60 }]}>Item Code</Text>
+        <Text style={[styles.th, { flex: 2 }]}>Item Name</Text>
+        <Text style={[styles.th, { width: 50 }]}>Pack</Text>
+        <Text style={[styles.th, { width: 80 }]}>Batch No</Text>
+        <Text style={[styles.th, { width: 50 }]}>Qty[P]</Text>
+        <Text style={[styles.th, { width: 70 }]}>Pack Rate</Text>
+        <Text style={[styles.th, { width: 50 }]}>Dis%</Text>
+        <Text style={[styles.th, { width: 80 }]}>Aprx Amt.</Text>
+        <Text style={[styles.th, { width: 30 }]}>Del</Text>
+      </View>
+
+      {/* Items List */}
+      <ScrollView style={styles.itemsScroll}>
+        {items.map((item, idx) => {
+          const approxAmt = ((parseFloat(item.saleRate) || 0) * (parseInt(item.totalLooseQty) || 0)).toFixed(2);
+          return (
+            <View key={idx} style={styles.itemRow}>
+              <Text style={[styles.td, { width: 60 }]}>{item.itemcode}</Text>
+              <Text style={[styles.td, { flex: 2 }]}>{item.itemName}</Text>
+              <Text style={[styles.td, { width: 50 }]}>{item.pack}</Text>
+              <Text style={[styles.td, { width: 80 }]}>{item.batchNo}</Text>
+              <View style={{ width: 50 }}>
+                <TextInput 
+                  style={styles.qtyInput} 
+                  value={item.totalLooseQty.toString()}
+                  onChangeText={(val) => updateItemQty(idx, val)}
+                  keyboardType="numeric"
                 />
               </View>
+              <Text style={[styles.td, { width: 70, textAlign: 'right' }]}>{item.saleRate}</Text>
+              <Text style={[styles.td, { width: 50, textAlign: 'right' }]}>{item.discPer}</Text>
+              <Text style={[styles.td, { width: 80, textAlign: 'right' }]}>{approxAmt}</Text>
+              <TouchableOpacity style={{ width: 30, alignItems: 'center' }} onPress={() => removeItem(idx)}>
+                <Text style={{ color: 'red', fontWeight: 'bold' }}>X</Text>
+              </TouchableOpacity>
             </View>
-
-            <View style={styles.gridColumn}>
-              <View style={styles.sectionHeader}>
-                <Feather name="map-pin" size={18} color="#2563eb" />
-                <Text style={styles.sectionTitle}>Delivery Details</Text>
-              </View>
-              <Text style={styles.fieldLabel}>Complete Address</Text>
-              <TextInput style={styles.input} placeholder="House No, Street..." value={address} onChangeText={setAddress} />
-              
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>Landmark</Text>
-                  <TextInput style={styles.input} placeholder="Near..." value={landmark} onChangeText={setLandmark} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>Pin Code</Text>
-                  <TextInput style={styles.input} placeholder="000000" value={pinCode} keyboardType="number-pad" onChangeText={setPinCode} />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {customFields.map((field) => (
-  <View key={field.id} style={{ marginBottom: 15 }}>
-    <Text style={styles.fieldLabel}>
-      {field.label} {field.required ? "*" : ""}
-    </Text>
-
-    {field.type === "text" && (
-      <TextInput
-        style={styles.input}
-        placeholder={field.label}
-        value={customValues[field.field_key]}
-        onChangeText={(text) =>
-          setCustomValues({ ...customValues, [field.field_key]: text })
-        }
-      />
-    )}
-
-    {field.type === "number" && (
-      <TextInput
-        style={styles.input}
-        placeholder={field.label}
-        value={customValues[field.field_key]}
-        keyboardType="numeric"
-        onChangeText={(text) =>
-          setCustomValues({ ...customValues, [field.field_key]: text })
-        }
-      />
-    )}
-
-    {field.type === "date" && (
-      <TextInput
-        style={styles.input}
-        placeholder={field.label}
-        value={customValues[field.field_key]}
-        onFocus={() => {/* show date picker */}}
-      />
-    )}
-  </View>
-))}
-
-          {/* SECTION 2: ORDER ITEMS */}
-          <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-            <Feather name="shopping-cart" size={18} color="#2563eb" />
-            <Text style={styles.sectionTitle}>Order Items</Text>
-          </View>
-
-          {orderItems.map((item, index) => (
-            <View key={item.id} style={styles.itemCard}>
-              <View style={styles.itemCardHeader}>
-                <Text style={styles.itemBadge}>ITEM #{index + 1}</Text>
-                {orderItems.length > 1 && (
-                  <TouchableOpacity onPress={() => removeOrderItem(item.id)} style={styles.removeBtn}>
-                    <Feather name="trash-2" size={18} color="#ef4444" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={isDesktop ? styles.itemInputsGrid : styles.mobileStack}>
-                <View style={{ flex: 2 }}>
-                   <Text style={styles.fieldLabel}>Medicine/Item Name</Text>
-<Picker
-  selectedValue={item.medicineId || ""}  // use null instead of ""
-  onValueChange={(value) => {
-    const selectedMedicine = medicines.find((m) => String(m.id) === value);
-    updateOrderItem(item.id, "medicineId", value ?? ""); // store string or empty
-    updateOrderItem(item.id, "name", selectedMedicine ? selectedMedicine.name : "");
-        console.log("Selected medicine ID:", value);
-
-  }}
-  style={[styles.input, { paddingVertical: 0 }]}
->
-  <Picker.Item label="Select medicine..." value={null} />  {/* null, not "" */}
-  {medicines.map((med) => (
-    <Picker.Item
-      key={med.id}
-      label={`${med.name} (Stock: ${med.stock})`}
-      value={String(med.id)}
-    />
-  ))}
-</Picker>
-     </View>
-                <View style={{ flex: 0.5 }}>
-                   <Text style={styles.fieldLabel}>Qty</Text>
-                   <TextInput style={styles.input} placeholder="1" keyboardType="number-pad" value={item.quantity} onChangeText={(t) => updateOrderItem(item.id, "quantity", t)} />
-                </View>
-                <View style={{ flex: 0.8 }}>
-                   <Text style={styles.fieldLabel}>MRP</Text>
-                   <TextInput style={styles.input} placeholder="0.00" keyboardType="numeric" value={item.mrp} onChangeText={(t) => updateOrderItem(item.id, "mrp", t)} />
-                </View>
-                <View style={{ flex: 0.8 }}>
-                   <Text style={styles.fieldLabel}>Rate</Text>
-                   <TextInput style={styles.input} placeholder="0.00" keyboardType="numeric" value={item.rate} onChangeText={(t) => updateOrderItem(item.id, "rate", t)} />
-                </View>
-              </View>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addItemButton} onPress={addOrderItem}>
-            <Ionicons name="add-circle-outline" size={20} color="#2563eb" />
-            <Text style={styles.addItemText}>Add Another Item</Text>
-          </TouchableOpacity>
-
-          {/* SECTION 3: OPTIONS */}
-          <View style={[isDesktop ? styles.desktopGrid : styles.mobileStack, { marginTop: 20 }]}>
-            <View style={styles.gridColumn}>
-                <Text style={styles.optionHeading}>Payment Mode</Text>
-                <View style={styles.optionsWrapper}>
-                  {["cod", "online", "upi"].map((mode) => (
-                      <TouchableOpacity key={mode} style={styles.radioRow} onPress={() => setPaymentMode(mode)}>
-                          <View style={styles.radioOuter}>{paymentMode === mode && <View style={styles.radioInner} />}</View>
-                          <Text style={styles.radioLabel}>{mode.toUpperCase()}</Text>
-                      </TouchableOpacity>
-                  ))}
-                </View>
-            </View>
-
-            <View style={styles.gridColumn}>
-                <Text style={styles.optionHeading}>Delivery Method</Text>
-                <View style={styles.optionsWrapper}>
-                  {["local", "outside", "bus"].map((type) => (
-                      <TouchableOpacity key={type} style={styles.radioRow} onPress={() => setDeliveryType(type)}>
-                          <View style={styles.radioOuter}>{deliveryType === type && <View style={styles.radioInner} />}</View>
-                          <Text style={styles.radioLabel}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
-                      </TouchableOpacity>
-                  ))}
-                </View>
-            </View>
-          </View>
-
-          {/* FOOTER: TOTAL & SUBMIT */}
-          <View style={[styles.footerContainer, isMobile && { flexDirection: "column", gap: 16 }]}>
-            <View style={styles.totalBox}>
-              <Text style={styles.totalLabel}>Grand Total</Text>
-              <Text style={styles.totalAmount}>₹{grandTotal.toLocaleString('en-IN')}</Text>
-            </View>
-
-            <TouchableOpacity style={[styles.submitBtn, isMobile && { width: "100%" }]} onPress={handleSubmit}>
-              <MaterialCommunityIcons name="file-document-check-outline" size={22} color="#fff" />
-              <Text style={styles.submitText}>Confirm & Create Order</Text>
-            </TouchableOpacity>
-          </View>
-
-        </View>
+          )
+        })}
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Bottom Actions */}
+      <View style={styles.bottomBar}>
+        <Text style={styles.shortcutText}>F1 - Search   ALT + (+) - Add Item   F8 - Edit   F9 - Save</Text>
+        
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
+          {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitBtnText}>SAVE ORDER (F9)</Text>}
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: BRAND.bg },
-  scrollContainer: { flexGrow: 1, paddingVertical: 20, paddingHorizontal: 16 },
-  mainWrapper: { alignSelf: "center", width: "100%", backgroundColor: BRAND.surface, borderRadius: 20, borderWidth: 1, borderColor: BRAND.border, elevation: 3, overflow: 'hidden' },
-  
-  headerContainer: { flexDirection: "row", alignItems: "center", padding: 24, gap: 15 },
-  circleBack: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: "center", alignItems: "center" },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: "#fff" },
-  headerSub: { fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 2 },
-
-  desktopGrid: { flexDirection: "row", gap: 30, paddingHorizontal: 24, paddingVertical: 20 },
-  mobileStack: { flexDirection: "column", paddingHorizontal: 20, paddingTop: 20, gap: 20 },
-  gridColumn: { flex: 1 },
-  
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 15, paddingHorizontal: 24 },
-  sectionTitle: { fontSize: 15, fontWeight: "800", color: BRAND.ink, textTransform: "uppercase", letterSpacing: 0.5 },
-
-  fieldLabel: { fontSize: 11, fontWeight: "800", color: BRAND.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 },
-  input: { backgroundColor: BRAND.bg, borderWidth: 1, borderColor: BRAND.border, borderRadius: 10, paddingHorizontal: 15, height: 46, fontSize: 14, color: BRAND.ink, marginBottom: 15, ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {}) },
-  phoneInputRow: { flexDirection: "row", alignItems: "center", ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {}) },
-  prefix: { color: BRAND.muted, fontWeight: "700", fontSize: 14 },
-  flexInput: { flex: 1, color: BRAND.ink, ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {}) },
-
-  itemCard: { backgroundColor: BRAND.surface, padding: 18, borderRadius: 12, marginBottom: 15, marginHorizontal: 24, borderWidth: 1, borderColor: BRAND.border, elevation: 1 },
-  itemCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  itemBadge: { fontSize: 10, fontWeight: "800", color: BRAND.primary, backgroundColor: '#EBF2FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  itemInputsGrid: { flexDirection: "row", gap: 12 },
-  removeBtn: { padding: 4 },
-
-  addItemButton: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 24 },
-  addItemText: { color: BRAND.primary, fontWeight: "700", fontSize: 14 },
-
-  optionHeading: { fontSize: 13, fontWeight: "800", color: BRAND.ink, marginBottom: 12, textTransform: 'uppercase' },
-  optionsWrapper: { flexDirection: "row", gap: 20, marginBottom: 20 },
-  radioRow: { flexDirection: "row", alignItems: "center" },
-  radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: BRAND.border, justifyContent: "center", alignItems: "center", marginRight: 8 },
-  radioInner: { width: 9, height: 9, backgroundColor: BRAND.primary, borderRadius: 4.5 },
-  radioLabel: { fontSize: 13, color: BRAND.muted, fontWeight: "700" },
-
-  footerContainer: { marginTop: 20, padding: 24, borderTopWidth: 1, borderTopColor: BRAND.border, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: '#FAFCFF' },
-  totalBox: { backgroundColor: '#F0FDF4', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#DCFCE7' },
-  totalLabel: { fontSize: 11, fontWeight: "800", color: '#166534', textTransform: "uppercase" },
-  totalAmount: { fontSize: 24, fontWeight: "900", color: '#14532D' },
-
-  submitBtn: { backgroundColor: BRAND.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, paddingHorizontal: 30, borderRadius: 12 },
-  submitText: { color: "#fff", fontWeight: "800", fontSize: 15 },
-
-  loader: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BRAND.bg },
-  loaderText: { marginTop: 15, color: BRAND.muted, fontWeight: "600" }
+  container: {
+    flex: 1,
+    backgroundColor: '#b5d09b', // Main background from screenshot
+    ...(Platform.OS === 'web' ? { fontFamily: 'monospace' } : {})
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F4A460', // Orange-ish top bar
+    padding: 4,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000'
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  topText: {
+    fontWeight: 'bold',
+    fontSize: 12
+  },
+  compactInput: {
+    height: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#777',
+    paddingHorizontal: 2,
+    fontSize: 12,
+    marginRight: 4
+  },
+  viewModeText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    letterSpacing: 2,
+    marginRight: 20
+  },
+  mainHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#008080', // Teal
+    padding: 4,
+    alignItems: 'center'
+  },
+  mainTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginRight: 20
+  },
+  headerValue: {
+    color: '#ff0', // Yellow
+    fontWeight: 'bold',
+    marginRight: 20
+  },
+  headerInfoGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20
+  },
+  headerLabel: {
+    color: '#fff',
+    fontSize: 12
+  },
+  headerValueLight: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  formArea: {
+    padding: 10,
+    position: 'relative'
+  },
+  watermarkContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+    pointerEvents: 'none'
+  },
+  watermarkText: {
+    fontSize: 120,
+    fontWeight: 'bold',
+    color: 'rgba(100, 150, 100, 0.2)',
+    letterSpacing: 10
+  },
+  row: {
+    flexDirection: 'row',
+    zIndex: 1
+  },
+  colLeft: {
+    flex: 2,
+    paddingRight: 10
+  },
+  colMiddle: {
+    flex: 1.5,
+    paddingRight: 10
+  },
+  colRight: {
+    flex: 1
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4
+  },
+  fieldLabel: {
+    width: 80,
+    fontSize: 12,
+    color: '#333'
+  },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#777',
+    height: 22,
+    paddingHorizontal: 4,
+    fontSize: 12,
+    ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {})
+  },
+  approxValueBox: {
+    backgroundColor: '#000',
+    padding: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignItems: 'center',
+    marginBottom: 5
+  },
+  approxValueTitle: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  approxValueAmt: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold'
+  },
+  paymentModes: {
+    flexDirection: 'row',
+    backgroundColor: '#8FBC8F',
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#777'
+  },
+  paymentRadio: {
+    fontSize: 10,
+    marginRight: 10,
+    fontWeight: 'bold'
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#006400',
+    paddingVertical: 4,
+    paddingHorizontal: 5
+  },
+  th: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+    paddingHorizontal: 2
+  },
+  itemsScroll: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    borderTopWidth: 1,
+    borderColor: '#006400'
+  },
+  itemRow: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    alignItems: 'center'
+  },
+  td: {
+    fontSize: 12,
+    color: '#000',
+    paddingHorizontal: 2
+  },
+  qtyInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#000',
+    height: 20,
+    fontSize: 12,
+    paddingHorizontal: 2,
+    textAlign: 'center',
+    ...(Platform.OS === 'web' ? { outlineWidth: 0 } : {})
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F4A460',
+    padding: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#000'
+  },
+  shortcutText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+    color: '#000'
+  },
+  submitBtn: {
+    backgroundColor: '#006400',
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderRadius: 4
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12
+  }
 });
