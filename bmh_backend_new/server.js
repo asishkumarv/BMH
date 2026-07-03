@@ -19,7 +19,7 @@ const walletRoutes = require('./routes/walletRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const holidayRoutes = require('./routes/holidayRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
+const bookingRoutes = require('./routes/bookingRoutes'); // Missing file
 const settingsRoutes = require('./routes/settingsRoutes');
 const pharmacyRoutes = require('./routes/pharmacyRoutes');
 const patientRoutes = require('./routes/patientRoutes');
@@ -45,7 +45,7 @@ app.use('/attendance', attendanceRoutes);
 app.use('/leave', require('./routes/leaveRoutes'));
 app.use('/holidays', holidayRoutes);
 app.use('/doctors', doctorRoutes);
-app.use('/bookings', bookingRoutes);
+// app.use('/bookings', bookingRoutes); // Missing file
 app.use('/settings', settingsRoutes);
 app.use('/pharmacy', pharmacyRoutes);
 app.use('/patient', patientRoutes);
