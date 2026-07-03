@@ -539,7 +539,22 @@ exports.getItems = async (req, res) => {
 
 exports.getStock = async (req, res) => {
     try {
-        const { rows } = await pool.query(`
+        const page = parseInt(req.body.page) || 1;
+        const limit = parseInt(req.body.limit) || 100;
+        const offset = (page - 1) * limit;
+        const search = req.body.search || '';
+
+        let queryArgs = [limit, offset];
+        let whereClause = 'WHERE stockbalqty > 0';
+        let countQueryArgs = [];
+
+        if (search) {
+            whereClause += ' AND (itemname ILIKE $3 OR c_item_code ILIKE $3)';
+            queryArgs.push(`%${search}%`);
+            countQueryArgs.push(`%${search}%`);
+        }
+
+        const dataQuery = `
             SELECT 
                 id, 
                 c_item_code, 
@@ -552,9 +567,31 @@ exports.getStock = async (req, res) => {
                 salerate AS "saleRate", 
                 updated_at
             FROM ecogreen_medicines 
+            ${whereClause}
             ORDER BY itemname ASC
-        `);
-        return res.status(200).json({ data: rows, lastUpdated: new Date().toISOString() });
+            LIMIT $1 OFFSET $2
+        `;
+
+        const countQuery = `SELECT COUNT(*) FROM ecogreen_medicines WHERE stockbalqty > 0 ${search ? 'AND (itemname ILIKE $1 OR c_item_code ILIKE $1)' : ''}`;
+
+        const [dataResult, countResult] = await Promise.all([
+            pool.query(dataQuery, queryArgs),
+            pool.query(countQuery, countQueryArgs)
+        ]);
+
+        const totalItems = parseInt(countResult.rows[0].count, 10);
+        const totalPages = Math.ceil(totalItems / limit);
+
+        return res.status(200).json({ 
+            data: dataResult.rows, 
+            pagination: {
+                currentPage: page,
+                totalPages,
+                totalItems,
+                itemsPerPage: limit
+            },
+            lastUpdated: new Date().toISOString() 
+        });
     } catch(err) {
          console.error('Stock fetch error:', err.message);
          res.status(500).json({ error: err.message });

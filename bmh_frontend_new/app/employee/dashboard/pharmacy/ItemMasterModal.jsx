@@ -5,44 +5,34 @@ import { Search, X } from 'lucide-react-native';
 
 export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allStock = [] }) {
   const [items, setItems] = useState([]);
-  const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 100;
 
+  // Debounce search text
   useEffect(() => {
-    if (visible) {
-      if (allStock && allStock.length > 0) {
-        setItems(allStock);
-        if (searchText.trim() === '') {
-           setFilteredItems(allStock);
-        }
-      } else if (apiKey) {
-        fetchStockData();
+    const delayDebounceFn = setTimeout(() => {
+      if (visible) {
+        setCurrentPage(1); // Reset to page 1 on new search
+        fetchStockData(1, searchText);
       }
-    }
-  }, [visible, apiKey, allStock]);
+    }, 500);
 
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchText, visible]);
+
+  // Fetch when page changes (not triggered by search)
   useEffect(() => {
-    setCurrentPage(1);
-    if (searchText.trim() === '') {
-      setFilteredItems(items);
-    } else {
-      const lower = searchText.toLowerCase();
-      setFilteredItems(
-        items.filter((item) => item.itemName?.toLowerCase().includes(lower) || item.c_item_code?.toLowerCase().includes(lower))
-      );
+    if (visible && currentPage > 1) {
+      fetchStockData(currentPage, searchText);
     }
-  }, [searchText, items]);
+  }, [currentPage]);
 
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-  const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const fetchStockData = async () => {
-    if (allStock && allStock.length > 0) return; // skip if we already have it from parent
-    
+  const fetchStockData = async (page = 1, search = '') => {
     setLoading(true);
     setError(null);
     try {
@@ -51,13 +41,16 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allSto
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({ page, limit: itemsPerPage, search })
       });
       const result = await res.json();
 
       if (result && result.data) {
         setItems(result.data);
-        setFilteredItems(result.data);
+        if (result.pagination) {
+          setTotalPages(result.pagination.totalPages);
+          setTotalItems(result.pagination.totalItems);
+        }
       } else {
         setError('Failed to fetch items from server.');
       }
@@ -126,7 +119,7 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allSto
           ) : (
             <FlatList
               style={styles.tableBody}
-              data={paginatedItems}
+              data={items}
               keyExtractor={(item, index) => index.toString()}
               initialNumToRender={20}
               maxToRenderPerBatch={20}
@@ -156,7 +149,7 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allSto
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Total Items: {filteredItems.length}</Text>
+            <Text style={styles.footerText}>Total Items: {totalItems}</Text>
             <View style={styles.pagination}>
                <TouchableOpacity 
                   disabled={currentPage === 1} 
