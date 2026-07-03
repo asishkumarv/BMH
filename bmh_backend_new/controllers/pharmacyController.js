@@ -529,23 +529,29 @@ exports.getItems = async (req, res) => {
 
 exports.getStock = async (req, res) => {
     try {
-        const { itemCodes, inputDateTime } = req.body;
-        if ((itemCodes && itemCodes.length > 0) || inputDateTime) {
-            const token = cache.get("default_token") || (await fetchToken()).apiKey;
-            const payload = { 
-                "c2Code": "P00000", 
-                "storeId": "001", 
-                "prodCode": "02", 
-                "inputDateTime":"2023-01-01 10:10:00",
-                "itemCodes":[],
-                "apiKey": token 
-            };
+        const token = cache.get("default_token") || (await fetchToken()).apiKey;
+        const payload = { 
+            "c2Code": "P00000", 
+            "storeId": "001", 
+            "prodCode": "02", 
+            "inputDateTime": "2023-01-01 10:10:00",
+            "itemCodes": [],
+            "apiKey": token 
+        };
 
-            const apiRes = await axios.post("http://117.211.64.158:21000/ws_c2_services_get_stock_data", payload, {timeout: 10000});
-            return res.status(200).json({ data: apiRes.data.data || [], lastUpdated: new Date().toISOString() });
+        const apiRes = await axios.post("http://117.211.64.158:21000/ws_c2_services_get_stock_data", payload, {timeout: 10000});
+        
+        if (apiRes.data && apiRes.data.data) {
+            db.stock = apiRes.data.data;
+            lastUpdated.stock = new Date().toISOString();
         }
-        res.status(200).json({ data: db.stock, lastUpdated: lastUpdated.stock });
+        
+        return res.status(200).json({ data: apiRes.data.data || [], lastUpdated: lastUpdated.stock });
     } catch(err) {
+         console.error('Stock fetch error:', err.message);
+         if (db.stock && db.stock.length > 0) {
+             return res.status(200).json({ data: db.stock, lastUpdated: lastUpdated.stock, fromCache: true });
+         }
          res.status(500).json({ error: err.message });
     }
 };
