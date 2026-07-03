@@ -116,3 +116,22 @@ exports.getOrdersByPatient = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
+
+exports.assignDelivery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { delivery_boy_id } = req.body;
+        const queryText = `
+            UPDATE online_orders 
+            SET delivery_boy_id = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
+            RETURNING *;
+        `;
+        const { rows } = await pool.query(queryText, [delivery_boy_id, id]);
+        if (rows.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
+        res.status(200).json({ success: true, message: 'Delivery assigned', order: rows[0] });
+    } catch (err) {
+        console.error("Assign delivery error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};

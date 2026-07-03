@@ -51,7 +51,7 @@ export const DeliverySidebar = ({ onClose }: { onClose?: () => void }) => {
       <Pressable style={styles.logoutBtn} onPress={() => {
         if (onClose) onClose();
         if (Platform.OS === 'web') {
-          localStorage.removeItem('deliveryUser');
+          localStorage.removeItem('employeeUser');
         }
         router.replace('/roles');
       }}>

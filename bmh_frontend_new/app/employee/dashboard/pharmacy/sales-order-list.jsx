@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 
 export default function SalesOrderList() {
   const [orders, setOrders] = useState([]);
+  const [deliveryBoys, setDeliveryBoys] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -37,8 +38,11 @@ export default function SalesOrderList() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/sales-orders-list');
-      // If the API isn't built yet, we can gracefully fallback
+      const [res, empRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/sales-orders-list'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees')
+      ]);
+      
       if (res.data && Array.isArray(res.data.data)) {
         setOrders(res.data.data);
       } else if (Array.isArray(res.data)) {
@@ -46,12 +50,28 @@ export default function SalesOrderList() {
       } else {
         setOrders([]);
       }
+
+      if (empRes.data && empRes.data.success) {
+        setDeliveryBoys(empRes.data.data.filter((e: any) => e.department === 'Delivery' && e.status === 'approved'));
+      }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
-      // For demonstration, we won't crash if the endpoint doesn't exist yet
       setOrders([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAssignDelivery = async (orderId, boyId) => {
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/sales-orders-list/${orderId}/assign-delivery`, {
+        delivery_boy_id: boyId
+      });
+      alert('Delivery Boy Assigned Successfully');
+      fetchOrders();
+      setModalVisible(false);
+    } catch (err) {
+      alert("Error: " + err.message);
     }
   };
 
@@ -62,8 +82,15 @@ export default function SalesOrderList() {
           <Text style={styles.orderId}>Ref No: {item.refNo}</Text>
           <Text style={styles.date}>{item.ordDate} {item.ordTime}</Text>
         </View>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>Completed</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+          {item.deliveryBoyId && (
+            <View style={styles.assignedBadge}>
+              <Text style={styles.assignedBadgeText}>Assigned</Text>
+            </View>
+          )}
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>Completed</Text>
+          </View>
         </View>
       </View>
       
@@ -192,7 +219,26 @@ export default function SalesOrderList() {
               )}
             </View>
             <View style={styles.modalFooter}>
-              <Text style={{fontWeight: 'bold', fontSize: 16}}>Total: ₹{selectedOrder.orderTotal}</Text>
+              <View style={{ flex: 1 }}>
+                {!selectedOrder.deliveryBoyId && selectedOrder.ordConversionFlag !== 1 && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      {deliveryBoys.map((boy: any) => (
+                        <TouchableOpacity 
+                          key={boy.id} 
+                          style={styles.boyTag}
+                          onPress={() => handleAssignDelivery(selectedOrder.id, boy.id)}
+                        >
+                          <Text style={styles.boyTagText}>{boy.full_name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
+                    </View>
+                  </View>
+                )}
+                <Text style={{fontWeight: 'bold', fontSize: 16}}>Total: ₹{selectedOrder.orderTotal}</Text>
+              </View>
               <TouchableOpacity 
                 style={[styles.generateBtn, selectedOrder.ordConversionFlag === 1 && {backgroundColor: '#9ca3af'}]}
                 onPress={handleGenerateInvoice}
@@ -409,8 +455,13 @@ const styles = StyleSheet.create({
   },
   generateBtnText: {
     color: '#fff',
-    fontWeight: 'bold'
+    fontWeight: '700',
+    fontSize: 14
   },
+  assignedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#E0E7FF' },
+  assignedBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#4338CA' },
+  boyTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  boyTagText: { fontSize: 12, color: '#334155', fontWeight: '600' },
   center: {
     flex: 1,
     justifyContent: 'center',

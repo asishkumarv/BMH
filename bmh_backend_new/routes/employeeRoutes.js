@@ -20,6 +20,15 @@ router.get('/by-department-id/:dept_id', employeeController.getEmployeesByDepart
 // PUT /employees/:id/status
 router.put('/:id/status', employeeController.updateEmployeeStatus);
 
+// GET /employees/delivery-fleet
+router.get('/delivery-fleet', employeeController.getDeliveryFleet);
+
+// PUT /employees/:id/location
+router.put('/:id/location', employeeController.updateEmployeeLocation);
+
+// GET /employees/:id/assigned-orders
+router.get('/:id/assigned-orders', employeeController.getAssignedOrders);
+
 // PUT /employees/:id/password
 router.put('/:id/password', employeeController.updateEmployeePassword);
 

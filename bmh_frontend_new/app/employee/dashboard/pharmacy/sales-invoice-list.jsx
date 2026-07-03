@@ -13,6 +13,7 @@ export default function SalesInvoiceList() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [invoiceItems, setInvoiceItems] = useState([]);
+  const [deliveryBoys, setDeliveryBoys] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const router = useRouter();
 
@@ -36,17 +37,38 @@ export default function SalesInvoiceList() {
   const fetchInvoices = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/sales-invoice-list');
+      const [res, empRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/sales-invoice-list'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees')
+      ]);
+      
       if (res.data && res.data.success) {
         setInvoices(res.data.data);
       } else {
         setInvoices([]);
+      }
+
+      if (empRes.data && empRes.data.success) {
+        setDeliveryBoys(empRes.data.data.filter((e: any) => e.department === 'Delivery' && e.status === 'approved'));
       }
     } catch (err) {
       console.error('Failed to fetch invoices:', err);
       setInvoices([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAssignDelivery = async (invoiceId, boyId) => {
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/sales-invoice-list/${invoiceId}/assign-delivery`, {
+        delivery_boy_id: boyId
+      });
+      alert('Delivery Boy Assigned Successfully');
+      fetchInvoices();
+      setModalVisible(false);
+    } catch (err) {
+      alert("Error: " + err.message);
     }
   };
 
@@ -62,8 +84,15 @@ export default function SalesInvoiceList() {
             </Text>
           )}
         </View>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>Completed</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+          {item.deliveryBoyId && (
+            <View style={styles.assignedBadge}>
+              <Text style={styles.assignedBadgeText}>Assigned</Text>
+            </View>
+          )}
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>Completed</Text>
+          </View>
         </View>
       </View>
       
@@ -177,7 +206,26 @@ export default function SalesInvoiceList() {
               )}
             </View>
             <View style={styles.modalFooter}>
-              <Text style={{fontWeight: 'bold', fontSize: 16}}>Total: ₹{selectedInvoice.orderTotal}</Text>
+              <View style={{ flex: 1 }}>
+                {!selectedInvoice.deliveryBoyId && selectedInvoice.salesOrderId && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      {deliveryBoys.map((boy: any) => (
+                        <TouchableOpacity 
+                          key={boy.id} 
+                          style={styles.boyTag}
+                          onPress={() => handleAssignDelivery(selectedInvoice.id, boy.id)}
+                        >
+                          <Text style={styles.boyTagText}>{boy.full_name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
+                    </View>
+                  </View>
+                )}
+                <Text style={{fontWeight: 'bold', fontSize: 16}}>Total: ₹{selectedInvoice.orderTotal}</Text>
+              </View>
               <TouchableOpacity 
                 style={styles.closeBtn}
                 onPress={() => setModalVisible(false)}
@@ -403,5 +451,14 @@ const styles = StyleSheet.create({
   closeBtnText: {
     color: '#fff',
     fontWeight: 'bold'
-  }
+  },
+  generateBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14
+  },
+  assignedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#E0E7FF' },
+  assignedBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#4338CA' },
+  boyTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  boyTagText: { fontSize: 12, color: '#334155', fontWeight: '600' }
 });

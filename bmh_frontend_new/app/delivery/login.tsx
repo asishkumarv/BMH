@@ -23,15 +23,20 @@ export default function EmployeePortal() {
     }
     setLoggingIn(true);
     try {
-      const response = await axios.post('https://napi.bharatmedicalhallplus.com/delivery-boy/login', {
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/employees/login', {
         email,
         password
       });
       if (response.data.success) {
+        if (response.data.data.department !== 'Delivery') {
+           alert('Access Denied. You are not registered as Delivery Staff.');
+           setLoggingIn(false);
+           return;
+        }
         if (Platform.OS === 'web') {
-          localStorage.setItem('deliveryUser', JSON.stringify(response.data.deliveryboy));
+          localStorage.setItem('employeeUser', JSON.stringify(response.data.data));
         } else {
-          await AsyncStorage.setItem('deliveryUser', JSON.stringify(response.data.deliveryboy));
+          await AsyncStorage.setItem('employeeUser', JSON.stringify(response.data.data));
         }
         router.replace('/delivery/dashboard' as any);
       }

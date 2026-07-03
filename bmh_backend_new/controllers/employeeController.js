@@ -101,6 +101,89 @@ exports.updateEmployeeStatus = async (req, res) => {
   }
 };
 
+exports.updateEmployeeLocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { lat, lng } = req.body;
+    
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({ success: false, message: 'Missing lat or lng' });
+    }
+
+    const result = await pool.query(
+      'UPDATE employees SET location_lat = $1, location_lng = $2 WHERE id = $3 RETURNING *',
+      [lat, lng, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
+
+    res.json({ success: true, message: 'Employee location updated' });
+  } catch (error) {
+    console.error('Error updating employee location:', error);
+    res.status(500).json({ success: false, message: 'Server error updating employee location' });
+  }
+};
+
+exports.getAssignedOrders = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Fetch from online_orders
+    const onlineOrdersRes = await pool.query(
+      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at 
+       FROM online_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
+    );
+
+    // Fetch from ecogreen_sales_orders
+    const ecogreenSalesOrdersRes = await pool.query(
+      `SELECT id, 'sales_order' as type, 'PENDING' as status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL as map_lat, NULL as map_lng, created_at
+       FROM ecogreen_sales_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
+    );
+
+    // Fetch from ecogreen_sales_invoices
+    const ecogreenSalesInvoicesRes = await pool.query(
+      `SELECT id, 'sales_invoice' as type, 'PENDING' as status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL as map_lat, NULL as map_lng, created_at
+       FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
+    );
+
+    const orders = [...onlineOrdersRes.rows, ...ecogreenSalesOrdersRes.rows, ...ecogreenSalesInvoicesRes.rows];
+    orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ success: true, data: orders });
+  } catch (err) {
+    console.error('Error fetching assigned orders:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getDeliveryFleet = async (req, res) => {
+  try {
+    // Get all delivery boys who are approved
+    const boysRes = await pool.query(`
+      SELECT id, full_name, email, phone, location_lat, location_lng, updated_at 
+      FROM employees 
+      WHERE department = 'Delivery' AND status = 'approved'
+    `);
+    const boys = boysRes.rows;
+
+    for (let boy of boys) {
+      // Get pending orders count for each boy
+      const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
+      const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_orders WHERE delivery_boy_id = $1`, [boy.id]);
+      const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1`, [boy.id]);
+      
+      boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count);
+    }
+
+    res.json({ success: true, data: boys });
+  } catch (err) {
+    console.error('Error fetching delivery fleet:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.updateEmployeePassword = async (req, res) => {
   try {
     const { id } = req.params;

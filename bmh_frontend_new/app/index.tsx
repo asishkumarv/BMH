@@ -4,6 +4,7 @@ import { ShieldCheck, Clock, Heart, ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../constants/Colors';
 import { useResponsive } from '../hooks/useResponsive';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -14,6 +15,37 @@ export default function LandingPage() {
     { icon: Clock, title: '24/7', subtitle: 'Always Available', color: '#10B981', bgColor: '#ECFDF5' },
     { icon: Heart, title: 'Care', subtitle: 'Patient First', color: '#06B6D4', bgColor: '#ECFEFF' },
   ];
+
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        if (Platform.OS === 'web') {
+          if (localStorage.getItem('adminUser')) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+          if (localStorage.getItem('employeeUser')) {
+            router.replace('/employee/dashboard');
+            return;
+          }
+        } else {
+          const adminUser = await AsyncStorage.getItem('adminUser');
+          if (adminUser) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+          const empUser = await AsyncStorage.getItem('employeeUser');
+          if (empUser) {
+            router.replace('/employee/dashboard');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkAuth();
+  }, []);
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} style={styles.container}>

@@ -5,14 +5,21 @@ import { MapPin, Phone, User, CheckCircle, Clock } from 'lucide-react-native';
 
 export default function OnlineOrdersScreen() {
   const [orders, setOrders] = useState([]);
+  const [deliveryBoys, setDeliveryBoys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const fetchOrders = async () => {
+  const fetchOrdersAndBoys = async () => {
     try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/online-orders');
-      if (res.data && res.data.success) {
-        setOrders(res.data.data);
+      const [ordRes, empRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/online-orders'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees')
+      ]);
+      if (ordRes.data && ordRes.data.success) {
+        setOrders(ordRes.data.data);
+      }
+      if (empRes.data && empRes.data.success) {
+        setDeliveryBoys(empRes.data.data.filter((e: any) => e.department === 'Delivery' && e.status === 'approved'));
       }
     } catch (err) {
       console.error(err);
@@ -22,8 +29,8 @@ export default function OnlineOrdersScreen() {
   };
 
   useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 30000); // Auto refresh every 30s
+    fetchOrdersAndBoys();
+    const interval = setInterval(fetchOrdersAndBoys, 30000); // Auto refresh every 30s
     return () => clearInterval(interval);
   }, []);
 
@@ -33,6 +40,19 @@ export default function OnlineOrdersScreen() {
         status: 'DISBURSED'
       });
       fetchOrders();
+      setSelectedOrder(null);
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  const handleAssignDelivery = async (orderId, boyId) => {
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/assign-delivery`, {
+        delivery_boy_id: boyId
+      });
+      alert('Delivery Boy Assigned Successfully');
+      fetchOrdersAndBoys();
       setSelectedOrder(null);
     } catch (err) {
       alert("Error: " + err.message);
@@ -52,8 +72,15 @@ export default function OnlineOrdersScreen() {
     <TouchableOpacity style={styles.card} onPress={() => setSelectedOrder(item)}>
       <View style={styles.cardHeader}>
         <Text style={styles.orderId}>Order #{item.id}</Text>
-        <View style={[styles.statusBadge, item.status === 'DISBURSED' ? styles.statusDisbursed : styles.statusPending]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+          {item.delivery_boy_id && (
+            <View style={styles.assignedBadge}>
+              <Text style={styles.assignedBadgeText}>Assigned</Text>
+            </View>
+          )}
+          <View style={[styles.statusBadge, item.status === 'DISBURSED' ? styles.statusDisbursed : item.status === 'DELIVERED' ? styles.statusDelivered : styles.statusPending]}>
+            <Text style={styles.statusText}>{item.status}</Text>
+          </View>
         </View>
       </View>
       <View style={styles.cardBody}>
@@ -81,7 +108,7 @@ export default function OnlineOrdersScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Online Orders</Text>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchOrders}>
+        <TouchableOpacity style={styles.refreshBtn} onPress={fetchOrdersAndBoys}>
           <Text style={styles.refreshBtnText}>Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -136,10 +163,29 @@ export default function OnlineOrdersScreen() {
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setSelectedOrder(null)}>
                   <Text style={styles.cancelBtnText}>Close</Text>
                 </TouchableOpacity>
-                {selectedOrder.status !== 'DISBURSED' && (
+
+                {selectedOrder.status !== 'DISBURSED' && selectedOrder.status !== 'DELIVERED' && !selectedOrder.delivery_boy_id && (
+                  <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      {deliveryBoys.map((boy: any) => (
+                        <TouchableOpacity 
+                          key={boy.id} 
+                          style={styles.boyTag}
+                          onPress={() => handleAssignDelivery(selectedOrder.id, boy.id)}
+                        >
+                          <Text style={styles.boyTagText}>{boy.full_name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
+                    </View>
+                  </View>
+                )}
+
+                {selectedOrder.status !== 'DISBURSED' && selectedOrder.status !== 'DELIVERED' && (
                   <TouchableOpacity style={styles.disburseBtn} onPress={() => handleDisburse(selectedOrder.id)}>
                     <CheckCircle color="#fff" size={18} style={{marginRight: 6}} />
-                    <Text style={styles.disburseBtnText}>Mark as Disbursed</Text>
+                    <Text style={styles.disburseBtnText}>Mark Disbursed</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -187,6 +233,11 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24 },
   cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, marginRight: 12 },
   cancelBtnText: { color: '#64748B', fontWeight: 'bold' },
-  disburseBtn: { backgroundColor: '#10B981', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  disburseBtnText: { color: '#fff', fontWeight: 'bold' }
+  disburseBtn: { backgroundColor: '#10B981', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, height: 40, alignSelf: 'flex-end' },
+  disburseBtnText: { color: '#fff', fontWeight: 'bold' },
+  statusDelivered: { backgroundColor: '#60A5FA' },
+  assignedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#E0E7FF' },
+  assignedBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#4338CA' },
+  boyTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  boyTagText: { fontSize: 12, color: '#334155', fontWeight: '600' }
 });

@@ -114,6 +114,7 @@ router.get('/', async (req, res) => {
       sysName: r.sys_name,
       sysIp: r.sys_ip,
       sysUser: r.sys_user,
+      deliveryBoyId: r.delivery_boy_id,
       createdAt: r.created_at
     }));
 
@@ -123,6 +124,29 @@ router.get('/', async (req, res) => {
     res.status(500).json({ success: false, error: 'Server error' });
   }
 });
+
+// PUT /:id/assign-delivery
+router.put('/:id/assign-delivery', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { delivery_boy_id } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE ecogreen_sales_orders SET delivery_boy_id = $1 WHERE id = $2 RETURNING *',
+      [delivery_boy_id, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    res.json({ success: true, message: 'Delivery assigned successfully' });
+  } catch (err) {
+    console.error('Error assigning delivery:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 // GET /:id (Mounted at /sales-order/:id or /sales-orders-list/:id)
 router.get('/:id', async (req, res) => {
   try {
