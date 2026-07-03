@@ -1,0 +1,106 @@
+const pool = require("../db");
+
+async function initOnlineOrdersDB() {
+    const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS online_orders (
+            id SERIAL PRIMARY KEY,
+            patient_id VARCHAR(255),
+            patient_name VARCHAR(255),
+            patient_mobile VARCHAR(20),
+            manual_address TEXT,
+            map_lat DECIMAL(10,8),
+            map_lng DECIMAL(11,8),
+            map_address TEXT,
+            items JSONB,
+            total_amount DECIMAL(10,2),
+            status VARCHAR(50) DEFAULT 'PENDING',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+    try {
+        await pool.query(createTableQuery);
+        console.log("✅ online_orders table ensured in DB.");
+    } catch (err) {
+        console.error("Failed to create online_orders table:", err);
+    }
+}
+
+exports.initOnlineOrdersDB = initOnlineOrdersDB;
+
+exports.createOrder = async (req, res) => {
+    try {
+        const { patient_id, patient_name, patient_mobile, manual_address, map_lat, map_lng, map_address, items, total_amount } = req.body;
+        
+        const queryText = `
+            INSERT INTO online_orders 
+            (patient_id, patient_name, patient_mobile, manual_address, map_lat, map_lng, map_address, items, total_amount, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDING')
+            RETURNING *;
+        `;
+        
+        const values = [
+            patient_id || '',
+            patient_name || 'Guest Patient',
+            patient_mobile || '',
+            manual_address || '',
+            map_lat || null,
+            map_lng || null,
+            map_address || '',
+            JSON.stringify(items || []),
+            total_amount || 0
+        ];
+
+        const { rows } = await pool.query(queryText, values);
+        res.status(201).json({ success: true, message: 'Order created successfully', order: rows[0] });
+    } catch (err) {
+        console.error("Create order error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.getOrders = async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = 'SELECT * FROM online_orders';
+        let values = [];
+        
+        if (status) {
+            query += ' WHERE status = $1';
+            values.push(status);
+        }
+        
+        query += ' ORDER BY created_at DESC';
+        
+        const { rows } = await pool.query(query, values);
+        res.status(200).json({ success: true, data: rows });
+    } catch (err) {
+        console.error("Get orders error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        
+        const queryText = `
+            UPDATE online_orders 
+            SET status = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
+            RETURNING *;
+        `;
+        
+        const { rows } = await pool.query(queryText, [status, id]);
+        
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+        
+        res.status(200).json({ success: true, message: 'Order status updated', order: rows[0] });
+    } catch (err) {
+        console.error("Update order status error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};

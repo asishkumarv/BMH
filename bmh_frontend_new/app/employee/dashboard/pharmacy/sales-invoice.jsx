@@ -601,7 +601,7 @@ export default function SalesOrder() {
         <Text style={styles.shortcutText}>F1 - Search   ALT + (+) - Add Item   F8 - Edit   F9 - Save</Text>
         
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitBtnText}>SAVE ORDER (F9)</Text>}
+          {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitBtnText}>SAVE ORDER (F12)</Text>}
         </TouchableOpacity>
       </View>
     </View>

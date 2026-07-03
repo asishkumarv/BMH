@@ -87,7 +87,7 @@ export default function PatientSidebar({ onClose }: { onClose?: () => void }) {
         {renderNavItem('Dashboard', LayoutDashboard, '/dashboard')}
         {renderNavItem('Find Doctor', Users, '/dashboard/doctors')}
         {renderNavItem('Appointments', CalendarDays, '/dashboard/appointments')}
-        {renderDummyNavItem('Medicine Store', ShoppingCart)}
+        {renderNavItem('Medicine Store', ShoppingCart, '/dashboard/medicine-store')}
         {renderDummyNavItem('My Orders', ShoppingBag)}
 
         {/* ACCOUNT SECTION */}

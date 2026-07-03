@@ -32,6 +32,7 @@ const deliveryAddressRoutes = require('./routes/deliveryAddressRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const ecogreenSalesOrderRoutes = require('./routes/ecogreenSalesOrderRoutes');
 const ecogreenSalesInvoiceRoutes = require('./routes/ecogreenSalesInvoiceRoutes');
+const onlineOrderRoutes = require('./routes/onlineOrderRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -66,6 +67,9 @@ app.use('/sales-orders-list', ecogreenSalesOrderRoutes);
 app.use('/sales-invoice', ecogreenSalesInvoiceRoutes);
 app.use('/sales-invoice-list', ecogreenSalesInvoiceRoutes);
 
+// Online Orders (Medical eCommerce)
+app.use('/online-orders', onlineOrderRoutes);
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
@@ -84,5 +88,13 @@ app.listen(PORT, () => {
     startMedicineCron();
   } catch (err) {
     console.error("Failed to start medicine cron:", err.message);
+  }
+
+  // Initialize Online Orders DB
+  try {
+    const { initOnlineOrdersDB } = require('./controllers/onlineOrderController');
+    initOnlineOrdersDB();
+  } catch (err) {
+    console.error("Failed to initialize online orders db:", err.message);
   }
 });

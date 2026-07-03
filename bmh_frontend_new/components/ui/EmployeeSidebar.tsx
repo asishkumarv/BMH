@@ -82,6 +82,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Sales Orders List', icon: FileText, route: '/employee/dashboard/pharmacy/sales-order-list' });
               dynamicNavItems.push({ name: 'Create Sales Invoice', icon: Package, route: '/employee/dashboard/pharmacy/sales-invoice' });
               dynamicNavItems.push({ name: 'Sales Invoices List', icon: FileText, route: '/employee/dashboard/pharmacy/sales-invoice-list' });
+              dynamicNavItems.push({ name: 'Online Orders', icon: Package, route: '/employee/dashboard/online-orders' });
             }
           }
         }
