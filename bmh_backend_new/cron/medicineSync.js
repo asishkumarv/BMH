@@ -9,6 +9,7 @@ async function initMedicineDB() {
             id SERIAL PRIMARY KEY,
             c_item_code VARCHAR(100),
             itemName VARCHAR(255),
+            itemQtyPerBox INTEGER,
             batchNo VARCHAR(100),
             stockBalQty DECIMAL(10,2),
             expiryDate VARCHAR(50),
@@ -58,11 +59,12 @@ async function syncMedicines(inputDateTime) {
                 
                 const queryText = `
                     INSERT INTO ecogreen_medicines 
-                        (c_item_code, itemName, batchNo, stockBalQty, expiryDate, mrp, saleRate, updated_at) 
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+                        (c_item_code, itemName, itemQtyPerBox, batchNo, stockBalQty, expiryDate, mrp, saleRate, updated_at) 
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
                     ON CONFLICT (c_item_code, batchNo) 
                     DO UPDATE SET 
                         itemName = EXCLUDED.itemName,
+                        itemQtyPerBox = EXCLUDED.itemQtyPerBox,
                         stockBalQty = EXCLUDED.stockBalQty,
                         expiryDate = EXCLUDED.expiryDate,
                         mrp = EXCLUDED.mrp,
@@ -75,6 +77,7 @@ async function syncMedicines(inputDateTime) {
                     await client.query(queryText, [
                         item.c_item_code,
                         item.itemName,
+                        item.itemQtyPerBox || 1,
                         item.batchNo || 'N/A',
                         item.stockBalQty || 0,
                         item.expiryDate,
