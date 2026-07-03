@@ -539,7 +539,21 @@ exports.getItems = async (req, res) => {
 
 exports.getStock = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM ecogreen_medicines ORDER BY "itemName" ASC');
+        const { rows } = await pool.query(`
+            SELECT 
+                id, 
+                c_item_code, 
+                itemname AS "itemName", 
+                itemqtyperbox AS "itemQtyPerBox", 
+                batchno AS "batchNo", 
+                stockbalqty AS "stockBalQty", 
+                expirydate AS "expiryDate", 
+                mrp, 
+                salerate AS "saleRate", 
+                updated_at
+            FROM ecogreen_medicines 
+            ORDER BY itemname ASC
+        `);
         return res.status(200).json({ data: rows, lastUpdated: new Date().toISOString() });
     } catch(err) {
          console.error('Stock fetch error:', err.message);
