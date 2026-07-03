@@ -20,6 +20,13 @@ const cache = {
   }
 };
 
+// Utility to format date as YYYY-MM-DD HH:mm:ss
+const getCurrentDateTime = () => {
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+};
+
 // In-memory data store for dashboard
 let db = {
     items: [],
@@ -534,7 +541,7 @@ exports.getStock = async (req, res) => {
             "c2Code": "P00000", 
             "storeId": "001", 
             "prodCode": "02", 
-            "inputDateTime": "2023-01-01 10:10:00",
+            "inputDateTime": getCurrentDateTime(),
             "itemCodes": [],
             "apiKey": token 
         };

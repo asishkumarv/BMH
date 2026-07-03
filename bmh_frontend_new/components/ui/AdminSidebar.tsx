@@ -57,7 +57,7 @@ export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
 
       <ScrollView style={styles.navContainer} showsVerticalScrollIndicator={false}>
         {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.route || (item.route !== '/admin/dashboard' && pathname.startsWith(item.route));
+          const isActive = pathname === item.route || (item.route !== '/admin/dashboard' && pathname.startsWith(item.route) && pathname.charAt(item.route.length) === '/');
           
           return (
             <Link key={item.name} href={item.route as any} asChild>

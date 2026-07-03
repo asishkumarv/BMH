@@ -80,6 +80,8 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
             if (empId && soa[empId] === true) {
               dynamicNavItems.push({ name: 'Create Sales Order', icon: Package, route: '/employee/dashboard/pharmacy/sales-order' });
               dynamicNavItems.push({ name: 'Sales Orders List', icon: FileText, route: '/employee/dashboard/pharmacy/sales-order-list' });
+              dynamicNavItems.push({ name: 'Create Sales Invoice', icon: Package, route: '/employee/dashboard/pharmacy/sales-invoice' });
+              dynamicNavItems.push({ name: 'Sales Invoices List', icon: FileText, route: '/employee/dashboard/pharmacy/sales-invoice-list' });
             }
           }
         }
@@ -101,7 +103,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
 
       <ScrollView style={styles.navContainer} showsVerticalScrollIndicator={false}>
         {navItems.map((item) => {
-          const isActive = pathname === item.route || (item.route !== '/employee/dashboard' && pathname.startsWith(item.route));
+          const isActive = pathname === item.route || (item.route !== '/employee/dashboard' && pathname.startsWith(item.route) && pathname.charAt(item.route.length) === '/');
           
           return (
             <Link key={item.name} href={item.route as any} asChild>

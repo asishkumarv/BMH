@@ -328,15 +328,15 @@ export default function SalesOrder() {
     };
 
     try {
-      const res = await axios.post('https://napi.bharatmedicalhallplus.com/sales-order', payload);
-      alert("Sales order saved successfully!");
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/sales-invoice', payload);
+      alert("Sales invoice saved successfully!");
       if (Platform.OS === 'web' && window.confirm("Do you want to print the bill?")) {
         printBill(formData, items);
       }
-      router.push('/employee/dashboard/pharmacy/sales-order-list');
+      router.push('/employee/dashboard/pharmacy/sales-invoice-list');
     } catch (err) {
       console.error(err);
-      alert("Failed to save sales order. The endpoint might not exist yet.");
+      alert("Failed to save sales invoice. The endpoint might not exist yet.");
     } finally {
       setLoading(false);
     }
@@ -375,7 +375,7 @@ export default function SalesOrder() {
 
       {/* Main Header (Teal) */}
       <View style={styles.mainHeader}>
-        <Text style={styles.mainTitle}>Sales Order</Text>
+        <Text style={styles.mainTitle}>Sales Invoice</Text>
         <Text style={styles.headerValue}>1</Text>
         <View style={styles.headerInfoGroup}>
           <Text style={styles.headerLabel}>Date </Text>

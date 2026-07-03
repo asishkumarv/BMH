@@ -126,4 +126,71 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /:id (Mounted at /sales-invoice/:id or /sales-invoice-list/:id)
+router.get('/:id', async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    const invoiceResult = await pool.query('SELECT * FROM ecogreen_sales_invoices WHERE id = $1', [invoiceId]);
+    
+    if (invoiceResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Invoice not found' });
+    }
+
+    const itemsResult = await pool.query('SELECT * FROM ecogreen_sales_invoice_items WHERE sales_invoice_id = $1 ORDER BY item_seq', [invoiceId]);
+
+    const invoice = invoiceResult.rows[0];
+    const transformedInvoice = {
+      id: invoice.id,
+      salesOrderId: invoice.sales_order_id,
+      ipNo: invoice.ip_no,
+      mobileNo: invoice.mobile_no,
+      patientName: invoice.patient_name,
+      patientAddress: invoice.patient_address,
+      patientEmail: invoice.patient_email,
+      counterSale: invoice.counter_sale,
+      ordDate: invoice.ord_date,
+      ordTime: invoice.ord_time,
+      userId: invoice.user_id,
+      actCode: invoice.act_code,
+      actName: invoice.act_name,
+      drCode: invoice.dr_code,
+      drName: invoice.dr_name,
+      drAddress: invoice.dr_address,
+      drRegNo: invoice.dr_reg_no,
+      drOfficeCode: invoice.dr_office_code,
+      dmanCode: invoice.dman_code,
+      orderTotal: invoice.order_total,
+      orderDiscPer: invoice.order_disc_per,
+      refNo: invoice.ref_no,
+      orderId: invoice.order_id,
+      remark: invoice.remark,
+      urgentFlag: invoice.urgent_flag,
+      ordConversionFlag: invoice.ord_conversion_flag,
+      dcConversionFlag: invoice.dc_conversion_flag,
+      ordRefNo: invoice.ord_ref_no,
+      sysName: invoice.sys_name,
+      sysIp: invoice.sys_ip,
+      sysUser: invoice.sys_user,
+      createdAt: invoice.created_at,
+      materialInfo: itemsResult.rows.map(item => ({
+        id: item.id,
+        itemSeq: item.item_seq,
+        itemcode: item.itemcode,
+        itemName: item.item_name,
+        totalLooseQty: item.total_loose_qty,
+        totalLooseSchQty: item.total_loose_sch_qty,
+        serviceQty: item.service_qty,
+        saleRate: item.sale_rate,
+        discPer: item.disc_per,
+        schDiscPer: item.sch_disc_per
+      }))
+    };
+
+    res.json({ success: true, data: transformedInvoice });
+  } catch (err) {
+    console.error('Error fetching sales invoice details:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 module.exports = router;
