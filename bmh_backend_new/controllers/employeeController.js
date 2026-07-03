@@ -149,6 +149,12 @@ exports.getAssignedOrders = async (req, res) => {
     );
 
     const orders = [...onlineOrdersRes.rows, ...ecogreenSalesOrdersRes.rows, ...ecogreenSalesInvoicesRes.rows];
+    // Fetch from ecogreenpurchase_orders
+    const purchaseOrdersRes = await pool.query(
+      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL as map_lat, gps_location as map_lng, created_at
+       FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
+    );
+    orders.push(...purchaseOrdersRes.rows);
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     res.json({ success: true, data: orders });
@@ -158,31 +164,32 @@ exports.getAssignedOrders = async (req, res) => {
   }
 };
 
-exports.getDeliveryFleet = async (req, res) => {
-  try {
-    // Get all delivery boys who are approved
-    const boysRes = await pool.query(`
-      SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
-      FROM employees 
-      WHERE department = 'Delivery' AND status = 'approved'
-    `);
-    const boys = boysRes.rows;
+// exports.getDeliveryFleet = async (req, res) => {
+//   try {
+//     // Get all delivery boys who are approved
+//     const boysRes = await pool.query(`
+//       SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
+//       FROM employees 
+//       WHERE department = 'Delivery' AND status = 'approved'
+//     `);
+//     const boys = boysRes.rows;
 
-    for (let boy of boys) {
-      // Get pending orders count for each boy
-      const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-      const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_orders WHERE delivery_boy_id = $1`, [boy.id]);
-      const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1`, [boy.id]);
+//     for (let boy of boys) {
+//       // Get pending orders count for each boy
+//       const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
+//       const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_orders WHERE delivery_boy_id = $1`, [boy.id]);
+//       const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1`, [boy.id]);
       
-      boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count);
-    }
+//       const o4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
+//       boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count) + parseInt(o4.rows[0].count);
+//     }
 
-    res.json({ success: true, data: boys });
-  } catch (err) {
-    console.error('Error fetching delivery fleet:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
+//     res.json({ success: true, data: boys });
+//   } catch (err) {
+//     console.error('Error fetching delivery fleet:', err);
+//     res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// };
 
 exports.updateEmployeePassword = async (req, res) => {
   try {
@@ -301,5 +308,18 @@ exports.getAllUsers = async (req, res) => {
     } catch (error) {
     console.error('Error fetching all users:', error);
     res.status(500).json({ success: false, message: 'Server error fetching all users' });
+  }
+};
+
+
+exports.updatePOAccess = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { has_po_access } = req.body;
+    const result = await pool.query('UPDATE employees SET has_po_access = $1 WHERE id = $2 RETURNING *', [has_po_access, id]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating PO access:', error);
+    res.status(500).json({ success: false, message: 'Server error updating PO access' });
   }
 };

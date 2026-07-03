@@ -85,7 +85,10 @@ app.listen(PORT, () => {
   // Initialize Medicine DB and background sync
   try {
     const { startMedicineCron } = require('./cron/medicineSync');
+    const { startPurchaseOrderCron } = require('./cron/purchaseOrderSync');
+    
     startMedicineCron();
+    startPurchaseOrderCron();
   } catch (err) {
     console.error("Failed to start medicine cron:", err.message);
   }

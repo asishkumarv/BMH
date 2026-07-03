@@ -19,8 +19,7 @@ const NAV_ITEMS = [
   { name: 'Profile', icon: User, route: '/employee/dashboard/profile' },
 ];
 
-const PHARMACY_ITEMS = [
-  { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-orders' },
+const BASE_PHARMACY_ITEMS = [
   { name: 'Purchase Orderlist', route: '/dashboard/pharmacy/purchase-orderlist' },
   { name: 'Sales Invoice Manager', route: '/dashboard/pharmacy/sales-invoices' },
   { name: 'Ecogreen Sales invocie', route: '/dashboard/pharmacy/ecogreen-invoices' },
@@ -30,6 +29,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [navItems, setNavItems] = React.useState(NAV_ITEMS);
+  const [pharmacyItems, setPharmacyItems] = React.useState(BASE_PHARMACY_ITEMS);
   const [pharmacyOpen, setPharmacyOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -85,6 +85,18 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Online Orders', icon: Package, route: '/employee/dashboard/online-orders' });
             }
           }
+          
+          let dynamicPharmacyItems = [...BASE_PHARMACY_ITEMS];
+          if (res.data.success && res.data.settings.purchase_order_access) {
+            let poa = res.data.settings.purchase_order_access;
+            if (typeof poa === 'string') poa = JSON.parse(poa);
+            const empId = u.id?.toString();
+            if (empId && poa[empId] === true) {
+              // Add Purchase Orders to the top of the pharmacy list
+              dynamicPharmacyItems.unshift({ name: 'Purchase Orders', route: '/dashboard/purchase-orders' });
+            }
+          }
+          setPharmacyItems(dynamicPharmacyItems);
         }
         
         setNavItems(dynamicNavItems);
@@ -143,7 +155,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
           </View>
         </Pressable>
 
-        {pharmacyOpen && PHARMACY_ITEMS.map((subItem) => {
+        {pharmacyOpen && pharmacyItems.map((subItem) => {
           const fullRoute = `/employee${subItem.route}`;
           const isSubActive = pathname === fullRoute;
           return (

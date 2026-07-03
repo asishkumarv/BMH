@@ -7,6 +7,7 @@ import { ShieldCheck } from 'lucide-react-native';
 export default function AdminSettings() {
   const [settings, setSettings] = useState<Record<string, { sub_admin: boolean, employee: boolean }>>({});
   const [salesOrderAccess, setSalesOrderAccess] = useState<Record<string, boolean>>({});
+  const [purchaseOrderAccess, setPurchaseOrderAccess] = useState<Record<string, boolean>>({});
   const [departments, setDepartments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,14 @@ export default function AdminSettings() {
       }
       setSalesOrderAccess(currentSalesOrderAccess);
 
+      let currentPurchaseOrderAccess = {};
+      if (settingsRes.data.success && settingsRes.data.settings.purchase_order_access) {
+        let value = settingsRes.data.settings.purchase_order_access;
+        if (typeof value === 'string') value = JSON.parse(value);
+        currentPurchaseOrderAccess = value;
+      }
+      setPurchaseOrderAccess(currentPurchaseOrderAccess);
+
     } catch (err) {
       console.error('Failed to fetch settings or departments', err);
     } finally {
@@ -85,6 +94,10 @@ export default function AdminSettings() {
         axios.post('https://napi.bharatmedicalhallplus.com/settings', {
           key: 'sales_order_access',
           value: salesOrderAccess
+        }),
+        axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+          key: 'purchase_order_access',
+          value: purchaseOrderAccess
         })
       ]);
       alert('Settings saved successfully');
@@ -108,6 +121,13 @@ export default function AdminSettings() {
 
   const toggleSalesOrderAccess = (empId: string, value: boolean) => {
     setSalesOrderAccess(prev => ({
+      ...prev,
+      [empId]: value
+    }));
+  };
+
+  const togglePurchaseOrderAccess = (empId: string, value: boolean) => {
+    setPurchaseOrderAccess(prev => ({
       ...prev,
       [empId]: value
     }));
@@ -193,6 +213,38 @@ export default function AdminSettings() {
                 onValueChange={(v) => toggleSalesOrderAccess(empId, v)} 
                 trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
                 thumbColor={salesOrderAccess[empId] ? Colors.light.primary : '#f8fafc'}
+              />
+            </View>
+          );
+        })}
+
+        {employees.length === 0 && (
+          <Text style={{textAlign: 'center', padding: 20, color: '#64748b'}}>No users found.</Text>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <ShieldCheck size={24} color={Colors.light.primary} />
+          <Text style={styles.cardTitle}>Purchase Order Access</Text>
+        </View>
+        <Text style={styles.description}>
+          Control which employees have access to view and assign EcoGreen Purchase Orders.
+        </Text>
+
+        {employees.map((emp, index) => {
+          const empId = emp.id?.toString() || index.toString();
+          return (
+            <View key={empId} style={styles.settingRow}>
+              <View style={{flex: 1}}>
+                <Text style={styles.settingTitle}>{emp.full_name || emp.name || 'Unknown User'}</Text>
+                <Text style={styles.settingDesc}>{emp.role || 'Employee'}</Text>
+              </View>
+              <Switch 
+                value={purchaseOrderAccess[empId] || false} 
+                onValueChange={(v) => togglePurchaseOrderAccess(empId, v)} 
+                trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
+                thumbColor={purchaseOrderAccess[empId] ? Colors.light.primary : '#f8fafc'}
               />
             </View>
           );
