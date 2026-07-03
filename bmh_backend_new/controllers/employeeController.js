@@ -164,32 +164,32 @@ exports.getAssignedOrders = async (req, res) => {
   }
 };
 
-// exports.getDeliveryFleet = async (req, res) => {
-//   try {
-//     // Get all delivery boys who are approved
-//     const boysRes = await pool.query(`
-//       SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
-//       FROM employees 
-//       WHERE department = 'Delivery' AND status = 'approved'
-//     `);
-//     const boys = boysRes.rows;
+exports.getDeliveryFleet = async (req, res) => {
+  try {
+    // Get all delivery boys who are approved
+    const boysRes = await pool.query(`
+      SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
+      FROM employees 
+      WHERE department = 'Delivery' AND status = 'approved'
+    `);
+    const boys = boysRes.rows;
 
-//     for (let boy of boys) {
-//       // Get pending orders count for each boy
-//       const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-//       const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_orders WHERE delivery_boy_id = $1`, [boy.id]);
-//       const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1`, [boy.id]);
+    for (let boy of boys) {
+      // Get pending orders count for each boy
+      const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
+      const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_orders WHERE delivery_boy_id = $1`, [boy.id]);
+      const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1`, [boy.id]);
       
-//       const o4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-//       boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count) + parseInt(o4.rows[0].count);
-//     }
+      const o4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
+      boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count) + parseInt(o4.rows[0].count);
+    }
 
-//     res.json({ success: true, data: boys });
-//   } catch (err) {
-//     console.error('Error fetching delivery fleet:', err);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// };
+    res.json({ success: true, data: boys });
+  } catch (err) {
+    console.error('Error fetching delivery fleet:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 
 exports.updateEmployeePassword = async (req, res) => {
   try {
