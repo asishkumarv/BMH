@@ -18,16 +18,23 @@ export default function AdminSettings() {
 
   const fetchData = async () => {
     try {
-      const [settingsRes, deptRes, empRes] = await Promise.all([
+      const [settingsRes, deptRes, empRes, subAdminRes] = await Promise.all([
         axios.get('https://napi.bharatmedicalhallplus.com/settings'),
         axios.get('https://napi.bharatmedicalhallplus.com/department'),
-        axios.get('https://napi.bharatmedicalhallplus.com/employees')
+        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+        axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins')
       ]);
 
       const depts = deptRes.data.data || [];
       setDepartments(depts);
       const emps = empRes.data.data || empRes.data || [];
-      setEmployees(Array.isArray(emps) ? emps : []);
+      const subAdmins = subAdminRes.data.data || subAdminRes.data || [];
+      
+      const combinedUsers = [
+        ...(Array.isArray(emps) ? emps : []),
+        ...(Array.isArray(subAdmins) ? subAdmins.map(sa => ({ ...sa, role: 'Sub Admin' })) : [])
+      ];
+      setEmployees(combinedUsers);
 
       let currentSettings: any = {};
       if (settingsRes.data.success && settingsRes.data.settings.doctor_management_access) {
@@ -178,7 +185,7 @@ export default function AdminSettings() {
           return (
             <View key={empId} style={styles.settingRow}>
               <View style={{flex: 1}}>
-                <Text style={styles.settingTitle}>{emp.name || 'Unknown Employee'}</Text>
+                <Text style={styles.settingTitle}>{emp.full_name || emp.name || 'Unknown User'}</Text>
                 <Text style={styles.settingDesc}>{emp.role || 'Employee'}</Text>
               </View>
               <Switch 
@@ -192,7 +199,7 @@ export default function AdminSettings() {
         })}
 
         {employees.length === 0 && (
-          <Text style={{textAlign: 'center', padding: 20, color: '#64748b'}}>No employees found.</Text>
+          <Text style={{textAlign: 'center', padding: 20, color: '#64748b'}}>No users found.</Text>
         )}
       </View>
 

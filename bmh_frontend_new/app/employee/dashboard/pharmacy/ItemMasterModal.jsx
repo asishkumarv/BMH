@@ -40,10 +40,16 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
         apiKey: apiKey
       };
 
-      const res = await fetch('http://117.211.64.158:21000/ws_c2_services_get_stock_data', {
+      const res = await fetch('https://napi.bharatmedicalhallplus.com/sales-order/get-stock-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          apiKey: apiKey,
+          companyCode: "BMH001",
+          storeId: "01"
+        })
       });
       const result = await res.json();
 

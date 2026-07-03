@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios'); // Added axios for proxy requests
 const pool = require('../db');
 
 // POST / (Mounted at /sales-order)
@@ -120,6 +121,28 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('Error fetching sales orders:', err);
     res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// Proxy route for token generation to avoid CORS
+router.post('/generate-token', async (req, res) => {
+  try {
+    const response = await axios.post('http://117.211.64.158:21000/ws_c2_services_generate_token', req.body);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Token proxy error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Proxy route for stock data to avoid CORS
+router.post('/get-stock-data', async (req, res) => {
+  try {
+    const response = await axios.post('http://117.211.64.158:21000/ws_c2_services_get_stock_data', req.body);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Stock data proxy error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

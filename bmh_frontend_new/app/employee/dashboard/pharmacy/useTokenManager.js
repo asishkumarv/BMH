@@ -40,19 +40,19 @@ export function useTokenManager() {
 
   const generateToken = async () => {
     try {
-      const res = await fetch('http://117.211.64.158:21000/ws_c2_services_generate_token', {
+      const response = await fetch('https://napi.bharatmedicalhallplus.com/sales-order/generate-token', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          c2Code: "P00000",
-          storeId: "001",
-          prodCode: "02",
-          securityKey: "VURBd01ESXdNakU9"
+          c2Code: "BMH001",
+          storeId: "01",
+          prodCode: "ERP",
+          securityKey: "142512140810141315"
         })
       });
-      const data = await res.json();
+      const data = await response.json();
       
       // Handle the exact structure based on what the API returns. We assume 'data.apiKey' or similar.
       const key = data.apiKey || data.data?.apiKey || data.data || data; 
