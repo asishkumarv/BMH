@@ -66,7 +66,7 @@ const StockDetailsScreen = () => {
         return;
       }
 
-      const response = await fetch('https://hospitaldatabasemanagement.onrender.com/ecogreensingleapis/add-stock', {
+      const response = await fetch('https://napi.bharatmedicalhallplus.com/ecogreensingleapis/add-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStock),
@@ -115,7 +115,7 @@ const StockDetailsScreen = () => {
 
     try {
       const response = await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/ecogreenbulkupload/stockbulk-upload-csv",
+        "https://napi.bharatmedicalhallplus.com/ecogreenbulkupload/stockbulk-upload-csv",
         {
           method: "POST",
           body: formData,
@@ -152,7 +152,7 @@ const StockDetailsScreen = () => {
       };
 
       const response = await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/ecogreen/stock-details",
+        "https://napi.bharatmedicalhallplus.com/ecogreen/stock-details",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

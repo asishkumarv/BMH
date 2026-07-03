@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from "@expo/vector-icons";
 
 const API_URL =
-  "https://hospitaldatabasemanagement.onrender.com/ecogreen/local-customer/all";
+  "https://napi.bharatmedicalhallplus.com/ecogreen/local-customer/all";
 
 export default function AdminLocalMasterScreen() {
   const [customers, setCustomers] = useState([]);
@@ -117,7 +117,7 @@ export default function AdminLocalMasterScreen() {
     }
 
     try {
-      const res = await fetch("https://hospitaldatabasemanagement.onrender.com/ecogreen/send-bulk", {
+      const res = await fetch("https://napi.bharatmedicalhallplus.com/ecogreen/send-bulk", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

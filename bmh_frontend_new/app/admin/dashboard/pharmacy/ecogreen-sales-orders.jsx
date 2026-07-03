@@ -19,7 +19,7 @@ import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const BASE_URL = "https://hospitaldatabasemanagement.onrender.com/ecogreen";
+const BASE_URL = "https://napi.bharatmedicalhallplus.com/ecogreen";
 
 const COLORS = {
   primary: "#004990",

@@ -50,7 +50,7 @@ useEffect(() => {
   const fetchMedicines = async () => {
     try {
       const res = await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/medicine/all"
+        "https://napi.bharatmedicalhallplus.com/medicine/all"
       );
       const data = await res.json();
 
@@ -69,7 +69,7 @@ useEffect(() => {
 useEffect(() => {
   const fetchCustomFields = async () => {
     try {
-      const res = await fetch("https://hospitaldatabasemanagement.onrender.com/CreateSalesorderfields/all");
+      const res = await fetch("https://napi.bharatmedicalhallplus.com/CreateSalesorderfields/all");
       const data = await res.json();
       if (data.success) {
         setCustomFields(data.fields || []);
@@ -196,7 +196,7 @@ const handleSubmit = async () => {
     }
 
     const res = await fetch(
-      "https://hospitaldatabasemanagement.onrender.com/salesorders/create",
+      "https://napi.bharatmedicalhallplus.com/salesorders/create",
       {
         method: "POST",
         headers: { Accept: "application/json" },

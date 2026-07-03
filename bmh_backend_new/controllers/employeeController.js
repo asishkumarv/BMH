@@ -162,7 +162,7 @@ exports.getDeliveryFleet = async (req, res) => {
   try {
     // Get all delivery boys who are approved
     const boysRes = await pool.query(`
-      SELECT id, full_name, email, phone, location_lat, location_lng, updated_at 
+      SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
       FROM employees 
       WHERE department = 'Delivery' AND status = 'approved'
     `);

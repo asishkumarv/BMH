@@ -16,7 +16,7 @@ import {
 import { Feather, Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from 'expo-router';
-const API_BASE = "https://hospitaldatabasemanagement.onrender.com/ecogreen";
+const API_BASE = "https://napi.bharatmedicalhallplus.com/ecogreen";
 
 const PurchaseOrderListScreen = () => {
   const [orders, setOrders] = useState([]);
@@ -91,7 +91,7 @@ const router = useRouter();
 
   const fetchDeliveryBoys = async () => {
     try {
-      const res = await fetch(`https://hospitaldatabasemanagement.onrender.com/employee/all`);
+      const res = await fetch(`https://napi.bharatmedicalhallplus.com/employee/all`);
       const json = await res.json();
       const hdDeliveryBoys = (json.employees || []).filter((emp) => emp.role === "Hd delivery");
       setDeliveryBoys(hdDeliveryBoys);

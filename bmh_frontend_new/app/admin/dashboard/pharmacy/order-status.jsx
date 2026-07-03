@@ -78,7 +78,7 @@ const SalesOrderStatusScreen = () => {
       setLoading(true);
 
       const response = await fetch(
-        'https://hospitaldatabasemanagement.onrender.com/ecogreen/sales-order-status',
+        'https://napi.bharatmedicalhallplus.com/ecogreen/sales-order-status',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

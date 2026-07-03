@@ -90,9 +90,10 @@ export default function EmployeePortal() {
               {/* Toggle Buttons */}
               <View style={styles.toggleContainer}>
                 <Pressable 
-                  style={styles.toggleBtnOutline} 
+                  style={styles.toggleBtnOutline}
+                  onPress={() => router.push('/delivery/register' as any)}
                 >
-                  <Text style={styles.toggleBtnTextOutline}>Contact Admin</Text>
+                  <Text style={styles.toggleBtnTextOutline}>Register</Text>
                 </Pressable>
                 <Pressable style={styles.toggleBtnSolid}>
                   <Text style={styles.toggleBtnTextSolid}>Login</Text>
@@ -119,32 +120,7 @@ export default function EmployeePortal() {
                 </Pressable>
               </View>
 
-              <View style={styles.divider}>
-                <View style={styles.line} />
-                <Text style={styles.dividerText}>QUICK ATTENDANCE</Text>
-                <View style={styles.line} />
-              </View>
 
-              {/* Quick Attendance */}
-              <View style={styles.attendanceSection}>
-                <Text style={styles.label}>Phone Number</Text>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Enter 10-digit phone number" 
-                  keyboardType="numeric"
-                  placeholderTextColor="#94A3B8" 
-                />
-                <View style={styles.attendanceBtns}>
-                  <Pressable style={styles.dutyOnBtn}>
-                    <Clock color="#FFF" size={16} />
-                    <Text style={styles.dutyBtnText}>Don't have an account? Contact Admin</Text>
-                  </Pressable>
-                  <Pressable style={styles.dutyOffBtn}>
-                    <Clock color="#FFF" size={16} />
-                    <Text style={styles.dutyBtnText}>Duty Off</Text>
-                  </Pressable>
-                </View>
-              </View>
 
             </View>
           </ScrollView>

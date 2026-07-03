@@ -92,7 +92,7 @@ const CustomerMasterScreen = () => {
       }
 
       setSaving(true);
-      const res = await fetch('https://hospitaldatabasemanagement.onrender.com/ecogreensingleapis/local-customer/add', {
+      const res = await fetch('https://napi.bharatmedicalhallplus.com/ecogreensingleapis/local-customer/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCustomer),
@@ -130,7 +130,7 @@ const CustomerMasterScreen = () => {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/ecogreenbulkupload/local-customer/bulk",
+        "https://napi.bharatmedicalhallplus.com/ecogreenbulkupload/local-customer/bulk",
         {
           method: "POST",
           body: formData,
@@ -164,7 +164,7 @@ const CustomerMasterScreen = () => {
     try {
       setLoading(true);
       const res = await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/ecogreen/local-customers",
+        "https://napi.bharatmedicalhallplus.com/ecogreen/local-customers",
         {
           method: "POST",
           headers: {

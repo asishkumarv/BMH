@@ -84,7 +84,7 @@ const handleBulkUpload = async (event) => {
   formData.append("file", file);
 
   try {
-    const response = await fetch("https://hospitaldatabasemanagement.onrender.com/ecogreenbulkupload/upload-itemmaster", {
+    const response = await fetch("https://napi.bharatmedicalhallplus.com/ecogreenbulkupload/upload-itemmaster", {
       method: "POST",
       body: formData
     });
@@ -111,7 +111,7 @@ const handleSaveItem = async () => {
   }
 
   try {
-    const response = await fetch("https://hospitaldatabasemanagement.onrender.com/ecogreensingleapis/add-item", {
+    const response = await fetch("https://napi.bharatmedicalhallplus.com/ecogreensingleapis/add-item", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -173,7 +173,7 @@ const { c2Code, storeId, prodCode, dateTime } = filters;
     console.log("Sending body:", body);
 
     const response = await fetch(
-      "https://hospitaldatabasemanagement.onrender.com/ecogreen/item-master",
+      "https://napi.bharatmedicalhallplus.com/ecogreen/item-master",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -110,7 +110,7 @@ const totalPayment = filteredInvoices.reduce((sum, item) => {
 const fetchInvoices = async () => {
   try {
     const response = await fetch(
-      "https://hospitaldatabasemanagement.onrender.com/ecogreen/sales-invoice/all"
+      "https://napi.bharatmedicalhallplus.com/ecogreen/sales-invoice/all"
     );
     const data = await response.json();
 
@@ -186,7 +186,7 @@ const formatAddress = (addr) => {
 const fetchDeliveryBoys = async () => {
   try {
     const res = await fetch(
-      "https://hospitaldatabasemanagement.onrender.com/employee/all"
+      "https://napi.bharatmedicalhallplus.com/employee/all"
     );
     const json = await res.json();
 
@@ -226,7 +226,7 @@ const handleAssignDeliveryBoy = async (orderId, value) => {
     }
 
     const res = await fetch(
-      "https://hospitaldatabasemanagement.onrender.com/ecogreen/sales-invoice/assign-delivery",
+      "https://napi.bharatmedicalhallplus.com/ecogreen/sales-invoice/assign-delivery",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -251,7 +251,7 @@ const autoAssignUnassignedOrders = async (orders) => {
 
     for (let order of unassigned) {
       await fetch(
-        "https://hospitaldatabasemanagement.onrender.com/ecogreen/sales-invoice/assign-delivery",
+        "https://napi.bharatmedicalhallplus.com/ecogreen/sales-invoice/assign-delivery",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

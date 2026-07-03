@@ -18,7 +18,7 @@ import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from 'expo-router';
 
 const API_BASE =
-  "https://hospitaldatabasemanagement.onrender.com/ecogreen/sales-order-status";
+  "https://napi.bharatmedicalhallplus.com/ecogreen/sales-order-status";
 
 const OFFICE_LAT = 21.930424;
 const OFFICE_LNG = 86.726709;
@@ -125,7 +125,7 @@ const EcogreenSalesOrderList = () => {
 
   const fetchDeliveryBoys = async () => {
     try {
-      const res = await fetch("https://hospitaldatabasemanagement.onrender.com/employee/all");
+      const res = await fetch("https://napi.bharatmedicalhallplus.com/employee/all");
       const json = await res.json();
       const hdDeliveryBoys = (json.employees || []).filter((emp) => emp.role === "Hd delivery");
       setDeliveryBoys(hdDeliveryBoys);

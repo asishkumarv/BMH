@@ -20,7 +20,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
-const API_BASE = "https://hospitaldatabasemanagement.onrender.com/ecogreen";
+const API_BASE = "https://napi.bharatmedicalhallplus.com/ecogreen";
 
 const AdminEcoGreenStockData = ({ navigation }) => {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
@@ -196,7 +196,7 @@ const AdminEcoGreenStockData = ({ navigation }) => {
         return;
       }
       const res = await fetch(
-        `https://hospitaldatabasemanagement.onrender.com/medicine/stock-batches/bulk-visibility`,
+        `https://napi.bharatmedicalhallplus.com/medicine/stock-batches/bulk-visibility`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

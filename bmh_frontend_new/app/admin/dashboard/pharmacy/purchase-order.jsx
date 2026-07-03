@@ -17,7 +17,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import { useRouter } from 'expo-router';
 
-const BASE_URL = "https://hospitaldatabasemanagement.onrender.com";
+const BASE_URL = "https://napi.bharatmedicalhallplus.com";
 
 const BRAND = {
   deep: '#1E3A8A',
