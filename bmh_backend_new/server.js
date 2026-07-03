@@ -77,4 +77,12 @@ app.listen(PORT, () => {
   } catch (err) {
     console.error("Failed to initialize pharmacy sync:", err.message);
   }
+
+  // Initialize Medicine DB and background sync
+  try {
+    const { startMedicineCron } = require('./cron/medicineSync');
+    startMedicineCron();
+  } catch (err) {
+    console.error("Failed to start medicine cron:", err.message);
+  }
 });

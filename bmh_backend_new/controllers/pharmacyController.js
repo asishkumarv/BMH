@@ -1,4 +1,5 @@
 const axios = require("axios");
+const pool = require("../db");
 
 // In-memory cache implementation to avoid external dependencies
 const cacheStore = {};
@@ -19,6 +20,7 @@ const cache = {
     };
   }
 };
+exports.cache = cache;
 
 // Utility to format date as YYYY-MM-DD HH:mm:ss
 const getCurrentDateTime = () => {
@@ -311,6 +313,7 @@ async function fetchToken() {
         throw err;
     }
 }
+exports.fetchToken = fetchToken;
 
 async function fetchMasterData(apiKey) {
     try {
@@ -536,29 +539,10 @@ exports.getItems = async (req, res) => {
 
 exports.getStock = async (req, res) => {
     try {
-        const token = cache.get("default_token") || (await fetchToken()).apiKey;
-        const payload = { 
-            "c2Code": "P00000", 
-            "storeId": "001", 
-            "prodCode": "02", 
-            "inputDateTime": getCurrentDateTime(),
-            "itemCodes": [],
-            "apiKey": token 
-        };
-
-        const apiRes = await axios.post("http://117.211.64.158:21000/ws_c2_services_get_stock_data", payload, {timeout: 10000});
-        
-        if (apiRes.data && apiRes.data.data) {
-            db.stock = apiRes.data.data;
-            lastUpdated.stock = new Date().toISOString();
-        }
-        
-        return res.status(200).json({ data: apiRes.data.data || [], lastUpdated: lastUpdated.stock });
+        const { rows } = await pool.query('SELECT * FROM ecogreen_medicines ORDER BY "itemName" ASC');
+        return res.status(200).json({ data: rows, lastUpdated: new Date().toISOString() });
     } catch(err) {
          console.error('Stock fetch error:', err.message);
-         if (db.stock && db.stock.length > 0) {
-             return res.status(200).json({ data: db.stock, lastUpdated: lastUpdated.stock, fromCache: true });
-         }
          res.status(500).json({ error: err.message });
     }
 };
