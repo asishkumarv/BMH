@@ -20,9 +20,7 @@ export default function PatientBooking() {
 
   // Booking Filters
   const [slotSearchQuery, setSlotSearchQuery] = useState('');
-  const [slotFilterDate, setSlotFilterDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
-  });
+  const [slotFilterDate, setSlotFilterDate] = useState('');
   const [showSlotDatePicker, setShowSlotDatePicker] = useState(false);
 
   // Booking Form State
@@ -96,6 +94,12 @@ export default function PatientBooking() {
   const pinCodeRef = React.useRef<TextInput>(null);
   const guardianRef = React.useRef<TextInput>(null);
   const emailRef = React.useRef<TextInput>(null);
+  const referenceRef = React.useRef<TextInput>(null);
+  const prRef = React.useRef<TextInput>(null);
+  const genderRef = React.useRef<TextInput>(null);
+  const paymentRef = React.useRef<TextInput>(null);
+  const [genderFocused, setGenderFocused] = useState(false);
+  const [paymentFocused, setPaymentFocused] = useState(false);
 
   // My Bookings State
   const [activeTab, setActiveTab] = useState('New Booking');
@@ -113,7 +117,7 @@ export default function PatientBooking() {
   const [bulkOriginalSlot, setBulkOriginalSlot] = useState<any>(null);
   const [bulkRefreshKey, setBulkRefreshKey] = useState(0);
   const [bulkDoctorFilter, setBulkDoctorFilter] = useState('');
-  const [bulkDateFilter, setBulkDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkDateFilter, setBulkDateFilter] = useState('');
   const [bulkAvailableSlots, setBulkAvailableSlots] = useState<any[]>([]);
   const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([]);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
@@ -127,7 +131,7 @@ export default function PatientBooking() {
     if (activeTab === 'Reschedule' && user) {
       fetchRescheduleBookings();
     }
-  }, [activeTab, user, rescheduleFilterDate, rescheduleFilterDoctor, rescheduleFilterPatient, rescheduleFilterDepartment]);
+  }, [activeTab, user, rescheduleFilterDate, rescheduleFilterDoctor, rescheduleFilterPatient, rescheduleFilterDepartment, rescheduleMode, bulkRefreshKey]);
 
   useEffect(() => {
     if (activeTab === 'Reschedule' && rescheduleMode === 'bulk') {
@@ -161,30 +165,54 @@ export default function PatientBooking() {
     }
   };
 
+  const executeBulkReschedule = async (newSlot: any) => {
+    setRescheduleLoading(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/bulk/reschedule`, {
+        original_slot_id: bulkOriginalSlot.id,
+        new_slot_id: newSlot.id
+      });
+      if (res.data.success) {
+        if (Platform.OS === 'web') {
+          window.alert(res.data.message);
+        } else {
+          Alert.alert('Success', res.data.message);
+        }
+        setBulkOriginalSlot(null);
+        setBulkRefreshKey(k => k + 1);
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.data.message);
+        } else {
+          Alert.alert('Error', res.data.message);
+        }
+      }
+    } catch(e: any) {
+      const msg = e.response?.data?.message || 'Failed to bulk reschedule';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Error', msg);
+      }
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
   const handleConfirmBulkReschedule = async (newSlot: any) => {
     if (!bulkOriginalSlot) return;
-    Alert.alert('Confirm Bulk Reschedule', `Are you sure you want to move all tokens from ${bulkOriginalSlot.start_time} to ${newSlot.start_time}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reschedule All', onPress: async () => {
-          setRescheduleLoading(true);
-          try {
-            const res = await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/bulk/reschedule`, {
-              original_slot_id: bulkOriginalSlot.id,
-              new_slot_id: newSlot.id
-            });
-            if (res.data.success) {
-              Alert.alert('Success', res.data.message);
-              setBulkOriginalSlot(null);
-            } else {
-              Alert.alert('Error', res.data.message);
-            }
-          } catch(e: any) {
-            Alert.alert('Error', e.response?.data?.message || 'Failed to bulk reschedule');
-          } finally {
-            setRescheduleLoading(false);
-          }
-      }}
-    ]);
+    
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Are you sure you want to move all tokens from ${bulkOriginalSlot.start_time} to ${newSlot.start_time}?`);
+      if (confirmed) {
+        executeBulkReschedule(newSlot);
+      }
+    } else {
+      Alert.alert('Confirm Bulk Reschedule', `Are you sure you want to move all tokens from ${bulkOriginalSlot.start_time} to ${newSlot.start_time}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reschedule All', onPress: () => executeBulkReschedule(newSlot) }
+      ]);
+    }
   };
 
   const fetchRescheduleBookings = async () => {
@@ -807,14 +835,14 @@ export default function PatientBooking() {
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>Email Address (Optional)</Text>
-              <TextInput ref={emailRef} style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" returnKeyType="done" />
+              <TextInput ref={emailRef} style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => referenceRef.current?.focus()} />
             </View>
           </View>
 
           <View style={[styles.row, isMobile && { flexDirection: 'column' }, { zIndex: 50, elevation: 50, position: 'relative' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0, position: 'relative', zIndex: 10 }}>
               <Text style={styles.formLabel}>Reference (Search or Enter Name)</Text>
-              <TextInput style={styles.input} value={reference} onChangeText={(text) => { setReference(text); setReferenceId(''); setReferenceUserType(''); }} placeholder="e.g. Dr. John - Cardiology" returnKeyType="next" blurOnSubmit={false} />
+              <TextInput ref={referenceRef} style={styles.input} value={reference} onChangeText={(text) => { setReference(text); setReferenceId(''); setReferenceUserType(''); }} placeholder="e.g. Dr. John - Cardiology" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => prRef.current?.focus()} />
               {reference.length > 0 && allStaff.filter(s => s.full_name && (s.full_name.toLowerCase().includes(reference.toLowerCase()) || (s.department && s.department.toLowerCase().includes(reference.toLowerCase())) || (s.type && s.type.toLowerCase().includes(reference.toLowerCase())))).length > 0 && !reference.includes('(') && (
                 <View style={{position: 'absolute', top: 70, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, maxHeight: 150, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5}}>
                   <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
@@ -830,14 +858,29 @@ export default function PatientBooking() {
             </View>
             <View style={{flex: 1}}>
               <Text style={styles.formLabel}>PR</Text>
-              <TextInput style={styles.input} value={pr} onChangeText={setPr} placeholder="PR Details" returnKeyType="next" />
+              <TextInput ref={prRef} style={styles.input} value={pr} onChangeText={setPr} placeholder="PR Details" returnKeyType="done" onSubmitEditing={() => genderRef.current?.focus()} />
             </View>
           </View>
           
           <View style={[styles.row, isMobile && { flexDirection: 'column' }]}>
             <View style={{flex: 1, marginRight: isMobile ? 0 : 10, marginBottom: isMobile ? 16 : 0}}>
-              <Text style={styles.formLabel}>Gender</Text>
-              <View style={styles.toggleRow}>
+              <Text style={styles.formLabel}>Gender (Type 'm' or 'f')</Text>
+                <TextInput
+                  ref={genderRef}
+                  style={{ width: 1, height: 1, opacity: 0, position: 'absolute' }}
+                  onFocus={() => setGenderFocused(true)}
+                  onBlur={() => setGenderFocused(false)}
+                  autoCapitalize="none"
+                  value=""
+                  onChangeText={(text) => {
+                    const last = text.slice(-1).toLowerCase();
+                    if (last === 'm') setGender('Male');
+                    if (last === 'f') setGender('Female');
+                  }}
+                  returnKeyType="next"
+                  onSubmitEditing={() => paymentRef.current?.focus()}
+                />
+                <View style={[styles.toggleRow, genderFocused && { shadowColor: '#3b82f6', shadowOpacity: 0.5, shadowRadius: 4, elevation: 4, borderWidth: 1, borderColor: '#3b82f6', borderRadius: 8 }]}>
                 <TouchableOpacity style={[styles.toggleBtn, gender === 'Male' && styles.toggleBtnActive]} onPress={() => setGender('Male')}>
                   <Text style={[styles.toggleText, gender === 'Male' && styles.toggleTextActive]}>Male</Text>
                 </TouchableOpacity>
@@ -847,8 +890,23 @@ export default function PatientBooking() {
               </View>
             </View>
             <View style={{flex: 1}}>
-              <Text style={styles.formLabel}>Payment Mode</Text>
-              <View style={styles.toggleRow}>
+              <Text style={styles.formLabel}>Payment Mode (Type 'c' or 'o')</Text>
+                <TextInput
+                  ref={paymentRef}
+                  style={{ width: 1, height: 1, opacity: 0, position: 'absolute' }}
+                  onFocus={() => setPaymentFocused(true)}
+                  onBlur={() => setPaymentFocused(false)}
+                  autoCapitalize="none"
+                  value=""
+                  onChangeText={(text) => {
+                    const last = text.slice(-1).toLowerCase();
+                    if (last === 'c') setPaymentMode('Cash');
+                    if (last === 'o') setPaymentMode('Online');
+                  }}
+                  returnKeyType="done"
+                  onSubmitEditing={() => handleBooking()}
+                />
+                <View style={[styles.toggleRow, paymentFocused && { shadowColor: '#3b82f6', shadowOpacity: 0.5, shadowRadius: 4, elevation: 4, borderWidth: 1, borderColor: '#3b82f6', borderRadius: 8 }]}>
                 <TouchableOpacity style={[styles.toggleBtn, paymentMode === 'Cash' && styles.toggleBtnActive]} onPress={() => setPaymentMode('Cash')}>
                   <Text style={[styles.toggleText, paymentMode === 'Cash' && styles.toggleTextActive]}>Cash</Text>
                 </TouchableOpacity>
