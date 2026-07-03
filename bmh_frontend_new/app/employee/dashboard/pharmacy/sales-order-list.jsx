@@ -10,6 +10,11 @@ export default function SalesOrderList() {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [orderItems, setOrderItems] = useState([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -79,13 +84,48 @@ export default function SalesOrderList() {
 
       <View style={styles.cardFooter}>
         <Text style={styles.user}>Created by: {item.userId}</Text>
-        <TouchableOpacity style={styles.viewBtn}>
+        <TouchableOpacity style={styles.viewBtn} onPress={() => openOrderDetails(item)}>
           <Eye size={16} color={Colors.light.primary} />
           <Text style={styles.viewBtnText}>View Details</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
+
+  const openOrderDetails = async (order) => {
+    setSelectedOrder(order);
+    setModalVisible(true);
+    setLoadingDetails(true);
+    try {
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/sales-order/${order.id}`);
+      if (res.data && res.data.success) {
+        setOrderItems(res.data.data.materialInfo || []);
+      }
+    } catch (err) {
+      console.error('Error fetching order details:', err);
+      alert('Failed to load order items.');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (!selectedOrder) return;
+    setGeneratingInvoice(true);
+    try {
+      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/sales-order/${selectedOrder.id}/generate-invoice`);
+      if (res.data && res.data.success) {
+        alert("Sales Invoice generated successfully!");
+        setModalVisible(false);
+        router.push('/employee/dashboard/pharmacy/sales-invoice-list');
+      }
+    } catch (err) {
+      console.error('Error generating invoice:', err);
+      alert("Failed to generate invoice.");
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -116,6 +156,52 @@ export default function SalesOrderList() {
       ) : (
         <View style={styles.center}>
           <Text style={styles.noData}>No sales orders found.</Text>
+        </View>
+      )}
+
+      {/* View Details & Generate Invoice Modal */}
+      {modalVisible && selectedOrder && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Order Details: {selectedOrder.refNo}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={{fontSize: 20}}>✕</Text></TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={{fontWeight: 'bold', marginBottom: 5}}>Customer: {selectedOrder.patientName}</Text>
+              <Text style={{marginBottom: 15}}>Date: {selectedOrder.ordDate} {selectedOrder.ordTime}</Text>
+              
+              <Text style={{fontWeight: 'bold', marginBottom: 5}}>Items:</Text>
+              {loadingDetails ? (
+                <ActivityIndicator size="small" color={Colors.light.primary} style={{marginVertical: 20}} />
+              ) : (
+                <View style={styles.itemsTable}>
+                  <View style={styles.itemsTableHeader}>
+                    <Text style={[styles.itemTh, {flex: 2}]}>Item</Text>
+                    <Text style={[styles.itemTh, {flex: 1}]}>Qty</Text>
+                    <Text style={[styles.itemTh, {flex: 1}]}>Rate</Text>
+                  </View>
+                  {orderItems.map((item, idx) => (
+                    <View key={idx} style={styles.itemsTableRow}>
+                      <Text style={[styles.itemTd, {flex: 2}]}>{item.itemName}</Text>
+                      <Text style={[styles.itemTd, {flex: 1}]}>{item.totalLooseQty}</Text>
+                      <Text style={[styles.itemTd, {flex: 1}]}>₹{item.saleRate}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+            <View style={styles.modalFooter}>
+              <Text style={{fontWeight: 'bold', fontSize: 16}}>Total: ₹{selectedOrder.orderTotal}</Text>
+              <TouchableOpacity 
+                style={[styles.generateBtn, selectedOrder.ordConversionFlag === 1 && {backgroundColor: '#9ca3af'}]}
+                onPress={handleGenerateInvoice}
+                disabled={generatingInvoice || selectedOrder.ordConversionFlag === 1}
+              >
+                {generatingInvoice ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.generateBtnText}>{selectedOrder.ordConversionFlag === 1 ? 'Invoice Already Generated' : 'Generate Invoice (Payment Done)'}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       )}
     </View>
@@ -246,8 +332,84 @@ const styles = StyleSheet.create({
   },
   viewBtnText: {
     color: Colors.light.primary,
-    fontSize: 14,
-    fontWeight: '600'
+    fontWeight: 'bold',
+    fontSize: 14
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '90%',
+    maxWidth: 600,
+    borderRadius: 8,
+    padding: 20,
+    maxHeight: '80%'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 10,
+    marginBottom: 10
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold'
+  },
+  modalBody: {
+    maxHeight: 400,
+    overflow: 'hidden'
+  },
+  itemsTable: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 4
+  },
+  itemsTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  itemTh: {
+    fontWeight: 'bold',
+    fontSize: 12
+  },
+  itemsTableRow: {
+    flexDirection: 'row',
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  itemTd: {
+    fontSize: 12
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee'
+  },
+  generateBtn: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 6
+  },
+  generateBtnText: {
+    color: '#fff',
+    fontWeight: 'bold'
   },
   center: {
     flex: 1,

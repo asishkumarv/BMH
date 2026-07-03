@@ -31,6 +31,7 @@ const deliveryBoyRoutes = require('./routes/deliveryBoyRoutes');
 const deliveryAddressRoutes = require('./routes/deliveryAddressRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const ecogreenSalesOrderRoutes = require('./routes/ecogreenSalesOrderRoutes');
+const ecogreenSalesInvoiceRoutes = require('./routes/ecogreenSalesInvoiceRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -60,6 +61,10 @@ app.use('/profile', profileRoutes);
 // Custom routes for EcoGreen-style sales orders
 app.use('/sales-order', ecogreenSalesOrderRoutes);
 app.use('/sales-orders-list', ecogreenSalesOrderRoutes);
+
+// Custom routes for EcoGreen-style sales invoices
+app.use('/sales-invoice', ecogreenSalesInvoiceRoutes);
+app.use('/sales-invoice-list', ecogreenSalesInvoiceRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -114,6 +114,58 @@ export default function SalesOrder() {
   });
 
   const [items, setItems] = useState([]);
+  const [allStock, setAllStock] = useState([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredAutocomplete, setFilteredAutocomplete] = useState([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  useEffect(() => {
+    const loadStock = async () => {
+      if (Platform.OS === 'web') {
+        const cached = localStorage.getItem('pharmacy_stock_cache');
+        if (cached) {
+          try {
+            setAllStock(JSON.parse(cached));
+          } catch(e) {}
+        }
+      }
+      
+      setStockLoading(true);
+      try {
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/pharmacy/stock', {});
+        if (res.data && res.data.data) {
+          const isExpired = (expiryStr) => {
+            if (!expiryStr) return false;
+            let expDate = new Date(expiryStr);
+            if (!isNaN(expDate.getTime()) && expiryStr.length >= 8) {
+              return expDate < new Date();
+            }
+            const parts = expiryStr.split(/[-/]/);
+            if (parts.length >= 2) {
+              let month = parseInt(parts[0], 10);
+              let year = parseInt(parts[1], 10);
+              if (year < 100) year += 2000;
+              expDate = new Date(year, month, 0); 
+              return expDate < new Date();
+            }
+            return false;
+          };
+
+          const validStock = res.data.data.filter(item => !isExpired(item.expiryDate));
+          setAllStock(validStock);
+          if (Platform.OS === 'web') {
+             localStorage.setItem('pharmacy_stock_cache', JSON.stringify(validStock));
+          }
+        }
+      } catch (err) {
+        console.error('Background stock fetch error:', err);
+      } finally {
+        setStockLoading(false);
+      }
+    };
+    loadStock();
+  }, []);
   
   useEffect(() => {
     const fetchPatientByMobile = async () => {
@@ -276,15 +328,15 @@ export default function SalesOrder() {
     };
 
     try {
-      const res = await axios.post('https://napi.bharatmedicalhallplus.com/sales-order', payload);
-      alert("Sales order saved successfully!");
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/sales-invoice', payload);
+      alert("Sales invoice saved successfully!");
       if (Platform.OS === 'web' && window.confirm("Do you want to print the bill?")) {
         printBill(formData, items);
       }
-      router.push('/employee/dashboard/pharmacy/sales-order-list');
+      router.push('/employee/dashboard/pharmacy/sales-invoice-list');
     } catch (err) {
       console.error(err);
-      alert("Failed to save sales order. The endpoint might not exist yet.");
+      alert("Failed to save sales invoice. The endpoint might not exist yet.");
     } finally {
       setLoading(false);
     }
@@ -306,6 +358,7 @@ export default function SalesOrder() {
         visible={itemMasterVisible} 
         onClose={() => setItemMasterVisible(false)}
         onSelectItem={handleItemSelect}
+        allStock={allStock}
       />
 
       {/* Top Orange Bar */}
@@ -322,7 +375,7 @@ export default function SalesOrder() {
 
       {/* Main Header (Teal) */}
       <View style={styles.mainHeader}>
-        <Text style={styles.mainTitle}>Sales Order</Text>
+        <Text style={styles.mainTitle}>Sales Invoice</Text>
         <Text style={styles.headerValue}>1</Text>
         <View style={styles.headerInfoGroup}>
           <Text style={styles.headerLabel}>Date </Text>
@@ -481,12 +534,95 @@ export default function SalesOrder() {
       </ScrollView>
 
       {/* Item Search and Totals Footer */}
-      <View style={styles.itemSearchFooter}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <TouchableOpacity style={styles.plusMinusBtn}><Text>+</Text></TouchableOpacity>
+      <View style={[styles.itemSearchFooter, { zIndex: 999 }]}>
+        <View style={{flexDirection: 'row', alignItems: 'center', position: 'relative', zIndex: 999}}>
+          <TouchableOpacity style={styles.plusMinusBtn} onPress={() => setItemMasterVisible(true)}><Text>+</Text></TouchableOpacity>
           <TouchableOpacity style={styles.plusMinusBtn}><Text>-</Text></TouchableOpacity>
           <Text style={[styles.metaLabel, {marginLeft: 5}]}>Item Search:</Text>
-          <TextInput style={[styles.input, {width: 250, backgroundColor: '#fff'}]} />
+          <View style={{position: 'relative', zIndex: 1000}}>
+            <TextInput 
+              style={[styles.input, {width: 250, backgroundColor: '#fff'}]} 
+              value={searchQuery}
+              placeholder="Type to search..."
+              onChangeText={(txt) => {
+                 setSearchQuery(txt);
+                 setHighlightedIndex(0);
+                 if (txt.length > 1) {
+                   const lower = txt.toLowerCase();
+                   setFilteredAutocomplete(allStock.filter(item => 
+                     item.itemName?.toLowerCase().includes(lower) || item.c_item_code?.toLowerCase().includes(lower)
+                   ).slice(0, 50));
+                 } else {
+                   setFilteredAutocomplete([]);
+                 }
+              }}
+              onKeyDown={(e) => {
+                 if (e.key === 'ArrowDown') {
+                   e.preventDefault();
+                   setHighlightedIndex(prev => Math.min(filteredAutocomplete.length - 1, prev + 1));
+                 } else if (e.key === 'ArrowUp') {
+                   e.preventDefault();
+                   setHighlightedIndex(prev => Math.max(0, prev - 1));
+                 } else if (e.key === 'Enter') {
+                   e.preventDefault();
+                   if (filteredAutocomplete.length > 0) {
+                     handleItemSelect(filteredAutocomplete[highlightedIndex]);
+                     setSearchQuery('');
+                     setFilteredAutocomplete([]);
+                   }
+                 } else if (e.key === 'Escape') {
+                   setFilteredAutocomplete([]);
+                 }
+              }}
+              onFocus={() => {
+                if (searchQuery.length > 1 && filteredAutocomplete.length === 0) {
+                   const lower = searchQuery.toLowerCase();
+                   setFilteredAutocomplete(allStock.filter(item => 
+                     item.itemName?.toLowerCase().includes(lower) || item.c_item_code?.toLowerCase().includes(lower)
+                   ).slice(0, 50));
+                }
+              }}
+            />
+            {filteredAutocomplete.length > 0 && (
+              <ScrollView style={{
+                position: 'absolute', 
+                bottom: 25, 
+                left: 0,
+                width: 400,
+                maxHeight: 250,
+                backgroundColor: '#fff',
+                borderWidth: 1,
+                borderColor: '#000',
+                zIndex: 1000,
+                elevation: 10
+              }}
+              keyboardShouldPersistTaps="handled"
+              >
+                {filteredAutocomplete.map((item, idx) => (
+                  <TouchableOpacity 
+                    key={idx} 
+                    style={{
+                      padding: 8, 
+                      borderBottomWidth: 1, 
+                      borderBottomColor: '#eee',
+                      backgroundColor: idx === highlightedIndex ? '#e6f7ff' : '#fff',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between'
+                    }}
+                    onPress={() => {
+                      handleItemSelect(item);
+                      setSearchQuery('');
+                      setFilteredAutocomplete([]);
+                    }}
+                  >
+                    <Text style={{fontWeight: 'bold', fontSize: 12, flex: 1}}>{item.itemName}</Text>
+                    <Text style={{fontSize: 12, color: '#666', width: 150, textAlign: 'right'}}>Rate: {item.saleRate} | Qty: {item.stockBalQty}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+          {stockLoading && <ActivityIndicator size="small" color="#000" style={{marginLeft: 10}} />}
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <TextInput style={[styles.input, {width: 50, textAlign: 'right', backgroundColor: '#fff'}]} value={items.length.toString()} editable={false} />

@@ -1,22 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform, FlatList } from 'react-native';
 import { Colors } from '../../../../constants/Colors';
 import { Search, X } from 'lucide-react-native';
 
-export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
+export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allStock = [] }) {
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
 
   useEffect(() => {
-    if (visible && apiKey) {
-      fetchStockData();
+    if (visible) {
+      if (allStock && allStock.length > 0) {
+        setItems(allStock);
+        if (searchText.trim() === '') {
+           setFilteredItems(allStock);
+        }
+      } else if (apiKey) {
+        fetchStockData();
+      }
     }
-  }, [visible, apiKey]);
+  }, [visible, apiKey, allStock]);
 
   useEffect(() => {
+    setCurrentPage(1);
     if (searchText.trim() === '') {
       setFilteredItems(items);
     } else {
@@ -27,7 +37,12 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
     }
   }, [searchText, items]);
 
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const fetchStockData = async () => {
+    if (allStock && allStock.length > 0) return; // skip if we already have it from parent
+    
     setLoading(true);
     setError(null);
     try {
@@ -109,10 +124,15 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
               <Text style={{color: 'red'}}>{error}</Text>
             </View>
           ) : (
-            <ScrollView style={styles.tableBody}>
-              {filteredItems.map((item, index) => (
+            <FlatList
+              style={styles.tableBody}
+              data={paginatedItems}
+              keyExtractor={(item, index) => index.toString()}
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+              windowSize={5}
+              renderItem={({ item, index }) => (
                 <TouchableOpacity 
-                  key={index} 
                   style={[styles.tableRow, index % 2 === 0 ? styles.rowEven : styles.rowOdd]}
                   onPress={() => onSelectItem(item)}
                 >
@@ -125,18 +145,35 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
                   <Text style={[styles.td, { flex: 1 }]}>{item.mrp}</Text>
                   <Text style={[styles.td, { flex: 1 }]}>{item.saleRate}</Text>
                 </TouchableOpacity>
-              ))}
-              {filteredItems.length === 0 && (
+              )}
+              ListEmptyComponent={() => (
                 <View style={styles.centerMsg}>
                   <Text>No items found.</Text>
                 </View>
               )}
-            </ScrollView>
+            />
           )}
 
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Total Items: {filteredItems.length}</Text>
+            <View style={styles.pagination}>
+               <TouchableOpacity 
+                  disabled={currentPage === 1} 
+                  onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
+               >
+                 <Text style={styles.pageBtnText}>Prev</Text>
+               </TouchableOpacity>
+               <Text style={styles.pageText}>Page {currentPage} of {totalPages || 1}</Text>
+               <TouchableOpacity 
+                  disabled={currentPage >= totalPages || totalPages === 0} 
+                  onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  style={[styles.pageBtn, (currentPage >= totalPages || totalPages === 0) && styles.pageBtnDisabled]}
+               >
+                 <Text style={styles.pageBtnText}>Next</Text>
+               </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -265,9 +302,34 @@ const styles = StyleSheet.create({
   footer: {
     backgroundColor: '#FF8C00', // Orange footer
     padding: 8,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center'
   },
   footerText: {
+    color: '#000',
+    fontWeight: 'bold'
+  },
+  pagination: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15
+  },
+  pageBtn: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4
+  },
+  pageBtnDisabled: {
+    opacity: 0.5
+  },
+  pageBtnText: {
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  pageText: {
     color: '#000',
     fontWeight: 'bold'
   }
