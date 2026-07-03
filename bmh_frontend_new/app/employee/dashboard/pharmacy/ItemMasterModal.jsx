@@ -41,27 +41,8 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
       const result = await res.json();
 
       if (result && result.data) {
-        const isExpired = (expiryStr) => {
-          if (!expiryStr) return false;
-          let expDate = new Date(expiryStr);
-          if (!isNaN(expDate.getTime()) && expiryStr.length >= 8) {
-            return expDate < new Date();
-          }
-          const parts = expiryStr.split(/[-/]/);
-          if (parts.length >= 2) {
-            let month = parseInt(parts[0], 10);
-            let year = parseInt(parts[1], 10);
-            if (year < 100) year += 2000;
-            // set to end of month
-            expDate = new Date(year, month, 0); 
-            return expDate < new Date();
-          }
-          return false;
-        };
-
-        const validItems = result.data.filter(item => !isExpired(item.expiryDate));
-        setItems(validItems);
-        setFilteredItems(validItems);
+        setItems(result.data);
+        setFilteredItems(result.data);
       } else {
         setError('Failed to fetch items from server.');
       }

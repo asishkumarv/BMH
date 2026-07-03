@@ -537,7 +537,7 @@ exports.getStock = async (req, res) => {
                 "storeId": "001", 
                 "prodCode": "02", 
                 "inputDateTime":"2023-01-01 10:10:00",
-                "itemCodes": (itemCodes && itemCodes.length > 0) ? itemCodes : [],
+                "itemCodes":[],
                 "apiKey": token 
             };
 
