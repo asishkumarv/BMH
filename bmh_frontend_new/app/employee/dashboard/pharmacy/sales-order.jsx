@@ -1,14 +1,82 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { ItemMasterModal } from './ItemMasterModal';
-import { useTokenManager } from './useTokenManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 
+const printBill = (orderData, items) => {
+  if (Platform.OS === 'web') {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const html = `
+      <html>
+        <head>
+          <title>Bill - Bharat Medical Hall</title>
+          <style>
+            body { font-family: monospace; padding: 20px; max-width: 400px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h2 { margin: 0; font-size: 24px; }
+            .header p { margin: 5px 0; }
+            .details { margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+            .details p { margin: 2px 0; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { text-align: left; padding: 4px 2px; }
+            th { border-bottom: 1px dashed #000; }
+            .total { text-align: right; font-weight: bold; margin-top: 10px; border-top: 1px dashed #000; padding-top: 10px; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>BHARAT MEDICAL HALL</h2>
+            <p>Receipt</p>
+          </div>
+          <div class="details">
+            <p><strong>Ref No:</strong> ${orderData.refNo}</p>
+            <p><strong>Date:</strong> ${orderData.ordDate} ${orderData.ordTime}</p>
+            <p><strong>Customer:</strong> ${orderData.patientName}</p>
+            <p><strong>Mobile:</strong> ${orderData.mobileNo}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Rate</th>
+                <th>Amt</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(i => `
+                <tr>
+                  <td>${i.itemName}</td>
+                  <td>${i.totalLooseQty}</td>
+                  <td>${i.saleRate}</td>
+                  <td>${((parseFloat(i.saleRate)||0) * (parseInt(i.totalLooseQty)||0)).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="total">
+            <p>Discount: ${orderData.orderDiscPer}%</p>
+            <p>Total Payable: Rs. ${orderData.orderTotal}</p>
+          </div>
+          <div style="text-align:center; margin-top: 20px; font-size: 12px;">
+            <p>Thank you! Visit again.</p>
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+};
+
 export default function SalesOrder() {
   const router = useRouter();
-  const apiKey = useTokenManager();
   
   const [itemMasterVisible, setItemMasterVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -48,6 +116,31 @@ export default function SalesOrder() {
   const [items, setItems] = useState([]);
   
   useEffect(() => {
+    const fetchPatientByMobile = async () => {
+      if (formData.mobileNo && formData.mobileNo.length === 10) {
+        try {
+          const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patient/by-mobile/${formData.mobileNo}`);
+          if (res.data && res.data.success && res.data.patient) {
+            const p = res.data.patient;
+            setFormData(prev => ({
+              ...prev,
+              patientName: p.name || prev.patientName,
+              patientEmail: p.email || prev.patientEmail,
+              patientAddress: p.address || p.city || prev.patientAddress,
+              orderDiscPer: "10"
+            }));
+            // Calculate with 10% discount
+            recalculateTotal(items, "10");
+          }
+        } catch (err) {
+          console.log("Patient fetch error:", err.message);
+        }
+      }
+    };
+    fetchPatientByMobile();
+  }, [formData.mobileNo]);
+
+  useEffect(() => {
     const fetchUser = async () => {
       let userDataStr = null;
       if (Platform.OS === 'web') {
@@ -63,22 +156,57 @@ export default function SalesOrder() {
     fetchUser();
   }, []);
 
+  const itemsRef = React.useRef(items);
+  const formDataRef = React.useRef(formData);
+  const handleSubmitRef = React.useRef(null);
+  
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+
   const handleKeyDown = useCallback((e) => {
     if (e.altKey && (e.key === '+' || e.key === '=')) {
       e.preventDefault();
+      e.stopPropagation();
       setItemMasterVisible(true);
+    } else if (e.altKey && e.key === '-') {
+      e.preventDefault();
+      e.stopPropagation();
+      const currentItems = itemsRef.current;
+      if (currentItems.length > 0) {
+        const newItems = currentItems.slice(0, -1);
+        setItems(newItems);
+        recalculateTotal(newItems, formDataRef.current.orderDiscPer);
+      }
+    } else if (e.key === 'F12') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (handleSubmitRef.current) handleSubmitRef.current();
+    } else if (e.key === 'F7') {
+      e.preventDefault();
+      e.stopPropagation();
+      setItems([]);
+      setFormData(prev => ({
+        ...prev,
+        ipNo: "", mobileNo: "", patientName: "", patientAddress: "", patientEmail: "",
+        orderTotal: "0.00", orderDiscPer: "0.00",
+        refNo: Math.floor(Math.random() * 10000), orderId: Math.floor(Math.random() * 1000)
+      }));
     }
   }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
+      // Use capture phase to ensure it triggers before input fields handle it
+      window.addEventListener('keydown', handleKeyDown, true);
+      return () => window.removeEventListener('keydown', handleKeyDown, true);
     }
   }, [handleKeyDown]);
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'orderDiscPer') {
+      recalculateTotal(items, value);
+    }
   };
 
   const handleItemSelect = (item) => {
@@ -108,13 +236,19 @@ export default function SalesOrder() {
     recalculateTotal(newItems);
   };
 
-  const recalculateTotal = (currentItems) => {
-    let total = 0;
+  const recalculateTotal = (currentItems, discPerOverride) => {
+    let grossTotal = 0;
     currentItems.forEach(item => {
-      total += (parseFloat(item.saleRate) || 0) * (parseInt(item.totalLooseQty) || 0);
+      grossTotal += (parseFloat(item.saleRate) || 0) * (parseInt(item.totalLooseQty) || 0);
     });
-    setFormData(prev => ({ ...prev, orderTotal: total.toFixed(2) }));
+    
+    const discPer = parseFloat(discPerOverride !== undefined ? discPerOverride : formData.orderDiscPer) || 0;
+    const finalTotal = grossTotal - (grossTotal * discPer / 100);
+    
+    setFormData(prev => ({ ...prev, orderTotal: finalTotal.toFixed(2) }));
   };
+
+
 
   const handleSubmit = async () => {
     if (items.length === 0) {
@@ -144,6 +278,9 @@ export default function SalesOrder() {
     try {
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/sales-order', payload);
       alert("Sales order saved successfully!");
+      if (Platform.OS === 'web' && window.confirm("Do you want to print the bill?")) {
+        printBill(formData, items);
+      }
       router.push('/employee/dashboard/pharmacy/sales-order-list');
     } catch (err) {
       console.error(err);
@@ -152,6 +289,10 @@ export default function SalesOrder() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
 
   const removeItem = (index) => {
     const newItems = items.filter((_, i) => i !== index);
@@ -165,7 +306,6 @@ export default function SalesOrder() {
         visible={itemMasterVisible} 
         onClose={() => setItemMasterVisible(false)}
         onSelectItem={handleItemSelect}
-        apiKey={apiKey}
       />
 
       {/* Top Orange Bar */}
@@ -252,10 +392,48 @@ export default function SalesOrder() {
               <Text style={styles.approxValueTitle}>Approx Value</Text>
               <Text style={styles.approxValueAmt}>{formData.orderTotal}</Text>
             </View>
+            <View style={[styles.fieldRow, { marginTop: 15 }]}>
+              <Text style={styles.fieldLabel}>Order Disc (%)</Text>
+              <TextInput 
+                style={[styles.input, { flex: 1 }]} 
+                keyboardType="numeric"
+                value={formData.orderDiscPer} 
+                onChangeText={t => updateField('orderDiscPer', t)} 
+              />
+            </View>
             <View style={styles.paymentModes}>
               <Text style={styles.paymentRadio}>◉ CASH</Text>
               <Text style={styles.paymentRadio}>○ CARD</Text>
             </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Meta Info Bar (Right side of Screenshot 1) */}
+      <View style={styles.metaBar}>
+        <View style={styles.metaRow}>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 'auto'}}>
+            <Text style={styles.metaLabel}>Ref ID</Text>
+            <TextInput style={[styles.input, {width: 60, backgroundColor: '#ff0'}]} value={formData.refNo.toString()} editable={false} />
+            <TextInput style={[styles.input, {width: 20, backgroundColor: '#ff0'}]} value="0" editable={false} />
+            <TextInput style={[styles.input, {width: 60, backgroundColor: '#ff0', marginRight: 10}]} editable={false} />
+            <Text style={styles.metaLabel}>Modi DateTime</Text>
+            <TextInput style={[styles.input, {width: 70, color: 'red'}]} value={formData.ordDate} editable={false} />
+            <TextInput style={[styles.input, {width: 70, color: 'red'}]} value={formData.ordTime} editable={false} />
+          </View>
+        </View>
+        <View style={[styles.metaRow, {marginTop: 4}]}>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 'auto'}}>
+            <Text style={styles.metaLabel}>Disc. in Amt</Text>
+            <TextInput style={[styles.input, {width: 50}]} value={(parseFloat(formData.orderTotal) * parseFloat(formData.orderDiscPer || 0) / 100).toFixed(2) || ".00"} editable={false} />
+            <Text style={styles.metaLabel}>Advance Amt</Text>
+            <TextInput style={[styles.input, {width: 50}]} value=".00" editable={false} />
+            <Text style={styles.metaLabel}>USER</Text>
+            <TextInput style={[styles.input, {width: 70}]} value={formData.userId} editable={false} />
+            <Text style={styles.metaLabel}>SMan</Text>
+            <TextInput style={[styles.input, {width: 70}]} value={formData.userId} editable={false} />
+            <Text style={styles.metaLabel}>Modified</Text>
+            <TextInput style={[styles.input, {width: 70, color: 'red'}]} value={formData.userId} editable={false} />
           </View>
         </View>
       </View>
@@ -301,6 +479,22 @@ export default function SalesOrder() {
           )
         })}
       </ScrollView>
+
+      {/* Item Search and Totals Footer */}
+      <View style={styles.itemSearchFooter}>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <TouchableOpacity style={styles.plusMinusBtn}><Text>+</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.plusMinusBtn}><Text>-</Text></TouchableOpacity>
+          <Text style={[styles.metaLabel, {marginLeft: 5}]}>Item Search:</Text>
+          <TextInput style={[styles.input, {width: 250, backgroundColor: '#fff'}]} />
+        </View>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <TextInput style={[styles.input, {width: 50, textAlign: 'right', backgroundColor: '#fff'}]} value={items.length.toString()} editable={false} />
+          <TextInput style={[styles.input, {width: 40, textAlign: 'right', backgroundColor: '#fff'}]} value={items.reduce((sum, item) => sum + (parseInt(item.totalLooseQty)||0), 0).toString()} editable={false} />
+          <TextInput style={[styles.input, {width: 40, textAlign: 'right', backgroundColor: '#fff'}]} value="0" editable={false} />
+        </View>
+        <TextInput style={[styles.input, {width: 100, textAlign: 'right', backgroundColor: '#fff', fontWeight: 'bold'}]} value={formData.orderTotal} editable={false} />
+      </View>
 
       {/* Bottom Actions */}
       <View style={styles.bottomBar}>
@@ -518,6 +712,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 12,
     color: '#000'
+  },
+  metaBar: {
+    paddingHorizontal: 10,
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#777'
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center'
+  },
+  metaLabel: {
+    fontSize: 11,
+    color: '#333',
+    marginRight: 4,
+    marginLeft: 8
+  },
+  itemSearchFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 5,
+    backgroundColor: '#b5d09b',
+    borderTopWidth: 1,
+    borderTopColor: '#777',
+    borderBottomWidth: 1,
+    borderBottomColor: '#777'
+  },
+  plusMinusBtn: {
+    width: 20,
+    height: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#777',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 2
   },
   submitBtn: {
     backgroundColor: '#006400',

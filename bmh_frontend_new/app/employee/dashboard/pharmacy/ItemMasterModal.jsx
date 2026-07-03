@@ -31,33 +31,39 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey }) {
     setLoading(true);
     setError(null);
     try {
-      const payload = {
-        c2Code: "P00000",
-        storeId: "001",
-        prodCode: "02",
-        inputDateTime: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        itemCodes: [],
-        apiKey: apiKey
-      };
-
-      const res = await fetch('https://napi.bharatmedicalhallplus.com/sales-order/get-stock-data', {
+      const res = await fetch('https://napi.bharatmedicalhallplus.com/pharmacy/stock', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          apiKey: apiKey,
-          companyCode: "BMH001",
-          storeId: "01"
-        })
+        body: JSON.stringify({})
       });
       const result = await res.json();
 
-      if (result && result.code === "200" && result.data) {
-        setItems(result.data);
-        setFilteredItems(result.data);
+      if (result && result.data) {
+        const isExpired = (expiryStr) => {
+          if (!expiryStr) return false;
+          let expDate = new Date(expiryStr);
+          if (!isNaN(expDate.getTime()) && expiryStr.length >= 8) {
+            return expDate < new Date();
+          }
+          const parts = expiryStr.split(/[-/]/);
+          if (parts.length >= 2) {
+            let month = parseInt(parts[0], 10);
+            let year = parseInt(parts[1], 10);
+            if (year < 100) year += 2000;
+            // set to end of month
+            expDate = new Date(year, month, 0); 
+            return expDate < new Date();
+          }
+          return false;
+        };
+
+        const validItems = result.data.filter(item => !isExpired(item.expiryDate));
+        setItems(validItems);
+        setFilteredItems(validItems);
       } else {
-        setError('Failed to fetch items or invalid API key.');
+        setError('Failed to fetch items from server.');
       }
     } catch (err) {
       console.error('Error fetching stock data:', err);
