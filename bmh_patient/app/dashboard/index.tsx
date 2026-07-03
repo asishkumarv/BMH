@@ -16,6 +16,7 @@ export default function PatientDashboard() {
   // Stats states
   const [specialistsCount, setSpecialistsCount] = useState(15);
   const [upcomingVisitsCount, setUpcomingVisitsCount] = useState(0);
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -38,6 +39,12 @@ export default function PatientDashboard() {
               b.status === 'Booked' || b.status === 'Waiting' || b.status === 'Current'
             );
             setUpcomingVisitsCount(activeBookings.length);
+          }
+          // 3. Fetch active online orders
+          const ordersRes = await axios.get(`https://napi.bharatmedicalhallplus.com/online-orders/patient/${p.id}`);
+          if (ordersRes.data.success && ordersRes.data.data) {
+            const activeOrders = ordersRes.data.data.filter((o: any) => o.status === 'PENDING');
+            setActiveOrdersCount(activeOrders.length);
           }
         }
       } catch (err) {
@@ -104,17 +111,21 @@ export default function PatientDashboard() {
         </View>
 
         {/* Card 2: Active Orders */}
-        <View style={styles.statCard}>
+        <TouchableOpacity style={styles.statCard} onPress={() => router.push('/dashboard/my-orders' as any)}>
           <View style={[styles.statIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
             <ShoppingBag size={20} color="#F59E0B" />
           </View>
           <Text style={styles.statLabel}>Active Orders</Text>
-          <Text style={styles.statValue}>4</Text>
-          <Text style={styles.statSubtext}>Pending pharmacy delivery</Text>
-          <View style={styles.liveIndicator}>
-            <Text style={styles.liveIndicatorText}>Live</Text>
-          </View>
-        </View>
+          <Text style={styles.statValue}>{activeOrdersCount}</Text>
+          <Text style={styles.statSubtext}>
+            {activeOrdersCount > 0 ? 'Pending pharmacy delivery' : 'No active orders'}
+          </Text>
+          {activeOrdersCount > 0 && (
+            <View style={styles.liveIndicator}>
+              <Text style={styles.liveIndicatorText}>Live</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         {/* Card 3: Upcoming Visits */}
         <View style={styles.statCard}>

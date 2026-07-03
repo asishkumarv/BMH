@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Search, ShoppingCart, Plus, Minus } from 'lucide-react-native';
+import { Search, ShoppingCart, Plus, Minus, Pill } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function MedicineStoreScreen() {
   const router = useRouter();
-  const [items, setItems] = useState([]);
+  const { isMobile } = useResponsive();
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -13,7 +15,7 @@ export default function MedicineStoreScreen() {
   
   // Cart is managed locally for simplicity, though a global state/context would be better for a full app.
   // We'll store it in localStorage on web to pass to the cart page.
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState<any>({});
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -24,7 +26,7 @@ export default function MedicineStoreScreen() {
     }
   }, []);
 
-  const saveCart = (newCart) => {
+  const saveCart = (newCart: any) => {
     setCart(newCart);
     if (Platform.OS === 'web') {
       localStorage.setItem('bmh_patient_cart', JSON.stringify(newCart));
@@ -69,7 +71,7 @@ export default function MedicineStoreScreen() {
     }
   };
 
-  const addToCart = (item) => {
+  const addToCart = (item: any) => {
     const newCart = { ...cart };
     if (newCart[item.c_item_code]) {
       newCart[item.c_item_code].qty += 1;
@@ -79,7 +81,7 @@ export default function MedicineStoreScreen() {
     saveCart(newCart);
   };
 
-  const removeFromCart = (itemCode) => {
+  const removeFromCart = (itemCode: any) => {
     const newCart = { ...cart };
     if (newCart[itemCode]) {
       newCart[itemCode].qty -= 1;
@@ -90,7 +92,7 @@ export default function MedicineStoreScreen() {
     saveCart(newCart);
   };
 
-  const cartTotalItems = Object.values(cart).reduce((sum, item) => sum + item.qty, 0);
+  const cartTotalItems = (Object.values(cart) as any[]).reduce((sum: number, item: any) => sum + item.qty, 0);
 
   return (
     <View style={styles.container}>
@@ -117,9 +119,12 @@ export default function MedicineStoreScreen() {
       </View>
 
       <FlatList 
+        key={isMobile ? 'mobile' : 'desktop'}
         data={items}
+        numColumns={isMobile ? 2 : 4}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContainer}
+        columnWrapperStyle={styles.columnWrapper}
         onEndReached={() => {
           if (currentPage < totalPages && !loading) {
             setCurrentPage(p => p + 1);
@@ -127,32 +132,38 @@ export default function MedicineStoreScreen() {
         }}
         onEndReachedThreshold={0.5}
         ListFooterComponent={loading ? <ActivityIndicator size="large" color="#3B82F6" style={{margin: 20}} /> : null}
-        renderItem={({item}) => {
+        renderItem={({item}: {item: any}) => {
           const cartItem = cart[item.c_item_code];
           return (
-            <View style={styles.card}>
+            <View style={[styles.card, { width: isMobile ? '47%' : '23%' }]}>
+              <View style={styles.imagePlaceholder}>
+                <Pill color="#94A3B8" size={32} />
+              </View>
               <View style={styles.cardInfo}>
-                <Text style={styles.itemName}>{item.itemName}</Text>
-                <Text style={styles.itemDesc}>Batch: {item.batchNo} | Exp: {item.expiryDate}</Text>
-                <Text style={styles.itemPrice}>₹{item.saleRate}</Text>
+                <Text style={styles.itemName} numberOfLines={2}>{item.itemName}</Text>
+                <Text style={styles.itemDesc} numberOfLines={1}>Exp: {item.expiryDate}</Text>
               </View>
               
-              <View style={styles.cardActions}>
-                {cartItem ? (
-                  <View style={styles.qtyContainer}>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.c_item_code)}>
-                      <Minus size={16} color="#3B82F6" />
+              <View style={styles.cardFooter}>
+                <Text style={styles.itemPrice}>₹{item.saleRate}</Text>
+                <View style={styles.cardActions}>
+                  {cartItem ? (
+                    <View style={styles.qtyContainer}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.c_item_code)}>
+                        <Minus size={14} color="#0F172A" />
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{cartItem.qty}</Text>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item)}>
+                        <Plus size={14} color="#0F172A" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(item)}>
+                      <Plus size={16} color="#fff" style={{marginRight: 4}} />
+                      <Text style={styles.addBtnText}>Add</Text>
                     </TouchableOpacity>
-                    <Text style={styles.qtyText}>{cartItem.qty}</Text>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item)}>
-                      <Plus size={16} color="#3B82F6" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(item)}>
-                    <Text style={styles.addBtnText}>Add to Cart</Text>
-                  </TouchableOpacity>
-                )}
+                  )}
+                </View>
               </View>
             </View>
           );
@@ -172,7 +183,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#0F172A',
   },
   title: {
     fontSize: 24,
@@ -220,68 +231,91 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     fontSize: 16,
-    outlineStyle: 'none'
+    outlineStyle: 'none' as any
   },
   listContainer: {
-    padding: 16
+    padding: 16,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    marginBottom: 16
   },
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    flexDirection: 'column',
+    elevation: 4,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
     borderWidth: 1,
-    borderColor: '#F1F5F9'
+    borderColor: '#E2E8F0'
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16
   },
   cardInfo: {
-    flex: 1
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12
   },
   itemName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 4
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+    height: 40,
+    lineHeight: 20
   },
   itemDesc: {
     fontSize: 12,
     color: '#64748B',
-    marginBottom: 8
+    marginBottom: 12,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 'auto',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9'
   },
   itemPrice: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#10B981'
+    fontWeight: '800',
+    color: '#0F172A',
   },
   cardActions: {
-    minWidth: 100,
-    alignItems: 'flex-end'
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addBtn: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#0F172A',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#3B82F6'
+    borderRadius: 8,
   },
   addBtnText: {
-    color: '#3B82F6',
-    fontWeight: 'bold'
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14
   },
   qtyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#3B82F6'
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
   },
   qtyBtn: {
     padding: 8
@@ -289,6 +323,6 @@ const styles = StyleSheet.create({
   qtyText: {
     paddingHorizontal: 8,
     fontWeight: 'bold',
-    color: '#1E293B'
+    color: '#0F172A'
   }
 });

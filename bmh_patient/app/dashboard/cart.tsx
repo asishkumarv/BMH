@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 
 // Leaflet setup for web
 let MapContainer: any, TileLayer: any, Marker: any, useMapEvents: any;
-if (Platform.OS === 'web') {
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
   const RL = require('react-leaflet');
   MapContainer = RL.MapContainer;
   TileLayer = RL.TileLayer;
@@ -16,26 +16,32 @@ if (Platform.OS === 'web') {
   require('leaflet/dist/leaflet.css');
   const L = require('leaflet');
   
-  // Fix Leaflet marker icons
+  // Fix Leaflet marker icons using CDN to prevent broken images in Metro Bundler
   delete L.Icon.Default.prototype._getIconUrl;
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-    iconUrl: require('leaflet/dist/images/marker-icon.png'),
-    shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
   });
 }
 
 function LocationPicker({ position, setPosition }: { position: any, setPosition: any }) {
-  if (Platform.OS !== 'web') {
-    return <Text style={{padding: 20}}>Map picker is only available on web in this demo.</Text>;
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !MapContainer) {
+    return <Text style={{padding: 20}}>Map picker is only available on web.</Text>;
   }
 
   const LocationMarker = () => {
-    useMapEvents({
+    const map = useMapEvents({
       click(e: any) {
         setPosition(e.latlng);
       },
     });
+
+    React.useEffect(() => {
+      if (position) {
+        map.flyTo(position, map.getZoom());
+      }
+    }, [position, map]);
 
     return position === null ? null : (
       <Marker position={position} />

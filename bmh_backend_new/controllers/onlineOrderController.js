@@ -104,3 +104,15 @@ exports.updateOrderStatus = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
+
+exports.getOrdersByPatient = async (req, res) => {
+    try {
+        const { patient_id } = req.params;
+        const query = 'SELECT * FROM online_orders WHERE patient_id = $1 ORDER BY created_at DESC';
+        const { rows } = await pool.query(query, [patient_id]);
+        res.status(200).json({ success: true, data: rows });
+    } catch (err) {
+        console.error("Get patient orders error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
