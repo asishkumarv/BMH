@@ -79,10 +79,10 @@ let tokenData = {
 
 // 🔐 Fixed credentials (move to .env in real project)
 const credentials = {
-  c2Code: process.env.C2_CODE,
-  storeId: process.env.STORE_ID,
-  prodCode: process.env.PROD_CODE,
-  securityKey: process.env.SECURITY_KEY,
+  c2Code: "P00000",
+  storeId: "001",
+  prodCode: "02",
+  securityKey: "VURBd01ESXdNakU9",
 };
 
 // 🔄 Generate Token Function

@@ -127,8 +127,13 @@ router.get('/', async (req, res) => {
 // Proxy route for token generation to avoid CORS
 router.post('/generate-token', async (req, res) => {
   try {
-    const response = await axios.post('http://117.211.64.158:21000/ws_c2_services_generate_token', req.body);
-    res.json(response.data);
+    const response = await fetch('http://117.211.64.158:21000/ws_c2_services_generate_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json(data);
   } catch (error) {
     console.error('Token proxy error:', error.message);
     res.status(500).json({ success: false, error: error.message });
@@ -138,8 +143,13 @@ router.post('/generate-token', async (req, res) => {
 // Proxy route for stock data to avoid CORS
 router.post('/get-stock-data', async (req, res) => {
   try {
-    const response = await axios.post('http://117.211.64.158:21000/ws_c2_services_get_stock_data', req.body);
-    res.json(response.data);
+    const response = await fetch('http://117.211.64.158:21000/ws_c2_services_get_stock_data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json(data);
   } catch (error) {
     console.error('Stock data proxy error:', error.message);
     res.status(500).json({ success: false, error: error.message });
