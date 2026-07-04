@@ -58,8 +58,8 @@ exports.getOrders = async (req, res) => {
         cre.full_name as creator_name, cre.profile_data as creator_profile,
         admin.full_name as admin_creator_name, admin.image as admin_creator_profile
       FROM manual_orders mo
-      LEFT JOIN employees emp ON mo.delivery_boy_id = emp.id
-      LEFT JOIN employees cre ON mo.created_by_id = cre.id AND mo.created_by_type != 'Admin'
+      LEFT JOIN employees emp ON mo.delivery_boy_id = emp.id::varchar
+      LEFT JOIN employees cre ON mo.created_by_id = cre.id::varchar AND mo.created_by_type != 'Admin'
       LEFT JOIN department_admins admin ON mo.created_by_id = admin.id::varchar AND mo.created_by_type = 'Admin'
       WHERE 1=1
     `;
