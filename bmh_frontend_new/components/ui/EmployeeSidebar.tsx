@@ -85,17 +85,16 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Online Orders', icon: Package, route: '/employee/dashboard/online-orders' });
             }
           }
-          
-          let dynamicPharmacyItems = [...BASE_PHARMACY_ITEMS];
           if (res.data.success && res.data.settings.purchase_order_access) {
             let poa = res.data.settings.purchase_order_access;
             if (typeof poa === 'string') poa = JSON.parse(poa);
             const empId = u.id?.toString();
             if (empId && poa[empId] === true) {
-              // Add Purchase Orders to the top of the pharmacy list
-              dynamicPharmacyItems.unshift({ name: 'Purchase Orders', route: '/dashboard/purchase-orders' });
+              dynamicNavItems.push({ name: 'Purchase Orders', icon: Package, route: '/employee/dashboard/purchase-orders' });
             }
           }
+          
+          let dynamicPharmacyItems = [...BASE_PHARMACY_ITEMS];
           setPharmacyItems(dynamicPharmacyItems);
         }
         

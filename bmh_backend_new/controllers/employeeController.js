@@ -323,3 +323,53 @@ exports.updatePOAccess = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error updating PO access' });
   }
 };
+
+exports.bulkSavePurchaseOrders = async (req, res) => {
+  const { orders } = req.body;
+  if (!orders || !Array.isArray(orders)) {
+    return res.status(400).json({ success: false, message: 'Invalid orders array' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let savedCount = 0;
+    
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      
+      const existsRes = await client.query(
+        'SELECT id FROM ecogreenpurchase_orders WHERE br_code=$1 AND year=$2 AND prefix=$3 AND srno=$4', 
+        [order.br_code, order.year, order.prefix, order.srno]
+      );
+
+      if (existsRes.rows.length === 0) {
+        await client.query(`
+          INSERT INTO ecogreenpurchase_orders 
+            (br_code, year, prefix, srno, custcode, custname, refcode, refname, total, details, status, created_at) 
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pending', CURRENT_TIMESTAMP)`, 
+        [
+          order.br_code, order.year, order.prefix, order.srno, order.custcode, order.custname,
+          order.refcode, order.refname, order.total, JSON.stringify(order.details)
+        ]);
+        savedCount++;
+      } else {
+        await client.query(`
+          UPDATE ecogreenpurchase_orders 
+          SET total = $1, details = $2 
+          WHERE id = $3`, 
+        [order.total, JSON.stringify(order.details), existsRes.rows[0].id]);
+        savedCount++;
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.json({ success: true, message: `Successfully saved ${savedCount} purchase orders.` });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error in bulkSavePurchaseOrders:', error);
+    res.status(500).json({ success: false, message: 'Failed to bulk save purchase orders', error: error.message });
+  } finally {
+    client.release();
+  }
+};

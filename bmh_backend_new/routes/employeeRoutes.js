@@ -23,6 +23,10 @@ router.put('/:id/status', employeeController.updateEmployeeStatus);
 // PUT /employees/:id/po-access
 router.put('/:id/po-access', employeeController.updatePOAccess);
 
+// POST /employees/purchase-orders/bulk-save
+router.post('/purchase-orders/bulk-save', employeeController.bulkSavePurchaseOrders);
+
+
 // GET /employees/delivery-fleet
 router.get('/delivery-fleet', employeeController.getDeliveryFleet);
 

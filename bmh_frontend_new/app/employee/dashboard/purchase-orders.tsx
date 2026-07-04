@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, ScrollView, TextInput } from 'react-native';
 import axios from 'axios';
-import { Package, MapPin, Bus, User, Map, CheckCircle } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Download, CheckSquare, Square } from 'lucide-react-native';
 
 export default function PurchaseOrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -24,6 +24,14 @@ export default function PurchaseOrdersScreen() {
     waybill_number: '',
     drop_location: ''
   });
+
+  // Manual Sync State
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
+  const [syncFromDate, setSyncFromDate] = useState('');
+  const [syncToDate, setSyncToDate] = useState('');
+  const [syncResults, setSyncResults] = useState<any[]>([]);
+  const [selectedSyncPOs, setSelectedSyncPOs] = useState<Set<number>>(new Set());
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -72,6 +80,54 @@ export default function PurchaseOrdersScreen() {
     } catch (err: any) {
       alert("Error assigning delivery: " + err.message);
     }
+  };
+
+  const handleFetchSyncData = async () => {
+    if (!syncFromDate || !syncToDate) return alert("Please enter both dates (YYYY-MM-DD)");
+    setIsSyncing(true);
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/pharmacy/purchase-order', {
+        fromDate: syncFromDate,
+        toDate: syncToDate
+      });
+      if (res.data && res.data.data) {
+        setSyncResults(res.data.data);
+      } else {
+        setSyncResults([]);
+        alert("No purchase orders found for this date range.");
+      }
+    } catch(err: any) {
+      alert("Failed to fetch: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSaveSyncData = async () => {
+    if (selectedSyncPOs.size === 0) return alert("Select at least one order");
+    setIsSyncing(true);
+    try {
+      const ordersToSave = syncResults.filter((_, idx) => selectedSyncPOs.has(idx));
+      await axios.post('https://napi.bharatmedicalhallplus.com/employees/purchase-orders/bulk-save', {
+        orders: ordersToSave
+      });
+      alert("Saved successfully!");
+      setSyncModalVisible(false);
+      setSyncResults([]);
+      setSelectedSyncPOs(new Set());
+      fetchData();
+    } catch(err: any) {
+      alert("Failed to save: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const toggleSyncSelection = (idx: number) => {
+    const next = new Set(selectedSyncPOs);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    setSelectedSyncPOs(next);
   };
 
   const openAssignModal = (order: any) => {
@@ -134,7 +190,7 @@ export default function PurchaseOrdersScreen() {
             style={[styles.btn, item.status === 'Assigned' ? styles.btnOutline : styles.btnPrimary]}
             onPress={() => openAssignModal(item)}
           >
-            <Text style={[styles.btnText, item.status === 'Assigned' ? styles.btnOutlineText : styles.btnPrimaryText]}>
+            <Text style={[item.status === 'Assigned' ? styles.btnOutlineText : styles.btnPrimaryText]}>
               {item.status === 'Assigned' ? 'Reassign Delivery' : 'Assign Delivery'}
             </Text>
           </TouchableOpacity>
@@ -153,7 +209,13 @@ export default function PurchaseOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Purchase Orders</Text>
+      <View style={styles.pageHeader}>
+        <Text style={styles.header}>Purchase Orders</Text>
+        <TouchableOpacity style={styles.syncBtn} onPress={() => setSyncModalVisible(true)}>
+          <Download color="white" size={18} />
+          <Text style={styles.syncBtnText}>Manual Sync</Text>
+        </TouchableOpacity>
+      </View>
       
       <FlatList
         data={orders}
@@ -162,6 +224,92 @@ export default function PurchaseOrdersScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         ListEmptyComponent={<Text style={{textAlign: 'center', marginTop: 40}}>No purchase orders found.</Text>}
       />
+
+      {/* SYNC MODAL */}
+      <Modal visible={syncModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Manual Fetch & Sync</Text>
+              <TouchableOpacity onPress={() => setSyncModalVisible(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{flexDirection: 'row', gap: 12, marginBottom: 16}}>
+              <View style={{flex: 1}}>
+                <Text style={styles.label}>From Date</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="YYYY-MM-DD" 
+                  value={syncFromDate} 
+                  onChangeText={setSyncFromDate} 
+                />
+              </View>
+              <View style={{flex: 1}}>
+                <Text style={styles.label}>To Date</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="YYYY-MM-DD" 
+                  value={syncToDate} 
+                  onChangeText={setSyncToDate} 
+                />
+              </View>
+            </View>
+            
+            <TouchableOpacity 
+              style={[styles.btn, styles.btnOutline, {marginBottom: 16}]} 
+              onPress={handleFetchSyncData}
+              disabled={isSyncing}
+            >
+              <Text style={styles.btnOutlineText}>{isSyncing ? 'Fetching...' : 'Fetch Orders'}</Text>
+            </TouchableOpacity>
+
+            {syncResults.length > 0 && (
+              <>
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4}}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      if (selectedSyncPOs.size === syncResults.length) setSelectedSyncPOs(new Set());
+                      else setSelectedSyncPOs(new Set(syncResults.map((_, i) => i)));
+                    }}
+                    style={{flexDirection: 'row', alignItems: 'center', gap: 8}}
+                  >
+                    {selectedSyncPOs.size === syncResults.length ? <CheckSquare color="#4F46E5" size={20} /> : <Square color="#64748B" size={20} />}
+                    <Text style={{fontWeight: 'bold', color: '#334155'}}>Select All</Text>
+                  </TouchableOpacity>
+                  <Text style={{marginLeft: 'auto', color: '#64748B'}}>{selectedSyncPOs.size} selected</Text>
+                </View>
+                
+                <ScrollView style={{maxHeight: 300, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8}}>
+                  {syncResults.map((po, idx) => (
+                    <TouchableOpacity 
+                      key={idx} 
+                      style={styles.syncRow} 
+                      onPress={() => toggleSyncSelection(idx)}
+                    >
+                      {selectedSyncPOs.has(idx) ? <CheckSquare color="#4F46E5" size={20} /> : <Square color="#64748B" size={20} />}
+                      <View style={{marginLeft: 12}}>
+                        <Text style={{fontWeight: 'bold', color: '#0F172A'}}>{po.prefix}{po.year}{po.srno}</Text>
+                        <Text style={{color: '#64748B', fontSize: 12}}>{po.custname}</Text>
+                      </View>
+                      <Text style={{marginLeft: 'auto', fontWeight: 'bold', color: '#0F172A'}}>₹{po.total}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity 
+                  style={[styles.saveBtn, {marginTop: 16}]} 
+                  onPress={handleSaveSyncData}
+                  disabled={isSyncing}
+                >
+                  <Text style={styles.saveBtnText}>{isSyncing ? 'Saving...' : 'Save Selected to Database'}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* ASSIGNMENT MODAL */}
       <Modal visible={!!selectedOrder} transparent animationType="slide">
@@ -265,7 +413,10 @@ export default function PurchaseOrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#F8FAFC' },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#0F172A', marginBottom: 16 },
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  header: { fontSize: 24, fontWeight: 'bold', color: '#0F172A' },
+  syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#4F46E5', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  syncBtnText: { color: 'white', fontWeight: 'bold' },
   card: { backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   orderId: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
@@ -307,5 +458,6 @@ const styles = StyleSheet.create({
   boyText: { color: '#64748B' },
   boyTextActive: { color: '#4F46E5', fontWeight: 'bold' },
   saveBtn: { backgroundColor: '#4F46E5', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
-  saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
+  saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  syncRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }
 });
