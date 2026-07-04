@@ -357,13 +357,13 @@ exports.getAllOrders = async (req, res) => {
 
     // Fetch from ecogreen_sales_orders
     const ecogreenSalesOrdersRes = await pool.query(
-      `SELECT id, 'sales_order' as type, status, order_total as total_amount, created_at, delivery_type, delivery_otp
+      `SELECT id, 'sales_order' as type, status, order_total as total_amount, created_at, delivery_type, NULL as delivery_otp
        FROM ecogreen_sales_orders WHERE mobile_no = $1 ORDER BY created_at DESC`, [mobile]
     );
 
     // Fetch from ecogreen_sales_invoices
     const ecogreenSalesInvoicesRes = await pool.query(
-      `SELECT id, 'sales_invoice' as type, status, order_total as total_amount, created_at, delivery_type, delivery_otp
+      `SELECT id, 'sales_invoice' as type, status, order_total as total_amount, created_at, delivery_type, NULL as delivery_otp
        FROM ecogreen_sales_invoices WHERE mobile_no = $1 ORDER BY created_at DESC`, [mobile]
     );
 
