@@ -34,6 +34,7 @@ export default function OrderAssignScreen() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All'); // All, online_order, sales_order, purchase_order, sales_invoice
+  const [assignmentFilter, setAssignmentFilter] = useState('All'); // All, Unassigned, Assigned, Completed
 
   const fetchData = async () => {
     try {
@@ -42,7 +43,7 @@ export default function OrderAssignScreen() {
         axios.get('https://napi.bharatmedicalhallplus.com/employees/delivery-fleet')
       ]);
       if (ordRes.data && ordRes.data.success) {
-        setOrders(ordRes.data.data.filter(o => !o.delivery_boy_id)); // Only unassigned by default, or all? Let's show all and distinguish
+        setOrders(ordRes.data.data);
       }
       if (empRes.data && empRes.data.success) {
         setDeliveryBoys(empRes.data.data);
@@ -159,6 +160,15 @@ export default function OrderAssignScreen() {
 
   const filteredOrders = orders.filter(o => {
     if (filterType !== 'All' && o.type !== filterType) return false;
+    
+    if (assignmentFilter === 'Unassigned') {
+       if (o.delivery_boy_id || o.status === 'DELIVERED') return false;
+    } else if (assignmentFilter === 'Assigned') {
+       if (!o.delivery_boy_id || o.status === 'DELIVERED') return false;
+    } else if (assignmentFilter === 'Completed') {
+       if (o.status !== 'DELIVERED') return false;
+    }
+
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
       return (
@@ -232,7 +242,27 @@ export default function OrderAssignScreen() {
                 styles.typeFilterText,
                 filterType === type && styles.typeFilterTextActive
               ]}>
-                {type === 'All' ? 'All Orders' : getTypeLabel(type)}
+                {type === 'All' ? 'All Channels' : getTypeLabel(type)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.typeFilters, { marginTop: 12 }]}>
+          {['All', 'Unassigned', 'Assigned', 'Completed'].map(status => (
+            <TouchableOpacity 
+              key={status}
+              style={[
+                styles.typeFilterBtn,
+                assignmentFilter === status && styles.typeFilterBtnActive,
+                assignmentFilter === status && { borderColor: '#334155', backgroundColor: '#334155' }
+              ]}
+              onPress={() => setAssignmentFilter(status)}
+            >
+              <Text style={[
+                styles.typeFilterText,
+                assignmentFilter === status && styles.typeFilterTextActive
+              ]}>
+                {status}
               </Text>
             </TouchableOpacity>
           ))}
