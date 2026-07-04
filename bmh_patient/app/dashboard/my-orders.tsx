@@ -31,7 +31,7 @@ export default function MyOrdersScreen() {
 
   const fetchOrders = async (patientId: string) => {
     try {
-      const res = await fetch(`https://napi.bharatmedicalhallplus.com/online-orders/patient/${patientId}`);
+      const res = await fetch(`https://napi.bharatmedicalhallplus.com/patients/${patientId}/all-orders`);
       const data = await res.json();
       if (data && data.success) {
         setOrders(data.data);
@@ -48,10 +48,15 @@ export default function MyOrdersScreen() {
       <View style={styles.cardHeader}>
         <View style={styles.orderIdContainer}>
           <Package size={20} color="#0F172A" style={{ marginRight: 8 }} />
-          <Text style={styles.orderId}>Order #{item.id}</Text>
+          <View>
+             <Text style={styles.orderType}>
+               {item.type === 'online_order' ? 'Online Order' : item.type === 'sales_order' ? 'Store Order' : item.type === 'sales_invoice' ? 'Store Invoice' : 'Appointment'}
+             </Text>
+             <Text style={styles.orderId}>ID #{item.id}</Text>
+          </View>
         </View>
-        <View style={[styles.statusBadge, item.status === 'DISBURSED' ? styles.statusDisbursed : styles.statusPending]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+        <View style={[styles.statusBadge, item.status === 'DELIVERED' ? styles.statusDisbursed : styles.statusPending]}>
+          <Text style={styles.statusText}>{item.status || 'PENDING'}</Text>
         </View>
       </View>
       
@@ -60,25 +65,29 @@ export default function MyOrdersScreen() {
           <Clock size={16} color="#64748B" style={styles.icon} />
           <Text style={styles.infoText}>{new Date(item.created_at).toLocaleString()}</Text>
         </View>
-        <View style={styles.infoRow}>
-          <MapPin size={16} color="#64748B" style={styles.icon} />
-          <Text style={styles.infoText} numberOfLines={1}>{item.manual_address || 'Location provided via map'}</Text>
-        </View>
         
-        <View style={styles.itemsList}>
-          {item.items && item.items.map((prod: any, idx: number) => (
-            <View key={idx} style={styles.itemRow}>
-              <Text style={styles.itemName} numberOfLines={1}>{prod.qty} x {prod.itemName}</Text>
-              <Text style={styles.itemPrice}>₹{(prod.saleRate * prod.qty).toFixed(2)}</Text>
-            </View>
-          ))}
-        </View>
+        {item.delivery_type && (
+           <View style={styles.infoRow}>
+             <MapPin size={16} color="#64748B" style={styles.icon} />
+             <Text style={styles.infoText}>Delivery: {item.delivery_type}</Text>
+           </View>
+        )}
+        
+        {item.delivery_otp && item.status !== 'DELIVERED' && (
+           <View style={styles.otpContainer}>
+              <Text style={styles.otpLabel}>Delivery OTP</Text>
+              <Text style={styles.otpValue}>{item.delivery_otp}</Text>
+              <Text style={styles.otpHint}>Share this with the delivery executive</Text>
+           </View>
+        )}
       </View>
       
-      <View style={styles.cardFooter}>
-        <Text style={styles.totalLabel}>Total Amount</Text>
-        <Text style={styles.totalAmount}>₹{parseFloat(item.total_amount).toFixed(2)}</Text>
-      </View>
+      {item.total_amount != null && (
+        <View style={styles.cardFooter}>
+          <Text style={styles.totalLabel}>Total Amount</Text>
+          <Text style={styles.totalAmount}>₹{parseFloat(item.total_amount).toFixed(2)}</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -101,7 +110,7 @@ export default function MyOrdersScreen() {
       ) : (
         <FlatList
           data={orders}
-          keyExtractor={(item: any) => item.id.toString()}
+          keyExtractor={(item: any, index) => `${item.type}-${item.id}-${index}`}
           renderItem={renderOrder}
           contentContainerStyle={styles.listContainer}
         />
@@ -175,4 +184,17 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 14, fontWeight: '600', color: '#64748B' },
   totalAmount: { fontSize: 18, fontWeight: '900', color: '#10B981' },
+  orderType: { fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' },
+  otpContainer: { 
+    marginTop: 12, 
+    backgroundColor: '#F0FDF4', 
+    padding: 12, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#BBF7D0',
+    alignItems: 'center'
+  },
+  otpLabel: { fontSize: 12, fontWeight: '600', color: '#16A34A', textTransform: 'uppercase' },
+  otpValue: { fontSize: 24, fontWeight: '900', color: '#15803D', letterSpacing: 4, marginVertical: 4 },
+  otpHint: { fontSize: 11, color: '#16A34A' }
 });

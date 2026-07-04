@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const bcrypt = require('bcrypt');
 
 // POST / (Mounted at /sales-invoice)
 router.post('/', async (req, res) => {
@@ -16,6 +17,19 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     await client.query('BEGIN');
+
+    // 0. Auto-create patient if not exists
+    if (mobileNo) {
+      const checkRes = await client.query('SELECT id FROM patients WHERE mobile = $1', [mobileNo]);
+      if (checkRes.rowCount === 0) {
+        const hashedPassword = await bcrypt.hash(mobileNo, 10);
+        await client.query(
+          `INSERT INTO patients (name, mobile, email, password)
+           VALUES ($1, $2, $3, $4)`,
+          [patientName || 'Walk-in Patient', mobileNo, patientEmail || null, hashedPassword]
+        );
+      }
+    }
 
     // 1. Insert Sales Invoice Header
     const insertHeader = `
@@ -117,6 +131,8 @@ router.get('/', async (req, res) => {
       sysIp: r.sys_ip,
       sysUser: r.sys_user,
       deliveryBoyId: r.delivery_boy_id,
+      deliveryType: r.delivery_type,
+      busDetails: r.bus_details,
       createdAt: r.created_at
     }));
 
@@ -173,6 +189,8 @@ router.get('/:id', async (req, res) => {
       sysIp: invoice.sys_ip,
       sysUser: invoice.sys_user,
       deliveryBoyId: invoice.delivery_boy_id,
+      deliveryType: invoice.delivery_type,
+      busDetails: invoice.bus_details,
       createdAt: invoice.created_at,
       materialInfo: itemsResult.rows.map(item => ({
         id: item.id,
@@ -199,11 +217,11 @@ router.get('/:id', async (req, res) => {
 router.put('/:id/assign-delivery', async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_boy_id } = req.body;
+    const { delivery_boy_id, delivery_type, bus_details } = req.body;
     
     const result = await pool.query(
-      'UPDATE ecogreen_sales_invoices SET delivery_boy_id = $1 WHERE id = $2 RETURNING *',
-      [delivery_boy_id, id]
+      'UPDATE ecogreen_sales_invoices SET delivery_boy_id = $1, delivery_type = $2, bus_details = $3 WHERE id = $4 RETURNING *',
+      [delivery_boy_id, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, id]
     );
 
     if (result.rows.length === 0) {
@@ -213,6 +231,28 @@ router.put('/:id/assign-delivery', async (req, res) => {
     res.json({ success: true, message: 'Delivery assigned successfully' });
   } catch (err) {
     console.error('Error assigning delivery:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// PUT /:id/update-bus-details
+router.put('/:id/update-bus-details', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { bus_details } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE ecogreen_sales_invoices SET bus_details = $1 WHERE id = $2 RETURNING *',
+      [bus_details ? JSON.stringify(bus_details) : null, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    res.json({ success: true, message: 'Bus details updated successfully' });
+  } catch (err) {
+    console.error('Error updating bus details:', err);
     res.status(500).json({ success: false, error: 'Server error' });
   }
 });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios'); // Added axios for proxy requests
 const pool = require('../db');
+const bcrypt = require('bcrypt');
 
 // POST / (Mounted at /sales-order)
 router.post('/', async (req, res) => {
@@ -16,6 +17,19 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     await client.query('BEGIN');
+
+    // 0. Auto-create patient if not exists
+    if (mobileNo) {
+      const checkRes = await client.query('SELECT id FROM patients WHERE mobile = $1', [mobileNo]);
+      if (checkRes.rowCount === 0) {
+        const hashedPassword = await bcrypt.hash(mobileNo, 10);
+        await client.query(
+          `INSERT INTO patients (name, mobile, email, password)
+           VALUES ($1, $2, $3, $4)`,
+          [patientName || 'Walk-in Patient', mobileNo, patientEmail || null, hashedPassword]
+        );
+      }
+    }
 
     // 1. Insert Sales Order Header
     const insertHeader = `
@@ -114,7 +128,7 @@ router.get('/', async (req, res) => {
       sysName: r.sys_name,
       sysIp: r.sys_ip,
       sysUser: r.sys_user,
-      deliveryBoyId: r.delivery_boy_id,
+      deliveryBoyId: r.delivery_boy_id,\n      deliveryType: r.delivery_type,\n      busDetails: r.bus_details,
       createdAt: r.created_at
     }));
 
@@ -129,18 +143,21 @@ router.get('/', async (req, res) => {
 router.put('/:id/assign-delivery', async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_boy_id } = req.body;
+    const { delivery_boy_id, delivery_type, bus_details } = req.body;
+    
+    // Generate 6-digit OTP
+    const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
     
     const result = await pool.query(
-      'UPDATE ecogreen_sales_orders SET delivery_boy_id = $1 WHERE id = $2 RETURNING *',
-      [delivery_boy_id, id]
+      'UPDATE ecogreen_sales_orders SET delivery_boy_id = $1, delivery_type = $2, bus_details = $3, delivery_otp = $4 WHERE id = $5 RETURNING *',
+      [delivery_boy_id, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    res.json({ success: true, message: 'Delivery assigned successfully' });
+    res.json({ success: true, message: 'Delivery assigned successfully', delivery_otp });
   } catch (err) {
     console.error('Error assigning delivery:', err);
     res.status(500).json({ success: false, error: 'Server error' });
@@ -315,6 +332,60 @@ router.post('/get-stock-data', async (req, res) => {
   } catch (error) {
     console.error('Stock data proxy error:', error.message);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /:id/update-bus-details
+router.put('/:id/update-bus-details', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { bus_details } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE ecogreen_sales_orders SET bus_details = $1 WHERE id = $2 RETURNING *',
+      [bus_details ? JSON.stringify(bus_details) : null, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    res.json({ success: true, message: 'Bus details updated successfully' });
+  } catch (err) {
+    console.error('Error updating bus details:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// PUT /:id/status
+router.put('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, delivery_otp } = req.body;
+    
+    if (status === 'DELIVERED') {
+      const checkQuery = 'SELECT delivery_otp FROM ecogreen_sales_orders WHERE id = $1';
+      const checkRes = await pool.query(checkQuery, [id]);
+      if (checkRes.rowCount > 0 && checkRes.rows[0].delivery_otp) {
+          if (checkRes.rows[0].delivery_otp !== delivery_otp) {
+              return res.status(400).json({ success: false, message: 'Invalid OTP' });
+          }
+      }
+    }
+    
+    const result = await pool.query(
+      'UPDATE ecogreen_sales_orders SET status = $1 WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    res.json({ success: true, message: 'Order status updated successfully' });
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 

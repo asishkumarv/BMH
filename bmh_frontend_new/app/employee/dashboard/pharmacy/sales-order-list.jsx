@@ -13,6 +13,7 @@ export default function SalesOrderList() {
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [deliveryType, setDeliveryType] = useState('Local');
   const [orderItems, setOrderItems] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
@@ -52,7 +53,7 @@ export default function SalesOrderList() {
       }
 
       if (empRes.data && empRes.data.success) {
-        setDeliveryBoys(empRes.data.data.filter((e: any) => e.department === 'Delivery' && e.status === 'approved'));
+        setDeliveryBoys(empRes.data.data.filter((e) => e.department === 'Delivery' && e.status === 'approved'));
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
@@ -64,9 +65,10 @@ export default function SalesOrderList() {
 
   const handleAssignDelivery = async (orderId, boyId) => {
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/sales-orders-list/${orderId}/assign-delivery`, {
-        delivery_boy_id: boyId
-      });
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-orders-list/${orderId}/assign-delivery`, {
+          delivery_boy_id: boyId,
+          delivery_type: deliveryType
+        });
       alert('Delivery Boy Assigned Successfully');
       fetchOrders();
       setModalVisible(false);
@@ -198,6 +200,15 @@ export default function SalesOrderList() {
               <Text style={{fontWeight: 'bold', marginBottom: 5}}>Customer: {selectedOrder.patientName}</Text>
               <Text style={{marginBottom: 15}}>Date: {selectedOrder.ordDate} {selectedOrder.ordTime}</Text>
               
+              {selectedOrder.deliveryType === 'Bus' && selectedOrder.busDetails && (
+                <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#FEF3C7', borderRadius: 8, borderWidth: 1, borderColor: '#F59E0B' }}>
+                  <Text style={{fontWeight: 'bold', color: '#B45309', marginBottom: 6}}>🚌 Bus Delivery Details:</Text>
+                  <Text style={{fontSize: 13, color: '#92400E'}}><Text style={{fontWeight:'bold'}}>Bus No:</Text> {selectedOrder.busDetails.bus_number}</Text>
+                  <Text style={{fontSize: 13, color: '#92400E'}}><Text style={{fontWeight:'bold'}}>Driver:</Text> {selectedOrder.busDetails.driver_name} ({selectedOrder.busDetails.driver_number})</Text>
+                  <Text style={{fontSize: 13, color: '#92400E'}}><Text style={{fontWeight:'bold'}}>Reach Time:</Text> {selectedOrder.busDetails.arrival_time}</Text>
+                  <Text style={{fontSize: 13, color: '#92400E'}}><Text style={{fontWeight:'bold'}}>Drop Location:</Text> {selectedOrder.busDetails.drop_location}</Text>
+                </View>
+              )}
               <Text style={{fontWeight: 'bold', marginBottom: 5}}>Items:</Text>
               {loadingDetails ? (
                 <ActivityIndicator size="small" color={Colors.light.primary} style={{marginVertical: 20}} />
@@ -208,7 +219,7 @@ export default function SalesOrderList() {
                     <Text style={[styles.itemTh, {flex: 1}]}>Qty</Text>
                     <Text style={[styles.itemTh, {flex: 1}]}>Rate</Text>
                   </View>
-                  {orderItems.map((item, idx) => (
+                  {orderItems?.map((item, idx) => (
                     <View key={idx} style={styles.itemsTableRow}>
                       <Text style={[styles.itemTd, {flex: 2}]}>{item.itemName}</Text>
                       <Text style={[styles.itemTd, {flex: 1}]}>{item.totalLooseQty}</Text>
@@ -222,9 +233,24 @@ export default function SalesOrderList() {
               <View style={{ flex: 1 }}>
                 {!selectedOrder.deliveryBoyId && selectedOrder.ordConversionFlag !== 1 && (
                   <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>Delivery Type:</Text>
+                    <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                      <TouchableOpacity 
+                        style={[styles.typeBtn, deliveryType === 'Local' && styles.typeBtnActive]}
+                        onPress={() => setDeliveryType('Local')}
+                      >
+                        <Text style={[styles.typeText, deliveryType === 'Local' && styles.typeTextActive]}>Local</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.typeBtn, deliveryType === 'Bus' && styles.typeBtnActive]}
+                        onPress={() => setDeliveryType('Bus')}
+                      >
+                        <Text style={[styles.typeText, deliveryType === 'Bus' && styles.typeTextActive]}>Bus</Text>
+                      </TouchableOpacity>
+                    </View>
                     <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
                     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                      {deliveryBoys.map((boy: any) => (
+                      {deliveryBoys?.map((boy) => (
                         <TouchableOpacity 
                           key={boy.id} 
                           style={styles.boyTag}
@@ -233,7 +259,7 @@ export default function SalesOrderList() {
                           <Text style={styles.boyTagText}>{boy.full_name}</Text>
                         </TouchableOpacity>
                       ))}
-                      {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
+                      {(!deliveryBoys || deliveryBoys.length === 0) && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
                     </View>
                   </View>
                 )}
@@ -460,6 +486,10 @@ const styles = StyleSheet.create({
   },
   assignedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#E0E7FF' },
   assignedBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#4338CA' },
+  typeBtn: { flex: 1, padding: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, alignItems: 'center' },
+  typeBtnActive: { borderColor: '#4F46E5', backgroundColor: '#EEF2FF' },
+  typeText: { fontSize: 14, color: '#64748B' },
+  typeTextActive: { color: '#4F46E5', fontWeight: 'bold' },
   boyTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   boyTagText: { fontSize: 12, color: '#334155', fontWeight: '600' },
   center: {

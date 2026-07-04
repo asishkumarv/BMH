@@ -18,5 +18,6 @@ router.put('/department-admins/:id/profile', adminController.updateDepartmentAdm
 router.get('/revenue-stats', adminController.getRevenueStats);
 router.get('/wallet-balances', adminController.getAllWalletBalances);
 router.get('/department-admins/:department_id/wallet-balances', adminController.getDepartmentWalletBalances);
+router.get('/all-orders-for-assignment', adminController.getAllOrdersForAssignment);
 
 module.exports = router;

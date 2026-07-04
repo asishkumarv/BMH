@@ -93,6 +93,14 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Purchase Orders', icon: Package, route: '/employee/dashboard/purchase-orders' });
             }
           }
+          if (res.data.success && res.data.settings.order_assign_access) {
+            let oaa = res.data.settings.order_assign_access;
+            if (typeof oaa === 'string') oaa = JSON.parse(oaa);
+            const empId = u.id?.toString();
+            if (empId && oaa[empId] === true) {
+              dynamicNavItems.push({ name: 'Order Assign', icon: Package, route: '/employee/dashboard/order-assign' });
+            }
+          }
           
           let dynamicPharmacyItems = [...BASE_PHARMACY_ITEMS];
           setPharmacyItems(dynamicPharmacyItems);

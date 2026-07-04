@@ -83,7 +83,17 @@ exports.getOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body;
+        const { status, delivery_otp } = req.body;
+        
+        if (status === 'DELIVERED') {
+            const checkQuery = 'SELECT delivery_otp FROM online_orders WHERE id = $1';
+            const checkRes = await pool.query(checkQuery, [id]);
+            if (checkRes.rowCount > 0 && checkRes.rows[0].delivery_otp) {
+                if (checkRes.rows[0].delivery_otp !== delivery_otp) {
+                    return res.status(400).json({ success: false, message: 'Invalid OTP' });
+                }
+            }
+        }
         
         const queryText = `
             UPDATE online_orders 
@@ -121,15 +131,19 @@ exports.assignDelivery = async (req, res) => {
     try {
         const { id } = req.params;
         const { delivery_boy_id } = req.body;
+        
+        // Generate 6-digit OTP
+        const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
+        
         const queryText = `
             UPDATE online_orders 
-            SET delivery_boy_id = $1, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2
+            SET delivery_boy_id = $1, delivery_otp = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3
             RETURNING *;
         `;
-        const { rows } = await pool.query(queryText, [delivery_boy_id, id]);
+        const { rows } = await pool.query(queryText, [delivery_boy_id, delivery_otp, id]);
         if (rows.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
-        res.status(200).json({ success: true, message: 'Delivery assigned', order: rows[0] });
+        res.status(200).json({ success: true, message: 'Delivery assigned', order: rows[0], delivery_otp });
     } catch (err) {
         console.error("Assign delivery error:", err);
         res.status(500).json({ success: false, error: err.message });

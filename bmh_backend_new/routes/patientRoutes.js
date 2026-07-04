@@ -9,4 +9,6 @@ router.get('/profile/:id', patientController.getProfile);
 router.put('/profile/:id', patientController.updateProfile);
 router.get('/by-mobile/:mobile', patientController.getPatientByMobile);
 
+router.get('/:id/all-orders', patientController.getAllOrders);
+
 module.exports = router;

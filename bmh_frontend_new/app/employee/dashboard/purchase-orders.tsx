@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, ScrollView, TextInput } from 'react-native';
 import axios from 'axios';
-import { Package, MapPin, Bus, User, Map, CheckCircle, Download, CheckSquare, Square } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Download, CheckSquare, Square, Search, Filter, Calendar, List } from 'lucide-react-native';
 
 export default function PurchaseOrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -19,6 +19,8 @@ export default function PurchaseOrdersScreen() {
   
   // Bus Pickup fields
   const [busDetails, setBusDetails] = useState({
+    bus_number: '',
+    arrival_time: '',
     driver_name: '',
     driver_number: '',
     waybill_number: '',
@@ -32,6 +34,11 @@ export default function PurchaseOrdersScreen() {
   const [syncResults, setSyncResults] = useState<any[]>([]);
   const [selectedSyncPOs, setSelectedSyncPOs] = useState<Set<number>>(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [viewOrderDetails, setViewOrderDetails] = useState<any>(null);
 
   const fetchData = async () => {
     try {
@@ -136,8 +143,24 @@ export default function PurchaseOrdersScreen() {
     setSelectedBoyId('');
     setAddress('');
     setGpsLocation('');
-    setBusDetails({ driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
+    setBusDetails({ bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
   };
+
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = 
+      (order.custname || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (`${order.prefix}${order.year}${order.srno}`).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.refname || '').toLowerCase().includes(searchQuery.toLowerCase());
+      
+    if (filterStatus === 'All') return matchesSearch;
+    if (filterStatus === 'Assigned') return matchesSearch && order.status === 'Assigned';
+    if (filterStatus === 'Pending') return matchesSearch && order.status !== 'Assigned';
+    return matchesSearch;
+  });
+
+  const totalPOs = filteredOrders.length;
+  const assignedPOs = filteredOrders.filter(o => o.status === 'Assigned').length;
+  const pendingPOs = totalPOs - assignedPOs;
 
   const renderOrder = ({ item }: { item: any }) => {
     let detailsStr = item.details;
@@ -147,16 +170,26 @@ export default function PurchaseOrdersScreen() {
         itemsCount = Array.isArray(parsed) ? parsed.length : 0;
     } catch (e) {}
 
+    let formattedDate = '';
+    if (item.created_at) {
+      formattedDate = new Date(item.created_at).toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric'
+      });
+    }
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.orderId}>{item.prefix}{item.year}{item.srno} ({item.br_code})</Text>
+          <View>
+            <Text style={styles.orderId}>{item.prefix}{item.year}{item.srno} ({item.br_code})</Text>
+            {formattedDate ? <Text style={styles.dateText}>{formattedDate}</Text> : null}
+          </View>
           <View style={[styles.statusBadge, item.status === 'Assigned' ? styles.statusAssigned : styles.statusPending]}>
             <Text style={styles.statusText}>{item.status}</Text>
           </View>
         </View>
         
-        <View style={styles.cardBody}>
+        <TouchableOpacity style={styles.cardBody} onPress={() => setViewOrderDetails(item)} activeOpacity={0.7}>
           <Text style={styles.customerName}>{item.custname}</Text>
           <Text style={styles.refCode}>Ref: {item.refname}</Text>
           
@@ -183,7 +216,7 @@ export default function PurchaseOrdersScreen() {
                 </Text>
              </View>
           )}
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.cardFooter}>
           <TouchableOpacity 
@@ -216,17 +249,109 @@ export default function PurchaseOrdersScreen() {
           <Text style={styles.syncBtnText}>Manual Sync</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.topStatsContainer}>
+        <View style={styles.topStatBox}>
+          <Text style={styles.topStatValue}>{totalPOs}</Text>
+          <Text style={styles.topStatLabel}>Total</Text>
+        </View>
+        <View style={[styles.topStatBox, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#E2E8F0' }]}>
+          <Text style={[styles.topStatValue, { color: '#10B981' }]}>{assignedPOs}</Text>
+          <Text style={styles.topStatLabel}>Assigned</Text>
+        </View>
+        <View style={styles.topStatBox}>
+          <Text style={[styles.topStatValue, { color: '#F59E0B' }]}>{pendingPOs}</Text>
+          <Text style={styles.topStatLabel}>Pending</Text>
+        </View>
+      </View>
+
+      <View style={styles.searchFilterContainer}>
+        <View style={styles.searchBar}>
+          <Search size={20} color="#64748B" />
+          <TextInput 
+            style={styles.searchInput} 
+            placeholder="Search by name, order no..." 
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <View style={styles.filterRow}>
+          <TouchableOpacity 
+            style={[styles.filterChip, filterStatus === 'All' && styles.filterChipActive]}
+            onPress={() => setFilterStatus('All')}
+          >
+            <Text style={[styles.filterChipText, filterStatus === 'All' && styles.filterChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.filterChip, filterStatus === 'Pending' && styles.filterChipActive]}
+            onPress={() => setFilterStatus('Pending')}
+          >
+            <Text style={[styles.filterChipText, filterStatus === 'Pending' && styles.filterChipTextActive]}>Pending</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.filterChip, filterStatus === 'Assigned' && styles.filterChipActive]}
+            onPress={() => setFilterStatus('Assigned')}
+          >
+            <Text style={[styles.filterChipText, filterStatus === 'Assigned' && styles.filterChipTextActive]}>Assigned</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
       
       <FlatList
-        data={orders}
+        data={filteredOrders}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderOrder}
         contentContainerStyle={{ paddingBottom: 24 }}
         ListEmptyComponent={<Text style={{textAlign: 'center', marginTop: 40}}>No purchase orders found.</Text>}
       />
 
+      {/* ORDER DETAILS MODAL */}
+      <Modal visible={!!viewOrderDetails} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Order Details</Text>
+              <TouchableOpacity onPress={() => setViewOrderDetails(null)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {viewOrderDetails && (
+              <ScrollView style={{maxHeight: '80%'}}>
+                <Text style={styles.detailsHeader}>{viewOrderDetails.custname}</Text>
+                <Text style={styles.detailsSub}>Order No: {viewOrderDetails.prefix}{viewOrderDetails.year}{viewOrderDetails.srno}</Text>
+                
+                <View style={styles.detailsItemList}>
+                  {(() => {
+                    let items = [];
+                    try {
+                      items = JSON.parse(viewOrderDetails.details) || [];
+                    } catch(e) {}
+                    
+                    if (items.length === 0) return <Text style={{color: '#64748B'}}>No items found.</Text>;
+                    
+                    return items.map((itm: any, idx: number) => (
+                      <View key={idx} style={styles.detailsItemRow}>
+                        <View style={{flex: 1}}>
+                          <Text style={styles.detailsItemName}>{itm.itemName}</Text>
+                          <Text style={styles.detailsItemCode}>Code: {itm.itemCode}</Text>
+                        </View>
+                        <View style={{alignItems: 'flex-end'}}>
+                          <Text style={styles.detailsItemQty}>Qty: {itm.Qty}</Text>
+                          <Text style={styles.detailsItemRate}>Rate: ₹{itm.rate}</Text>
+                        </View>
+                      </View>
+                    ));
+                  })()}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* SYNC MODAL */}
-      <Modal visible={syncModalVisible} transparent animationType="slide">
+      <Modal visible={syncModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -312,7 +437,7 @@ export default function PurchaseOrdersScreen() {
       </Modal>
 
       {/* ASSIGNMENT MODAL */}
-      <Modal visible={!!selectedOrder} transparent animationType="slide">
+      <Modal visible={!!selectedOrder} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -389,6 +514,10 @@ export default function PurchaseOrdersScreen() {
 
               {deliveryType === 'Bus' && (
                 <>
+                  <Text style={styles.label}>Bus Number</Text>
+                  <TextInput style={styles.input} value={busDetails.bus_number} onChangeText={t => setBusDetails(p => ({...p, bus_number: t}))} />
+                  <Text style={styles.label}>Bus Incoming Time</Text>
+                  <TextInput style={styles.input} value={busDetails.arrival_time} onChangeText={t => setBusDetails(p => ({...p, arrival_time: t}))} />
                   <Text style={styles.label}>Driver Name</Text>
                   <TextInput style={styles.input} value={busDetails.driver_name} onChangeText={t => setBusDetails(p => ({...p, driver_name: t}))} />
                   <Text style={styles.label}>Driver Number</Text>
@@ -440,11 +569,37 @@ const styles = StyleSheet.create({
   btnOutline: { borderWidth: 1, borderColor: '#4F46E5' },
   btnOutlineText: { color: '#4F46E5', fontWeight: 'bold' },
   
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  dateText: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  
+  topStatsContainer: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 12, marginBottom: 16, paddingVertical: 16, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  topStatBox: { flex: 1, alignItems: 'center' },
+  topStatValue: { fontSize: 24, fontWeight: 'bold', color: '#0F172A' },
+  topStatLabel: { fontSize: 13, color: '#64748B', marginTop: 4 },
+  
+  searchFilterContainer: { marginBottom: 16 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  searchInput: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, fontSize: 16 },
+  filterRow: { flexDirection: 'row', gap: 8 },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: 'white', borderWidth: 1, borderColor: '#E2E8F0' },
+  filterChipActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+  filterChipText: { color: '#64748B', fontWeight: '600' },
+  filterChipTextActive: { color: 'white' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', padding: 16 },
+  modalContent: { backgroundColor: 'white', borderRadius: 24, padding: 24, maxHeight: '90%', width: '100%', maxWidth: 600, alignSelf: 'center', shadowColor: '#000', shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.1, shadowRadius: 15, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  closeBtn: { fontSize: 24, color: '#64748B' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#0F172A' },
+  closeBtn: { fontSize: 24, color: '#94A3B8' },
+  
+  detailsHeader: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 4 },
+  detailsSub: { fontSize: 14, color: '#64748B', marginBottom: 16 },
+  detailsItemList: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  detailsItemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  detailsItemName: { fontSize: 14, fontWeight: 'bold', color: '#334155', marginBottom: 4 },
+  detailsItemCode: { fontSize: 12, color: '#64748B' },
+  detailsItemQty: { fontSize: 14, fontWeight: '600', color: '#4F46E5', marginBottom: 4 },
+  detailsItemRate: { fontSize: 12, color: '#64748B' },
+
   label: { fontSize: 14, fontWeight: '600', color: '#334155', marginBottom: 8, marginTop: 16 },
   typeSelector: { flexDirection: 'row', gap: 12 },
   typeBtn: { flex: 1, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, alignItems: 'center', gap: 4 },

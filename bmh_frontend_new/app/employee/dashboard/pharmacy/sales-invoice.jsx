@@ -288,6 +288,8 @@ export default function SalesOrder() {
     const materialInfo = items.map(item => ({
       itemSeq: item.itemSeq,
       itemcode: item.itemcode,
+      itemName: item.itemName,
+      item_name: item.itemName,
       totalLooseQty: item.totalLooseQty,
       totalLooseSchQty: item.totalLooseSchQty,
       serviceQty: item.serviceQty,

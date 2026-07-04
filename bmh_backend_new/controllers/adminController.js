@@ -375,3 +375,26 @@ exports.getDepartmentWalletBalances = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error fetching department wallet balances' });
   }
 };
+
+exports.getAllOrdersForAssignment = async (req, res) => {
+    try {
+        const onlineOrders = await pool.query(
+            \SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, delivery_boy_id, created_at, 'Local' as delivery_type FROM online_orders ORDER BY created_at DESC\
+        );
+        const salesOrders = await pool.query(
+            \SELECT id, 'sales_order' as type, status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL as map_lat, NULL as map_lng, delivery_boy_id, created_at, delivery_type FROM ecogreen_sales_orders ORDER BY created_at DESC\
+        );
+        const purchaseOrders = await pool.query(
+            \SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL as map_lat, gps_location as map_lng, delivery_boy_id, created_at, delivery_type FROM ecogreenpurchase_orders ORDER BY created_at DESC\
+        );
+        
+        const allOrders = [...onlineOrders.rows, ...salesOrders.rows, ...purchaseOrders.rows];
+        allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        res.json({ success: true, data: allOrders });
+    } catch (error) {
+        console.error('Error fetching all orders for assignment:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+

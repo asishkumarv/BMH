@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -7,10 +7,18 @@ import { MapPin, Phone, User, CheckCircle, Clock, Package } from 'lucide-react-n
 import { Colors } from '../../../constants/Colors';
 
 export default function DeliveryDashboard() {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [locationStatus, setLocationStatus] = useState('Initializing...');
+  const [busModalVisible, setBusModalVisible] = useState(false);
+  const [selectedBusOrder, setSelectedBusOrder] = useState<any>(null);
+  const [busDetails, setBusDetails] = useState({
+    bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: ''
+  });
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [deliveryOtp, setDeliveryOtp] = useState('');
+  const [currentOrder, setCurrentOrder] = useState({ id: '', type: '' });
 
   useEffect(() => {
     const init = async () => {
@@ -34,7 +42,7 @@ export default function DeliveryDashboard() {
     init();
   }, []);
 
-  const fetchOrders = async (userId) => {
+  const fetchOrders = async (userId: string | number) => {
     try {
       const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/${userId}/assigned-orders`);
       if (res.data && res.data.success) {
@@ -57,7 +65,7 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const startLocationTracking = async (userId) => {
+  const startLocationTracking = async (userId: string | number) => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       setLocationStatus('Permission denied');
@@ -85,7 +93,14 @@ export default function DeliveryDashboard() {
     );
   };
 
-  const handleMarkDelivered = async (orderId, type) => {
+  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string) => {
+    if ((type === 'online_order' || type === 'sales_order') && deliveryType === 'Local') {
+      setCurrentOrder({ id: String(orderId), type });
+      setDeliveryOtp('');
+      setOtpModalVisible(true);
+      return;
+    }
+
     if (Platform.OS !== 'web') {
       Alert.alert(
         "Confirm Delivery",
@@ -102,23 +117,68 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const processDelivery = async (orderId, type) => {
+  const processDelivery = async (orderId: string | number, type: string, otp?: string) => {
     try {
       if (type === 'online_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, {
-          status: 'DELIVERED'
+          status: 'DELIVERED',
+          delivery_otp: otp
+        });
+      } else if (type === 'sales_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/status`, {
+          status: 'DELIVERED',
+          delivery_otp: otp
         });
       } else {
         alert('Ecogreen Order Delivered (Status update pending backend implementation)');
       }
       alert('Order Marked as Delivered!');
+      setOtpModalVisible(false);
       if (user) fetchOrders(user.id);
-    } catch (err) {
-      alert("Error: " + err.message);
+    } catch (err: any) {
+      alert("Error: " + (err.response?.data?.message || err.message));
     }
   };
 
-  const openMap = (lat, lng, address) => {
+  const handleOpenBusDetails = (order: any) => {
+    setSelectedBusOrder(order);
+    if (order.bus_details) {
+      let parsed = order.bus_details;
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch(e) {}
+      }
+      setBusDetails(parsed || { bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
+    } else {
+      setBusDetails({ bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
+    }
+    setBusModalVisible(true);
+  };
+
+  const handleSaveBusDetails = async () => {
+    if (!selectedBusOrder) return;
+    try {
+      let url = '';
+      if (selectedBusOrder.type === 'sales_order') {
+        url = `https://napi.bharatmedicalhallplus.com/sales-order/${selectedBusOrder.id}/update-bus-details`;
+      } else if (selectedBusOrder.type === 'sales_invoice' || selectedBusOrder.type === 'ecogreen_invoice') {
+        url = `https://napi.bharatmedicalhallplus.com/sales-invoice-list/${selectedBusOrder.id}/update-bus-details`;
+      } else {
+        alert("Cannot update bus details for this order type");
+        return;
+      }
+      
+      const res = await axios.put(url, { bus_details: busDetails });
+      if (res.data) {
+        alert("Bus Details Saved!");
+        setBusModalVisible(false);
+        if (user) fetchOrders(user.id);
+      }
+    } catch (err: any) {
+      alert("Failed to save bus details: " + err.message);
+    }
+  };
+
+  const openMap = (lat: any, lng: any, address: string) => {
     let url = '';
     if (lat && lng) {
       url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
@@ -136,15 +196,22 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const renderOrder = ({ item }) => (
+  const renderOrder = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View>
-          <Text style={styles.orderTypeBadge}>
-            {item.type === 'online_order' ? 'Online App Order' : item.type === 'sales_order' ? 'Ecogreen Sales Order' : 'Ecogreen Invoice'}
-          </Text>
-          <Text style={styles.orderId}>Order #{item.id}</Text>
-        </View>
+          <View>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+              <Text style={styles.orderTypeBadge}>
+                {item.type === 'online_order' ? 'Online App Order' : item.type === 'sales_order' ? 'Ecogreen Sales Order' : item.type === 'purchase_order' ? 'Ecogreen Purchase Order' : 'Ecogreen Invoice'}
+              </Text>
+              {item.delivery_type === 'Bus' && (
+                <View style={[styles.orderTypeBadge, {backgroundColor: '#FEF3C7'}]}>
+                  <Text style={{fontSize: 10, fontWeight: 'bold', color: '#B45309'}}>🚌 BUS DELIVERY</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.orderId}>Order #{item.id}</Text>
+          </View>
         <View style={[styles.statusBadge, item.status === 'DELIVERED' ? styles.statusDelivered : styles.statusPending]}>
           <Text style={styles.statusText}>{item.status}</Text>
         </View>
@@ -175,15 +242,34 @@ export default function DeliveryDashboard() {
           <Text style={styles.mapBtnText}>Navigate</Text>
         </TouchableOpacity>
 
-        {item.status !== 'DELIVERED' && (
-          <TouchableOpacity 
+        {item.delivery_type === 'Bus' && item.type !== 'purchase_order' && (
+             <TouchableOpacity 
+               style={[styles.mapBtn, {backgroundColor: '#FFFBEB', borderColor: '#FDE68A'}]} 
+               onPress={() => handleOpenBusDetails(item)}
+             >
+               <Package color="#D97706" size={16} style={{marginRight: 6}} />
+               <Text style={[styles.mapBtnText, {color: '#D97706'}]}>Bus Info</Text>
+             </TouchableOpacity>
+          )}
+          {item.delivery_type === 'Bus' && item.type === 'purchase_order' && (
+             <TouchableOpacity 
+               style={[styles.mapBtn, {backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}]} 
+               onPress={() => handleOpenBusDetails(item)}
+             >
+               <Package color="#16A34A" size={16} style={{marginRight: 6}} />
+               <Text style={[styles.mapBtnText, {color: '#16A34A'}]}>View Bus</Text>
+             </TouchableOpacity>
+          )}
+
+          {item.status !== 'DELIVERED' && item.type !== 'purchase_order' && (
+            <TouchableOpacity 
             style={styles.deliverBtn} 
-            onPress={() => handleMarkDelivered(item.id, item.type)}
-          >
-            <CheckCircle color="#fff" size={16} style={{marginRight: 6}} />
-            <Text style={styles.deliverBtnText}>Mark Delivered</Text>
-          </TouchableOpacity>
-        )}
+            onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type)}
+            >
+              <CheckCircle color="#fff" size={16} style={{marginRight: 6}} />
+              <Text style={styles.deliverBtnText}>Mark Delivered</Text>
+            </TouchableOpacity>
+          )}
       </View>
     </View>
   );
@@ -216,6 +302,88 @@ export default function DeliveryDashboard() {
           contentContainerStyle={styles.listContainer}
         />
       )}
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={busModalVisible}
+        onRequestClose={() => setBusModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {selectedBusOrder?.type === 'purchase_order' ? 'Bus Pickup Details' : 'Enter Bus Delivery Details'}
+            </Text>
+            
+            <ScrollView style={{width: '100%', maxHeight: '70%'}}>
+              <Text style={styles.label}>Bus Number</Text>
+              <TextInput style={styles.input} value={busDetails.bus_number} onChangeText={t => setBusDetails(p => ({...p, bus_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              
+              <Text style={styles.label}>Reach Time / Incoming Time</Text>
+              <TextInput style={styles.input} value={busDetails.arrival_time} onChangeText={t => setBusDetails(p => ({...p, arrival_time: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              
+              <Text style={styles.label}>Driver Name</Text>
+              <TextInput style={styles.input} value={busDetails.driver_name} onChangeText={t => setBusDetails(p => ({...p, driver_name: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              
+              <Text style={styles.label}>Driver Number</Text>
+              <TextInput style={styles.input} value={busDetails.driver_number} onChangeText={t => setBusDetails(p => ({...p, driver_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              
+              <Text style={styles.label}>Waybill Number</Text>
+              <TextInput style={styles.input} value={busDetails.waybill_number} onChangeText={t => setBusDetails(p => ({...p, waybill_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              
+              <Text style={styles.label}>Drop Location</Text>
+              <TextInput style={styles.input} value={busDetails.drop_location} onChangeText={t => setBusDetails(p => ({...p, drop_location: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setBusModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </TouchableOpacity>
+              {selectedBusOrder?.type !== 'purchase_order' && (
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBusDetails}>
+                  <Text style={styles.saveBtnText}>Save Details</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={otpModalVisible}
+        onRequestClose={() => setOtpModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Delivery OTP</Text>
+            
+            <Text style={styles.label}>Ask the customer for the 6-digit delivery OTP</Text>
+            <TextInput 
+              style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
+              value={deliveryOtp} 
+              onChangeText={setDeliveryOtp} 
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="000000"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setOtpModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.saveBtn, deliveryOtp.length !== 6 && { opacity: 0.5 }]} 
+                onPress={() => processDelivery(currentOrder.id, currentOrder.type, deliveryOtp)}
+                disabled={deliveryOtp.length !== 6}
+              >
+                <Text style={styles.saveBtnText}>Verify & Mark Delivered</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -248,5 +416,15 @@ const styles = StyleSheet.create({
   mapBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flex: 1, justifyContent: 'center', marginRight: 8 },
   mapBtnText: { color: '#3B82F6', fontWeight: 'bold', fontSize: 14 },
   deliverBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flex: 1, justifyContent: 'center', marginLeft: 8 },
-  deliverBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 }
+  deliverBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '90%', maxHeight: '80%' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, color: '#1E293B' },
+  label: { fontSize: 14, fontWeight: 'bold', color: '#475569', marginBottom: 5, marginTop: 10 },
+  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 10, fontSize: 14, color: '#1E293B', backgroundColor: '#F8FAFC' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20, gap: 10 },
+  cancelBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#F1F5F9' },
+  cancelBtnText: { color: '#64748B', fontWeight: 'bold' },
+  saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#3B82F6' },
+  saveBtnText: { color: '#fff', fontWeight: 'bold' }
 });

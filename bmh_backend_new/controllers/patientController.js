@@ -330,3 +330,55 @@ exports.getPatientByMobile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
+
+exports.getAllOrders = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get patient mobile to fetch sales orders which might only be linked by mobile
+    const patientRes = await pool.query('SELECT mobile FROM patients WHERE id = ', [id]);
+    if (patientRes.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+    const mobile = patientRes.rows[0].mobile;
+
+    // Fetch from online_orders
+    const onlineOrdersRes = await pool.query(
+      \SELECT id, 'online_order' as type, status, total_amount, created_at, 'Local' as delivery_type, delivery_otp 
+       FROM online_orders WHERE patient_id =  ORDER BY created_at DESC\, [id]
+    );
+
+    // Fetch from ecogreen_sales_orders
+    const ecogreenSalesOrdersRes = await pool.query(
+      \SELECT id, 'sales_order' as type, status, order_total as total_amount, created_at, delivery_type, delivery_otp
+       FROM ecogreen_sales_orders WHERE mobile_no =  ORDER BY created_at DESC\, [mobile]
+    );
+
+    // Fetch from ecogreen_sales_invoices
+    const ecogreenSalesInvoicesRes = await pool.query(
+      \SELECT id, 'sales_invoice' as type, status, order_total as total_amount, created_at, delivery_type, delivery_otp
+       FROM ecogreen_sales_invoices WHERE mobile_no =  ORDER BY created_at DESC\, [mobile]
+    );
+
+    // Fetch appointments
+    const bookingsRes = await pool.query(
+      \SELECT id, 'appointment' as type, status, NULL as total_amount, created_at, 'In-Person' as delivery_type, NULL as delivery_otp
+       FROM patient_bookings WHERE patient_id =  ORDER BY created_at DESC\, [id]
+    );
+
+    let allOrders = [
+      ...onlineOrdersRes.rows, 
+      ...ecogreenSalesOrdersRes.rows, 
+      ...ecogreenSalesInvoicesRes.rows,
+      ...bookingsRes.rows
+    ];
+
+    allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ success: true, data: allOrders });
+  } catch (error) {
+    console.error('Get Patient Orders Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
