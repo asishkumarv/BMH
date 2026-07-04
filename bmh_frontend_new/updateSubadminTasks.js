@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 const path = 'app/department/dashboard/tasks.tsx';
-let content = fs.readFileSync(path, 'utf8');
+let content = fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 
 // 1. Add 'recurring' to activeTab state
 content = content.replace(
@@ -168,8 +168,8 @@ content = content.replace(
   "{!isRecurring && (\n              <>\n                <Text style={styles.label}>Due Date & Time</Text>"
 );
 content = content.replace(
-  /<\/View>\n              <\/View>\n            <\/ScrollView>/m,
-  "</View>\n              </>\n            )}\n              </View>\n            </ScrollView>"
+  /<\/View>\n\s*<\/View>\n\s*<\/ScrollView>/m,
+  "</View>\n              </>\n            )}\n              </View>\n              </View>\n            </ScrollView>"
 );
 
 

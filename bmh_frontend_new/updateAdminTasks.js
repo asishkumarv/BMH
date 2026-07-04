@@ -1,38 +1,29 @@
 const fs = require('fs');
 
 const path = 'app/admin/dashboard/tasks.tsx';
-let content = fs.readFileSync(path, 'utf8');
+let content = fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 
 // 1. Add 'recurring' to activeTab state
 content = content.replace(
-  "const [activeTab, setActiveTab] = useState<'all' | 'my' | 'super_admins' | 'department_admins' | 'employees'>('all');",
-  "const [activeTab, setActiveTab] = useState<'all' | 'my' | 'super_admins' | 'department_admins' | 'employees' | 'recurring'>('all');\n  const [recurringTasks, setRecurringTasks] = useState<any[]>([]);\n  const [isRecurring, setIsRecurring] = useState(false);\n  const [frequency, setFrequency] = useState('daily');\n  const [specificDays, setSpecificDays] = useState('');"
+  "const [activeTab, setActiveTab] = useState<'all' | 'my' | 'employees'>('all');",
+  "const [activeTab, setActiveTab] = useState<'all' | 'my' | 'employees' | 'recurring'>('all');\n  const [recurringTasks, setRecurringTasks] = useState<any[]>([]);\n  const [isRecurring, setIsRecurring] = useState(false);\n  const [frequency, setFrequency] = useState('daily');\n  const [specificDays, setSpecificDays] = useState('');"
 );
 
-// 2. Add fetchRecurringTasks to useEffect
+// 2. Fetch Recurring Tasks
 content = content.replace(
-  "fetchTasks();\n    fetchUsers();",
-  "fetchTasks();\n    fetchRecurringTasks();\n    fetchUsers();"
+  "const [taskRes, usersRes] = await Promise.all([",
+  "const [taskRes, usersRes, recurringRes] = await Promise.all([\n"
 );
-
-// 3. Add fetchRecurringTasks function
 content = content.replace(
-  "const fetchTasks = async () => {",
-  `const fetchRecurringTasks = async () => {
-    try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/tasks/recurring?user_type=super_admin');
-      if (res.data.success) {
-        setRecurringTasks(res.data.data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchTasks = async () => {`
+  "axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users')",
+  "axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users'),\n        axios.get('https://napi.bharatmedicalhallplus.com/tasks/recurring?user_type=super_admin')"
+);
+content = content.replace(
+  "if (taskRes.data.success) setTasks(taskRes.data.data);",
+  "if (taskRes.data.success) setTasks(taskRes.data.data);\n      if (recurringRes.data.success) setRecurringTasks(recurringRes.data.data);"
 );
 
-// 4. Update handleCreateTask to support recurring
+// 3. Update handleCreateTask for recurring
 content = content.replace(
   /await axios\.post\('https:\/\/napi\.bharatmedicalhallplus\.com\/tasks', \{([\s\S]*?)\}\);/m,
   `if (isRecurring) {
@@ -42,29 +33,29 @@ content = content.replace(
           parsedDays = specificDays.split(',').map(s => s.trim()).filter(s => s);
         }
         await axios.post('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
-          title, description, assigner_type: 'super_admin', assigner_id: adminUser.id || 1,
+          title, description, assigner_type: 'super_admin', assigner_id: superAdminUser.id || 1,
           assignee_type: finalAssigneeType, assignee_id: parseInt(finalAssigneeId), department: finalDept,
           priority, frequency, specific_days: parsedDays
         });
-        fetchRecurringTasks();
+        fetchInitData();
       } else {
         await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {$1});
       }`
 );
 
-// 5. Clear isRecurring in handleCreateTask
+// 4. Clear fields
 content = content.replace(
   "setPriority('Moderate');",
   "setPriority('Moderate');\n      setIsRecurring(false);\n      setFrequency('daily');\n      setSpecificDays('');"
 );
 
-// 6. Add tab to UI
+// 5. Add tab
 content = content.replace(
   "{ id: 'employees', label: 'Employees' }",
   "{ id: 'employees', label: 'Employees' },\n            { id: 'recurring', label: 'Recurring Schedules' }"
 );
 
-// 7. Add recurring task card renderer
+// 6. Fix renderer logic
 const recurringCard = `
   const renderRecurringTaskCard = (task: any) => (
     <View key={task.id} style={styles.taskCard}>
@@ -97,7 +88,7 @@ const recurringCard = `
               try {
                 const newStatus = task.status === 'active' ? 'paused' : 'active';
                 await axios.put(\`https://napi.bharatmedicalhallplus.com/tasks/recurring/\${task.id}/status\`, { status: newStatus });
-                fetchRecurringTasks();
+                fetchInitData();
                 Alert.alert('Success', \`Schedule \${newStatus}\`);
               } catch(e) {
                 Alert.alert('Error', 'Failed to update schedule');
@@ -106,16 +97,34 @@ const recurringCard = `
           >
             <Text style={styles.actionBtnText}>{task.status === 'active' ? 'Pause Schedule' : 'Resume Schedule'}</Text>
           </Pressable>
+          <Pressable 
+            style={[styles.actionBtn, { backgroundColor: '#ef4444', marginLeft: 8 }]}
+            onPress={async () => {
+              Alert.alert('Delete Schedule', 'Are you sure?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: async () => {
+                  try {
+                    await axios.delete(\`https://napi.bharatmedicalhallplus.com/tasks/recurring/\${task.id}\`);
+                    fetchInitData();
+                  } catch(e) {
+                    Alert.alert('Error', 'Failed to delete schedule');
+                  }
+                }}
+              ])
+            }}
+          >
+            <Text style={styles.actionBtnText}>Delete</Text>
+          </Pressable>
       </View>
     </View>
   );
 `;
+
 content = content.replace(
   "const renderTaskCard = (task: any) => (",
   recurringCard + "\n  const renderTaskCard = (task: any) => ("
 );
 
-// 8. Render correct tasks list based on tab
 content = content.replace(
   "getTasksForTab().map(renderTaskCard)",
   "activeTab === 'recurring' ? recurringTasks.map(renderRecurringTaskCard) : getTasksForTab().map(renderTaskCard)"
@@ -126,8 +135,7 @@ content = content.replace(
   "(activeTab === 'recurring' ? recurringTasks.length : getTasksForTab().length) === 0"
 );
 
-
-// 9. Add recurring fields to modal
+// 7. UI changes
 const recurringFields = `
             <Text style={styles.label}>Schedule Type</Text>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
@@ -158,7 +166,7 @@ const recurringFields = `
                 )}
                 {frequency === 'monthly' && (
                   <>
-                    <Text style={styles.label}>Specific Dates (e.g. 1, 15, 30)</Text>
+                    <Text style={styles.label}>Specific Dates (e.g. 1, 15, 30) or Ranges (1-5)</Text>
                     <TextInput style={styles.input} value={specificDays} onChangeText={setSpecificDays} placeholder="1, 15, 28" />
                   </>
                 )}
@@ -177,8 +185,8 @@ content = content.replace(
   "{!isRecurring && (\n              <>\n                <Text style={styles.label}>Due Date & Time</Text>"
 );
 content = content.replace(
-  /<\/View>\n              <\/View>\n            <\/ScrollView>/m,
-  "</View>\n              </>\n            )}\n              </View>\n            </ScrollView>"
+  "</View>\n              </View>\n            </ScrollView>",
+  "</View>\n              </>\n            )}\n              </View>\n              </View>\n            </ScrollView>"
 );
 
 fs.writeFileSync(path, content);
