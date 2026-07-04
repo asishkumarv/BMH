@@ -65,7 +65,7 @@ export default function OrderAssignScreen() {
         setDeliveryBoys(empRes.data.data);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching data:', err.message || err);
     } finally {
       setLoading(false);
     }
@@ -396,13 +396,9 @@ export default function OrderAssignScreen() {
                     <View style={styles.inputGroup}>
                       <Text style={styles.label}>Select Delivery Boy</Text>
                       <View style={styles.dropdownWrapper}>
-                        <Picker
-                          selectedValue={selectedBoyId}
-                          onValueChange={(itemValue) => setSelectedBoyId(itemValue)}
-                          style={styles.picker}
-                        >
-                          <Picker.Item label="Select a delivery boy..." value="" />
-                          {deliveryBoys.map(boy => (
+                        <Picker selectedValue={selectedBoyId} onValueChange={(val) => setSelectedBoyId(val)} style={styles.picker}>
+                          <Picker.Item label="Select Delivery Boy" value="" />
+                          {deliveryBoys?.map(boy => (
                             <Picker.Item key={boy.id} label={boy.full_name || boy.name} value={boy.id} />
                           ))}
                         </Picker>

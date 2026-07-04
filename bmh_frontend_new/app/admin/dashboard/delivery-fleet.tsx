@@ -5,7 +5,7 @@ import { MapPin, User, Package, RefreshCw, X, Eye, CheckCircle, Navigation } fro
 import 'leaflet/dist/leaflet.css';
 
 let MapContainer: any, TileLayer: any, Marker: any, Popup: any, L: any;
-if (Platform.OS === 'web') {
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
   const RL = require('react-leaflet');
   MapContainer = RL.MapContainer;
   TileLayer = RL.TileLayer;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, SafeAreaView, StatusBar } from 'react-native';
-import { Slot, router, usePathname } from 'expo-router';
+import { Slot, router, usePathname, useRootNavigationState } from 'expo-router';
 import { LayoutDashboard, Users, LogOut, Activity, Calendar } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -10,7 +10,11 @@ export default function DoctorLayout() {
   const [user, setUser] = useState<any>(null);
   const { isMobile } = useResponsive();
 
+  const rootNavigationState = useRootNavigationState();
+
   useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem('userToken');
       const userData = await AsyncStorage.getItem('userData');
@@ -26,7 +30,7 @@ export default function DoctorLayout() {
       }
     };
     checkAuth();
-  }, []);
+  }, [rootNavigationState?.key]);
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('userToken');

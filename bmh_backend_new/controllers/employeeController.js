@@ -226,7 +226,7 @@ exports.getDeliveryFleet = async (req, res) => {
       const d2 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND updated_at::date = CURRENT_DATE`, [boy.id]);
       const d3 = await pool.query(`SELECT COUNT(*) FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND updated_at::date = CURRENT_DATE`, [boy.id]);
       const d4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND updated_at::date = CURRENT_DATE`, [boy.id]);
-      const d5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND status = 'Delivered' AND delivered_at::date = CURRENT_DATE`, [boy.id]);
+      const d5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND status = 'Delivered' AND updated_at::date = CURRENT_DATE`, [boy.id]);
       boy.delivered_today_count = parseInt(d1.rows[0].count) + parseInt(d2.rows[0].count) + parseInt(d3.rows[0].count) + parseInt(d4.rows[0].count) + parseInt(d5.rows[0].count);
 
       // Get assigned today count (all orders where delivery_boy_id matches and was updated today)

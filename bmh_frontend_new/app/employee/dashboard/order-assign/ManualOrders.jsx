@@ -62,7 +62,7 @@ export default function ManualOrders({ deliveryBoys }) {
         setOrders(res.data.data);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching data:', err.message || err);
     } finally {
       setLoading(false);
     }
@@ -182,7 +182,7 @@ export default function ManualOrders({ deliveryBoys }) {
         await Share.share({ message: msg });
       }
     } catch (error) {
-      console.error(error);
+      console.error('Error sharing:', error.message || error);
     }
   };
 
@@ -249,7 +249,7 @@ export default function ManualOrders({ deliveryBoys }) {
                 style={styles.inlinePicker}
               >
                 <Picker.Item label="Assign To" value="" />
-                {deliveryBoys.map(boy => (
+                {deliveryBoys?.map(boy => (
                   <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
                 ))}
               </Picker>
@@ -543,7 +543,7 @@ export default function ManualOrders({ deliveryBoys }) {
                <View style={{marginTop: 20}}>
                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Notes</Text>
                  <View style={{backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
-                    {selectedOrder.notes && selectedOrder.notes.length > 0 ? (typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : selectedOrder.notes).map((n, i) => (
+                    {selectedOrder.notes && selectedOrder.notes.length > 0 ? (typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : selectedOrder.notes)?.map((n, i) => (
                       <View key={i} style={{marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderColor: '#e2e8f0'}}>
                         <Text style={{fontSize: 12, color: '#64748b'}}>{n.author} at {new Date(n.timestamp).toLocaleString()}</Text>
                         <Text style={{fontSize: 14, color: '#1e293b', marginTop: 2}}>{n.text}</Text>

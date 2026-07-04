@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, SafeAreaView, ActivityIndicator, Pressable, Text, Modal, StatusBar } from 'react-native';
-import { Slot, useRouter } from 'expo-router';
+import { Slot, useRouter, useRootNavigationState } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { SubAdminSidebar } from '../../../components/ui/SubAdminSidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
@@ -16,7 +16,11 @@ export default function SubAdminLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
 
+  const rootNavigationState = useRootNavigationState();
+
   useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
     // Basic auth check
     const init = async () => {
       if (Platform.OS === 'web') {
@@ -36,7 +40,7 @@ export default function SubAdminLayout() {
       }
     };
     init();
-  }, []);
+  }, [rootNavigationState?.key]);
 
   useAttendanceReminder(user);
 

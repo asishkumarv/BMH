@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, ScrollView, Image } from 'react-native';
 import { ShieldCheck, Clock, Heart, ArrowRight } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useRootNavigationState } from 'expo-router';
 import { Colors } from '../constants/Colors';
 import { useResponsive } from '../hooks/useResponsive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,7 +16,11 @@ export default function LandingPage() {
     { icon: Heart, title: 'Care', subtitle: 'Patient First', color: '#06B6D4', bgColor: '#ECFEFF' },
   ];
 
+  const rootNavigationState = useRootNavigationState();
+
   React.useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
     const checkAuth = async () => {
       try {
         if (Platform.OS === 'web') {
@@ -45,7 +49,7 @@ export default function LandingPage() {
       }
     };
     checkAuth();
-  }, []);
+  }, [rootNavigationState?.key]);
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} style={styles.container}>
