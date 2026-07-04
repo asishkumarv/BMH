@@ -25,6 +25,15 @@ export default function DeliveryDashboard() {
   const [paymentImage, setPaymentImage] = useState<any>(null);
   const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '' });
   const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
+  useEffect(() => {
+    let interval: any;
+    if (user) {
+      interval = setInterval(() => {
+        fetchOrders(user.id);
+      }, 5000); // Check every 15 seconds
+    }
+    return () => clearInterval(interval);
+  }, [user, orders]);
 
   useEffect(() => {
     const init = async () => {
@@ -56,7 +65,7 @@ export default function DeliveryDashboard() {
         if (orders.length > 0 && res.data.data.length > orders.length) {
            try {
              const { sound } = await Audio.Sound.createAsync(
-                { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
+                { uri: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' },
                 { isLooping: true, shouldPlay: true }
              );
              setAlarmSound(sound);
@@ -179,7 +188,7 @@ export default function DeliveryDashboard() {
     if (!selectedBusOrder) return;
     try {
       let url = '';
-      let payload = { bus_details: busDetails };
+      let payload: any = { bus_details: busDetails };
 
       if (selectedBusOrder.type === 'manual_order') {
         url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedBusOrder.id}`;
@@ -210,9 +219,14 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const openMap = (lat: any, lng: any, address: string) => {
+  const openMap = (lat: any, lng: any, address: string, locationLink?: string) => {
     let url = '';
-    if (lat && lng) {
+    
+    if (locationLink && (locationLink.startsWith('http://') || locationLink.startsWith('https://'))) {
+      url = locationLink;
+    } else if (address && (address.startsWith('http://') || address.startsWith('https://'))) {
+      url = address;
+    } else if (lat && lng) {
       url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     } else if (address) {
       url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -276,7 +290,7 @@ export default function DeliveryDashboard() {
       <View style={styles.cardFooter}>
         <TouchableOpacity 
           style={styles.mapBtn} 
-          onPress={() => openMap(item.map_lat, item.map_lng, item.address)}
+          onPress={() => openMap(item.map_lat, item.map_lng, item.address, item.location_link)}
         >
           <MapPin color="#3B82F6" size={16} style={{marginRight: 6}} />
           <Text style={styles.mapBtnText}>Navigate</Text>

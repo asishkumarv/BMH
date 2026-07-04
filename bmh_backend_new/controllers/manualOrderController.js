@@ -109,7 +109,7 @@ exports.updateOrder = async (req, res) => {
     // Simple helper
     const addField = (col, val) => {
       if (val !== undefined) {
-        params.push(val);
+        params.push(val === '' ? null : val);
         updateFields.push(`${col} = $${params.length}`);
       }
     };

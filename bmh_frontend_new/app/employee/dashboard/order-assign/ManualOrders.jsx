@@ -21,6 +21,8 @@ export default function ManualOrders({ deliveryBoys }) {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [editAddress, setEditAddress] = useState('');
+  const [newNote, setNewNote] = useState('');
   
   // Patient auto-fill state
   const [patients, setPatients] = useState([]);
@@ -104,6 +106,25 @@ export default function ManualOrders({ deliveryBoys }) {
       }
     } catch (err) {
       alert('Failed to create order');
+    }
+  };
+
+  const handleUpdateOrderDetails = async () => {
+    if (!selectedOrder) return;
+    try {
+      const authCookie = Cookies.get('auth_employee');
+      const auth = authCookie ? JSON.parse(authCookie) : null;
+      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
+        address: editAddress,
+        new_note: newNote,
+        note_author: auth ? auth.full_name : 'Employee'
+      });
+      alert('Order updated successfully!');
+      setNewNote('');
+      fetchManualOrders();
+      setViewModalVisible(false);
+    } catch (err) {
+      alert('Failed to update order');
     }
   };
 
@@ -211,8 +232,13 @@ export default function ManualOrders({ deliveryBoys }) {
         
         {/* Actions */}
         <View style={[styles.cell, { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center' }]}>
-          <TouchableOpacity onPress={() => { setSelectedOrder(item); setViewModalVisible(true); }} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
-            <Eye size={16} color="#4338ca" />
+          <TouchableOpacity onPress={() => { 
+              setSelectedOrder(item); 
+              setEditAddress(item.address || '');
+              setNewNote('');
+              setViewModalVisible(true); 
+            }} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
+             <Eye size={16} color="#4338ca" />
           </TouchableOpacity>
         </View>
       </View>
@@ -420,6 +446,21 @@ export default function ManualOrders({ deliveryBoys }) {
                )}
 
                <View style={{marginTop: 20}}>
+                 <Text style={{fontWeight:'bold', marginBottom: 10}}>Address Info</Text>
+                 <TextInput 
+                   style={styles.input} 
+                   value={editAddress} 
+                   onChangeText={setEditAddress} 
+                   multiline 
+                 />
+                 {selectedOrder.location_link && (
+                   <Text style={{color: '#3b82f6', marginTop: 5}} onPress={() => Platform.OS==='web'?window.open(selectedOrder.location_link,'_blank'):Linking.openURL(selectedOrder.location_link)}>
+                     Open Location Link
+                   </Text>
+                 )}
+               </View>
+
+               <View style={{marginTop: 20}}>
                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Notes</Text>
                  <View style={{backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
                     {selectedOrder.notes && (typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : selectedOrder.notes).map((n, i) => (
@@ -428,10 +469,21 @@ export default function ManualOrders({ deliveryBoys }) {
                         <Text style={{fontSize: 14, color: '#1e293b', marginTop: 2}}>{n.text}</Text>
                       </View>
                     ))}
+                    <TextInput
+                      style={[styles.input, {marginTop: 10, backgroundColor: '#fff'}]}
+                      placeholder="Add a new note..."
+                      value={newNote}
+                      onChangeText={setNewNote}
+                    />
                  </View>
                </View>
 
             </ScrollView>
+            <View style={styles.modalFooter}>
+               <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateOrderDetails}>
+                 <Text style={styles.saveBtnText}>Save Updates</Text>
+               </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
