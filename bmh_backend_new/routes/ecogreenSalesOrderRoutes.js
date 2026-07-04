@@ -128,7 +128,9 @@ router.get('/', async (req, res) => {
       sysName: r.sys_name,
       sysIp: r.sys_ip,
       sysUser: r.sys_user,
-      deliveryBoyId: r.delivery_boy_id,\n      deliveryType: r.delivery_type,\n      busDetails: r.bus_details,
+      deliveryBoyId: r.delivery_boy_id,
+      deliveryType: r.delivery_type,
+      busDetails: r.bus_details,
       createdAt: r.created_at
     }));
 
