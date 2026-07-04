@@ -35,11 +35,19 @@ export default function OrderAssignScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All'); // All, online_order, sales_order, purchase_order, sales_invoice
   const [assignmentFilter, setAssignmentFilter] = useState('All'); // All, Unassigned, Assigned, Completed
+  
+  // Date Filters
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const fetchData = async () => {
     try {
+      let url = 'https://napi.bharatmedicalhallplus.com/admin/all-orders-for-assignment';
+      if (fromDate && toDate) {
+        url += `?fromDate=${fromDate}&toDate=${toDate}`;
+      }
       const [ordRes, empRes] = await Promise.all([
-        axios.get('https://napi.bharatmedicalhallplus.com/admin/all-orders-for-assignment'),
+        axios.get(url),
         axios.get('https://napi.bharatmedicalhallplus.com/employees/delivery-fleet')
       ]);
       if (ordRes.data && ordRes.data.success) {
@@ -267,6 +275,26 @@ export default function OrderAssignScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        
+        <View style={styles.dateFilterContainer}>
+          <Calendar size={18} color="#64748b" style={{marginRight: 8}} />
+          <TextInput
+            style={styles.dateInput}
+            placeholder="From: YYYY-MM-DD"
+            value={fromDate}
+            onChangeText={setFromDate}
+          />
+          <Text style={{marginHorizontal: 8, color: '#94a3b8'}}>-</Text>
+          <TextInput
+            style={styles.dateInput}
+            placeholder="To: YYYY-MM-DD"
+            value={toDate}
+            onChangeText={setToDate}
+          />
+          <TouchableOpacity style={styles.applyDateBtn} onPress={fetchData}>
+            <Text style={styles.applyDateText}>Apply</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Orders List */}
@@ -508,6 +536,35 @@ const styles = StyleSheet.create({
   },
   typeFilterTextActive: {
     color: '#fff',
+  },
+  dateFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  dateInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1e293b',
+    outlineStyle: 'none'
+  },
+  applyDateBtn: {
+    backgroundColor: '#0ea5e9',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  applyDateText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
   },
   listContainer: {
     paddingBottom: 40,
