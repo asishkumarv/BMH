@@ -148,8 +148,71 @@ exports.createRecurringTask = async (req, res) => {
       specific_days ? JSON.stringify(specific_days) : null
     ];
     const result = await pool.query(query, values);
+    const rTask = result.rows[0];
     
-    res.status(201).json({ success: true, data: result.rows[0], message: 'Recurring task created successfully' });
+    // Trigger immediate generation if due today
+    try {
+        const today = new Date();
+        const currentDayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+        const currentDateOfMonth = today.getDate();
+        
+        let shouldGenerate = false;
+        if (rTask.frequency === 'daily') {
+            shouldGenerate = true;
+        } else if (rTask.frequency === 'weekly') {
+            let days = rTask.specific_days || [];
+            if (typeof days === 'string') {
+                try { days = JSON.parse(days); } catch(e) { days = []; }
+            }
+            if (days.includes(currentDayOfWeek) || days.includes(currentDayOfWeek.toString())) {
+                shouldGenerate = true;
+            }
+        } else if (rTask.frequency === 'monthly') {
+            let dates = rTask.specific_days || [];
+            if (typeof dates === 'string') {
+                try { dates = JSON.parse(dates); } catch(e) { dates = []; }
+            }
+            for (let d of dates) {
+                if (typeof d === 'string' && d.includes('-')) {
+                    const parts = d.split('-');
+                    if (parts.length === 2) {
+                        const start = parseInt(parts[0]);
+                        const end = parseInt(parts[1]);
+                        if (currentDateOfMonth >= start && currentDateOfMonth <= end) {
+                            shouldGenerate = true;
+                            break;
+                        }
+                    }
+                } else {
+                    if (d == currentDateOfMonth) {
+                        shouldGenerate = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (shouldGenerate) {
+            const dueAt = new Date(today);
+            dueAt.setHours(23, 59, 59, 999);
+            const insertTask = `
+                INSERT INTO tasks (
+                    title, description, department, assigner_type, assigner_id, 
+                    assignee_type, assignee_id, priority, due_date, status
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'assigned')
+            `;
+            const tValues = [
+                rTask.title, rTask.description, rTask.department, rTask.assigner_type, rTask.assigner_id,
+                rTask.assignee_type, rTask.assignee_id, rTask.priority, dueAt.toISOString()
+            ];
+            await pool.query(insertTask, tValues);
+            await pool.query(`UPDATE recurring_tasks SET last_generated_at = CURRENT_TIMESTAMP WHERE id = $1`, [rTask.id]);
+        }
+    } catch (genErr) {
+        console.error('Error generating initial task for recurring schedule:', genErr);
+    }
+    
+    res.status(201).json({ success: true, data: rTask, message: 'Recurring task created successfully' });
   } catch (err) {
     console.error('Error creating recurring task:', err);
     res.status(500).json({ success: false, message: 'Failed to create recurring task' });

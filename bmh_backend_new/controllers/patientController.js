@@ -375,10 +375,12 @@ exports.getAllOrders = async (req, res) => {
 
     // Fetch from manual_orders
     const manualOrdersRes = await pool.query(
-      `SELECT id, 'manual_order' as type, status, amount as total_amount, created_at, mode_of_delivery as delivery_type, delivery_otp, 
-              json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', est_reach_time, 'travels_name', bus_travels_name) as bus_details, 
-              notes
-       FROM manual_orders WHERE customer_phone = $1 ORDER BY created_at DESC`, [mobile]
+      `SELECT mo.id, 'manual_order' as type, mo.status, mo.amount as total_amount, mo.created_at, mo.mode_of_delivery as delivery_type, mo.delivery_otp, 
+              json_build_object('bus_number', mo.bus_number, 'driver_name', mo.bus_driver_name, 'driver_number', mo.bus_driver_number, 'arrival_time', mo.est_reach_time, 'travels_name', mo.bus_travels_name) as bus_details, 
+              mo.notes, emp.full_name as delivery_boy_name, emp.mobile as delivery_boy_phone
+       FROM manual_orders mo
+       LEFT JOIN employees emp ON mo.delivery_boy_id = emp.id::varchar
+       WHERE mo.customer_phone = $1 ORDER BY mo.created_at DESC`, [mobile]
     );
 
     let allOrders = [

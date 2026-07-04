@@ -23,7 +23,7 @@ export default function DeliveryDashboard() {
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentTxnId, setPaymentTxnId] = useState('');
   const [paymentImage, setPaymentImage] = useState<any>(null);
-  const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '' });
+  const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '', payment_mode: '' });
   const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
   useEffect(() => {
     let interval: any;
@@ -109,9 +109,9 @@ export default function DeliveryDashboard() {
     );
   };
 
-  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string, amount: string = '') => {
+  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string, amount: string = '', paymentMode: string = '') => {
     if ((type === 'online_order' || type === 'sales_order' || type === 'manual_order') && deliveryType === 'Local') {
-      setCurrentOrder({ id: String(orderId), type, amount: String(amount) });
+      setCurrentOrder({ id: String(orderId), type, amount: String(amount), payment_mode: paymentMode });
       setDeliveryOtp('');
       setPaymentMode('Cash');
       setPaidAmount(String(amount));
@@ -134,6 +134,20 @@ export default function DeliveryDashboard() {
       if (window.confirm("Are you sure you want to mark this as Delivered?")) {
         processDelivery(orderId, type);
       }
+    }
+  };
+  const handleUpdateStatus = async (orderId: string | number, type: string, newStatus: string) => {
+    try {
+      if (type === 'manual_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, {
+          status: newStatus
+        });
+        if (user) fetchOrders(user.id);
+      } else {
+        alert("Status updates not yet supported for this order type.");
+      }
+    } catch (err) {
+      alert('Failed to update status');
     }
   };
 
@@ -315,10 +329,31 @@ export default function DeliveryDashboard() {
              </TouchableOpacity>
           )}
 
-          {item.status?.toLowerCase() !== 'delivered' && item.type !== 'purchase_order' && (
+          {item.type === 'manual_order' && item.status === 'Assigned' && (
+            <TouchableOpacity 
+              style={[styles.deliverBtn, {backgroundColor: '#F59E0B'}]} 
+              onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}
+            >
+              <Package color="#fff" size={16} style={{marginRight: 6}} />
+              <Text style={styles.deliverBtnText}>Pickup</Text>
+            </TouchableOpacity>
+          )}
+
+          {item.type === 'manual_order' && item.status === 'Picked Up' && (
+            <TouchableOpacity 
+              style={[styles.deliverBtn, {backgroundColor: '#3B82F6'}]} 
+              onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}
+            >
+              <Navigation color="#fff" size={16} style={{marginRight: 6}} />
+              <Text style={styles.deliverBtnText}>Start</Text>
+            </TouchableOpacity>
+          )}
+
+          {((item.type === 'manual_order' && item.status === 'Out for Delivery') || 
+            (item.type !== 'manual_order' && item.status?.toLowerCase() !== 'delivered' && item.type !== 'purchase_order')) && (
             <TouchableOpacity 
             style={styles.deliverBtn} 
-            onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type)}
+            onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode)}
             >
               <CheckCircle color="#fff" size={16} style={{marginRight: 6}} />
               <Text style={styles.deliverBtnText}>Mark Delivered</Text>
@@ -431,7 +466,7 @@ export default function DeliveryDashboard() {
                 placeholder="0000"
               />
 
-              {currentOrder.type === 'manual_order' && (
+              {currentOrder.type === 'manual_order' && currentOrder.payment_mode !== 'Prepaid' && (
                 <>
                   <Text style={[styles.label, {marginTop: 20}]}>Payment Mode</Text>
                   <View style={{flexDirection:'row', gap:10, marginBottom: 10}}>

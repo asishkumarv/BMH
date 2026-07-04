@@ -182,7 +182,7 @@ export default function DepartmentTasksScreen() {
         </View>
         <View style={styles.metaItem}>
           <Clock color={Colors.light.icon} size={16} />
-          <Text style={styles.metaText}>Schedule: {task.frequency.toUpperCase()} {task.specific_days ? '(' + JSON.parse(task.specific_days).join(', ') + ')' : ''}</Text>
+          <Text style={styles.metaText}>Schedule: {task.frequency.toUpperCase()} {task.specific_days ? '(' + (Array.isArray(task.specific_days) ? task.specific_days : JSON.parse(task.specific_days)).join(', ') + ')' : ''}</Text>
         </View>
       </View>
       

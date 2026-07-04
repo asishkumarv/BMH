@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation } from 'lucide-react-native';
+import { Share } from 'react-native';
 
 export default function ManualOrders({ deliveryBoys }) {
   const { width } = useWindowDimensions();
@@ -43,7 +44,9 @@ export default function ManualOrders({ deliveryBoys }) {
     mode_of_delivery: 'Counter',
     order_date: new Date().toISOString().split('T')[0],
     order_time: new Date().toTimeString().substring(0,5),
-    notes: ''
+    notes: '',
+    payment_mode: 'POD',
+    payment_txn_id: ''
   });
 
   const fetchManualOrders = async () => {
@@ -98,7 +101,28 @@ export default function ManualOrders({ deliveryBoys }) {
 
   const handleCreateSubmit = async () => {
     try {
-      const res = await axios.post('https://napi.bharatmedicalhallplus.com/manual-orders', formData);
+      let createdById = null;
+      let createdByType = 'Employee';
+      if (typeof window !== 'undefined') {
+        const adminUser = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser');
+        const empUser = localStorage.getItem('employeeUser');
+        if (adminUser) {
+          const auth = JSON.parse(adminUser);
+          createdById = auth.id;
+          createdByType = 'Admin';
+        } else if (empUser) {
+          const auth = JSON.parse(empUser);
+          createdById = auth.id;
+        }
+      }
+
+      const payload = {
+        ...formData,
+        created_by_id: createdById,
+        created_by_type: createdByType
+      };
+
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/manual-orders', payload);
       if (res.data.success) {
         alert('Order created successfully!');
         setCreateModalVisible(false);
@@ -112,12 +136,16 @@ export default function ManualOrders({ deliveryBoys }) {
   const handleUpdateOrderDetails = async () => {
     if (!selectedOrder) return;
     try {
-      const authCookie = Cookies.get('auth_employee');
-      const auth = authCookie ? JSON.parse(authCookie) : null;
+      let authName = 'Employee';
+      if (typeof window !== 'undefined') {
+        const u = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser') || localStorage.getItem('employeeUser');
+        if (u) authName = JSON.parse(u).full_name || authName;
+      }
       await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
+        ...selectedOrder,
         address: editAddress,
         new_note: newNote,
-        note_author: auth ? auth.full_name : 'Employee'
+        note_author: authName
       });
       alert('Order updated successfully!');
       setNewNote('');
@@ -138,6 +166,23 @@ export default function ManualOrders({ deliveryBoys }) {
       fetchManualOrders();
     } catch (err) {
       alert('Failed to assign boy');
+    }
+  };
+
+  const handleShareOrder = async (item) => {
+    try {
+      const msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'}\nOTP: ${item.delivery_otp || 'N/A'}`;
+      if (Platform.OS === 'web') {
+        if (navigator.share) {
+          await navigator.share({ title: 'Order Details', text: msg });
+        } else {
+          alert('Sharing not supported on this browser');
+        }
+      } else {
+        await Share.share({ message: msg });
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -222,6 +267,9 @@ export default function ManualOrders({ deliveryBoys }) {
         <View style={[styles.cell, { flex: 1 }]}>
           <Text style={styles.cellText}>{item.order_date ? item.order_date.substring(0,10) : ''}</Text>
           <Text style={styles.cellSubText}>{item.order_time}</Text>
+          {item.started_at && item.delivered_at && (
+             <Text style={[styles.cellSubText, {color:'#10B981'}]}>Time: {Math.round((new Date(item.delivered_at).getTime() - new Date(item.started_at).getTime()) / 60000)}m</Text>
+          )}
         </View>
         
         {/* Created By */}
@@ -239,6 +287,9 @@ export default function ManualOrders({ deliveryBoys }) {
               setViewModalVisible(true); 
             }} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
              <Eye size={16} color="#4338ca" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#dcfce7'}]}>
+             <Share2 size={16} color="#15803d" />
           </TouchableOpacity>
         </View>
       </View>
@@ -378,6 +429,27 @@ export default function ManualOrders({ deliveryBoys }) {
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
+                  <Text style={styles.label}>Payment Mode</Text>
+                  <View style={styles.dropdownWrapper}>
+                    <Picker
+                      selectedValue={formData.payment_mode}
+                      onValueChange={(val) => setFormData({...formData, payment_mode: val})}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="POD (Pay on Delivery)" value="POD" />
+                      <Picker.Item label="Prepaid" value="Prepaid" />
+                    </Picker>
+                  </View>
+                </View>
+                {formData.payment_mode === 'Prepaid' && (
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Transaction Number</Text>
+                    <TextInput style={styles.input} value={formData.payment_txn_id || ''} onChangeText={(t) => setFormData({...formData, payment_txn_id: t})} placeholder="Txn ID" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
                   <Text style={styles.label}>Delivery Charge</Text>
                   <TextInput style={styles.input} value={formData.delivery_charge || ''} onChangeText={(t) => setFormData({...formData, delivery_charge: t})} placeholder="Charge" keyboardType="numeric" />
                 </View>
@@ -427,23 +499,31 @@ export default function ManualOrders({ deliveryBoys }) {
                {selectedOrder.mode_of_delivery === 'Bus' && (
                  <View style={{marginTop: 20, backgroundColor: '#f8fafc', padding: 15, borderRadius: 8}}>
                     <Text style={{fontWeight:'bold', marginBottom: 10}}>Bus Info</Text>
-                    <Text>Travels: {selectedOrder.bus_travels_name || 'N/A'}</Text>
-                    <Text>Driver: {selectedOrder.bus_driver_name || 'N/A'} ({selectedOrder.bus_driver_number || 'N/A'})</Text>
-                    <Text>Bus No: {selectedOrder.bus_number || 'N/A'}</Text>
-                    <Text>Dispatch: {selectedOrder.dispatch_time || 'N/A'}</Text>
-                    <Text>Est Arrival: {selectedOrder.est_reach_time || 'N/A'}</Text>
+                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Travels Name" value={selectedOrder.bus_travels_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_travels_name: t})} />
+                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Name" value={selectedOrder.bus_driver_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_name: t})} />
+                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Number" value={selectedOrder.bus_driver_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_number: t})} />
+                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus No" value={selectedOrder.bus_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_number: t})} />
                  </View>
                )}
 
-               {!!(selectedOrder.payment_mode || selectedOrder.paid_amount) && (
-                 <View style={{marginTop: 20, backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8}}>
-                    <Text style={{fontWeight:'bold', marginBottom: 10}}>Payment Info</Text>
-                    <Text>Mode: {selectedOrder.payment_mode}</Text>
-                    <Text>Amount: ₹{selectedOrder.paid_amount}</Text>
-                    <Text>Txn ID: {selectedOrder.payment_txn_id || 'N/A'}</Text>
-                    {selectedOrder.payment_attachment && <Image source={{uri: `https://napi.bharatmedicalhallplus.com${selectedOrder.payment_attachment}`}} style={{width: 100, height: 100, marginTop: 10}}/>}
-                 </View>
-               )}
+               <View style={{marginTop: 20, backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8}}>
+                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Payment Info</Text>
+                  <View style={styles.dropdownWrapper}>
+                    <Picker
+                      selectedValue={selectedOrder.payment_mode || 'POD'}
+                      onValueChange={(val) => setSelectedOrder({...selectedOrder, payment_mode: val})}
+                      style={[styles.picker, {marginBottom:5}]}
+                    >
+                      <Picker.Item label="Cash" value="Cash" />
+                      <Picker.Item label="Online" value="Online" />
+                      <Picker.Item label="Prepaid" value="Prepaid" />
+                      <Picker.Item label="POD" value="POD" />
+                    </Picker>
+                  </View>
+                  <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Paid Amount" value={selectedOrder.paid_amount || ''} onChangeText={t => setSelectedOrder({...selectedOrder, paid_amount: t})} />
+                  <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Txn ID" value={selectedOrder.payment_txn_id || ''} onChangeText={t => setSelectedOrder({...selectedOrder, payment_txn_id: t})} />
+                  {selectedOrder.payment_attachment && <Image source={{uri: `https://napi.bharatmedicalhallplus.com${selectedOrder.payment_attachment}`}} style={{width: 100, height: 100, marginTop: 10}}/>}
+               </View>
 
                <View style={{marginTop: 20}}>
                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Address Info</Text>

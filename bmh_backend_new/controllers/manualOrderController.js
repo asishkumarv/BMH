@@ -26,8 +26,9 @@ exports.createOrder = async (req, res) => {
         order_no, invoice_no, amount, delivery_charge, mode_of_delivery,
         order_date, order_time, customer_phone, customer_name,
         ship_to_phone, ship_to_name, address, location_link,
-        status, created_by_id, created_by_type, delivery_otp, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17)
+        status, created_by_id, created_by_type, delivery_otp, notes,
+        payment_mode, payment_txn_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19)
       RETURNING *
     `;
 
@@ -48,7 +49,9 @@ exports.createOrder = async (req, res) => {
       created_by_id, 
       created_by_type, 
       delivery_otp, 
-      initialNotes
+      initialNotes,
+      req.body.payment_mode || null,
+      req.body.payment_txn_id || null
     ];
 
     const result = await pool.query(insertQuery, values);
@@ -63,6 +66,11 @@ exports.createOrder = async (req, res) => {
 // Get All Manual Orders
 exports.getOrders = async (req, res) => {
   try {
+    // Run schema migrations for timestamp tracking
+    await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
+
     // Optionally filter by customer_phone, delivery_boy_id, status
     const { customer_phone, delivery_boy_id, status } = req.query;
     let query = `
@@ -141,6 +149,11 @@ exports.updateOrder = async (req, res) => {
     addField('est_reach_time', est_reach_time);
     addField('address', address);
     
+    // Automatically capture exact time transitions
+    if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);
+    if (status === 'Out for Delivery') updateFields.push(`started_at = CURRENT_TIMESTAMP`);
+    if (status === 'Delivered') updateFields.push(`delivered_at = CURRENT_TIMESTAMP`);
+
     if (payment_attachment) addField('payment_attachment', payment_attachment);
     if (bus_front_image) addField('bus_front_image', bus_front_image);
 

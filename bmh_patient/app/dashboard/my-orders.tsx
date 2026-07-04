@@ -81,6 +81,14 @@ export default function MyOrdersScreen() {
            </View>
         )}
 
+        {item.delivery_boy_name && (
+           <View style={{marginTop: 12, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+              <Text style={{fontWeight: 'bold', color: '#1e293b', marginBottom: 6}}>Delivery Executive</Text>
+              <Text style={{fontSize: 14, color: '#334155'}}>{item.delivery_boy_name}</Text>
+              <Text style={{fontSize: 14, color: '#334155'}}>{item.delivery_boy_phone}</Text>
+           </View>
+        )}
+
         {item.bus_details && item.bus_details.bus_number && (
            <View style={{marginTop: 12, backgroundColor: '#f0fdf4', padding: 12, borderRadius: 8}}>
               <Text style={{fontWeight: 'bold', color: '#166534', marginBottom: 6}}>Bus Tracking Details</Text>
