@@ -1,7 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken"); // 👈 for login tokens
-const pool = require("../db");
+const pool = require("../config/db");
+const sharp = require("sharp");
 const multer = require("multer");
 const path = require("path");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -106,6 +107,25 @@ router.post("/login", async (req, res) => {
 
     // 4️⃣ Return user info (excluding password)
     const { password: _, ...userData } = user;
+
+    // Compress image if it exists to prevent AsyncStorage crashes
+    if (userData.image) {
+      try {
+        let base64Data = userData.image;
+        if (userData.image.includes('base64,')) {
+          base64Data = userData.image.split('base64,')[1];
+        }
+        const imgBuffer = Buffer.from(base64Data, 'base64');
+        const compressedBuffer = await sharp(imgBuffer)
+          .resize(100, 100, { fit: 'cover' })
+          .jpeg({ quality: 60 })
+          .toBuffer();
+        userData.image = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+      } catch (err) {
+        console.error('Failed to compress image:', err);
+        delete userData.image;
+      }
+    }
 
     res.json({ message: "Login successful", token, user: userData });
   } catch (err) {

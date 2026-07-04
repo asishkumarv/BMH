@@ -1,4 +1,5 @@
-const pool = require('../db');
+const pool = require('../config/db');
+const sharp = require('sharp');
 
 exports.getAllEmployees = async (req, res) => {
   try {
@@ -68,6 +69,30 @@ exports.loginEmployee = async (req, res) => {
     if (user.status !== 'approved') {
       return res.status(403).json({ success: false, message: 'Account is not active' });
     }
+
+    // Compress image if it exists to prevent AsyncStorage crashes on frontend
+    if (user.image) {
+      try {
+        let base64Data = user.image;
+        let mimeType = 'image/jpeg';
+        if (user.image.includes('base64,')) {
+          const parts = user.image.split('base64,');
+          mimeType = parts[0].replace('data:', '').replace(';', '');
+          base64Data = parts[1];
+        }
+        const imgBuffer = Buffer.from(base64Data, 'base64');
+        const compressedBuffer = await sharp(imgBuffer)
+          .resize(100, 100, { fit: 'cover' })
+          .jpeg({ quality: 60 })
+          .toBuffer();
+        
+        user.image = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+      } catch (err) {
+        console.error('Failed to compress image:', err);
+        delete user.image;
+      }
+    }
+
 
     res.json({ success: true, data: user });
   } catch (error) {
