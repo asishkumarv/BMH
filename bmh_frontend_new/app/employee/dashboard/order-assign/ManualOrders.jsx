@@ -319,47 +319,47 @@ export default function ManualOrders({ deliveryBoys }) {
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Customer Phone No</Text>
-                  <TextInput style={styles.input} value={formData.customer_phone} onChangeText={handlePatientSearch} placeholder="Phone No" />
+                  <TextInput style={styles.input} value={formData.customer_phone || ''} onChangeText={handlePatientSearch} placeholder="Phone No" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Customer Name</Text>
-                  <TextInput style={styles.input} value={formData.customer_name} onChangeText={(t) => setFormData({...formData, customer_name: t})} placeholder="Name" />
+                  <TextInput style={styles.input} value={formData.customer_name || ''} onChangeText={(t) => setFormData({...formData, customer_name: t})} placeholder="Name" />
                 </View>
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Ship to Phone No</Text>
-                  <TextInput style={styles.input} value={formData.ship_to_phone} onChangeText={(t) => setFormData({...formData, ship_to_phone: t})} placeholder="Ship Phone" />
+                  <TextInput style={styles.input} value={formData.ship_to_phone || ''} onChangeText={(t) => setFormData({...formData, ship_to_phone: t})} placeholder="Ship Phone" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Ship to Name</Text>
-                  <TextInput style={styles.input} value={formData.ship_to_name} onChangeText={(t) => setFormData({...formData, ship_to_name: t})} placeholder="Ship Name" />
+                  <TextInput style={styles.input} value={formData.ship_to_name || ''} onChangeText={(t) => setFormData({...formData, ship_to_name: t})} placeholder="Ship Name" />
                 </View>
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Address</Text>
-                  <TextInput style={styles.input} value={formData.address} onChangeText={(t) => setFormData({...formData, address: t})} placeholder="Full Address" />
+                  <TextInput style={styles.input} value={formData.address || ''} onChangeText={(t) => setFormData({...formData, address: t})} placeholder="Full Address" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Delivery Location Link</Text>
-                  <TextInput style={styles.input} value={formData.location_link} onChangeText={(t) => setFormData({...formData, location_link: t})} placeholder="Google Maps URL" />
+                  <TextInput style={styles.input} value={formData.location_link || ''} onChangeText={(t) => setFormData({...formData, location_link: t})} placeholder="Google Maps URL" />
                 </View>
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Order No</Text>
-                  <TextInput style={styles.input} value={formData.order_no} onChangeText={(t) => setFormData({...formData, order_no: t})} placeholder="Order No" />
+                  <TextInput style={styles.input} value={formData.order_no || ''} onChangeText={(t) => setFormData({...formData, order_no: t})} placeholder="Order No" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Invoice No</Text>
-                  <TextInput style={styles.input} value={formData.invoice_no} onChangeText={(t) => setFormData({...formData, invoice_no: t})} placeholder="Invoice No" />
+                  <TextInput style={styles.input} value={formData.invoice_no || ''} onChangeText={(t) => setFormData({...formData, invoice_no: t})} placeholder="Invoice No" />
                 </View>
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Amount</Text>
-                  <TextInput style={styles.input} value={formData.amount} onChangeText={(t) => setFormData({...formData, amount: t})} placeholder="Amount" keyboardType="numeric" />
+                  <TextInput style={styles.input} value={formData.amount || ''} onChangeText={(t) => setFormData({...formData, amount: t})} placeholder="Amount" keyboardType="numeric" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Mode of Delivery</Text>
@@ -379,21 +379,21 @@ export default function ManualOrders({ deliveryBoys }) {
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Delivery Charge</Text>
-                  <TextInput style={styles.input} value={formData.delivery_charge} onChangeText={(t) => setFormData({...formData, delivery_charge: t})} placeholder="Charge" keyboardType="numeric" />
+                  <TextInput style={styles.input} value={formData.delivery_charge || ''} onChangeText={(t) => setFormData({...formData, delivery_charge: t})} placeholder="Charge" keyboardType="numeric" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Order Date</Text>
-                  <TextInput style={styles.input} value={formData.order_date} onChangeText={(t) => setFormData({...formData, order_date: t})} placeholder="YYYY-MM-DD" />
+                  <TextInput style={styles.input} value={formData.order_date || ''} onChangeText={(t) => setFormData({...formData, order_date: t})} placeholder="YYYY-MM-DD" />
                 </View>
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Order Time</Text>
-                  <TextInput style={styles.input} value={formData.order_time} onChangeText={(t) => setFormData({...formData, order_time: t})} placeholder="HH:MM" />
+                  <TextInput style={styles.input} value={formData.order_time || ''} onChangeText={(t) => setFormData({...formData, order_time: t})} placeholder="HH:MM" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Notes</Text>
-                  <TextInput style={[styles.input, {height: 60}]} multiline value={formData.notes} onChangeText={(t) => setFormData({...formData, notes: t})} placeholder="Initial Notes..." />
+                  <TextInput style={[styles.input, {height: 60}]} multiline value={formData.notes || ''} onChangeText={(t) => setFormData({...formData, notes: t})} placeholder="Initial Notes..." />
                 </View>
               </View>
             </ScrollView>

@@ -315,7 +315,7 @@ export default function DeliveryDashboard() {
              </TouchableOpacity>
           )}
 
-          {item.status !== 'DELIVERED' && item.type !== 'purchase_order' && (
+          {item.status?.toLowerCase() !== 'delivered' && item.type !== 'purchase_order' && (
             <TouchableOpacity 
             style={styles.deliverBtn} 
             onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type)}
