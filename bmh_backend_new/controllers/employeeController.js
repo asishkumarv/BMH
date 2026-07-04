@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const pool = require('../db');
 const sharp = require('sharp');
 
 exports.getAllEmployees = async (req, res) => {

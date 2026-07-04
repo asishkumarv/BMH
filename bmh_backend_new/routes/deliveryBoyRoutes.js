@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken"); // 👈 for login tokens
-const pool = require("../config/db");
+const pool = require("../db");
 const sharp = require("sharp");
 const multer = require("multer");
 const path = require("path");
