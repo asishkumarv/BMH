@@ -192,3 +192,17 @@ exports.updateRecurringTaskStatus = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to update recurring task' });
   }
 };
+exports.deleteRecurringTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM recurring_tasks WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Recurring task not found' });
+    }
+    res.json({ success: true, message: 'Recurring task deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting recurring task:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete recurring task' });
+  }
+};
+
