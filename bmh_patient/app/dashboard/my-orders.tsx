@@ -31,7 +31,7 @@ export default function MyOrdersScreen() {
 
   const fetchOrders = async (patientId: string) => {
     try {
-      const res = await fetch(`https://napi.bharatmedicalhallplus.com/patients/${patientId}/all-orders`);
+      const res = await fetch(`https://napi.bharatmedicalhallplus.com/patient/${patientId}/all-orders`);
       const data = await res.json();
       if (data && data.success) {
         setOrders(data.data);

@@ -343,7 +343,7 @@ exports.getAllOrders = async (req, res) => {
     const { id } = req.params;
     
     // Get patient mobile to fetch sales orders which might only be linked by mobile
-    const patientRes = await pool.query('SELECT mobile FROM patients WHERE id = ', [id]);
+    const patientRes = await pool.query('SELECT mobile FROM patients WHERE id = $1', [id]);
     if (patientRes.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
