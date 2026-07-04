@@ -14,13 +14,7 @@ export default function AdminTasksScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'super_admins' | 'department_admins' | 'employees' | 'recurring'>('all');
-  
-  // Recurring tasks state
-  const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [frequency, setFrequency] = useState('daily');
-  const [specificDays, setSpecificDays] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'super_admins' | 'department_admins' | 'employees'>('all');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -49,30 +43,8 @@ export default function AdminTasksScreen() {
 
   useEffect(() => {
     fetchTasks();
-    fetchRecurringTasks();
     fetchUsers();
   }, []);
-
-  const fetchRecurringTasks = async () => {
-    try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('superAdminToken')}` } 
-      });
-      // The backend uses req.user, but wait, does super admin send token? 
-      // The current fetchTasks uses `?user_type=super_admin`. Let me check if recurring supports this, or I should update backend to allow `?user_type=super_admin` without token.
-    } catch(e) {}
-  };
-
-  const fetchRecurringTasks = async () => {
-    try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/tasks/recurring?user_type=super_admin');
-      if (res.data.success) {
-        setRecurringTasks(res.data.data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const fetchTasks = async () => {
     try {
@@ -140,20 +112,7 @@ export default function AdminTasksScreen() {
     }
 
     try {
-      if (isRecurring) {
-        let parsedDays = null;
-        if (frequency === 'weekly' || frequency === 'monthly') {
-          if (!specificDays) return Alert.alert('Error', 'Please specify days or dates.');
-          parsedDays = specificDays.split(',').map(s => s.trim()).filter(s => s);
-        }
-        await axios.post('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
-          title, description, assigner_type: 'super_admin', assigner_id: adminUser.id || 1,
-          assignee_type: finalAssigneeType, assignee_id: parseInt(finalAssigneeId), department: finalDept,
-          priority, frequency, specific_days: parsedDays
-        });
-        fetchRecurringTasks();
-      } else {
-        await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
+      await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
         title,
         description,
         assigner_type: 'super_admin',
@@ -164,16 +123,12 @@ export default function AdminTasksScreen() {
         due_date: dueDate || null,
         priority
       });
-      }
       setShowCreateModal(false);
       fetchTasks();
       setTitle('');
       setDescription('');
       setDueDate('');
       setPriority('Moderate');
-      setIsRecurring(false);
-      setFrequency('daily');
-      setSpecificDays('');
       Alert.alert('Success', 'Task created successfully');
     } catch (e) {
       console.error(e);
@@ -199,51 +154,6 @@ export default function AdminTasksScreen() {
     }
   };
 
-
-  
-  const renderRecurringTaskCard = (task: any) => (
-    <View key={task.id} style={styles.taskCard}>
-      <View style={styles.taskHeader}>
-        <Text style={styles.taskTitle}>{task.title} (Recurring)</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={[styles.statusBadge, { backgroundColor: task.status === 'active' ? '#dcfce7' : '#f3f4f6' }]}>
-            <Text style={[styles.statusText, { color: task.status === 'active' ? '#16a34a' : '#6b7280' }]}>{task.status.toUpperCase()}</Text>
-          </View>
-        </View>
-      </View>
-      
-      <Text style={styles.taskDesc}>{task.description}</Text>
-      
-      <View style={styles.taskMeta}>
-        <View style={styles.metaItem}>
-          <User color={Colors.light.icon} size={16} />
-          <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} - {task.department || 'N/A'}</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <Clock color={Colors.light.icon} size={16} />
-          <Text style={styles.metaText}>Schedule: {task.frequency.toUpperCase()} {task.specific_days ? '(' + JSON.parse(task.specific_days).join(', ') + ')' : ''}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.taskActions}>
-          <Pressable 
-            style={[styles.actionBtn, { backgroundColor: task.status === 'active' ? '#f59e0b' : '#10b981' }]}
-            onPress={async () => {
-              try {
-                const newStatus = task.status === 'active' ? 'paused' : 'active';
-                await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/recurring/${task.id}/status`, { status: newStatus });
-                fetchRecurringTasks();
-                Alert.alert('Success', `Schedule ${newStatus}`);
-              } catch(e) {
-                Alert.alert('Error', 'Failed to update schedule');
-              }
-            }}
-          >
-            <Text style={styles.actionBtnText}>{task.status === 'active' ? 'Pause Schedule' : 'Resume Schedule'}</Text>
-          </Pressable>
-      </View>
-    </View>
-  );
 
   const renderTaskCard = (task: any) => (
     <View key={task.id} style={styles.taskCard}>
@@ -346,8 +256,7 @@ export default function AdminTasksScreen() {
             { id: 'my', label: 'My Tasks' },
             { id: 'super_admins', label: 'Super Admins' },
             { id: 'department_admins', label: 'Departments' },
-            { id: 'employees', label: 'Employees' },
-            { id: 'recurring', label: 'Recurring Schedules' }
+            { id: 'employees', label: 'Employees' }
           ].map(tab => (
             <Pressable key={tab.id} style={[styles.tab, activeTab === tab.id && styles.activeTab]} onPress={() => setActiveTab(tab.id as any)}>
               <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>{tab.label}</Text>
@@ -384,10 +293,10 @@ export default function AdminTasksScreen() {
             </View>
           </View>
 
-          {(activeTab === 'recurring' ? recurringTasks.length : getTasksForTab().length) === 0 ? (
+          {getTasksForTab().length === 0 ? (
             <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
           ) : (
-            activeTab === 'recurring' ? recurringTasks.map(renderRecurringTaskCard) : getTasksForTab().map(renderTaskCard)
+            getTasksForTab().map(renderTaskCard)
           )}
         </ScrollView>
       )}
@@ -497,43 +406,6 @@ export default function AdminTasksScreen() {
               </>
             )}
 
-            
-            <Text style={styles.label}>Schedule Type</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-              <Pressable style={[styles.radioBtn, !isRecurring && styles.radioActive]} onPress={() => setIsRecurring(false)}>
-                <Text style={{ color: !isRecurring ? '#FFF' : Colors.light.text }}>One-time Task</Text>
-              </Pressable>
-              <Pressable style={[styles.radioBtn, isRecurring && styles.radioActive]} onPress={() => setIsRecurring(true)}>
-                <Text style={{ color: isRecurring ? '#FFF' : Colors.light.text }}>Recurring Task</Text>
-              </Pressable>
-            </View>
-
-            {isRecurring && (
-              <View style={{ padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16 }}>
-                <Text style={styles.label}>Frequency</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                  {['daily', 'weekly', 'monthly'].map(f => (
-                    <Pressable key={f} style={[styles.radioBtn, frequency === f && styles.radioActive, { flex: 1, paddingVertical: 8 }]} onPress={() => { setFrequency(f); setSpecificDays(''); }}>
-                      <Text style={{ textAlign: 'center', color: frequency === f ? '#FFF' : Colors.light.text }}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                {frequency === 'weekly' && (
-                  <>
-                    <Text style={styles.label}>Specific Days (e.g. 1 for Mon, 7 for Sun)</Text>
-                    <TextInput style={styles.input} value={specificDays} onChangeText={setSpecificDays} placeholder="1, 3, 5 (Mon, Wed, Fri)" />
-                  </>
-                )}
-                {frequency === 'monthly' && (
-                  <>
-                    <Text style={styles.label}>Specific Dates (e.g. 1, 15, 30)</Text>
-                    <TextInput style={styles.input} value={specificDays} onChangeText={setSpecificDays} placeholder="1, 15, 28" />
-                  </>
-                )}
-              </View>
-            )}
-
             <Text style={styles.label}>Priority</Text>
             <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
               {Platform.OS === 'web' ? (
@@ -559,9 +431,7 @@ export default function AdminTasksScreen() {
               )}
             </View>
 
-            {!isRecurring && (
-              <>
-                <Text style={styles.label}>Due Date & Time</Text>
+            <Text style={styles.label}>Due Date & Time</Text>
             <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: Colors.light.background }}>
               {Platform.OS === 'web' ? (
                 <input 
