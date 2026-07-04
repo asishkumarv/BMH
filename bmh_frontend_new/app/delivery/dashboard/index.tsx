@@ -421,14 +421,14 @@ export default function DeliveryDashboard() {
             <Text style={styles.modalTitle}>Delivery Verification</Text>
             
             <ScrollView>
-              <Text style={styles.label}>Ask the customer for the 6-digit delivery OTP</Text>
+              <Text style={styles.label}>Ask the customer for the 4-digit delivery OTP</Text>
               <TextInput 
                 style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
                 value={deliveryOtp} 
                 onChangeText={setDeliveryOtp} 
                 keyboardType="number-pad"
-                maxLength={6}
-                placeholder="000000"
+                maxLength={4}
+                placeholder="0000"
               />
 
               {currentOrder.type === 'manual_order' && (
@@ -467,9 +467,9 @@ export default function DeliveryDashboard() {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.saveBtn, deliveryOtp.length !== 6 && { opacity: 0.5 }]} 
+                style={[styles.saveBtn, deliveryOtp.length !== 4 && { opacity: 0.5 }]} 
                 onPress={() => processDelivery(currentOrder.id, currentOrder.type, deliveryOtp)}
-                disabled={deliveryOtp.length !== 6}
+                disabled={deliveryOtp.length !== 4}
               >
                 <Text style={styles.saveBtnText}>Verify & Mark Delivered</Text>
               </TouchableOpacity>

@@ -32,10 +32,23 @@ exports.createOrder = async (req, res) => {
     `;
 
     const values = [
-      order_no, invoice_no, amount, delivery_charge, mode_of_delivery,
-      order_date, order_time, customer_phone, customer_name,
-      ship_to_phone, ship_to_name, address, location_link,
-      created_by_id, created_by_type, delivery_otp, initialNotes
+      order_no || null, 
+      invoice_no || null, 
+      amount === '' ? null : amount, 
+      delivery_charge === '' ? null : delivery_charge, 
+      mode_of_delivery || null,
+      order_date === '' ? null : order_date, 
+      order_time === '' ? null : order_time, 
+      customer_phone || null, 
+      customer_name || null,
+      ship_to_phone || null, 
+      ship_to_name || null, 
+      address || null, 
+      location_link || null,
+      created_by_id, 
+      created_by_type, 
+      delivery_otp, 
+      initialNotes
     ];
 
     const result = await pool.query(insertQuery, values);
@@ -97,7 +110,7 @@ exports.updateOrder = async (req, res) => {
       payment_mode, paid_amount, payment_txn_id, hand_over_to,
       bus_travels_name, bus_driver_name, bus_driver_number, bus_number,
       dispatch_time, est_reach_time,
-      new_note, note_author, delivery_otp
+      new_note, note_author, delivery_otp, address
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -126,6 +139,7 @@ exports.updateOrder = async (req, res) => {
     addField('bus_number', bus_number);
     addField('dispatch_time', dispatch_time);
     addField('est_reach_time', est_reach_time);
+    addField('address', address);
     
     if (payment_attachment) addField('payment_attachment', payment_attachment);
     if (bus_front_image) addField('bus_front_image', bus_front_image);

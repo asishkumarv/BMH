@@ -421,7 +421,7 @@ export default function ManualOrders({ deliveryBoys }) {
                  <Text><Text style={{fontWeight:'bold'}}>Customer:</Text> {selectedOrder.customer_name} ({selectedOrder.customer_phone})</Text>
                  <Text><Text style={{fontWeight:'bold'}}>Amount:</Text> ₹{selectedOrder.amount}</Text>
                  <Text><Text style={{fontWeight:'bold'}}>Mode:</Text> {selectedOrder.mode_of_delivery}</Text>
-                 {selectedOrder.delivery_otp && <Text><Text style={{fontWeight:'bold'}}>OTP:</Text> {selectedOrder.delivery_otp}</Text>}
+                 {/* Employee should not see OTP to ensure secure delivery */}
                </View>
 
                {selectedOrder.mode_of_delivery === 'Bus' && (
@@ -435,7 +435,7 @@ export default function ManualOrders({ deliveryBoys }) {
                  </View>
                )}
 
-               {(selectedOrder.payment_mode || selectedOrder.paid_amount) && (
+               {!!(selectedOrder.payment_mode || selectedOrder.paid_amount) && (
                  <View style={{marginTop: 20, backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8}}>
                     <Text style={{fontWeight:'bold', marginBottom: 10}}>Payment Info</Text>
                     <Text>Mode: {selectedOrder.payment_mode}</Text>
@@ -449,7 +449,7 @@ export default function ManualOrders({ deliveryBoys }) {
                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Address Info</Text>
                  <TextInput 
                    style={styles.input} 
-                   value={editAddress} 
+                   value={editAddress || ''} 
                    onChangeText={setEditAddress} 
                    multiline 
                  />
@@ -463,16 +463,16 @@ export default function ManualOrders({ deliveryBoys }) {
                <View style={{marginTop: 20}}>
                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Notes</Text>
                  <View style={{backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
-                    {selectedOrder.notes && (typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : selectedOrder.notes).map((n, i) => (
+                    {selectedOrder.notes && selectedOrder.notes.length > 0 ? (typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : selectedOrder.notes).map((n, i) => (
                       <View key={i} style={{marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderColor: '#e2e8f0'}}>
                         <Text style={{fontSize: 12, color: '#64748b'}}>{n.author} at {new Date(n.timestamp).toLocaleString()}</Text>
                         <Text style={{fontSize: 14, color: '#1e293b', marginTop: 2}}>{n.text}</Text>
                       </View>
-                    ))}
+                    )) : null}
                     <TextInput
                       style={[styles.input, {marginTop: 10, backgroundColor: '#fff'}]}
                       placeholder="Add a new note..."
-                      value={newNote}
+                      value={newNote || ''}
                       onChangeText={setNewNote}
                     />
                  </View>
