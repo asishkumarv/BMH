@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Modal } from 'react-native';
 import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 import { MapPin, Phone, User, CheckCircle, Clock } from 'lucide-react-native';
 
 export default function OnlineOrdersScreen() {
@@ -19,7 +20,7 @@ export default function OnlineOrdersScreen() {
         setOrders(ordRes.data.data);
       }
       if (empRes.data && empRes.data.success) {
-        setDeliveryBoys(empRes.data.data.filter((e: any) => e.department === 'Delivery' && e.status === 'approved'));
+        setDeliveryBoys(empRes.data.data.filter((e) => e.department === 'Delivery' && e.status === 'approved'));
       }
     } catch (err) {
       console.error(err);
@@ -167,18 +168,21 @@ export default function OnlineOrdersScreen() {
                 {selectedOrder.status !== 'DISBURSED' && selectedOrder.status !== 'DELIVERED' && !selectedOrder.delivery_boy_id && (
                   <View style={{ flex: 1, marginLeft: 16 }}>
                     <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
-                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                      {deliveryBoys.map((boy: any) => (
-                        <TouchableOpacity 
-                          key={boy.id} 
-                          style={styles.boyTag}
-                          onPress={() => handleAssignDelivery(selectedOrder.id, boy.id)}
-                        >
-                          <Text style={styles.boyTagText}>{boy.full_name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                      {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
+                    <View style={styles.dropdownWrapper}>
+                      <Picker
+                        selectedValue=""
+                        onValueChange={(val) => {
+                          if (val) handleAssignDelivery(selectedOrder.id, val);
+                        }}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Select a delivery boy..." value="" />
+                        {deliveryBoys.map((boy) => (
+                          <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
+                        ))}
+                      </Picker>
                     </View>
+                    {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
                   </View>
                 )}
 
@@ -238,6 +242,22 @@ const styles = StyleSheet.create({
   statusDelivered: { backgroundColor: '#60A5FA' },
   assignedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#E0E7FF' },
   assignedBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#4338CA' },
-  boyTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  boyTagText: { fontSize: 12, color: '#334155', fontWeight: '600' }
+  dropdownWrapper: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    height: 40,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  picker: {
+    height: 40,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    color: '#1e293b',
+    ...Platform.select({ web: { outlineStyle: 'none' } })
+  }
 });

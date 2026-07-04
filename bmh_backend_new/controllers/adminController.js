@@ -22,11 +22,12 @@ exports.getSuperAdmins = async (req, res) => {
 
 exports.addAdmin = async (req, res) => {
   try {
-    const { 
+    let { 
       full_name, email, password, department_id, 
       mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days,
       bank_account, blood_group, address, profile_data 
     } = req.body;
+    if (email) email = email.toLowerCase();
     
     let finalProfileData = typeof profile_data === 'string' ? JSON.parse(profile_data) : (profile_data || {});
     if (bank_account) finalProfileData.bank_account = bank_account;
@@ -57,7 +58,8 @@ exports.addAdmin = async (req, res) => {
 
 exports.loginAdmin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    if (email) email = email.toLowerCase();
     
     const result = await pool.query(`
       SELECT a.*, d.name as department 
@@ -84,7 +86,8 @@ exports.loginAdmin = async (req, res) => {
 
 exports.loginSuperAdmin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    if (email) email = email.toLowerCase();
     
     const result = await pool.query('SELECT * FROM super_admins WHERE email = $1 AND password = $2', [email, password]);
     
@@ -399,12 +402,7 @@ exports.getAllOrdersForAssignment = async (req, res) => {
             `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL as map_lat, gps_location as map_lng, delivery_boy_id, created_at, delivery_type FROM ecogreenpurchase_orders ${dateFilter} ORDER BY created_at DESC`,
             queryParams
         );
-        const salesInvoices = await pool.query(
-            `SELECT id, 'sales_invoice' as type, status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL as map_lat, NULL as map_lng, delivery_boy_id, created_at, delivery_type FROM ecogreen_sales_invoices ${dateFilter} ORDER BY created_at DESC`,
-            queryParams
-        );
-        
-        const allOrders = [...onlineOrders.rows, ...salesOrders.rows, ...purchaseOrders.rows, ...salesInvoices.rows];
+        const allOrders = [...onlineOrders.rows, ...salesOrders.rows, ...purchaseOrders.rows];
         allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         
         res.json({ success: true, data: allOrders });

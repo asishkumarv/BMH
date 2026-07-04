@@ -24,7 +24,8 @@ exports.getEmployeesByDepartment = async (req, res) => {
 
 exports.addEmployee = async (req, res) => {
   try {
-    const { full_name, email, password, department, role, profile_data } = req.body;
+    let { full_name, email, password, department, role, profile_data } = req.body;
+    if (email) email = email.toLowerCase();
 
     const mobile = profile_data && profile_data.mobile ? profile_data.mobile : null;
     
@@ -57,7 +58,8 @@ exports.addEmployee = async (req, res) => {
 
 exports.loginEmployee = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    if (email) email = email.toLowerCase();
     
     const result = await pool.query('SELECT * FROM employees WHERE email = $1 AND password = $2', [email, password]);
     

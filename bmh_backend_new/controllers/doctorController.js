@@ -5,7 +5,8 @@ const jwt = require('jsonwebtoken');
 // Register Doctor (Pending Approval)
 exports.registerDoctor = async (req, res) => {
   try {
-    const { full_name, email, password, phone_number, department, role, experience, gender, description, profile_photo } = req.body;
+    let { full_name, email, password, phone_number, department, role, experience, gender, description, profile_photo } = req.body;
+    if (email) email = email.toLowerCase();
     
     // Check if email exists
     const existing = await pool.query('SELECT id FROM doctors WHERE email = $1', [email]);
@@ -35,7 +36,8 @@ exports.registerDoctor = async (req, res) => {
 // Login Doctor
 exports.loginDoctor = async (req, res) => {
   try {
-    const { emailOrId, password } = req.body;
+    let { emailOrId, password } = req.body;
+    if (emailOrId && emailOrId.includes('@')) emailOrId = emailOrId.toLowerCase();
 
     const result = await pool.query('SELECT * FROM doctors WHERE email = $1 OR id = $1', [emailOrId]);
     if (result.rowCount === 0) return res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -59,7 +61,8 @@ exports.loginDoctor = async (req, res) => {
 // Admin/Subadmin Create Doctor directly
 exports.createDoctor = async (req, res) => {
   try {
-    const { full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    let { full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    if (email) email = email.toLowerCase();
     
     // Auto generate ID: e.g. CARDIOD101
     const deptPrefix = department ? department.substring(0, 3).toUpperCase() : 'DOC';

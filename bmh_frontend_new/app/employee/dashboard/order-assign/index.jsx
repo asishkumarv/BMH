@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, ScrollView, TextInput, useWindowDimensions } from 'react-native';
 import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Filter, Calendar, List } from 'lucide-react-native';
 
 export default function OrderAssignScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width > 1024;
   const isTablet = width > 768 && width <= 1024;
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [orders, setOrders] = useState([]);
   const [deliveryBoys, setDeliveryBoys] = useState([]);
@@ -33,18 +40,17 @@ export default function OrderAssignScreen() {
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('All'); // All, online_order, sales_order, purchase_order, sales_invoice
+  const [filterType, setFilterType] = useState('All'); // All, online_order, sales_order, purchase_order
   const [assignmentFilter, setAssignmentFilter] = useState('All'); // All, Unassigned, Assigned, Completed
   
-  // Date Filters
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  // Date Filter
+  const [selectedDate, setSelectedDate] = useState('');
 
   const fetchData = async () => {
     try {
       let url = 'https://napi.bharatmedicalhallplus.com/admin/all-orders-for-assignment';
-      if (fromDate && toDate) {
-        url += `?fromDate=${fromDate}&toDate=${toDate}`;
+      if (selectedDate) {
+        url += `?fromDate=${selectedDate}&toDate=${selectedDate}`;
       }
       const [ordRes, empRes] = await Promise.all([
         axios.get(url),
@@ -215,6 +221,14 @@ export default function OrderAssignScreen() {
     }
   };
 
+  if (!mounted) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0ea5e9" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -235,61 +249,43 @@ export default function OrderAssignScreen() {
           />
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeFilters}>
-          {['All', 'online_order', 'sales_order', 'sales_invoice', 'purchase_order'].map(type => (
-            <TouchableOpacity 
-              key={type}
-              style={[
-                styles.typeFilterBtn,
-                filterType === type && styles.typeFilterBtnActive,
-                filterType === type && { borderColor: type === 'All' ? '#0f172a' : getTypeColor(type), backgroundColor: type === 'All' ? '#0f172a' : getTypeColor(type) }
-              ]}
-              onPress={() => setFilterType(type)}
+        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12, marginBottom: 12 }}>
+          {/* Channel Filter Dropdown */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={filterType}
+              onValueChange={(itemValue) => setFilterType(itemValue)}
+              style={styles.picker}
             >
-              <Text style={[
-                styles.typeFilterText,
-                filterType === type && styles.typeFilterTextActive
-              ]}>
-                {type === 'All' ? 'All Channels' : getTypeLabel(type)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.typeFilters, { marginTop: 12 }]}>
-          {['All', 'Unassigned', 'Assigned', 'Completed'].map(status => (
-            <TouchableOpacity 
-              key={status}
-              style={[
-                styles.typeFilterBtn,
-                assignmentFilter === status && styles.typeFilterBtnActive,
-                assignmentFilter === status && { borderColor: '#334155', backgroundColor: '#334155' }
-              ]}
-              onPress={() => setAssignmentFilter(status)}
+              <Picker.Item label="All Channels" value="All" />
+              <Picker.Item label="Online Orders" value="online_order" />
+              <Picker.Item label="Sales Orders" value="sales_order" />
+              <Picker.Item label="Purchase Orders" value="purchase_order" />
+            </Picker>
+          </View>
+
+          {/* Status Filter Dropdown */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={assignmentFilter}
+              onValueChange={(itemValue) => setAssignmentFilter(itemValue)}
+              style={styles.picker}
             >
-              <Text style={[
-                styles.typeFilterText,
-                assignmentFilter === status && styles.typeFilterTextActive
-              ]}>
-                {status}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              <Picker.Item label="All Statuses" value="All" />
+              <Picker.Item label="Unassigned" value="Unassigned" />
+              <Picker.Item label="Assigned" value="Assigned" />
+              <Picker.Item label="Completed" value="Completed" />
+            </Picker>
+          </View>
+        </View>
         
         <View style={styles.dateFilterContainer}>
           <Calendar size={18} color="#64748b" style={{marginRight: 8}} />
           <TextInput
             style={styles.dateInput}
-            placeholder="From: YYYY-MM-DD"
-            value={fromDate}
-            onChangeText={setFromDate}
-          />
-          <Text style={{marginHorizontal: 8, color: '#94a3b8'}}>-</Text>
-          <TextInput
-            style={styles.dateInput}
-            placeholder="To: YYYY-MM-DD"
-            value={toDate}
-            onChangeText={setToDate}
+            placeholder="Date: YYYY-MM-DD"
+            value={selectedDate}
+            onChangeText={setSelectedDate}
           />
           <TouchableOpacity style={styles.applyDateBtn} onPress={fetchData}>
             <Text style={styles.applyDateText}>Apply</Text>
@@ -384,19 +380,17 @@ export default function OrderAssignScreen() {
                 {deliveryType !== 'Store' && (
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>Select Delivery Boy</Text>
-                    <View style={styles.boyGrid}>
-                      {deliveryBoys.map(boy => (
-                        <TouchableOpacity
-                          key={boy.id}
-                          style={[styles.boyCard, selectedBoyId === boy.id && styles.boyCardActive]}
-                          onPress={() => setSelectedBoyId(boy.id)}
-                        >
-                          <User size={20} color={selectedBoyId === boy.id ? '#0ea5e9' : '#64748b'} />
-                          <Text style={[styles.boyName, selectedBoyId === boy.id && styles.boyNameActive]}>
-                            {boy.full_name || boy.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                    <View style={styles.dropdownWrapper}>
+                      <Picker
+                        selectedValue={selectedBoyId}
+                        onValueChange={(itemValue) => setSelectedBoyId(itemValue)}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Select a delivery boy..." value="" />
+                        {deliveryBoys.map(boy => (
+                          <Picker.Item key={boy.id} label={boy.full_name || boy.name} value={boy.id} />
+                        ))}
+                      </Picker>
                     </View>
                   </View>
                 )}
@@ -480,10 +474,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '700',
     color: '#0f172a',
   },
@@ -493,7 +487,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   filtersContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   searchBox: {
     flexDirection: 'row',
@@ -503,8 +497,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 48,
-    marginBottom: 12,
+    height: 40,
+    marginBottom: 8,
   },
   searchInput: {
     flex: 1,
@@ -518,12 +512,30 @@ const styles = StyleSheet.create({
   },
   typeFilterBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     backgroundColor: '#fff',
     marginRight: 8,
+  },
+  dropdownWrapper: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    height: 40,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 40,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    color: '#1e293b',
+    ...Platform.select({ web: { outlineStyle: 'none' } })
   },
   typeFilterBtnActive: {
     borderColor: '#0f172a',
@@ -540,19 +552,18 @@ const styles = StyleSheet.create({
   dateFilterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 8,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 48,
+    height: 40,
   },
   dateInput: {
     flex: 1,
     fontSize: 14,
-    color: '#1e293b',
-    outlineStyle: 'none'
+    color: '#1e293b'
   },
   applyDateBtn: {
     backgroundColor: '#0ea5e9',

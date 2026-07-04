@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput } from 'react-native';
 import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 import { Colors } from '../../../../constants/Colors';
 import { Search, Eye } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -249,18 +250,21 @@ export default function SalesOrderList() {
                       </TouchableOpacity>
                     </View>
                     <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
-                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                      {deliveryBoys?.map((boy) => (
-                        <TouchableOpacity 
-                          key={boy.id} 
-                          style={styles.boyTag}
-                          onPress={() => handleAssignDelivery(selectedOrder.id, boy.id)}
-                        >
-                          <Text style={styles.boyTagText}>{boy.full_name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                      {(!deliveryBoys || deliveryBoys.length === 0) && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
+                    <View style={styles.dropdownWrapper}>
+                      <Picker
+                        selectedValue=""
+                        onValueChange={(val) => {
+                          if (val) handleAssignDelivery(selectedOrder.id, val);
+                        }}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Select a delivery boy..." value="" />
+                        {deliveryBoys?.map((boy) => (
+                          <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
+                        ))}
+                      </Picker>
                     </View>
+                    {(!deliveryBoys || deliveryBoys.length === 0) && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
                   </View>
                 )}
                 <Text style={{fontWeight: 'bold', fontSize: 16}}>Total: ₹{selectedOrder.orderTotal}</Text>
@@ -383,6 +387,24 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontSize: 16,
     fontWeight: '700'
+  },
+  dropdownWrapper: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    height: 40,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  picker: {
+    height: 40,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    color: '#1e293b',
+    ...Platform.select({ web: { outlineStyle: 'none' } })
   },
   cardFooter: {
     flexDirection: 'row',

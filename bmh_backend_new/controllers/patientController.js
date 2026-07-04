@@ -23,6 +23,7 @@ exports.register = async (req, res) => {
       guardian_name,
       guardianName
     } = req.body;
+    let finalEmail = email ? email.toLowerCase() : email;
 
     const resolvedName = name || [first_name, last_name].filter(Boolean).join(' ') || 'Patient';
     const resolvedMobile = mobile || phone_number;
@@ -73,7 +74,7 @@ exports.register = async (req, res) => {
         [
           resolvedName,
           resolvedMobile,
-          email || null,
+          finalEmail,
           age ? parseInt(age) : null,
           gender || null,
           resolvedBloodGroup || null,
@@ -100,7 +101,8 @@ exports.register = async (req, res) => {
 // Login patient (supports both email and phone number as identifier)
 exports.login = async (req, res) => {
   try {
-    const { email, mobile, username, password } = req.body;
+    let { email, mobile, username, password } = req.body;
+    if (email) email = email.toLowerCase();
     const identifier = email || mobile || username;
 
     if (!identifier || !password) {
@@ -175,7 +177,8 @@ exports.login = async (req, res) => {
 // Forgot Password
 exports.forgotPassword = async (req, res) => {
   try {
-    const { email, mobile, newPassword, confirmPassword } = req.body;
+    let { email, mobile, newPassword, confirmPassword } = req.body;
+    if (email) email = email.toLowerCase();
     const identifier = email || mobile;
 
     if (!identifier || !newPassword || !confirmPassword) {
@@ -252,6 +255,7 @@ exports.updateProfile = async (req, res) => {
     const resolvedBloodGroup = blood_group || bloodGroup;
     const resolvedPinCode = pin_code || pinCode;
     const resolvedGuardianName = guardian_name || guardianName;
+    const resolvedEmail = email ? email.toLowerCase() : email;
 
     // Fetch existing
     const existing = await pool.query('SELECT * FROM patients WHERE id = $1', [id]);
@@ -285,7 +289,7 @@ exports.updateProfile = async (req, res) => {
 
     const values = [
       name || existing.rows[0].name,
-      email !== undefined ? email : existing.rows[0].email,
+      resolvedEmail !== undefined ? resolvedEmail : existing.rows[0].email,
       age !== undefined ? (age ? parseInt(age) : null) : existing.rows[0].age,
       gender !== undefined ? gender : existing.rows[0].gender,
       resolvedBloodGroup !== undefined ? resolvedBloodGroup : existing.rows[0].blood_group,
