@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import { Audio } from 'expo-av';
 import { MapPin, Phone, User, CheckCircle, Clock, Package } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
 
@@ -18,7 +19,12 @@ export default function DeliveryDashboard() {
   });
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [deliveryOtp, setDeliveryOtp] = useState('');
-  const [currentOrder, setCurrentOrder] = useState({ id: '', type: '' });
+  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paidAmount, setPaidAmount] = useState('');
+  const [paymentTxnId, setPaymentTxnId] = useState('');
+  const [paymentImage, setPaymentImage] = useState<any>(null);
+  const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '' });
+  const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -48,13 +54,14 @@ export default function DeliveryDashboard() {
       if (res.data && res.data.success) {
         // If we have more orders now than before, it means a new order was assigned
         if (orders.length > 0 && res.data.data.length > orders.length) {
-           if (Platform.OS === 'web') {
-             try {
-               const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-               audio.play();
-             } catch (e) { console.log(e); }
-           }
-           alert("🔔 New Delivery Assigned!");
+           try {
+             const { sound } = await Audio.Sound.createAsync(
+                { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
+                { isLooping: true, shouldPlay: true }
+             );
+             setAlarmSound(sound);
+             alert("🔔 New Delivery Assigned!");
+           } catch (e) { console.log("Audio play failed:", e); }
         }
         setOrders(res.data.data);
       }
@@ -93,10 +100,14 @@ export default function DeliveryDashboard() {
     );
   };
 
-  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string) => {
-    if ((type === 'online_order' || type === 'sales_order') && deliveryType === 'Local') {
-      setCurrentOrder({ id: String(orderId), type });
+  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string, amount: string = '') => {
+    if ((type === 'online_order' || type === 'sales_order' || type === 'manual_order') && deliveryType === 'Local') {
+      setCurrentOrder({ id: String(orderId), type, amount: String(amount) });
       setDeliveryOtp('');
+      setPaymentMode('Cash');
+      setPaidAmount(String(amount));
+      setPaymentTxnId('');
+      setPaymentImage(null);
       setOtpModalVisible(true);
       return;
     }
@@ -129,6 +140,16 @@ export default function DeliveryDashboard() {
           status: 'DELIVERED',
           delivery_otp: otp
         });
+      } else if (type === 'manual_order') {
+        const payload: any = {
+          status: 'Delivered',
+          delivery_otp: otp,
+          payment_mode: paymentMode,
+          paid_amount: paidAmount,
+          payment_txn_id: paymentTxnId
+        };
+        // For image upload, if we want to use form data we should implement it, but for now we send raw json without image since it's complex via put in this generic function.
+        await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, payload);
       } else {
         alert('Ecogreen Order Delivered (Status update pending backend implementation)');
       }
@@ -158,7 +179,18 @@ export default function DeliveryDashboard() {
     if (!selectedBusOrder) return;
     try {
       let url = '';
-      if (selectedBusOrder.type === 'sales_order') {
+      let payload = { bus_details: busDetails };
+
+      if (selectedBusOrder.type === 'manual_order') {
+        url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedBusOrder.id}`;
+        payload = {
+          bus_number: busDetails.bus_number,
+          bus_driver_name: busDetails.driver_name,
+          bus_driver_number: busDetails.driver_number,
+          est_reach_time: busDetails.arrival_time,
+          bus_travels_name: busDetails.waybill_number
+        };
+      } else if (selectedBusOrder.type === 'sales_order') {
         url = `https://napi.bharatmedicalhallplus.com/sales-order/${selectedBusOrder.id}/update-bus-details`;
       } else if (selectedBusOrder.type === 'sales_invoice' || selectedBusOrder.type === 'ecogreen_invoice') {
         url = `https://napi.bharatmedicalhallplus.com/sales-invoice-list/${selectedBusOrder.id}/update-bus-details`;
@@ -167,7 +199,7 @@ export default function DeliveryDashboard() {
         return;
       }
       
-      const res = await axios.put(url, { bus_details: busDetails });
+      const res = await axios.put(url, payload);
       if (res.data) {
         alert("Bus Details Saved!");
         setBusModalVisible(false);
@@ -193,6 +225,14 @@ export default function DeliveryDashboard() {
       window.open(url, '_blank');
     } else {
       Linking.openURL(url).catch(() => alert('Could not open maps'));
+    }
+  };
+
+  const stopAlarm = async () => {
+    if (alarmSound) {
+      await alarmSound.stopAsync();
+      await alarmSound.unloadAsync();
+      setAlarmSound(null);
     }
   };
 
@@ -279,11 +319,18 @@ export default function DeliveryDashboard() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Welcome, {user?.full_name}</Text>
-          <Text style={styles.subtitle}>GPS Status: {locationStatus}</Text>
+          <Text style={styles.subtitle}>GPS: {locationStatus}</Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={() => user && fetchOrders(user.id)}>
-          <Text style={styles.refreshBtnText}>Refresh</Text>
-        </TouchableOpacity>
+        <View style={{flexDirection:'row', gap: 10}}>
+          {alarmSound && (
+            <TouchableOpacity style={[styles.refreshBtn, {backgroundColor: '#ef4444'}]} onPress={stopAlarm}>
+              <Text style={[styles.refreshBtnText, {color: '#fff'}]}>Stop Alarm</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.refreshBtn} onPress={() => user && fetchOrders(user.id)}>
+            <Text style={styles.refreshBtnText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -357,17 +404,49 @@ export default function DeliveryDashboard() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Enter Delivery OTP</Text>
+            <Text style={styles.modalTitle}>Delivery Verification</Text>
             
-            <Text style={styles.label}>Ask the customer for the 6-digit delivery OTP</Text>
-            <TextInput 
-              style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
-              value={deliveryOtp} 
-              onChangeText={setDeliveryOtp} 
-              keyboardType="number-pad"
-              maxLength={6}
-              placeholder="000000"
-            />
+            <ScrollView>
+              <Text style={styles.label}>Ask the customer for the 6-digit delivery OTP</Text>
+              <TextInput 
+                style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
+                value={deliveryOtp} 
+                onChangeText={setDeliveryOtp} 
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="000000"
+              />
+
+              {currentOrder.type === 'manual_order' && (
+                <>
+                  <Text style={[styles.label, {marginTop: 20}]}>Payment Mode</Text>
+                  <View style={{flexDirection:'row', gap:10, marginBottom: 10}}>
+                     <TouchableOpacity 
+                        style={{flex:1, padding:10, borderWidth:1, borderColor: paymentMode==='Cash'?'#10B981':'#CBD5E1', borderRadius:8, backgroundColor: paymentMode==='Cash'?'#D1FAE5':'#fff'}}
+                        onPress={()=>setPaymentMode('Cash')}
+                     >
+                       <Text style={{textAlign:'center', fontWeight:'bold', color: paymentMode==='Cash'?'#065F46':'#475569'}}>Cash</Text>
+                     </TouchableOpacity>
+                     <TouchableOpacity 
+                        style={{flex:1, padding:10, borderWidth:1, borderColor: paymentMode==='Online'?'#3B82F6':'#CBD5E1', borderRadius:8, backgroundColor: paymentMode==='Online'?'#DBEAFE':'#fff'}}
+                        onPress={()=>setPaymentMode('Online')}
+                     >
+                       <Text style={{textAlign:'center', fontWeight:'bold', color: paymentMode==='Online'?'#1E40AF':'#475569'}}>Online / UPI</Text>
+                     </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.label}>Paid Amount (₹)</Text>
+                  <TextInput style={styles.input} value={paidAmount} onChangeText={setPaidAmount} keyboardType="numeric" />
+
+                  {paymentMode === 'Online' && (
+                    <>
+                      <Text style={styles.label}>Transaction ID</Text>
+                      <TextInput style={styles.input} value={paymentTxnId} onChangeText={setPaymentTxnId} placeholder="e.g. UTR / Ref No" />
+                    </>
+                  )}
+                </>
+              )}
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setOtpModalVisible(false)}>

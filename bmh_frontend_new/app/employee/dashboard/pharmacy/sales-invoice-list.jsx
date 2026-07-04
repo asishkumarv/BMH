@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput, Platform } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { Colors } from '../../../../constants/Colors';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, Image, ScrollView, Alert } from 'react-native';
-import { LayoutDashboard, Users, CalendarDays, User, LogOut, ShoppingCart, ShoppingBag } from 'lucide-react-native';
+import { LayoutDashboard, Users, CalendarDays, User, LogOut, ShoppingCart, ShoppingBag, MapPin } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -94,6 +94,7 @@ export default function PatientSidebar({ onClose }: { onClose?: () => void }) {
         <Text style={[styles.sectionHeader, { marginTop: 24 }]}>ACCOUNT</Text>
         
         {renderNavItem('Profile Settings', User, '/dashboard/profile')}
+        {renderNavItem('My Addresses', MapPin, '/dashboard/addresses')}
         
         <Pressable style={styles.navItem} onPress={handleLogout}>
           <LogOut color="#F87171" size={20} />

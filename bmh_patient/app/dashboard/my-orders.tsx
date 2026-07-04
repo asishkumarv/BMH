@@ -50,7 +50,7 @@ export default function MyOrdersScreen() {
           <Package size={20} color="#0F172A" style={{ marginRight: 8 }} />
           <View>
              <Text style={styles.orderType}>
-               {item.type === 'online_order' ? 'Online Order' : item.type === 'sales_order' ? 'Store Order' : item.type === 'sales_invoice' ? 'Store Invoice' : 'Appointment'}
+               {item.type === 'online_order' ? 'Online Order' : item.type === 'sales_order' ? 'Store Order' : item.type === 'sales_invoice' ? 'Store Invoice' : item.type === 'manual_order' ? 'Delivery Order' : 'Appointment'}
              </Text>
              <Text style={styles.orderId}>ID #{item.id}</Text>
           </View>
@@ -73,11 +73,33 @@ export default function MyOrdersScreen() {
            </View>
         )}
         
-        {item.delivery_otp && item.status !== 'DELIVERED' && (
+        {item.delivery_otp && item.status !== 'DELIVERED' && item.status !== 'Completed' && (
            <View style={styles.otpContainer}>
               <Text style={styles.otpLabel}>Delivery OTP</Text>
               <Text style={styles.otpValue}>{item.delivery_otp}</Text>
               <Text style={styles.otpHint}>Share this with the delivery executive</Text>
+           </View>
+        )}
+
+        {item.bus_details && item.bus_details.bus_number && (
+           <View style={{marginTop: 12, backgroundColor: '#f0fdf4', padding: 12, borderRadius: 8}}>
+              <Text style={{fontWeight: 'bold', color: '#166534', marginBottom: 6}}>Bus Tracking Details</Text>
+              <Text style={{fontSize: 13, color: '#14532d'}}>Travels: {item.bus_details.travels_name || 'N/A'}</Text>
+              <Text style={{fontSize: 13, color: '#14532d'}}>Bus No: {item.bus_details.bus_number}</Text>
+              <Text style={{fontSize: 13, color: '#14532d'}}>Driver: {item.bus_details.driver_name} ({item.bus_details.driver_number})</Text>
+              <Text style={{fontSize: 13, color: '#14532d', marginTop: 4, fontWeight: 'bold'}}>Est Arrival: {new Date(item.bus_details.arrival_time).toLocaleString()}</Text>
+           </View>
+        )}
+
+        {item.notes && (
+           <View style={{marginTop: 12}}>
+              <Text style={{fontWeight: 'bold', color: '#475569', marginBottom: 6}}>Order Updates</Text>
+              {Array.isArray(item.notes) ? item.notes.map((n:any, i:number) => (
+                <View key={i} style={{marginBottom: 4}}>
+                  <Text style={{fontSize: 12, color: '#1e293b'}}>• {n.text}</Text>
+                  <Text style={{fontSize: 10, color: '#94a3b8', marginLeft: 8}}>{new Date(n.timestamp).toLocaleString()}</Text>
+                </View>
+              )) : null}
            </View>
         )}
       </View>

@@ -249,7 +249,8 @@ exports.updateProfile = async (req, res) => {
       guardian_name,
       guardianName,
       password,
-      confirm_password
+      confirm_password,
+      addresses
     } = req.body;
 
     const resolvedBloodGroup = blood_group || bloodGroup;
@@ -282,9 +283,10 @@ exports.updateProfile = async (req, res) => {
           city = $6,
           pin_code = $7,
           guardian_name = $8,
-          password = $9
-      WHERE id = $10
-      RETURNING id, name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name;
+          password = $9,
+          addresses = $10::jsonb
+      WHERE id = $11
+      RETURNING id, name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name, addresses;
     `;
 
     const values = [
@@ -297,6 +299,7 @@ exports.updateProfile = async (req, res) => {
       resolvedPinCode !== undefined ? resolvedPinCode : existing.rows[0].pin_code,
       resolvedGuardianName !== undefined ? resolvedGuardianName : existing.rows[0].guardian_name,
       hashedPassword,
+      addresses !== undefined ? JSON.stringify(addresses) : existing.rows[0].addresses,
       id
     ];
 
@@ -318,7 +321,7 @@ exports.getPatientByMobile = async (req, res) => {
   try {
     const { mobile } = req.params;
     const query = `
-      SELECT id, name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name 
+      SELECT id, name, mobile, email, age, gender, blood_group, city, pin_code, guardian_name, addresses 
       FROM patients 
       WHERE mobile = $1
     `;
@@ -370,11 +373,20 @@ exports.getAllOrders = async (req, res) => {
        FROM patient_bookings WHERE patient_id = $1 ORDER BY created_at DESC`, [id]
     );
 
+    // Fetch from manual_orders
+    const manualOrdersRes = await pool.query(
+      `SELECT id, 'manual_order' as type, status, amount as total_amount, created_at, mode_of_delivery as delivery_type, delivery_otp, 
+              json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', est_reach_time, 'travels_name', bus_travels_name) as bus_details, 
+              notes
+       FROM manual_orders WHERE customer_phone = $1 ORDER BY created_at DESC`, [mobile]
+    );
+
     let allOrders = [
       ...onlineOrdersRes.rows, 
       ...ecogreenSalesOrdersRes.rows, 
       ...ecogreenSalesInvoicesRes.rows,
-      ...bookingsRes.rows
+      ...bookingsRes.rows,
+      ...manualOrdersRes.rows
     ];
 
     allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));

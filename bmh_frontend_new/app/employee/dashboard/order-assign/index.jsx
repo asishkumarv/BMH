@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, ScrollView, TextInput, useWindowDimensions } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
-import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Filter, Calendar, List } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Filter, Calendar, List, Plus } from 'lucide-react-native';
+import ManualOrders from './ManualOrders';
 
 export default function OrderAssignScreen() {
   const { width } = useWindowDimensions();
@@ -18,6 +19,7 @@ export default function OrderAssignScreen() {
   const [orders, setOrders] = useState([]);
   const [deliveryBoys, setDeliveryBoys] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('All Orders');
   
   // Assignment Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -231,238 +233,252 @@ export default function OrderAssignScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Dispatch Center</Text>
-        <Text style={styles.subtitle}>Assign and track deliveries across all channels</Text>
+      <View style={{flexDirection: 'row', gap: 20, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#e2e8f0'}}>
+        <TouchableOpacity onPress={() => setActiveTab('All Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'All Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+          <Text style={{fontWeight: activeTab === 'All Orders' ? 'bold' : 'normal', color: activeTab === 'All Orders' ? '#4338ca' : '#64748b'}}>All Orders</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setActiveTab('Manual Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Manual Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+          <Text style={{fontWeight: activeTab === 'Manual Orders' ? 'bold' : 'normal', color: activeTab === 'Manual Orders' ? '#4338ca' : '#64748b'}}>Manual Orders</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Filters */}
-      <View style={styles.filtersContainer}>
-        <View style={styles.searchBox}>
-          <Search size={20} color="#94a3b8" />
-          <TextInput 
-            style={styles.searchInput}
-            placeholder="Search by ID, Name, or Mobile..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+      {activeTab === 'Manual Orders' ? (
+        <ManualOrders deliveryBoys={deliveryBoys} />
+      ) : (
+      <>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Dispatch Center</Text>
+          <Text style={styles.subtitle}>Assign and track deliveries across all channels</Text>
         </View>
 
-        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12, marginBottom: 12 }}>
-          {/* Channel Filter Dropdown */}
-          <View style={styles.dropdownWrapper}>
-            <Picker
-              selectedValue={filterType}
-              onValueChange={(itemValue) => setFilterType(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="All Channels" value="All" />
-              <Picker.Item label="Online Orders" value="online_order" />
-              <Picker.Item label="Sales Orders" value="sales_order" />
-              <Picker.Item label="Purchase Orders" value="purchase_order" />
-            </Picker>
+        {/* Filters */}
+        <View style={styles.filtersContainer}>
+          <View style={styles.searchBox}>
+            <Search size={20} color="#94a3b8" />
+            <TextInput 
+              style={styles.searchInput}
+              placeholder="Search by ID, Name, or Mobile..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
           </View>
 
-          {/* Status Filter Dropdown */}
-          <View style={styles.dropdownWrapper}>
-            <Picker
-              selectedValue={assignmentFilter}
-              onValueChange={(itemValue) => setAssignmentFilter(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="All Statuses" value="All" />
-              <Picker.Item label="Unassigned" value="Unassigned" />
-              <Picker.Item label="Assigned" value="Assigned" />
-              <Picker.Item label="Completed" value="Completed" />
-            </Picker>
+          <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12, marginBottom: 12 }}>
+            {/* Channel Filter Dropdown */}
+            <View style={styles.dropdownWrapper}>
+              <Picker
+                selectedValue={filterType}
+                onValueChange={(itemValue) => setFilterType(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="All Channels" value="All" />
+                <Picker.Item label="Online Orders" value="online_order" />
+                <Picker.Item label="Sales Orders" value="sales_order" />
+                <Picker.Item label="Purchase Orders" value="purchase_order" />
+              </Picker>
+            </View>
+
+            {/* Status Filter Dropdown */}
+            <View style={styles.dropdownWrapper}>
+              <Picker
+                selectedValue={assignmentFilter}
+                onValueChange={(itemValue) => setAssignmentFilter(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="All Statuses" value="All" />
+                <Picker.Item label="Unassigned" value="Unassigned" />
+                <Picker.Item label="Assigned" value="Assigned" />
+                <Picker.Item label="Completed" value="Completed" />
+              </Picker>
+            </View>
           </View>
-        </View>
-        
-        <View style={styles.dateFilterContainer}>
-          <Calendar size={18} color="#64748b" style={{marginRight: 8}} />
-          <TextInput
-            style={styles.dateInput}
-            placeholder="Date: YYYY-MM-DD"
-            value={selectedDate}
-            onChangeText={setSelectedDate}
-          />
-          <TouchableOpacity style={styles.applyDateBtn} onPress={fetchData}>
-            <Text style={styles.applyDateText}>Apply</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Orders List */}
-      <FlatList 
-        data={filteredOrders}
-        keyExtractor={item => `${item.type}-${item.id}`}
-        contentContainerStyle={styles.listContainer}
-        numColumns={isDesktop ? 3 : isTablet ? 2 : 1}
-        key={isDesktop ? 3 : isTablet ? 2 : 1} // Force re-render on grid change
-        renderItem={({ item }) => (
-          <View style={[styles.orderCard, isDesktop || isTablet ? { flex: 1, margin: 8 } : { marginBottom: 16 }]}>
-            <View style={[styles.cardHeader, { borderBottomColor: getTypeColor(item.type) }]}>
-              <View style={styles.typeBadgeContainer}>
-                <View style={[styles.typeBadgeDot, { backgroundColor: getTypeColor(item.type) }]} />
-                <Text style={[styles.typeBadgeText, { color: getTypeColor(item.type) }]}>{getTypeLabel(item.type)}</Text>
-              </View>
-              <Text style={styles.orderId}>#{item.id}</Text>
-            </View>
-
-            <View style={styles.cardBody}>
-              <Text style={styles.patientName}>{item.patient_name || 'N/A'}</Text>
-              <Text style={styles.patientMobile}>{item.mobile_no || 'N/A'}</Text>
-
-              <View style={styles.detailsRow}>
-                <MapPin size={16} color="#64748b" style={{ marginTop: 2 }} />
-                <Text style={styles.addressText}>{item.address || 'No Address Provided'}</Text>
-              </View>
-
-              <View style={styles.statusRow}>
-                 <Text style={styles.statusLabel}>Status: <Text style={styles.statusValue}>{item.status || 'PENDING'}</Text></Text>
-                 <Text style={styles.amountText}>₹{item.total_amount || '0'}</Text>
-              </View>
-              
-              {item.delivery_boy_id && (
-                 <View style={styles.assignedBadge}>
-                   <CheckCircle size={14} color="#10b981" style={{ marginRight: 4 }}/>
-                   <Text style={styles.assignedBadgeText}>Assigned ({item.delivery_type})</Text>
-                 </View>
-              )}
-            </View>
-
-            <TouchableOpacity 
-              style={[styles.assignBtn, item.delivery_boy_id && styles.assignBtnSuccess]} 
-              onPress={() => openAssignModal(item)}
-            >
-              <Bus size={18} color="#fff" />
-              <Text style={styles.assignBtnText}>
-                {item.delivery_boy_id ? 'Reassign Delivery' : 'Assign Delivery'}
-              </Text>
+          
+          <View style={styles.dateFilterContainer}>
+            <Calendar size={18} color="#64748b" style={{marginRight: 8}} />
+            <TextInput
+              style={styles.dateInput}
+              placeholder="Date: YYYY-MM-DD"
+              value={selectedDate}
+              onChangeText={setSelectedDate}
+            />
+            <TouchableOpacity style={styles.applyDateBtn} onPress={fetchData}>
+              <Text style={styles.applyDateText}>Apply</Text>
             </TouchableOpacity>
           </View>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-             <Package size={48} color="#cbd5e1" />
-             <Text style={styles.emptyText}>No orders found matching your criteria</Text>
-          </View>
-        }
-      />
+        </View>
 
-      {/* Assignment Modal */}
-      {selectedOrder && (
-        <Modal transparent animationType="slide" visible={!!selectedOrder} onRequestClose={() => setSelectedOrder(null)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Assign Delivery (Order #{selectedOrder.id})</Text>
-              
-              <ScrollView style={styles.modalScroll}>
-                <Text style={styles.label}>Delivery Type</Text>
-                <View style={styles.typeSelectorRow}>
-                  {['Local', 'Bus', 'Store'].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[styles.typeOption, deliveryType === type && styles.typeOptionActive]}
-                      onPress={() => setDeliveryType(type)}
-                    >
-                      {type === 'Local' && <MapPin size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
-                      {type === 'Bus' && <Bus size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
-                      {type === 'Store' && <Package size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
-                      <Text style={[styles.typeOptionText, deliveryType === type && styles.typeOptionTextActive]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+        {/* Orders List */}
+        <FlatList 
+          data={filteredOrders}
+          keyExtractor={item => `${item.type}-${item.id}`}
+          contentContainerStyle={styles.listContainer}
+          numColumns={isDesktop ? 3 : isTablet ? 2 : 1}
+          key={isDesktop ? 3 : isTablet ? 2 : 1} // Force re-render on grid change
+          renderItem={({ item }) => (
+            <View style={[styles.orderCard, isDesktop || isTablet ? { flex: 1, margin: 8 } : { marginBottom: 16 }]}>
+              <View style={[styles.cardHeader, { borderBottomColor: getTypeColor(item.type) }]}>
+                <View style={styles.typeBadgeContainer}>
+                  <View style={[styles.typeBadgeDot, { backgroundColor: getTypeColor(item.type) }]} />
+                  <Text style={[styles.typeBadgeText, { color: getTypeColor(item.type) }]}>{getTypeLabel(item.type)}</Text>
+                </View>
+                <Text style={styles.orderId}>#{item.id}</Text>
+              </View>
+
+              <View style={styles.cardBody}>
+                <Text style={styles.patientName}>{item.patient_name || 'N/A'}</Text>
+                <Text style={styles.patientMobile}>{item.mobile_no || 'N/A'}</Text>
+
+                <View style={styles.detailsRow}>
+                  <MapPin size={16} color="#64748b" style={{ marginTop: 2 }} />
+                  <Text style={styles.addressText}>{item.address || 'No Address Provided'}</Text>
                 </View>
 
-                {deliveryType !== 'Store' && (
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Select Delivery Boy</Text>
-                    <View style={styles.dropdownWrapper}>
-                      <Picker
-                        selectedValue={selectedBoyId}
-                        onValueChange={(itemValue) => setSelectedBoyId(itemValue)}
-                        style={styles.picker}
+                <View style={styles.statusRow}>
+                   <Text style={styles.statusLabel}>Status: <Text style={styles.statusValue}>{item.status || 'PENDING'}</Text></Text>
+                   <Text style={styles.amountText}>₹{item.total_amount || '0'}</Text>
+                </View>
+                
+                {item.delivery_boy_id && (
+                   <View style={styles.assignedBadge}>
+                     <CheckCircle size={14} color="#10b981" style={{ marginRight: 4 }}/>
+                     <Text style={styles.assignedBadgeText}>Assigned ({item.delivery_type})</Text>
+                   </View>
+                )}
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.assignBtn, item.delivery_boy_id && styles.assignBtnSuccess]} 
+                onPress={() => openAssignModal(item)}
+              >
+                <Bus size={18} color="#fff" />
+                <Text style={styles.assignBtnText}>
+                  {item.delivery_boy_id ? 'Reassign Delivery' : 'Assign Delivery'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+               <Package size={48} color="#cbd5e1" />
+               <Text style={styles.emptyText}>No orders found matching your criteria</Text>
+            </View>
+          }
+        />
+
+        {/* Assignment Modal */}
+        {selectedOrder && (
+          <Modal transparent animationType="slide" visible={!!selectedOrder} onRequestClose={() => setSelectedOrder(null)}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Assign Delivery (Order #{selectedOrder.id})</Text>
+                
+                <ScrollView style={styles.modalScroll}>
+                  <Text style={styles.label}>Delivery Type</Text>
+                  <View style={styles.typeSelectorRow}>
+                    {['Local', 'Bus', 'Store'].map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[styles.typeOption, deliveryType === type && styles.typeOptionActive]}
+                        onPress={() => setDeliveryType(type)}
                       >
-                        <Picker.Item label="Select a delivery boy..." value="" />
-                        {deliveryBoys.map(boy => (
-                          <Picker.Item key={boy.id} label={boy.full_name || boy.name} value={boy.id} />
-                        ))}
-                      </Picker>
-                    </View>
+                        {type === 'Local' && <MapPin size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
+                        {type === 'Bus' && <Bus size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
+                        {type === 'Store' && <Package size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
+                        <Text style={[styles.typeOptionText, deliveryType === type && styles.typeOptionTextActive]}>
+                          {type}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                )}
 
-                {deliveryType === 'Local' && (
-                  <>
+                  {deliveryType !== 'Store' && (
                     <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Delivery Address</Text>
-                      <TextInput 
-                        style={styles.textInput}
-                        value={address}
-                        onChangeText={setAddress}
-                        placeholder="Enter full address"
-                        multiline
-                      />
+                      <Text style={styles.label}>Select Delivery Boy</Text>
+                      <View style={styles.dropdownWrapper}>
+                        <Picker
+                          selectedValue={selectedBoyId}
+                          onValueChange={(itemValue) => setSelectedBoyId(itemValue)}
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="Select a delivery boy..." value="" />
+                          {deliveryBoys.map(boy => (
+                            <Picker.Item key={boy.id} label={boy.full_name || boy.name} value={boy.id} />
+                          ))}
+                        </Picker>
+                      </View>
                     </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Map Coordinates (Lat,Lng)</Text>
-                      <TextInput 
-                        style={styles.textInput}
-                        value={gpsLocation}
-                        onChangeText={setGpsLocation}
-                        placeholder="e.g. 17.3850,78.4867"
-                      />
-                    </View>
-                  </>
-                )}
+                  )}
 
-                {deliveryType === 'Bus' && (
-                  <View style={styles.busDetailsGrid}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Bus Number</Text>
-                      <TextInput style={styles.textInput} value={busDetails.bus_number} onChangeText={(v) => setBusDetails({...busDetails, bus_number: v})} placeholder="AP 39 X 1234"/>
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Driver Name</Text>
-                      <TextInput style={styles.textInput} value={busDetails.driver_name} onChangeText={(v) => setBusDetails({...busDetails, driver_name: v})} placeholder="John Doe"/>
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Driver Number</Text>
-                      <TextInput style={styles.textInput} value={busDetails.driver_number} onChangeText={(v) => setBusDetails({...busDetails, driver_number: v})} placeholder="9876543210"/>
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Waybill/LR No.</Text>
-                      <TextInput style={styles.textInput} value={busDetails.waybill_number} onChangeText={(v) => setBusDetails({...busDetails, waybill_number: v})} placeholder="LR12345"/>
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Arrival/Departure Time</Text>
-                      <TextInput style={styles.textInput} value={busDetails.arrival_time} onChangeText={(v) => setBusDetails({...busDetails, arrival_time: v})} placeholder="10:00 AM"/>
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Drop Location</Text>
-                      <TextInput style={styles.textInput} value={busDetails.drop_location} onChangeText={(v) => setBusDetails({...busDetails, drop_location: v})} placeholder="City Center Bus Stand"/>
-                    </View>
-                  </View>
-                )}
+                  {deliveryType === 'Local' && (
+                    <>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Delivery Address</Text>
+                        <TextInput 
+                          style={styles.textInput}
+                          value={address}
+                          onChangeText={setAddress}
+                          placeholder="Enter full address"
+                          multiline
+                        />
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Map Coordinates (Lat,Lng)</Text>
+                        <TextInput 
+                          style={styles.textInput}
+                          value={gpsLocation}
+                          onChangeText={setGpsLocation}
+                          placeholder="e.g. 17.3850,78.4867"
+                        />
+                      </View>
+                    </>
+                  )}
 
-              </ScrollView>
-              
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setSelectedOrder(null)}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleAssignV2}>
-                  <Text style={styles.saveBtnText}>Confirm Assignment</Text>
-                </TouchableOpacity>
+                  {deliveryType === 'Bus' && (
+                    <View style={styles.busDetailsGrid}>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Bus Number</Text>
+                        <TextInput style={styles.textInput} value={busDetails.bus_number} onChangeText={(v) => setBusDetails({...busDetails, bus_number: v})} placeholder="AP 39 X 1234"/>
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Driver Name</Text>
+                        <TextInput style={styles.textInput} value={busDetails.driver_name} onChangeText={(v) => setBusDetails({...busDetails, driver_name: v})} placeholder="John Doe"/>
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Driver Number</Text>
+                        <TextInput style={styles.textInput} value={busDetails.driver_number} onChangeText={(v) => setBusDetails({...busDetails, driver_number: v})} placeholder="9876543210"/>
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Waybill/LR No.</Text>
+                        <TextInput style={styles.textInput} value={busDetails.waybill_number} onChangeText={(v) => setBusDetails({...busDetails, waybill_number: v})} placeholder="LR12345"/>
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Arrival/Departure Time</Text>
+                        <TextInput style={styles.textInput} value={busDetails.arrival_time} onChangeText={(v) => setBusDetails({...busDetails, arrival_time: v})} placeholder="10:00 AM"/>
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Drop Location</Text>
+                        <TextInput style={styles.textInput} value={busDetails.drop_location} onChangeText={(v) => setBusDetails({...busDetails, drop_location: v})} placeholder="City Center Bus Stand"/>
+                      </View>
+                    </View>
+                  )}
+
+                </ScrollView>
+                
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setSelectedOrder(null)}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleAssignV2}>
+                    <Text style={styles.saveBtnText}>Confirm Assignment</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
+        )}
+      </>
       )}
-
     </View>
   );
 }

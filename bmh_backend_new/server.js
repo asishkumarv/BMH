@@ -34,6 +34,7 @@ const profileRoutes = require('./routes/profileRoutes');
 const ecogreenSalesOrderRoutes = require('./routes/ecogreenSalesOrderRoutes');
 const ecogreenSalesInvoiceRoutes = require('./routes/ecogreenSalesInvoiceRoutes');
 const onlineOrderRoutes = require('./routes/onlineOrderRoutes');
+const manualOrderRoutes = require('./routes/manualOrderRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -71,6 +72,9 @@ app.use('/sales-invoice-list', ecogreenSalesInvoiceRoutes);
 
 // Online Orders (Medical eCommerce)
 app.use('/online-orders', onlineOrderRoutes);
+
+// Manual Orders
+app.use('/manual-orders', manualOrderRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
