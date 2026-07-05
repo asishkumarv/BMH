@@ -12,6 +12,7 @@ export default function ManualOrders({ deliveryBoys }) {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [buses, setBuses] = useState([]);
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,12 +50,16 @@ export default function ManualOrders({ deliveryBoys }) {
     payment_txn_id: '',
       is_scheduled: false,
       scheduled_date: '',
-      scheduled_time: ''
+      scheduled_time: '',
+      bus_travels_name: '',
+      bus_driver_name: '',
+      bus_driver_number: '',
+      bus_number: ''
   });
 
-  const fetchManualOrders = async () => {
+  const fetchManualOrders = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       let url = 'https://napi.bharatmedicalhallplus.com/manual-orders';
       const params = [];
       if (assignmentFilter !== 'All') params.push(`status=${assignmentFilter}`);
@@ -67,13 +72,46 @@ export default function ManualOrders({ deliveryBoys }) {
     } catch (err) {
       console.error('Error fetching data:', err.message || err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchManualOrders();
+    fetchBuses();
+    const interval = setInterval(() => {
+      fetchManualOrders(true);
+    }, 10000);
+    return () => clearInterval(interval);
   }, [assignmentFilter]);
+
+  const fetchBuses = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/buses');
+      if (res.data && res.data.success) {
+        setBuses(res.data.data);
+      }
+    } catch(err) {
+      console.log('Error fetching buses', err);
+    }
+  };
+
+  const handleBusSelection = (busId) => {
+    if (!busId) return;
+    const bus = buses.find(b => b.id.toString() === busId.toString());
+    if (bus) {
+      setFormData({
+        ...formData,
+        bus_travels_name: bus.operator_name || bus.bus_name,
+        bus_driver_name: bus.contact_person || '',
+        bus_driver_number: bus.mobile_no || '',
+        bus_number: bus.bus_number || '',
+        mode_of_delivery: 'Bus',
+        is_scheduled: true,
+        scheduled_time: bus.departure_time || ''
+      });
+    }
+  };
 
   const handlePatientSearch = async (text) => {
     setPatientSearch(text);
@@ -121,6 +159,7 @@ export default function ManualOrders({ deliveryBoys }) {
 
       const payload = {
         ...formData,
+        is_scheduled: formData.mode_of_delivery === 'Schedule Delivery',
         created_by_id: createdById,
         created_by_type: createdByType
       };
@@ -239,7 +278,7 @@ export default function ManualOrders({ deliveryBoys }) {
         
         {/* Delivery Boy */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {item.delivery_boy_id ? (
+          {(item.delivery_boy_id && item.status === 'Delivered') ? (
             <View style={{flexDirection: 'row', alignItems: 'center'}}>
                {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={20} color="#94a3b8" style={{marginRight: 4}}/>}
                <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name}</Text>
@@ -247,11 +286,11 @@ export default function ManualOrders({ deliveryBoys }) {
           ) : (
             <View style={styles.pickerWrapper}>
               <Picker
-                selectedValue={''}
-                onValueChange={(val) => handleAssignBoy(item.id, val)}
+                selectedValue={item.delivery_boy_id || ''}
+                onValueChange={(val) => { if(val) handleAssignBoy(item.id, val); }}
                 style={styles.inlinePicker}
               >
-                <Picker.Item label="Assign To" value="" />
+                <Picker.Item label={item.delivery_boy_id ? "Reassign To" : "Assign To"} value="" />
                 {deliveryBoys?.map(boy => (
                   <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
                 ))}
@@ -430,6 +469,49 @@ export default function ManualOrders({ deliveryBoys }) {
                     </Picker>
                   </View>
                 </View>
+                {formData.mode_of_delivery === 'Schedule Delivery' && (
+                  <>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Scheduled Date</Text>
+                      <TextInput style={styles.input} value={formData.scheduled_date || ''} onChangeText={(t) => setFormData({...formData, scheduled_date: t})} placeholder="YYYY-MM-DD" />
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Scheduled Time</Text>
+                      <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
+                    </View>
+                  </>
+                )}
+                {formData.mode_of_delivery === 'Bus' && (
+                  <>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Select Bus Route</Text>
+                      <View style={styles.dropdownWrapper}>
+                        <Picker
+                          selectedValue=""
+                          onValueChange={(val) => handleBusSelection(val)}
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="-- Choose from Database --" value="" />
+                          {buses.map(b => (
+                            <Picker.Item key={b.id} label={`${b.bus_name} (${b.departure_time || 'N/A'}) - to ${b.destination}`} value={b.id.toString()} />
+                          ))}
+                        </Picker>
+                      </View>
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Bus Driver Number</Text>
+                      <TextInput style={styles.input} value={formData.bus_driver_number || ''} onChangeText={(t) => setFormData({...formData, bus_driver_number: t})} placeholder="Driver No" />
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Bus Number</Text>
+                      <TextInput style={styles.input} value={formData.bus_number || ''} onChangeText={(t) => setFormData({...formData, bus_number: t})} placeholder="OD-XX..." />
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Travels Name</Text>
+                      <TextInput style={styles.input} value={formData.bus_travels_name || ''} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="Travels" />
+                    </View>
+                  </>
+                )}
               </View>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>

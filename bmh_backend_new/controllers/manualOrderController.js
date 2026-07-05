@@ -6,7 +6,8 @@ exports.createOrder = async (req, res) => {
     const {
       order_no, invoice_no, amount, delivery_charge, mode_of_delivery,
       order_date, order_time, customer_phone, customer_name,
-      ship_to_phone, ship_to_name, address, location_link, notes
+      ship_to_phone, ship_to_name, address, location_link, notes,
+      bus_travels_name, bus_driver_name, bus_driver_number, bus_number
     } = req.body;
 
     const created_by_id = req.user?.id || req.body.created_by_id || null;
@@ -27,8 +28,9 @@ exports.createOrder = async (req, res) => {
         order_date, order_time, customer_phone, customer_name,
         ship_to_phone, ship_to_name, address, location_link,
         status, created_by_id, created_by_type, delivery_otp, notes,
-        payment_mode, payment_txn_id, is_scheduled, scheduled_date, scheduled_time
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        payment_mode, payment_txn_id, is_scheduled, scheduled_date, scheduled_time,
+        bus_travels_name, bus_driver_name, bus_driver_number, bus_number
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING *
     `;
 
@@ -54,7 +56,11 @@ exports.createOrder = async (req, res) => {
       req.body.payment_txn_id || null,
         req.body.is_scheduled || false,
         req.body.scheduled_date || null,
-        req.body.scheduled_time || null
+        req.body.scheduled_time || null,
+        bus_travels_name || null,
+        bus_driver_name || null,
+        bus_driver_number || null,
+        bus_number || null
     ];
 
     const result = await pool.query(insertQuery, values);
@@ -209,6 +215,29 @@ exports.updateOrder = async (req, res) => {
 
     
     const updatedOrder = result.rows[0];
+    
+    if (delivery_boy_id && currentOrder.rows[0].delivery_boy_id != delivery_boy_id) {
+       try {
+           const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+           if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+              const { sendExpoPushNotification } = require('../utils/pushNotification');
+              
+              let shouldPushNow = true;
+              if (updatedOrder.is_scheduled && updatedOrder.scheduled_date && updatedOrder.scheduled_time) {
+                 const sDate = typeof updatedOrder.scheduled_date === 'string' ? updatedOrder.scheduled_date.split('T')[0] : updatedOrder.scheduled_date.toISOString().split('T')[0];
+                 const scheduledDateTime = new Date(`${sDate}T${updatedOrder.scheduled_time}`);
+                 const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
+                 if (alarmTime > new Date()) {
+                    shouldPushNow = false;
+                 }
+              }
+              
+              if (shouldPushNow) {
+                 sendExpoPushNotification(empRes.rows[0].push_token, 'New Manual Order Assigned', `Order #${updatedOrder.order_no || updatedOrder.id} has been assigned to you.`);
+              }
+           }
+       } catch(e) { console.error('Push error:', e); }
+    }
     
     // Wallet update logic for POD Cash Orders
     if (updatedOrder.status === 'Delivered' && updatedOrder.payment_mode === 'POD' && updatedOrder.delivery_boy_id) {

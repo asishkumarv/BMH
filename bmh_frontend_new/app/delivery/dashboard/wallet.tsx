@@ -333,16 +333,16 @@ export default function EmployeeWalletScreen() {
 
               <View style={[{ flexDirection: 'row', gap: 16, marginTop: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={[styles.statsBox, { flex: 1 }]}>
-                  <Text style={styles.statsLabel}>Total Cash Booked</Text>
+                  <Text style={styles.statsLabel}>Total Cash of POD</Text>
                   <Text style={[styles.statsValue, { color: '#16a34a' }]}>₹{totalCashBooked}</Text>
                 </View>
                 <View style={[styles.statsBox, { flex: 1 }]}>
-                  <Text style={styles.statsLabel}>Total Online Booked</Text>
+                  <Text style={styles.statsLabel}>Total Online pay of POD</Text>
                   <Text style={[styles.statsValue, { color: Colors.light.primary }]}>₹{totalOnlineBooked}</Text>
                 </View>
               </View>
 
-              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>My Booking Collections</Text>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>My Order Collections</Text>
               {bookings.slice(0, 10).map(b => (
                 <View key={b.booking_id} style={styles.txCard}>
                   <View style={[styles.txIconWrapper, { backgroundColor: b.payment_mode === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>

@@ -28,8 +28,14 @@ export default function LandingPage() {
             router.replace('/admin/dashboard');
             return;
           }
-          if (localStorage.getItem('employeeUser')) {
-            router.replace('/employee/dashboard');
+          const empStr = localStorage.getItem('employeeUser');
+          if (empStr) {
+            const user = JSON.parse(empStr);
+            if (user.department === 'Delivery') {
+              router.replace('/delivery/dashboard');
+            } else {
+              router.replace('/employee/dashboard');
+            }
             return;
           }
         } else {
@@ -40,7 +46,12 @@ export default function LandingPage() {
           }
           const empUser = await AsyncStorage.getItem('employeeUser');
           if (empUser) {
-            router.replace('/employee/dashboard');
+            const user = JSON.parse(empUser);
+            if (user.department === 'Delivery') {
+              router.replace('/delivery/dashboard');
+            } else {
+              router.replace('/employee/dashboard');
+            }
             return;
           }
         }

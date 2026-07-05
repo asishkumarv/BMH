@@ -143,6 +143,29 @@ exports.assignDelivery = async (req, res) => {
         `;
         const { rows } = await pool.query(queryText, [delivery_boy_id, delivery_otp, id]);
         if (rows.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
+        
+        try {
+            const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+            if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+                const { sendExpoPushNotification } = require('../utils/pushNotification');
+                
+                let shouldPushNow = true;
+                const ord = rows[0];
+                if (ord.is_scheduled && ord.scheduled_date && ord.scheduled_time) {
+                   const sDate = typeof ord.scheduled_date === 'string' ? ord.scheduled_date.split('T')[0] : ord.scheduled_date.toISOString().split('T')[0];
+                   const scheduledDateTime = new Date(`${sDate}T${ord.scheduled_time}`);
+                   const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
+                   if (alarmTime > new Date()) {
+                      shouldPushNow = false;
+                   }
+                }
+                
+                if (shouldPushNow) {
+                   sendExpoPushNotification(empRes.rows[0].push_token, 'New Online Order Assigned', `Order #${ord.id} has been assigned to you.`);
+                }
+            }
+        } catch(e) { console.error('Push error:', e); }
+
         res.status(200).json({ success: true, message: 'Delivery assigned', order: rows[0], delivery_otp });
     } catch (err) {
         console.error("Assign delivery error:", err);

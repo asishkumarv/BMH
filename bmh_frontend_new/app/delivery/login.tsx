@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/Colors';
+import { registerForPushNotificationsAsync } from '../../utils/pushNotifications';
 import { useResponsive } from '../../hooks/useResponsive';
 
 export default function EmployeePortal() {
