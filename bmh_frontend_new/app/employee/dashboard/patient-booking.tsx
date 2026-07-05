@@ -420,7 +420,7 @@ export default function PatientBooking() {
         const res = await axios.get('https://napi.bharatmedicalhallplus.com/doctors');
         if (res.data.success && res.data.data) {
           let docs = res.data.data;
-          const formatted = docs.map((d: any) => ({ id: d.id, name: d.full_name || d.name }));
+          const formatted = .map((d: any) => ({ id: d.id, name: d.full_name || d.name }));
           setUniqueDoctors(formatted);
         }
       } catch (err) {
@@ -1102,7 +1102,7 @@ export default function PatientBooking() {
                   style={styles.picker}
                 >
                   <Picker.Item label="All Doctors" value="" />
-                  {uniqueDoctors.map((d: any) => (
+                  {.map((d: any) => (
                     <Picker.Item key={d.id} label={d.name} value={d.id} />
                   ))}
                 </Picker>
@@ -1128,7 +1128,7 @@ export default function PatientBooking() {
                 <Text style={styles.tableCellHeader}>Status</Text>
                 <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
               </View>
-              {myBookings.map((b, i) => (
+              {.map((b, i) => (
                 <View key={i} style={styles.tableRow}>
                   <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
                       <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id}</Text>
@@ -1185,7 +1185,7 @@ export default function PatientBooking() {
               <View style={styles.pickerContainer}>
                 <Picker selectedValue={bDoctorFilter} onValueChange={setBDoctorFilter} style={styles.picker}>
                   <Picker.Item label="All Doctors" value="" />
-                  {uniqueDoctors.map((d: any) => (<Picker.Item key={d.id} label={d.name} value={d.id} />))}
+                  {.map((d: any) => (<Picker.Item key={d.id} label={d.name} value={d.id} />))}
                 </Picker>
               </View>
             </View>
@@ -1194,7 +1194,7 @@ export default function PatientBooking() {
               <View style={styles.pickerContainer}>
                 <Picker selectedValue={bEmployeeFilter} onValueChange={setBEmployeeFilter} style={styles.picker}>
                   <Picker.Item label="All Employees" value="" />
-                  {allEmployees.map((e: any) => (<Picker.Item key={e.id} label={e.full_name} value={e.id} />))}
+                  {.map((e: any) => (<Picker.Item key={e.id} label={e.full_name} value={e.id} />))}
                 </Picker>
               </View>
             </View>
@@ -1222,7 +1222,7 @@ export default function PatientBooking() {
                 <Text style={styles.tableCellHeader}>Payment/Status</Text>
                 <Text style={[styles.tableCellHeader, {flex: 0.5, textAlign: 'center'}]}>Actions</Text>
               </View>
-              {allBookings.map((b, i) => (
+              {.map((b, i) => (
                 <React.Fragment key={i}>
                   {editBookingSelected?.booking_id === b.booking_id ? (
                     <View style={{padding: 16, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0'}}>
@@ -1354,7 +1354,7 @@ export default function PatientBooking() {
                       <Text style={{color: '#64748b'}}>No future slots available to move these tokens to.</Text>
                     ) : (
                       <View style={styles.grid}>
-                        {rescheduleSlots.map((s: any, i: number) => (
+                        {.map((s: any, i: number) => (
                           <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleConfirmBulkReschedule(s)} disabled={rescheduleLoading}>
                             <View style={styles.slotDetails}>
                                 <View style={styles.slotDetailRow}><User color="#64748b" size={16} /><Text style={[styles.slotDetailText, {fontWeight: 'bold', color: '#1e293b'}]}>Dr. {s.doctor_name}</Text></View>
@@ -1379,7 +1379,7 @@ export default function PatientBooking() {
                         <View style={styles.pickerContainer}>
                           <Picker selectedValue={bulkDoctorFilter} onValueChange={setBulkDoctorFilter} style={styles.picker}>
                             <Picker.Item label="All Doctors" value="" />
-                            {uniqueDoctors.map((d: any) => (
+                            {.map((d: any) => (
                               <Picker.Item key={d.id} label={d.name} value={d.id} />
                             ))}
                           </Picker>
@@ -1396,7 +1396,7 @@ export default function PatientBooking() {
                     </View>
                     
                     <View style={styles.grid}>
-                      {bulkAvailableSlots.map((s: any, i: number) => (
+                      {.map((s: any, i: number) => (
                         <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleSelectBulkSlot(s)}>
                           <View style={styles.slotDetails}>
                                 <View style={styles.slotDetailRow}><User color="#64748b" size={16} /><Text style={[styles.slotDetailText, {fontWeight: 'bold', color: '#1e293b'}]}>Dr. {s.doctor_name}</Text></View>
@@ -1425,7 +1425,7 @@ export default function PatientBooking() {
                 <Text style={{color: '#64748b'}}>No future slots available for this doctor.</Text>
               ) : (
                 <View style={styles.grid}>
-                  {rescheduleSlots.map((s, i) => (
+                  {.map((s, i) => (
                     <TouchableOpacity key={i} style={[styles.slotCard, isMobile && { width: '100%' }]} onPress={() => handleConfirmReschedule(s)} disabled={rescheduleLoading}>
                       <View style={[styles.slotHeader, {alignItems: 'flex-start'}]}>
                         <View style={{flexDirection: 'row', flex: 1, gap: 12}}>
@@ -1518,7 +1518,7 @@ export default function PatientBooking() {
                       style={styles.picker}
                     >
                       <Picker.Item label="All Doctors" value="" />
-                      {uniqueDoctors.map((d: any) => (
+                      {.map((d: any) => (
                         <Picker.Item key={d.id} label={d.name} value={d.id} />
                       ))}
                     </Picker>
@@ -1541,7 +1541,7 @@ export default function PatientBooking() {
                     <Text style={styles.tableCellHeader}>PR / Ref</Text>
                     <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Action</Text>
                   </View>
-                  {rescheduleBookings.map((b, i) => (
+                  {.map((b, i) => (
                     <View key={i} style={styles.tableRow}>
                       <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
                       <View style={styles.tableCell}>

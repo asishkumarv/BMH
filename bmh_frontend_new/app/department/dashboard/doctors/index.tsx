@@ -168,7 +168,7 @@ export default function DepartmentDoctorManagement() {
 
     const proceed = async () => {
       try {
-        const results = await Promise.all(selectedTokens.map(async (token_number) => {
+        const results = await Promise.all(.map(async (token_number) => {
           // Skip if already in desired state
           if (action === 'block' && slotBookingsMap[token_number] === 'VIP Quota') return token_number;
           if (action === 'unblock' && slotBookingsMap[token_number] !== 'VIP Quota') return token_number;
@@ -380,7 +380,7 @@ export default function DepartmentDoctorManagement() {
     }
     setAddingSlot(true);
     try {
-      const results = await Promise.allSettled(newSlot.slotConfigs.map(async (config) => {
+      const results = await Promise.allSettled(newSlot..map(async (config) => {
         return axios.post('https://napi.bharatmedicalhallplus.com/doctors/slots', {
           doctor_id: newSlot.doctor_id,
           date: newSlot.date,
@@ -548,7 +548,7 @@ export default function DepartmentDoctorManagement() {
                   style={styles.picker}
                 >
                   <Picker.Item label="None" value="" />
-                  {peons.map((p: any) => (
+                  {.map((p: any) => (
                     <Picker.Item key={p.id} label={p.full_name} value={p.id} />
                   ))}
                 </Picker>
@@ -556,7 +556,7 @@ export default function DepartmentDoctorManagement() {
             </View>
           </View>
 
-          {newSlot.slotConfigs.map((config, index) => (
+          {newSlot..map((config, index) => (
             <View key={index} style={{borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16}}>
               <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
                 <Text style={{fontWeight: 'bold', color: '#1e293b'}}>Slot #{index + 1}</Text>
@@ -585,7 +585,7 @@ export default function DepartmentDoctorManagement() {
                       style={styles.picker}
                     >
                       <Picker.Item label="Select Time" value="" />
-                      {TIME_SLOTS.map((t, i) => (
+                      {.map((t, i) => (
                         <Picker.Item key={i} label={t} value={t} />
                       ))}
                     </Picker>
@@ -604,7 +604,7 @@ export default function DepartmentDoctorManagement() {
                       style={styles.picker}
                     >
                       <Picker.Item label="Select Time" value="" />
-                      {TIME_SLOTS.map((t, i) => (
+                      {.map((t, i) => (
                         <Picker.Item key={i} label={t} value={t} />
                       ))}
                     </Picker>
@@ -646,7 +646,7 @@ export default function DepartmentDoctorManagement() {
       ) : (
         <>
           <View style={styles.tabContainer}>
-        {TABS.map(tab => (
+        {.map(tab => (
           <TouchableOpacity 
             key={tab} 
             style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -732,7 +732,7 @@ export default function DepartmentDoctorManagement() {
                   <Text style={styles.tableCellHeader}>Status</Text>
                   <Text style={styles.tableCellHeader}>Actions</Text>
                 </View>
-                {doctors.map((d, i) => (
+                {.map((d, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>{d.id}</Text>
                     <View style={styles.tableCell}>
@@ -780,7 +780,7 @@ export default function DepartmentDoctorManagement() {
                   <Text style={styles.tableCellHeader}>Assigned Peon</Text>
                   <Text style={styles.tableCellHeader}>Actions</Text>
                 </View>
-                {slots.map((s, i) => (
+                {.map((s, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={styles.tableCell}>{new Date(s.date).toLocaleDateString()}</Text>
                     <Text style={styles.tableCell}>{s.doctor_name}</Text>
@@ -845,7 +845,7 @@ export default function DepartmentDoctorManagement() {
                     <View style={styles.pickerContainer}>
                       <Picker selectedValue={bDoctor} onValueChange={(val) => setBDoctor(val)} style={styles.picker}>
                         <Picker.Item label="All Doctors" value="" />
-                        {doctors.map((d: any) => <Picker.Item key={d.id} label={d.full_name} value={d.id} />)}
+                        {.map((d: any) => <Picker.Item key={d.id} label={d.full_name} value={d.id} />)}
                       </Picker>
                     </View>
                   </View>
@@ -854,7 +854,7 @@ export default function DepartmentDoctorManagement() {
                     <View style={styles.pickerContainer}>
                       <Picker selectedValue={bEmployee} onValueChange={(val) => setBEmployee(val)} style={styles.picker}>
                         <Picker.Item label="All" value="" />
-                        {employees.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
+                        {.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
                       </Picker>
                     </View>
                   </View>
@@ -874,7 +874,7 @@ export default function DepartmentDoctorManagement() {
                   <Text style={styles.tableCellHeader}>Booked By</Text>
                   <Text style={styles.tableCellHeader}>Status</Text>
                 </View>
-                {bookings.map((b, i) => (
+                {.map((b, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
                   <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id || b.original_booking_id}</Text>
