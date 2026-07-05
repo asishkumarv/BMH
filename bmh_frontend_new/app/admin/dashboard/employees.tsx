@@ -75,7 +75,7 @@ export default function EmployeesScreen() {
           if (empRes.data.success) setEmployees(empRes.data.data);
         } else {
           if (adminRes.data.success) {
-            const mappedAdmins = adminRes.data.data.map((a: any) => ({
+            const mappedAdmins = adminRes.data.data?.map((a: any) => ({
               ...a,
               role: 'Sub Admin',
               department: depts.find(d => String(d.id) === String(a.department_id))?.name || 'Unknown'
@@ -162,7 +162,7 @@ export default function EmployeesScreen() {
         status: newStatus
       });
       if (response.data.success) {
-        setEmployees(employees.map(e => e.id === employeeId ? { ...e, status: newStatus } : e));
+        setEmployees(employees?.map(e => e.id === employeeId ? { ...e, status: newStatus } : e));
       }
     } catch (error) {
       Alert.alert('Error', `Failed to update status to ${newStatus}`);
@@ -366,7 +366,7 @@ export default function EmployeesScreen() {
                 <CustomDropdown
                   options={[
                     { label: 'All Departments (Global)', value: 'all' },
-                    ...departments.map(d => ({ label: d.name, value: d.id }))
+                    ...departments?.map(d => ({ label: d.name, value: d.id }))
                   ]}
                   value={selectedDeptForRole}
                   onChange={(val) => setSelectedDeptForRole(val)}
@@ -477,7 +477,7 @@ export default function EmployeesScreen() {
                     {employeePayslips && employeePayslips.length > 0 && (
                       <View>
                         <Text style={[styles.sectionLabel, {marginTop: 16}]}>Recent Payslips</Text>
-                        {employeePayslips.slice(0, 3).map((ps, i) => (
+                        {employeePayslips.slice(0, 3)?.map((ps, i) => (
                           <View key={i} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 8 }}>
                             <Text style={{ fontWeight: '700', marginBottom: 4 }}>{ps.month}</Text>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -580,7 +580,7 @@ export default function EmployeesScreen() {
                               if (empRes.data.success) {
                                 let updatedEmps = empRes.data.data;
                                 if (selectedEmployee.role === 'Sub Admin') {
-                                  updatedEmps = updatedEmps.map((a: any) => ({
+                                  updatedEmps = updatedEmps?.map((a: any) => ({
                                     ...a, role: 'Sub Admin', department: selectedEmployee.department
                                   }));
                                 }

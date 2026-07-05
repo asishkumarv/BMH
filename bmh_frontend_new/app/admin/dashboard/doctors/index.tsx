@@ -175,7 +175,7 @@ export default function DoctorManagement() {
 
     const proceed = async () => {
       try {
-        const results = await Promise.all(.map(async (token_number) => {
+        const results = await Promise.all(selectedTokens.map(async (token_number) => {
           // Skip if already in desired state
           if (action === 'block' && slotBookingsMap[token_number] === 'VIP Quota') return token_number;
           if (action === 'unblock' && slotBookingsMap[token_number] !== 'VIP Quota') return token_number;
@@ -403,7 +403,7 @@ export default function DoctorManagement() {
     }
     setAddingSlot(true);
     try {
-      const results = await Promise.allSettled(newSlot..map(async (config) => {
+      const results = await Promise.allSettled(newSlot.slotConfigs.map(async (config) => {
         return axios.post('https://napi.bharatmedicalhallplus.com/doctors/slots', {
           doctor_id: newSlot.doctor_id,
           date: newSlot.date,
@@ -488,7 +488,7 @@ export default function DoctorManagement() {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Department" value="" />
-                  {.map((d, i) => (
+                  {departments.map((d, i) => (
                     <Picker.Item key={i} label={d.name} value={d.name} />
                   ))}
                 </Picker>
@@ -540,7 +540,7 @@ export default function DoctorManagement() {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Department" value="" />
-                  {.map((d, i) => (
+                  {departments.map((d, i) => (
                     <Picker.Item key={i} label={d.name} value={d.name} />
                   ))}
                 </Picker>
@@ -604,7 +604,7 @@ export default function DoctorManagement() {
                   style={styles.picker}
                 >
                   <Picker.Item label="None" value="" />
-                  {.map((p: any) => (
+                  {peons.map((p: any) => (
                     <Picker.Item key={p.id} label={p.full_name} value={p.id} />
                   ))}
                 </Picker>
@@ -612,7 +612,7 @@ export default function DoctorManagement() {
             </View>
           </View>
 
-          {newSlot..map((config, index) => (
+          {newSlot.slotConfigs.map((config, index) => (
             <View key={index} style={{borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, marginBottom: 16}}>
               <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
                 <Text style={{fontWeight: 'bold', color: '#1e293b'}}>Slot #{index + 1}</Text>
@@ -641,7 +641,7 @@ export default function DoctorManagement() {
                       style={styles.picker}
                     >
                       <Picker.Item label="Select Time" value="" />
-                      {.map((t, i) => (
+                      {TIME_SLOTS.map((t, i) => (
                         <Picker.Item key={i} label={t} value={t} />
                       ))}
                     </Picker>
@@ -660,7 +660,7 @@ export default function DoctorManagement() {
                       style={styles.picker}
                     >
                       <Picker.Item label="Select Time" value="" />
-                      {.map((t, i) => (
+                      {TIME_SLOTS.map((t, i) => (
                         <Picker.Item key={i} label={t} value={t} />
                       ))}
                     </Picker>
@@ -703,7 +703,7 @@ export default function DoctorManagement() {
       ) : (
         <>
           <View style={styles.tabContainer}>
-        {.map(tab => (
+        {TABS.map(tab => (
           <TouchableOpacity 
             key={tab} 
             style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -790,7 +790,7 @@ export default function DoctorManagement() {
                   <Text style={styles.tableCellHeader}>Status</Text>
                   <Text style={styles.tableCellHeader}>Actions</Text>
                 </View>
-                {.map((d, i) => (
+                {doctors.map((d, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>{d.id}</Text>
                     <View style={styles.tableCell}>
@@ -839,7 +839,7 @@ export default function DoctorManagement() {
                   <Text style={styles.tableCellHeader}>Assigned Peon</Text>
                   <Text style={styles.tableCellHeader}>Actions</Text>
                 </View>
-                {.map((s, i) => (
+                {slots.map((s, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={styles.tableCell}>{new Date(s.date).toLocaleDateString()}</Text>
                     <Text style={styles.tableCell}>{s.doctor_name}</Text>
@@ -907,7 +907,7 @@ export default function DoctorManagement() {
                     <View style={styles.pickerContainer}>
                       <Picker selectedValue={bDept} onValueChange={(val) => { setBDept(val); setBDoctor(''); }} style={styles.picker}>
                         <Picker.Item label="All" value="" />
-                        {.map((d: any) => <Picker.Item key={d.name} label={d.name} value={d.name} />)}
+                        {departments.map((d: any) => <Picker.Item key={d.name} label={d.name} value={d.name} />)}
                       </Picker>
                     </View>
                   </View>
@@ -925,7 +925,7 @@ export default function DoctorManagement() {
                     <View style={styles.pickerContainer}>
                       <Picker selectedValue={bEmployee} onValueChange={(val) => setBEmployee(val)} style={styles.picker}>
                         <Picker.Item label="All" value="" />
-                        {.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
+                        {employees.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
                       </Picker>
                     </View>
                   </View>
@@ -945,7 +945,7 @@ export default function DoctorManagement() {
                   <Text style={styles.tableCellHeader}>Booked By</Text>
                   <Text style={styles.tableCellHeader}>Status</Text>
                 </View>
-                {.map((b, i) => (
+                {bookings.map((b, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
                   <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id || b.original_booking_id}</Text>
@@ -1004,7 +1004,7 @@ export default function DoctorManagement() {
                     <View style={styles.pickerContainer}>
                       <Picker selectedValue={cDoctor} onValueChange={setCDoctor} style={styles.picker}>
                         <Picker.Item label="All Doctors" value="" />
-                        {.map((d: any) => <Picker.Item key={d.id} label={d.full_name} value={d.id} />)}
+                        {doctors.map((d: any) => <Picker.Item key={d.id} label={d.full_name} value={d.id} />)}
                       </Picker>
                     </View>
                   </View>
@@ -1013,7 +1013,7 @@ export default function DoctorManagement() {
                     <View style={styles.pickerContainer}>
                       <Picker selectedValue={cEmployee} onValueChange={setCEmployee} style={styles.picker}>
                         <Picker.Item label="All" value="" />
-                        {.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
+                        {employees.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
                       </Picker>
                     </View>
                   </View>
@@ -1036,7 +1036,7 @@ export default function DoctorManagement() {
                       <Text style={styles.tableCellHeader}>Fee</Text>
                       <Text style={styles.tableCellHeader}>Refund Status</Text>
                     </View>
-                    {.map((b, i) => (
+                    {cancelledTokens.map((b, i) => (
                       <View key={i} style={styles.tableRow}>
                         <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
                   <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id || b.original_booking_id}</Text>
@@ -1086,7 +1086,7 @@ export default function DoctorManagement() {
                   <Text style={styles.tableCellHeader}>Total Bookings</Text>
                   <Text style={styles.tableCellHeader}>Total Amount</Text>
                 </View>
-                {.map((r, i) => (
+                {revenue.map((r, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={styles.tableCell}>{new Date(r.date).toLocaleDateString()}</Text>
                     <Text style={styles.tableCell}>{r.department}</Text>
@@ -1218,7 +1218,7 @@ export default function DoctorManagement() {
                     style={styles.picker}
                   >
                     <Picker.Item label="None" value="" />
-                    {.map((p: any) => (
+                    {peons.map((p: any) => (
                       <Picker.Item key={p.id} label={p.full_name} value={p.id} />
                     ))}
                   </Picker>
