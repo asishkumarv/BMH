@@ -872,7 +872,7 @@ export default function DoctorManagement() {
                 <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
                   <View style={[styles.filterCol, {minWidth: 150}]}>
                     <Text style={styles.label}>Patient Name</Text>
-                    <TextInput style={[styles.input, {padding: 10}]} value={bPatient} onChangeText={setBPatient} placeholder="Search patient" />
+                    <TextInput style={[styles.input, {padding: 10}]} value={bPatient} onChangeText={setBPatient} placeholder="Search patient or ID" />
                   </View>
                   <View style={[styles.filterCol, {minWidth: 150}]}>
                     <Text style={styles.label}>Date</Text>
@@ -938,6 +938,7 @@ export default function DoctorManagement() {
 
                 <View style={styles.tableRowHeader}>
                   <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                  <Text style={[styles.tableCellHeader, {flex: 0.5}]}>ID</Text>
                   <Text style={styles.tableCellHeader}>Patient</Text>
                   <Text style={styles.tableCellHeader}>Doctor & Slot</Text>
                   <Text style={styles.tableCellHeader}>Payment</Text>
@@ -947,6 +948,7 @@ export default function DoctorManagement() {
                 {bookings.map((b, i) => (
                   <View key={i} style={styles.tableRow}>
                     <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                  <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id || b.original_booking_id}</Text>
                     <View style={styles.tableCell}>
                       <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
                       <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
@@ -982,7 +984,7 @@ export default function DoctorManagement() {
                 <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
                   <View style={[styles.filterCol, {minWidth: 150}]}>
                     <Text style={styles.label}>Patient Name</Text>
-                    <TextInput style={[styles.input, {padding: 10}]} value={cPatient} onChangeText={setCPatient} placeholder="Search patient" />
+                    <TextInput style={[styles.input, {padding: 10}]} value={cPatient} onChangeText={setCPatient} placeholder="Search patient or ID" />
                   </View>
                   <View style={[styles.filterCol, {minWidth: 150}]}>
                     <Text style={styles.label}>Date</Text>
@@ -1026,6 +1028,7 @@ export default function DoctorManagement() {
                   <View style={{ minWidth: isMobile ? 1000 : '100%' }}>
                     <View style={styles.tableRowHeader}>
                       <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                  <Text style={[styles.tableCellHeader, {flex: 0.5}]}>ID</Text>
                       <Text style={styles.tableCellHeader}>Patient</Text>
                       <Text style={styles.tableCellHeader}>Doctor & Date</Text>
                       <Text style={styles.tableCellHeader}>Cancelled At</Text>
@@ -1036,6 +1039,7 @@ export default function DoctorManagement() {
                     {cancelledTokens.map((b, i) => (
                       <View key={i} style={styles.tableRow}>
                         <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                  <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id || b.original_booking_id}</Text>
                         <View style={styles.tableCell}>
                           <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
                           <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>

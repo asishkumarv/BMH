@@ -1,4 +1,20 @@
-import React, { useState, useEffect } from 'react';
+const executeCancel = async (b: any) => {
+    try {
+      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/bookings/${b.booking_id || b.id}/cancel`, {
+        cancelled_by_id: user.id,
+        cancelled_by_name: user.name || user.full_name,
+        cancelled_by_role: user.role,
+        cancelled_by_dept: user.department || '',
+        refund_type: cancelRefundMode,
+        refund_tnx: cancelRefundTnx
+      });
+      if (res.data.success) {
+        alert('Booking cancelled successfully');
+        setCancelBookingSelected(null);
+        setCancelRefundTnx('');
+        fetchAllBookings();
+      }
+    } catch (err) {import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search, User, Edit, XCircle } from 'lucide-react-native';
 import * as Print from 'expo-print';
@@ -118,6 +134,9 @@ export default function PatientBooking() {
   const [editBookingSelected, setEditBookingSelected] = useState<any>(null);
   const [editForm, setEditForm] = useState({ patient_name: '', mobile: '', age: '', gender: 'Male', blood_group: '', city: '', pin_code: '', guardian_name: '', reason_for_visit: '', reference: '', pr: '' });
   const [editLoading, setEditLoading] = useState(false);
+  const [cancelBookingSelected, setCancelBookingSelected] = useState<any>(null);
+  const [cancelRefundMode, setCancelRefundMode] = useState('Cash');
+  const [cancelRefundTnx, setCancelRefundTnx] = useState('');
 
   useEffect(() => {
     if (activeTab === 'Bookings' && user) {
@@ -1044,7 +1063,7 @@ export default function PatientBooking() {
           <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
             <View style={[styles.filterCol, {minWidth: 150}]}>
               <Text style={styles.label}>Patient Name</Text>
-              <TextInput style={[styles.input, {padding: 10}]} value={filterPatient} onChangeText={setFilterPatient} placeholder="Search patient" />
+              <TextInput style={[styles.input, {padding: 10}]} value={filterPatient} onChangeText={setFilterPatient} placeholder="Search patient or ID" />
             </View>
             <View style={[styles.filterCol, {minWidth: 150}]}>
               <Text style={styles.label}>Date Filter</Text>
@@ -1100,6 +1119,7 @@ export default function PatientBooking() {
             <View style={{ minWidth: isMobile ? 800 : '100%' }}>
               <View style={styles.tableRowHeader}>
                 <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                <Text style={[styles.tableCellHeader, {flex: 0.5}]}>ID</Text>
                 <Text style={styles.tableCellHeader}>Patient</Text>
                 <Text style={styles.tableCellHeader}>Doctor</Text>
                 <Text style={styles.tableCellHeader}>Date/Time</Text>
@@ -1111,6 +1131,7 @@ export default function PatientBooking() {
               {myBookings.map((b, i) => (
                 <View key={i} style={styles.tableRow}>
                   <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                      <Text style={[styles.tableCell, {flex: 0.5}]}>#{b.booking_id || b.id}</Text>
                   <View style={styles.tableCell}>
                     <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
                     <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
@@ -1184,6 +1205,8 @@ export default function PatientBooking() {
                   <Picker.Item label="All Status" value="" />
                   <Picker.Item label="Confirmed" value="Confirmed" />
                   <Picker.Item label="Completed" value="Completed" />
+                  <Picker.Item label="Booked" value="Booked" />
+                  <Picker.Item label="Cancelled" value="Cancelled" />
                 </Picker>
               </View>
             </View>
@@ -1200,80 +1223,110 @@ export default function PatientBooking() {
                 <Text style={[styles.tableCellHeader, {flex: 0.5, textAlign: 'center'}]}>Actions</Text>
               </View>
               {allBookings.map((b, i) => (
-                <View key={i} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
-                  <View style={styles.tableCell}>
-                    <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
-                    <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile} | Age: {b.age}</Text>
-                  </View>
-                  <View style={styles.tableCell}>
-                    <Text>{b.doctor_name}</Text>
-                    <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.date).toLocaleDateString('en-GB')} {b.start_time}</Text>
-                  </View>
-                  <View style={styles.tableCell}>
-                    <Text>{b.booked_by_name}</Text>
-                    <Text style={{fontSize: 12, color: '#64748b'}}>{b.booked_by_role || '-'}</Text>
-                  </View>
-                  <View style={styles.tableCell}>
-                    <Text>₹{b.fee} ({b.payment_mode})</Text>
-                    <Text style={{fontSize: 12, color: b.status === 'Cancelled' ? 'red' : 'green'}}>{b.status}</Text>
-                  </View>
-                  <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row', justifyContent: 'center', gap: 12}]}>
-                    {b.status !== 'Cancelled' && (
-                      <>
-                        <TouchableOpacity onPress={() => {
-                          setEditBookingSelected(b);
-                          setEditForm({ patient_name: b.patient_name, mobile: b.mobile, age: String(b.age), gender: b.gender, blood_group: b.blood_group, city: b.city, pin_code: b.pin_code, guardian_name: b.guardian_name, reason_for_visit: b.reason_for_visit, reference: b.reference, pr: b.pr });
-                        }}><Edit color="#eab308" size={20} /></TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleCancelBooking(b)}><XCircle color="#ef4444" size={20} /></TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                </View>
+                <React.Fragment key={i}>
+                  {editBookingSelected?.booking_id === b.booking_id ? (
+                    <View style={{padding: 16, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0'}}>
+                      <Text style={{fontWeight: 'bold', marginBottom: 12, fontSize: 16}}>Edit Booking #{b.token_number}</Text>
+                      <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
+                        <View style={{width: 150}}><Text style={styles.label}>Patient Name*</Text><TextInput style={styles.input} value={editForm.patient_name} onChangeText={(v) => setEditForm({...editForm, patient_name: v})} /></View>
+                        <View style={{width: 150}}><Text style={styles.label}>Mobile*</Text><TextInput style={styles.input} value={editForm.mobile} onChangeText={(v) => setEditForm({...editForm, mobile: v})} /></View>
+                        <View style={{width: 80}}><Text style={styles.label}>Age*</Text><TextInput style={styles.input} value={editForm.age} onChangeText={(v) => setEditForm({...editForm, age: v})} /></View>
+                        <View style={{width: 150}}><Text style={styles.label}>Gender</Text>
+                          <View style={styles.pickerContainer}>
+                            <Picker selectedValue={editForm.gender} onValueChange={(v) => setEditForm({...editForm, gender: v})} style={styles.picker}>
+                              <Picker.Item label="Male" value="Male" /><Picker.Item label="Female" value="Female" />
+                            </Picker>
+                          </View>
+                        </View>
+                        <View style={{width: 200}}><Text style={styles.label}>Address</Text><TextInput style={styles.input} value={editForm.city} onChangeText={(v) => setEditForm({...editForm, city: v})} /></View>
+                      </View>
+                      <View style={{flexDirection: 'row', gap: 12, marginTop: 16}}>
+                        <TouchableOpacity style={{backgroundColor: '#3b82f6', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6}} onPress={handleEditSave} disabled={editLoading}>
+                          <Text style={{color: 'white', fontWeight: 'bold'}}>{editLoading ? 'Saving...' : 'Save Changes'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={{backgroundColor: '#e2e8f0', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6}} onPress={() => { setEditBookingSelected(null); }}>
+                          <Text style={{color: '#475569', fontWeight: 'bold'}}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : cancelBookingSelected?.booking_id === b.booking_id ? (
+                    <View style={{padding: 16, backgroundColor: '#fef2f2', borderBottomWidth: 1, borderColor: '#fecaca', flexDirection: 'column'}}>
+                      <Text style={{color: '#b91c1c', fontWeight: 'bold', fontSize: 16, marginBottom: 12}}>Are you sure you want to cancel Token #{b.token_number} for {b.patient_name}?</Text>
+                      
+                      <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 16}}>
+                        <Text style={styles.label}>Refund Method:</Text>
+                        <View style={[styles.pickerContainer, {width: 150}]}>
+                          <Picker selectedValue={cancelRefundMode} onValueChange={(v) => setCancelRefundMode(v)} style={styles.picker}>
+                            <Picker.Item label="Cash" value="Cash" />
+                            <Picker.Item label="Online" value="Online" />
+                          </Picker>
+                        </View>
+                        {cancelRefundMode === 'Online' && (
+                          <TextInput 
+                            style={[styles.input, {width: 200}]} 
+                            placeholder="Transaction ID" 
+                            value={cancelRefundTnx} 
+                            onChangeText={setCancelRefundTnx} 
+                          />
+                        )}
+                      </View>
+
+                      <View style={{flexDirection: 'row', gap: 12}}>
+                        <TouchableOpacity style={{backgroundColor: '#ef4444', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6}} onPress={() => {
+                          if (cancelRefundMode === 'Online' && !cancelRefundTnx) {
+                            alert('Please enter a transaction ID for online refund');
+                            return;
+                          }
+                          executeCancel(b);
+                        }}>
+                          <Text style={{color: 'white', fontWeight: 'bold'}}>Yes, Cancel Token</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={{backgroundColor: '#e2e8f0', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6}} onPress={() => setCancelBookingSelected(null)}>
+                          <Text style={{color: '#475569', fontWeight: 'bold'}}>No, Keep It</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.tableRow}>
+                      <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                      <View style={styles.tableCell}>
+                        <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile} | Age: {b.age}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text>{b.doctor_name}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.date).toLocaleDateString('en-GB')} {b.start_time}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text>{b.booked_by_name}</Text>
+                        <Text style={{fontSize: 12, color: '#64748b'}}>{b.booked_by_role || '-'}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text>₹{b.fee} ({b.payment_mode})</Text>
+                        <Text style={{fontSize: 12, color: b.status === 'Cancelled' ? 'red' : 'green'}}>{b.status}</Text>
+                      </View>
+                      <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row', justifyContent: 'center', gap: 12}]}>
+                        {b.status !== 'Cancelled' && (
+                          <>
+                            <TouchableOpacity onPress={() => {
+                              setEditBookingSelected(b);
+                              setCancelBookingSelected(null);
+                              setEditForm({ patient_name: b.patient_name, mobile: b.mobile, age: String(b.age), gender: b.gender, blood_group: b.blood_group, city: b.city, pin_code: b.pin_code, guardian_name: b.guardian_name, reason_for_visit: b.reason_for_visit, reference: b.reference, pr: b.pr });
+                            }}><Edit color="#eab308" size={20} /></TouchableOpacity>
+                            <TouchableOpacity onPress={() => {
+                              setCancelBookingSelected(b);
+                              setEditBookingSelected(null);
+                            }}><XCircle color="#ef4444" size={20} /></TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  )}
+                </React.Fragment>
               ))}
               {allBookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found.</Text>}
             </View>
           </ScrollView>
-
-          {/* Edit Booking Modal */}
-          {editBookingSelected && (
-            <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 1000}}>
-              <View style={[styles.card, {width: isMobile ? '95%' : 600, maxHeight: '90%'}]}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16}}>
-                  <Text style={{fontSize: 18, fontWeight: 'bold'}}>Edit Booking #{editBookingSelected.token_number}</Text>
-                  <TouchableOpacity onPress={() => setEditBookingSelected(null)}><XCircle color="#64748b" size={24} /></TouchableOpacity>
-                </View>
-                <ScrollView>
-                  <View style={styles.grid}>
-                    <View style={styles.formGroup}>
-                      <Text style={styles.label}>Patient Name*</Text>
-                      <TextInput style={styles.input} value={editForm.patient_name} onChangeText={(v) => setEditForm({...editForm, patient_name: v})} />
-                    </View>
-                    <View style={styles.formGroup}>
-                      <Text style={styles.label}>Mobile*</Text>
-                      <TextInput style={styles.input} value={editForm.mobile} onChangeText={(v) => setEditForm({...editForm, mobile: v})} />
-                    </View>
-                    <View style={styles.formGroup}>
-                      <Text style={styles.label}>Age*</Text>
-                      <TextInput style={styles.input} value={editForm.age} onChangeText={(v) => setEditForm({...editForm, age: v})} />
-                    </View>
-                    <View style={styles.formGroup}>
-                      <Text style={styles.label}>Gender</Text>
-                      <View style={styles.pickerContainer}>
-                        <Picker selectedValue={editForm.gender} onValueChange={(v) => setEditForm({...editForm, gender: v})} style={styles.picker}>
-                          <Picker.Item label="Male" value="Male" /><Picker.Item label="Female" value="Female" />
-                        </Picker>
-                      </View>
-                    </View>
-                    <View style={styles.formGroup}><Text style={styles.label}>Address</Text><TextInput style={styles.input} value={editForm.city} onChangeText={(v) => setEditForm({...editForm, city: v})} /></View>
-                  </View>
-                  <TouchableOpacity style={styles.confirmBtn} onPress={handleEditSave} disabled={editLoading}>
-                    <Text style={styles.confirmBtnText}>{editLoading ? 'Saving...' : 'Save Changes'}</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            </View>
-          )}
         </View>
       ) : activeTab === 'Reschedule' ? (
         <View style={styles.card}>
