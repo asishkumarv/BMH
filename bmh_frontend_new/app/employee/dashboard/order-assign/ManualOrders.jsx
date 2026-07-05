@@ -31,7 +31,7 @@ export default function ManualOrders({ deliveryBoys }) {
   const [patientSearch, setPatientSearch] = useState('');
 
   // Create Form State
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     customer_phone: '',
     customer_name: '',
     ship_to_phone: '',
@@ -48,14 +48,15 @@ export default function ManualOrders({ deliveryBoys }) {
     notes: '',
     payment_mode: 'POD',
     payment_txn_id: '',
-      is_scheduled: false,
-      scheduled_date: '',
-      scheduled_time: '',
-      bus_travels_name: '',
-      bus_driver_name: '',
-      bus_driver_number: '',
-      bus_number: ''
-  });
+    is_scheduled: false,
+    scheduled_date: '',
+    scheduled_time: '',
+    bus_travels_name: '',
+    bus_driver_name: '',
+    bus_driver_number: '',
+    bus_number: ''
+  };
+  const [formData, setFormData] = useState(initialFormData);
 
   const fetchManualOrders = async (silent = false) => {
     try {
@@ -103,7 +104,7 @@ export default function ManualOrders({ deliveryBoys }) {
       setFormData({
         ...formData,
         bus_travels_name: bus.operator_name || bus.bus_name,
-        bus_driver_name: bus.contact_person || '',
+        bus_driver_name: bus.parcel_contact_person || bus.contact_person || '',
         bus_driver_number: bus.mobile_no || '',
         bus_number: bus.bus_number || '',
         mode_of_delivery: 'Bus',
@@ -119,7 +120,7 @@ export default function ManualOrders({ deliveryBoys }) {
       try {
         const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patient/by-mobile/${text}`);
         if (res.data && res.data.success) {
-          const p = res.data.data;
+          const p = res.data.patient || res.data.data;
           let defaultAddress = p.addresses && p.addresses.length > 0 ? p.addresses[0].address : '';
           let defaultLink = p.addresses && p.addresses.length > 0 ? p.addresses[0].location_link : '';
           setFormData({
@@ -252,6 +253,32 @@ export default function ManualOrders({ deliveryBoys }) {
       }
     } catch(e){}
 
+    // Filter available delivery boys based on order scheduled_time and boy's shift
+    const availableBoys = deliveryBoys?.filter(boy => {
+      if (!item.scheduled_time || !boy.schedule_in || !boy.schedule_out) return true; // Show all if no shift data
+      try {
+        const [bH, bM] = item.scheduled_time.split(':').map(Number);
+        if (isNaN(bH)) return true;
+        const busMins = bH * 60 + (bM || 0);
+
+        const [inH, inM] = boy.schedule_in.split(':').map(Number);
+        const inMins = inH * 60 + (inM || 0);
+
+        const [outH, outM] = boy.schedule_out.split(':').map(Number);
+        const outMins = outH * 60 + (outM || 0);
+
+        if (inMins <= outMins) {
+          return busMins >= inMins && busMins <= outMins;
+        } else {
+          // Night shift cross midnight
+          return busMins >= inMins || busMins <= outMins;
+        }
+      } catch (e) {
+        return true;
+      }
+    });
+
+
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
         {/* Status */}
@@ -291,7 +318,7 @@ export default function ManualOrders({ deliveryBoys }) {
                 style={styles.inlinePicker}
               >
                 <Picker.Item label={item.delivery_boy_id ? "Reassign To" : "Assign To"} value="" />
-                {deliveryBoys?.map(boy => (
+                {availableBoys?.map(boy => (
                   <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
                 ))}
               </Picker>
@@ -517,6 +544,10 @@ export default function ManualOrders({ deliveryBoys }) {
                     <Text style={styles.label}>Travels Name</Text>
                     <TextInput style={styles.input} value={formData.bus_travels_name || ''} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="Travels" />
                   </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Timing</Text>
+                    <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
+                  </View>
                 </View>
               )}
               <View style={styles.formRow}>
@@ -562,6 +593,9 @@ export default function ManualOrders({ deliveryBoys }) {
               </View>
             </ScrollView>
             <View style={styles.modalFooter}>
+              <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#ef4444', marginRight: 10}]} onPress={() => setFormData(initialFormData)}>
+                <Text style={styles.saveBtnText}>Clear Form</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleCreateSubmit}>
                 <Text style={styles.saveBtnText}>Save Order</Text>
               </TouchableOpacity>

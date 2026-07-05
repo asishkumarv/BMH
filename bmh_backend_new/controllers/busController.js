@@ -29,7 +29,7 @@ exports.initBusesDB = async () => {
 
 exports.getBuses = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM buses WHERE status = 'Active' ORDER BY bus_name ASC");
+    const result = await pool.query("SELECT * FROM buses ORDER BY bus_name ASC");
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching buses:', error);

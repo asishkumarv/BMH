@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
-import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee } from 'lucide-react-native';
+import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee, FileText } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Colors } from '../../../constants/Colors';
 
@@ -408,6 +408,23 @@ export default function DeliveryDashboard() {
           <Text style={styles.infoText}>{new Date(item.created_at).toLocaleString()}</Text>
         </View>
         <Text style={styles.totalText}>Total: ₹{parseFloat(item.total_amount || 0).toFixed(2)}</Text>
+        {item.notes ? (
+          <View style={{marginTop: 10, backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+              <FileText size={14} color="#64748B" style={{marginRight: 4}} />
+              <Text style={{fontSize: 12, fontWeight: 'bold', color: '#475569'}}>Notes</Text>
+            </View>
+            {typeof item.notes === 'string' && item.notes.startsWith('[') ? (
+              JSON.parse(item.notes).map((n: any, i: number) => (
+                <Text key={i} style={{fontSize: 13, color: '#334155', marginTop: 2}}>
+                  • {n.text} <Text style={{fontSize: 10, color: '#94a3b8'}}>({n.author})</Text>
+                </Text>
+              ))
+            ) : (
+              <Text style={{fontSize: 13, color: '#334155'}}>{item.notes}</Text>
+            )}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.cardFooter}>

@@ -23,7 +23,7 @@ async function generateSql() {
     const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet, { range: 1 });
+    const data = xlsx.utils.sheet_to_json(worksheet, { range: 3 });
 
     let sql = `
 CREATE TABLE IF NOT EXISTS buses (
