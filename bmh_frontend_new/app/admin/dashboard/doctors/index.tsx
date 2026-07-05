@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 
 const TABS = ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens', 'Revenue'];
 
@@ -261,9 +262,17 @@ export default function DoctorManagement() {
   const handleExportCSV = async () => {
     if (!bookings || bookings.length === 0) return;
     
-    let csvContent = "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode,Booked By\n";
+    let completed = bookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0);
+    let refund = bookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0);
+    let toRefund = bookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0);
+
+    let csvContent = "Bharat Medical Hall - Filtered Bookings Report\n";
+    csvContent += `Filters:,Date: ${bDate || 'All'},Doctor: ${doctors?.find(d => d.id === bDoctor)?.name || 'All'},Employee: ${employees?.find(e => e.id === bEmployee)?.full_name || 'All'}\n`;
+    csvContent += `Summary:,Completed: ₹${completed},Refund: ₹${refund},To Refund: ₹${toRefund}\n\n`;
+
+    csvContent += "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Booked By,Status,Payment Mode,Fee\n";
     bookings.forEach((b) => {
-      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString()},${b.start_time},${b.status},${b.payment_mode},${b.booked_by_name || 'Self'}\n`;
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.booked_by_name || 'Self'},${b.status},${b.payment_mode},${b.fee}\n`;
     });
     
     if (Platform.OS === 'web') {
@@ -282,7 +291,95 @@ export default function DoctorManagement() {
     }
   };
 
-  const fetchData = async () => {
+  const handlePrintBookings = async () => {
+    if (!bookings || bookings.length === 0) return;
+    
+    let completed = bookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0);
+    let refund = bookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0);
+    let toRefund = bookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0);
+
+    const htmlContent = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; font-size: 24px; }
+            .header-info { text-align: center; margin-bottom: 20px; font-size: 14px; color: #666; }
+            .summary-box { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-around; border: 1px solid #e2e8f0; }
+            .summary-item { text-align: center; font-size: 14px; }
+            .summary-item span { display: block; font-size: 18px; font-weight: bold; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f1f5f9; color: #1e293b; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Bharat Medical Hall</h1>
+          <div class="header-info">
+            <p><strong>Filtered Bookings Report</strong></p>
+            <p>Date: ${bDate || 'All'} | Doctor: ${doctors?.find(d => d.id === bDoctor)?.name || 'All'} | Employee: ${employees?.find(e => e.id === bEmployee)?.full_name || 'All'}</p>
+          </div>
+          <div class="summary-box">
+            <div class="summary-item" style="color: #16a34a;">Completed<span>₹${completed}</span></div>
+            <div class="summary-item" style="color: #ef4444;">Refund<span>₹${refund}</span></div>
+            <div class="summary-item" style="color: #f59e0b;">To Refund<span>₹${toRefund}</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Patient</th>
+                <th>Mobile</th>
+                <th>Doctor</th>
+                <th>Date & Time</th>
+                <th>Booked By</th>
+                <th>Status</th>
+                <th>Fee</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bookings.map((b: any) => `
+                <tr>
+                  <td>#${b.token_number}</td>
+                  <td>${b.patient_name}</td>
+                  <td>${b.mobile}</td>
+                  <td>${b.doctor_name}</td>
+                  <td>${new Date(b.date).toLocaleDateString('en-GB')} ${b.start_time}</td>
+                  <td>${b.booked_by_name || 'Self'}</td>
+                  <td>${b.status}</td>
+                  <td>₹${b.fee} (${b.payment_mode})</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    try {
+      // @ts-ignore
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.write(htmlContent);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 250);
+      } else {
+        // @ts-ignore
+        if (typeof Print !== 'undefined') await Print.printAsync({ html: htmlContent });
+      }
+    } catch (err) {
+      console.error('Print error', err);
+    }
+  };
+const fetchData = async () => {
     setLoading(true);
     try {
       const deptsRes = await axios.get('https://napi.bharatmedicalhallplus.com/department').catch(() => ({data: {data: []}}));
@@ -863,11 +960,23 @@ export default function DoctorManagement() {
             {activeTab === 'Bookings' && (
               <View style={styles.card}>
                 <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
-                  <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>Bookings Filter</Text>
-                  <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
-                    <Text style={styles.exportBtnText}>Export CSV</Text>
-                  </TouchableOpacity>
-                </View>
+                    <View>
+                      <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 8}}>Bookings Filter</Text>
+                      <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap'}}>
+                        <Text style={{fontSize: 13, color: '#16a34a', fontWeight: 'bold'}}>Completed: ₹{bookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                        <Text style={{fontSize: 13, color: '#ef4444', fontWeight: 'bold'}}>Refund: ₹{bookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                        <Text style={{fontSize: 13, color: '#f59e0b', fontWeight: 'bold'}}>To Refund: ₹{bookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                      </View>
+                    </View>
+                    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center'}}>
+                      <TouchableOpacity style={[styles.exportBtn, {backgroundColor: '#3b82f6'}]} onPress={handlePrintBookings}>
+                        <Text style={styles.exportBtnText}>Print All</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
+                        <Text style={styles.exportBtnText}>Export CSV</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
                 <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
                   <View style={[styles.filterCol, {minWidth: 150}]}>

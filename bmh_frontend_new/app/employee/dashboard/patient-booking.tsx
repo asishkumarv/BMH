@@ -494,7 +494,8 @@ export default function PatientBooking() {
                 <th>Mobile</th>
                 <th>Doctor</th>
                 <th>Date & Time</th>
-                <th>Status</th>
+                  <th>Booked By</th>
+                  <th>Status</th>
                 <th>Fee</th>
               </tr>
             </thead>
@@ -506,6 +507,7 @@ export default function PatientBooking() {
                   <td>${b.mobile}</td>
                   <td>${b.doctor_name}</td>
                   <td>${new Date(b.date).toLocaleDateString('en-GB')} ${b.start_time}</td>
+                  <td>${b.booked_by_name || '-'}</td>
                   <td>${b.status}</td>
                   <td>₹${b.fee} (${b.payment_mode})</td>
                 </tr>
@@ -580,7 +582,8 @@ export default function PatientBooking() {
                 <th>Mobile</th>
                 <th>Doctor</th>
                 <th>Date & Time</th>
-                <th>Status</th>
+                  <th>Booked By</th>
+                  <th>Status</th>
                 <th>Fee</th>
               </tr>
             </thead>
@@ -592,6 +595,7 @@ export default function PatientBooking() {
                   <td>${b.mobile}</td>
                   <td>${b.doctor_name}</td>
                   <td>${new Date(b.date).toLocaleDateString('en-GB')} ${b.start_time}</td>
+                  <td>${b.booked_by_name || '-'}</td>
                   <td>${b.status}</td>
                   <td>₹${b.fee} (${b.payment_mode})</td>
                 </tr>
@@ -1245,11 +1249,23 @@ useEffect(() => {
       ) : activeTab === 'My Bookings' ? (
         <View style={styles.card}>
           <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
-            <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>My Booked Patients</Text>
-            <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
-              <Text style={styles.exportBtnText}>Export CSV</Text>
-            </TouchableOpacity>
-          </View>
+              <View>
+                <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 8}}>My Booked Patients</Text>
+                <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap'}}>
+                  <Text style={{fontSize: 13, color: '#16a34a', fontWeight: 'bold'}}>Completed: ₹{myBookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                  <Text style={{fontSize: 13, color: '#ef4444', fontWeight: 'bold'}}>Refund: ₹{myBookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                  <Text style={{fontSize: 13, color: '#f59e0b', fontWeight: 'bold'}}>To Refund: ₹{myBookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                </View>
+              </View>
+              <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center'}}>
+                <TouchableOpacity style={[styles.exportBtn, {backgroundColor: '#3b82f6'}]} onPress={handlePrintMyBookings}>
+                  <Text style={styles.exportBtnText}>Print All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
+                  <Text style={styles.exportBtnText}>Export CSV</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           
           <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
             <View style={[styles.filterCol, {minWidth: 150}]}>
