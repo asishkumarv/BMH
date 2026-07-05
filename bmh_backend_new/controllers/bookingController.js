@@ -604,7 +604,7 @@ exports.getCancelledBookings = async (req, res) => {
       LEFT JOIN patients p ON cb.patient_id = p.id
       JOIN doctor_slots ds ON cb.slot_id = ds.id
       JOIN doctors d ON ds.doctor_id = d.id
-      LEFT JOIN employees e ON cb.booked_by = e.id
+      LEFT JOIN employees e ON cb.booked_by = e.id::varchar
       WHERE 1=1
     `;
     let params = [];

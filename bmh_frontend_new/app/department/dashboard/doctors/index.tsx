@@ -21,6 +21,88 @@ for (let h = 8; h <= 20; h++) {
 export default function DepartmentDoctorManagement() {
   const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState('Doctors');
+
+  // Cancelled Tokens State
+  const [cancelledTokens, setCancelledTokens] = useState<any[]>([]);
+  const [cDate, setCDate] = useState('');
+  const [cDoctor, setCDoctor] = useState('');
+  const [cPatient, setCPatient] = useState('');
+  const [cEmployee, setCEmployee] = useState('');
+  const [showCDatePicker, setShowCDatePicker] = useState(false);
+  const [todayRefund, setTodayRefund] = useState(0);
+  const [filterRefund, setFilterRefund] = useState(0);
+
+  // Refund Processing State
+  const [refundProcessing, setRefundProcessing] = useState<any>(null);
+  const [refundType, setRefundType] = useState('Cash');
+  const [refundTnx, setRefundTnx] = useState('');
+  const [processingRefund, setProcessingRefund] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'Cancelled Tokens') fetchCancelledTokens();
+  }, [activeTab, cDate, cDoctor, cPatient, cEmployee]);
+
+  const fetchCancelledTokens = async () => {
+    try {
+      let url = 'https://napi.bharatmedicalhallplus.com/bookings/cancelled-list?';
+      if (cDate) url += `date=${cDate}&`;
+      if (cDoctor) url += `doctor_id=${cDoctor}&`;
+      if (cEmployee) url += `booked_by=${cEmployee}&`;
+      if (cPatient) url += `patient_name=${cPatient}&`;
+      const res = await axios.get(url);
+      const tokens = res.data.data || [];
+      setCancelledTokens(tokens);
+      
+      const today = new Date().toISOString().split('T')[0];
+      const todayTotal = tokens.filter((t: any) => t.refund_status === 'Refunded' && new Date(t.cancelled_at).toISOString().split('T')[0] === today).reduce((sum: number, t: any) => sum + parseFloat(t.fee), 0);
+      setTodayRefund(todayTotal);
+
+      const filterTotal = tokens.filter((t: any) => t.refund_status === 'Refunded').reduce((sum: number, t: any) => sum + parseFloat(t.fee), 0);
+      setFilterRefund(filterTotal);
+
+      const deptsRes = await axios.get('https://napi.bharatmedicalhallplus.com/department').catch(() => ({data: {data: []}}));
+      setDepartments(deptsRes.data.data || []);
+      const empRes = await axios.get('https://napi.bharatmedicalhallplus.com/employees').catch(()=>null);
+      if (empRes?.data?.data) setEmployees(empRes.data.data);
+      const docsRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors').catch(()=>null);
+      if (docsRes?.data?.data) setDoctors(docsRes.data.data);
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
+  const handleProcessRefund = async () => {
+    if (refundType === 'Online' && !refundTnx) {
+      alert('Transaction number is required for Online refunds');
+      return;
+    }
+    setProcessingRefund(true);
+    try {
+      const userData = await AsyncStorage.getItem('adminUser') || await AsyncStorage.getItem('departmentUser') || await AsyncStorage.getItem('user');
+      let userId = '1';
+      if (userData) {
+         const user = JSON.parse(userData);
+         userId = user.id;
+      }
+
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/cancelled/${refundProcessing.id}/refund`, {
+        refund_type: refundType,
+        refund_tnx: refundTnx,
+        processed_by_id: userId
+      });
+      if (res.data.success) {
+        alert('Refund processed successfully');
+        setRefundProcessing(null);
+        setRefundTnx('');
+        fetchCancelledTokens();
+      }
+    } catch(err: any) {
+      alert(err?.response?.data?.message || 'Failed to process refund');
+    } finally {
+      setProcessingRefund(false);
+    }
+  };
+
   const [doctors, setDoctors] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
