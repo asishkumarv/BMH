@@ -392,6 +392,18 @@ export default function SubAdminRegisterScreen() {
                 <Text style={styles.complianceText}>I hereby verify that all operational records provided match my active credentials and align with the standard parameters of Bharat Medical Hall corporate compliance policies.</Text>
               </View>
 
+              {errorMessage ? (
+                <View style={{ backgroundColor: '#FEE2E2', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#DC2626', fontSize: 14, textAlign: 'center' }}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
+              {successMessage ? (
+                <View style={{ backgroundColor: '#DCFCE7', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ color: '#16A34A', fontSize: 14, textAlign: 'center' }}>{successMessage}</Text>
+                </View>
+              ) : null}
+
               <Pressable style={[styles.submitBtn, registering && { opacity: 0.7 }]} onPress={handleRegister} disabled={registering}>
                 <Text style={styles.submitBtnText}>{registering ? 'Registering...' : 'Finalize Account Registration →'}</Text>
               </Pressable>

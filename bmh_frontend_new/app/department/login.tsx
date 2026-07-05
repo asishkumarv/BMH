@@ -47,7 +47,14 @@ export default function SubAdminLoginScreen() {
         });
       }
     } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || 'Invalid credentials');
+      const backendMessage = error.response?.data?.message;
+      if (backendMessage === 'Account is not active') {
+        setErrorMessage('Admin is not approved yet. Please wait for approval.');
+      } else if (backendMessage === 'Invalid email or password') {
+        setErrorMessage('Invalid credentials. Please try again.');
+      } else {
+        setErrorMessage(backendMessage || 'Login failed. Invalid credentials.');
+      }
     } finally {
       setLoading(false);
     }

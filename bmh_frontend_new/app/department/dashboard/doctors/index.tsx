@@ -9,7 +9,7 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-const TABS = ['Doctors', 'Slots', 'Bookings']; // No Revenue tab
+const TABS = ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens']; // No Revenue tab
 
 const TIME_SLOTS: string[] = [];
 for (let h = 8; h <= 20; h++) {
@@ -816,6 +816,53 @@ export default function DepartmentDoctorManagement() {
       </ScrollView>
       </>
       )}
+
+      
+      {/* Refund Modal */}
+      <Modal visible={!!refundProcessing} animationType="slide" transparent={true} onRequestClose={() => setRefundProcessing(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, {maxWidth: 400}]}>
+            <View style={styles.modalHeaderContainer}>
+              <Text style={styles.modalTitle}>Process Refund</Text>
+              <TouchableOpacity onPress={() => setRefundProcessing(null)}>
+                <X color="#64748b" size={24} />
+              </TouchableOpacity>
+            </View>
+            {refundProcessing && (
+              <View>
+                <Text style={{fontSize: 16, marginBottom: 16}}>
+                  Refunding <Text style={{fontWeight: 'bold', color: '#10b981'}}>₹{refundProcessing.fee}</Text> for Token #{refundProcessing.token_number}
+                </Text>
+                
+                <Text style={styles.label}>Refund Type</Text>
+                <View style={[styles.pickerContainer, {marginBottom: 16}]}>
+                  <Picker selectedValue={refundType} onValueChange={setRefundType} style={styles.picker}>
+                    <Picker.Item label="Cash" value="Cash" />
+                    <Picker.Item label="Online" value="Online" />
+                  </Picker>
+                </View>
+                
+                {refundType === 'Online' && (
+                  <View style={{marginBottom: 16}}>
+                    <Text style={styles.label}>Transaction Number *</Text>
+                    <TextInput style={styles.input} value={refundTnx} onChangeText={setRefundTnx} placeholder="Enter Txn Number" />
+                  </View>
+                )}
+                
+                {refundType === 'Cash' && (
+                  <Text style={{fontSize: 12, color: '#64748b', marginBottom: 16}}>
+                    Warning: Cash refund amount will be deducted from your cash-in-hand wallet balance.
+                  </Text>
+                )}
+                
+                <TouchableOpacity style={styles.submitBtn} onPress={handleProcessRefund} disabled={processingRefund}>
+                  {processingRefund ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Confirm Refund</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit Doctor Modal */}
       <Modal visible={!!editDoctor} animationType="slide" transparent={true} onRequestClose={() => setEditDoctor(null)}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image, Platform } from 'react-native';
-import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search, User } from 'lucide-react-native';
+import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search, User, Edit, XCircle } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -634,7 +634,7 @@ export default function PatientBooking() {
       <Text style={styles.header}>Patient Booking</Text>
       
       <View style={styles.tabContainer}>
-        {['New Booking', 'My Bookings', 'Reschedule'].map(tab => (
+        {['New Booking', 'My Bookings', 'Reschedule', 'Bookings'].map(tab => (
           <TouchableOpacity 
             key={tab} 
             style={[styles.tab, activeTab === tab && styles.activeTab]}

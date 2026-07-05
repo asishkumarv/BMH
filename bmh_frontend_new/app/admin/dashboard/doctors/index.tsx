@@ -5,11 +5,12 @@ import axios from 'axios';
 import { Colors } from '../../../../constants/Colors';
 import { useResponsive } from '../../../../hooks/useResponsive';
 import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 
-const TABS = ['Doctors', 'Slots', 'Bookings', 'Revenue'];
+const TABS = ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens', 'Revenue'];
 
 const TIME_SLOTS: string[] = [];
 for (let h = 8; h <= 20; h++) {
@@ -881,6 +882,115 @@ export default function DoctorManagement() {
               </View>
             )}
 
+            
+            {activeTab === 'Cancelled Tokens' && (
+              <View style={styles.card}>
+                <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
+                  <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>Cancelled Tokens & Refunds</Text>
+                  <View style={{flexDirection: 'row', gap: 16}}>
+                    <View style={{backgroundColor: '#ecfdf5', padding: 8, borderRadius: 8}}>
+                      <Text style={{fontSize: 12, color: '#065f46', fontWeight: 'bold'}}>Today's Refunds: ₹{todayRefund}</Text>
+                    </View>
+                    <View style={{backgroundColor: '#eff6ff', padding: 8, borderRadius: 8}}>
+                      <Text style={{fontSize: 12, color: '#1e3a8a', fontWeight: 'bold'}}>Filtered Refunds: ₹{filterRefund}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Patient Name</Text>
+                    <TextInput style={[styles.input, {padding: 10}]} value={cPatient} onChangeText={setCPatient} placeholder="Search patient" />
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Date</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="date" value={cDate} onChange={(e) => setCDate(e.target.value)} style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, color: '#1e293b', width: '100%' } as any} />
+                    ) : (
+                      <>
+                        <TouchableOpacity onPress={() => setShowCDatePicker(true)}>
+                          <TextInput style={[styles.input, {padding: 10}]} value={cDate} editable={false} placeholder="Select Date" />
+                        </TouchableOpacity>
+                        {showCDatePicker && <DateTimePicker value={cDate ? new Date(cDate) : new Date()} mode="date" display="default" onChange={(e, d) => { setShowCDatePicker(false); if(d) setCDate(d.toISOString().split('T')[0]); }} />}
+                      </>
+                    )}
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Doctor</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker selectedValue={cDoctor} onValueChange={setCDoctor} style={styles.picker}>
+                        <Picker.Item label="All Doctors" value="" />
+                        {doctors.map((d: any) => <Picker.Item key={d.id} label={d.full_name} value={d.id} />)}
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150}]}>
+                    <Text style={styles.label}>Cancelled By</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker selectedValue={cEmployee} onValueChange={setCEmployee} style={styles.picker}>
+                        <Picker.Item label="All" value="" />
+                        {employees.map((e: any) => <Picker.Item key={e.id} label={e.full_name} value={e.id} />)}
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={[styles.filterCol, {minWidth: 150, justifyContent: 'flex-end'}]}>
+                    <TouchableOpacity style={styles.clearBtn} onPress={() => { setCDoctor(''); setCEmployee(''); setCDate(''); setCPatient(''); }}>
+                      <Text style={styles.clearBtnText}>Clear Filters</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ minWidth: isMobile ? 1000 : '100%' }}>
+                    <View style={styles.tableRowHeader}>
+                      <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
+                      <Text style={styles.tableCellHeader}>Patient</Text>
+                      <Text style={styles.tableCellHeader}>Doctor & Date</Text>
+                      <Text style={styles.tableCellHeader}>Cancelled At</Text>
+                      <Text style={styles.tableCellHeader}>Cancelled By</Text>
+                      <Text style={styles.tableCellHeader}>Fee</Text>
+                      <Text style={styles.tableCellHeader}>Refund Status</Text>
+                    </View>
+                    {cancelledTokens.map((b, i) => (
+                      <View key={i} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, {flex: 0.5, fontWeight: 'bold'}]}>#{b.token_number}</Text>
+                        <View style={styles.tableCell}>
+                          <Text style={{fontWeight: '500'}}>{b.patient_name}</Text>
+                          <Text style={{fontSize: 12, color: '#64748b'}}>{b.mobile}</Text>
+                        </View>
+                        <View style={styles.tableCell}>
+                          <Text>{b.doctor_name}</Text>
+                          <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.date).toLocaleDateString()}</Text>
+                        </View>
+                        <View style={styles.tableCell}>
+                          <Text>{new Date(b.cancelled_at).toLocaleDateString()}</Text>
+                          <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.cancelled_at).toLocaleTimeString()}</Text>
+                        </View>
+                        <View style={styles.tableCell}>
+                          <Text>{b.cancelled_by_name || 'System'}</Text>
+                          <Text style={{fontSize: 12, color: '#64748b'}}>{b.cancelled_by_role}</Text>
+                        </View>
+                        <Text style={[styles.tableCell, {fontWeight: 'bold'}]}>₹{b.fee}</Text>
+                        <View style={styles.tableCell}>
+                          {b.refund_status === 'Refunded' ? (
+                            <View>
+                              <Text style={{color: '#10b981', fontWeight: 'bold'}}>Refunded</Text>
+                              <Text style={{fontSize: 10, color: '#64748b'}}>{b.refund_type}</Text>
+                            </View>
+                          ) : (
+                            <TouchableOpacity style={{backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start'}} onPress={() => setRefundProcessing(b)}>
+                              <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>Process Refund</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    ))}
+                    {cancelledTokens.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No cancelled tokens found.</Text>}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+
             {activeTab === 'Revenue' && (
               <View style={styles.card}>
                 <View style={styles.tableRowHeader}>
@@ -908,6 +1018,53 @@ export default function DoctorManagement() {
       </ScrollView>
       </>
       )}
+
+      
+      {/* Refund Modal */}
+      <Modal visible={!!refundProcessing} animationType="slide" transparent={true} onRequestClose={() => setRefundProcessing(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, {maxWidth: 400}]}>
+            <View style={styles.modalHeaderContainer}>
+              <Text style={styles.modalTitle}>Process Refund</Text>
+              <TouchableOpacity onPress={() => setRefundProcessing(null)}>
+                <X color="#64748b" size={24} />
+              </TouchableOpacity>
+            </View>
+            {refundProcessing && (
+              <View>
+                <Text style={{fontSize: 16, marginBottom: 16}}>
+                  Refunding <Text style={{fontWeight: 'bold', color: '#10b981'}}>₹{refundProcessing.fee}</Text> for Token #{refundProcessing.token_number}
+                </Text>
+                
+                <Text style={styles.label}>Refund Type</Text>
+                <View style={[styles.pickerContainer, {marginBottom: 16}]}>
+                  <Picker selectedValue={refundType} onValueChange={setRefundType} style={styles.picker}>
+                    <Picker.Item label="Cash" value="Cash" />
+                    <Picker.Item label="Online" value="Online" />
+                  </Picker>
+                </View>
+                
+                {refundType === 'Online' && (
+                  <View style={{marginBottom: 16}}>
+                    <Text style={styles.label}>Transaction Number *</Text>
+                    <TextInput style={styles.input} value={refundTnx} onChangeText={setRefundTnx} placeholder="Enter Txn Number" />
+                  </View>
+                )}
+                
+                {refundType === 'Cash' && (
+                  <Text style={{fontSize: 12, color: '#64748b', marginBottom: 16}}>
+                    Warning: Cash refund amount will be deducted from your cash-in-hand wallet balance.
+                  </Text>
+                )}
+                
+                <TouchableOpacity style={styles.submitBtn} onPress={handleProcessRefund} disabled={processingRefund}>
+                  {processingRefund ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Confirm Refund</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit Doctor Modal */}
       <Modal visible={!!editDoctor} animationType="slide" transparent={true} onRequestClose={() => setEditDoctor(null)}>
