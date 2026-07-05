@@ -188,39 +188,39 @@ exports.getBookings = async (req, res) => {
 
     if (date) {
       params.push(date);
-      query += ` AND date = ${params.length}`;
+      query += ` AND date = $${params.length}`;
     }
     if (department) {
       params.push(department);
-      query += ` AND department = ${params.length}`;
+      query += ` AND department = $${params.length}`;
     }
     if (slot_id) {
       params.push(slot_id);
-      query += ` AND slot_id = ${params.length}`;
+      query += ` AND slot_id = $${params.length}`;
     }
     if (booked_by) {
       params.push(booked_by);
-      query += ` AND booked_by_id = ${params.length}`;
+      query += ` AND booked_by_id = $${params.length}`;
     }
     if (doctor_id) {
       params.push(doctor_id);
-      query += ` AND doctor_id = ${params.length}`;
+      query += ` AND doctor_id = $${params.length}`;
     }
     if (patient_name) {
       params.push(`%${patient_name}%`);
-      query += ` AND (patient_name ILIKE ${params.length} OR mobile ILIKE ${params.length} OR booking_id::text ILIKE ${params.length})`;
+      query += ` AND (patient_name ILIKE $${params.length} OR mobile ILIKE $${params.length} OR booking_id::text ILIKE $${params.length})`;
     }
     if (patient_id) {
       params.push(patient_id);
-      query += ` AND patient_id = ${params.length}`;
+      query += ` AND patient_id = $${params.length}`;
     }
     if (status) {
       params.push(status);
-      query += ` AND status = ${params.length}`;
+      query += ` AND status = $${params.length}`;
     }
     if (booking_id) {
       params.push(booking_id);
-      query += ` AND booking_id::text ILIKE '%' || ${params.length} || '%'`;
+      query += ` AND booking_id::text ILIKE '%' || $${params.length} || '%'`;
     }
 
     query += ' ORDER BY date DESC, start_time ASC, token_number ASC';
