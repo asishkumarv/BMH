@@ -10,6 +10,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
 
 export default function SubAdminLayout() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('global_refresh', () => {
+      setRefreshKey(prev => prev + 1);
+    });
+    return () => sub.remove();
+  }, []);
   const { isDesktop } = useResponsive();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -76,7 +84,7 @@ export default function SubAdminLayout() {
             title={!isDesktop ? "Department Portal" : undefined}
             onMenuPress={!isDesktop ? () => setIsMobileSidebarOpen(true) : undefined}
           />
-          <Slot />
+          <View key={refreshKey} style={{flex: 1}}><Slot /></View>
         </View>
       </View>
     </SafeAreaView>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Wallet, User, LogOut, Menu } from 'lucide-react-native';
+import {  Wallet, User, LogOut, Menu , RefreshCcw } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -67,6 +67,10 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
     }
   };
 
+  const handleRefresh = () => {
+    DeviceEventEmitter.emit('global_refresh');
+  };
+
   const handleWalletClick = () => {
     if (userType === 'super_admin') {
       router.push('/admin/dashboard/wallet');
@@ -110,6 +114,9 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
       )}
 
       <View style={styles.actions}>
+        <TouchableOpacity style={styles.iconButton} onPress={handleRefresh}>
+          <RefreshCcw size={24} color={Colors.light.text} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton} onPress={handleWalletClick}>
           <Wallet size={24} color={Colors.light.text} />
         </TouchableOpacity>
