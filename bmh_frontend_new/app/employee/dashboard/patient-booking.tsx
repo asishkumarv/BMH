@@ -421,6 +421,108 @@ export default function PatientBooking() {
   }, [user]);
 
 
+  const handleExportAllCSV = async () => {
+    if (!allBookings || allBookings.length === 0) return;
+    
+    let completed = allBookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0);
+    let refund = allBookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0);
+    let toRefund = allBookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0);
+
+    let csvContent = "Bharat Medical Hall - Filtered Bookings Report\n";
+    csvContent += `Filters:,Date: ${bDateFilter || 'All'},Doctor: ${bDoctorFilter || 'All'},Employee: ${bEmployeeFilter || 'All'},Status: ${bStatusFilter || 'All'}\n`;
+    csvContent += `Summary:,Completed: ₹${completed},Refund: ₹${refund},To Refund: ₹${toRefund}\n\n`;
+
+    csvContent += "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode,Fee\n";
+    allBookings.forEach((b: any) => {
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.status},${b.payment_mode},${b.fee}\n`;
+    });
+    
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'all_bookings_report.csv');
+      a.click();
+    } else {
+      // @ts-ignore
+      const uri = FileSystem.documentDirectory + "all_bookings_report.csv";
+      // @ts-ignore
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri);
+    }
+  };
+
+  const handlePrintAllBookings = async () => {
+    if (!allBookings || allBookings.length === 0) return;
+    
+    let completed = allBookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0);
+    let refund = allBookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0);
+    let toRefund = allBookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0);
+
+    const htmlContent = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; font-size: 24px; }
+            .header-info { text-align: center; margin-bottom: 20px; font-size: 14px; color: #666; }
+            .summary-box { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-around; border: 1px solid #e2e8f0; }
+            .summary-item { text-align: center; font-size: 14px; }
+            .summary-item span { display: block; font-size: 18px; font-weight: bold; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f1f5f9; color: #1e293b; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Bharat Medical Hall</h1>
+          <div class="header-info">
+            <p><strong>Filtered Bookings Report</strong></p>
+            <p>Date: ${bDateFilter || 'All'} | Doctor: ${bDoctorFilter || 'All'} | Employee: ${bEmployeeFilter || 'All'} | Status: ${bStatusFilter || 'All'}</p>
+          </div>
+          <div class="summary-box">
+            <div class="summary-item" style="color: #16a34a;">Completed<span>₹${completed}</span></div>
+            <div class="summary-item" style="color: #ef4444;">Refund<span>₹${refund}</span></div>
+            <div class="summary-item" style="color: #f59e0b;">To Refund<span>₹${toRefund}</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Patient</th>
+                <th>Mobile</th>
+                <th>Doctor</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th>Fee</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allBookings.map((b: any) => `
+                <tr>
+                  <td>#${b.token_number}</td>
+                  <td>${b.patient_name}</td>
+                  <td>${b.mobile}</td>
+                  <td>${b.doctor_name}</td>
+                  <td>${new Date(b.date).toLocaleDateString('en-GB')} ${b.start_time}</td>
+                  <td>${b.status}</td>
+                  <td>₹${b.fee} (${b.payment_mode})</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    try {
+      await Print.printAsync({ html: htmlContent });
+    } catch (err) {
+      console.error('Print error', err);
+    }
+  };
+
   const handleExportCSV = async () => {
     if (!myBookings || myBookings.length === 0) return;
     
@@ -445,31 +547,7 @@ export default function PatientBooking() {
     }
   };
 
-  const handleExportAllCSV = async () => {
-    if (!allBookings || allBookings.length === 0) return;
-    
-    let csvContent = "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode\n";
-    allBookings.forEach((b: any) => {
-      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.status},${b.payment_mode}\n`;
-    });
-    
-    if (Platform.OS === 'web') {
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.setAttribute('href', url);
-      a.setAttribute('download', 'all_bookings.csv');
-      a.click();
-    } else {
-      // @ts-ignore
-      const uri = FileSystem.documentDirectory + "all_bookings.csv";
-      // @ts-ignore
-      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
-      await Sharing.shareAsync(uri);
-    }
-  };
-
-  useEffect(() => {
+useEffect(() => {
     const loadUserAndSlots = async () => {
       const userData = await AsyncStorage.getItem('employeeUser');
       if (userData) {
@@ -1181,6 +1259,9 @@ export default function PatientBooking() {
                 <Text style={{fontSize: 13, color: '#ef4444', fontWeight: 'bold'}}>Refund: ₹{allBookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
                 <Text style={{fontSize: 13, color: '#f59e0b', fontWeight: 'bold'}}>To Refund: ₹{allBookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
               </View>
+              <TouchableOpacity style={[styles.exportBtn, {backgroundColor: '#3b82f6'}]} onPress={handlePrintAllBookings}>
+                <Text style={styles.exportBtnText}>Print All</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.exportBtn} onPress={handleExportAllCSV}>
                 <Text style={styles.exportBtnText}>Export CSV</Text>
               </TouchableOpacity>
@@ -1329,6 +1410,14 @@ export default function PatientBooking() {
                         <Text style={{fontSize: 12, color: b.status === 'Cancelled' ? 'red' : 'green'}}>{b.status}</Text>
                       </View>
                       <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row', justifyContent: 'center', gap: 12}]}>
+                        {b.status === 'Booked' && (
+                          <TouchableOpacity onPress={() => {
+                            setActiveTab('Reschedule');
+                            handleSelectReschedule(b);
+                          }}>
+                            <Calendar color="#8b5cf6" size={20} />
+                          </TouchableOpacity>
+                        )}
                         {b.status !== 'Cancelled' && (
                           <TouchableOpacity onPress={() => handlePrintReceipt(b)}>
                             <Printer color="#3b82f6" size={20} />
