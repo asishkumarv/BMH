@@ -432,9 +432,9 @@ export default function PatientBooking() {
     csvContent += `Filters:,Date: ${bDateFilter || 'All'},Doctor: ${bDoctorFilter || 'All'},Employee: ${bEmployeeFilter || 'All'},Status: ${bStatusFilter || 'All'}\n`;
     csvContent += `Summary:,Completed: ₹${completed},Refund: ₹${refund},To Refund: ₹${toRefund}\n\n`;
 
-    csvContent += "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode,Fee\n";
+    csvContent += "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Booked By,Status,Payment Mode,Fee\n";
     allBookings.forEach((b: any) => {
-      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.status},${b.payment_mode},${b.fee}\n`;
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.booked_by_name || '-'},${b.status},${b.payment_mode},${b.fee}\n`;
     });
     
     if (Platform.OS === 'web') {
@@ -479,7 +479,7 @@ export default function PatientBooking() {
           <h1>Bharat Medical Hall</h1>
           <div class="header-info">
             <p><strong>Filtered Bookings Report</strong></p>
-            <p>Date: ${bDateFilter || 'All'} | Doctor: ${bDoctorFilter || 'All'} | Employee: ${bEmployeeFilter || 'All'} | Status: ${bStatusFilter || 'All'}</p>
+            <p>Date: ${bDateFilter || 'All'} | Doctor: ${uniqueDoctors.find((d:any) => d.id === bDoctorFilter)?.name || 'All'} | Employee: ${allEmployees.find((e:any) => e.id === bEmployeeFilter)?.full_name || 'All'} | Status: ${bStatusFilter || 'All'}</p>
           </div>
           <div class="summary-box">
             <div class="summary-item" style="color: #16a34a;">Completed<span>₹${completed}</span></div>
@@ -565,7 +565,7 @@ export default function PatientBooking() {
           <h1>Bharat Medical Hall</h1>
           <div class="header-info">
             <p><strong>My Booked Patients Report</strong></p>
-            <p>Date: ${filterDate || 'All'} | Doctor: ${filterDoctor || 'All'} | Patient: ${filterPatient || 'All'}</p>
+            <p>Date: ${filterDate || 'All'} | Doctor: ${uniqueDoctors.find((d:any) => d.id === filterDoctor)?.name || 'All'} | Patient: ${filterPatient || 'All'}</p>
           </div>
           <div class="summary-box">
             <div class="summary-item" style="color: #16a34a;">Completed<span>₹${completed}</span></div>
