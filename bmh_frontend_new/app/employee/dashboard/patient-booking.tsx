@@ -445,6 +445,30 @@ export default function PatientBooking() {
     }
   };
 
+  const handleExportAllCSV = async () => {
+    if (!allBookings || allBookings.length === 0) return;
+    
+    let csvContent = "Token,Patient Name,Mobile,Doctor,Department,Date,Time,Status,Payment Mode\n";
+    allBookings.forEach((b: any) => {
+      csvContent += `${b.token_number},${b.patient_name},${b.mobile},${b.doctor_name},${b.department},${new Date(b.date).toLocaleDateString('en-GB')},${b.start_time},${b.status},${b.payment_mode}\n`;
+    });
+    
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'all_bookings.csv');
+      a.click();
+    } else {
+      // @ts-ignore
+      const uri = FileSystem.documentDirectory + "all_bookings.csv";
+      // @ts-ignore
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(uri);
+    }
+  };
+
   useEffect(() => {
     const loadUserAndSlots = async () => {
       const userData = await AsyncStorage.getItem('employeeUser');
@@ -1150,9 +1174,20 @@ export default function PatientBooking() {
         <View style={styles.card}>
           <View style={[styles.headerRow, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
             <Text style={{fontSize: 20, fontWeight: 'bold', color: '#1e293b'}}>All Bookings</Text>
-            <TouchableOpacity style={styles.clearBtn} onPress={() => { setBDateFilter(''); setBDoctorFilter(''); setBPatientFilter(''); setBEmployeeFilter(''); setBStatusFilter(''); }}>
-              <Text style={styles.clearBtnText}>Clear Filters</Text>
-            </TouchableOpacity>
+            
+            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center'}}>
+              <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap'}}>
+                <Text style={{fontSize: 13, color: '#16a34a', fontWeight: 'bold'}}>Completed: ₹{allBookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                <Text style={{fontSize: 13, color: '#ef4444', fontWeight: 'bold'}}>Refund: ₹{allBookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+                <Text style={{fontSize: 13, color: '#f59e0b', fontWeight: 'bold'}}>To Refund: ₹{allBookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0)}</Text>
+              </View>
+              <TouchableOpacity style={styles.exportBtn} onPress={handleExportAllCSV}>
+                <Text style={styles.exportBtnText}>Export CSV</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => { setBDateFilter(''); setBDoctorFilter(''); setBPatientFilter(''); setBEmployeeFilter(''); setBStatusFilter(''); }}>
+                <Text style={styles.clearBtnText}>Clear Filters</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
@@ -1295,17 +1330,22 @@ export default function PatientBooking() {
                       </View>
                       <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row', justifyContent: 'center', gap: 12}]}>
                         {b.status !== 'Cancelled' && (
-                          <>
-                            <TouchableOpacity onPress={() => {
-                              setEditBookingSelected(b);
-                              setCancelBookingSelected(null);
-                              setEditForm({ patient_name: b.patient_name, mobile: b.mobile, age: String(b.age), gender: b.gender, blood_group: b.blood_group, city: b.city, pin_code: b.pin_code, guardian_name: b.guardian_name, reason_for_visit: b.reason_for_visit, reference: b.reference, pr: b.pr });
-                            }}><Edit color="#eab308" size={20} /></TouchableOpacity>
-                            <TouchableOpacity onPress={() => {
-                              setCancelBookingSelected(b);
-                              setEditBookingSelected(null);
-                            }}><XCircle color="#ef4444" size={20} /></TouchableOpacity>
-                          </>
+                          <TouchableOpacity onPress={() => handlePrintReceipt(b)}>
+                            <Printer color="#3b82f6" size={20} />
+                          </TouchableOpacity>
+                        )}
+                        {b.status !== 'Cancelled' && (
+                          <TouchableOpacity onPress={() => {
+                            setEditBookingSelected(b);
+                            setCancelBookingSelected(null);
+                            setEditForm({ patient_name: b.patient_name, mobile: b.mobile, age: String(b.age), gender: b.gender, blood_group: b.blood_group, city: b.city, pin_code: b.pin_code, guardian_name: b.guardian_name, reason_for_visit: b.reason_for_visit, reference: b.reference, pr: b.pr });
+                          }}><Edit color="#eab308" size={20} /></TouchableOpacity>
+                        )}
+                        {b.status !== 'Cancelled' && b.status !== 'Completed' && (
+                          <TouchableOpacity onPress={() => {
+                            setCancelBookingSelected(b);
+                            setEditBookingSelected(null);
+                          }}><XCircle color="#ef4444" size={20} /></TouchableOpacity>
                         )}
                       </View>
                     </View>
