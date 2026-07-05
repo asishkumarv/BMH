@@ -1,12 +1,19 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, LogOut, Package, User } from 'lucide-react-native';
+import { LayoutDashboard, LogOut, Package, User, CalendarDays, CalendarClock, CheckSquare, Briefcase, Wallet, Bell, FileText } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/delivery/dashboard' },
+  { name: 'Attendance', icon: CalendarDays, route: '/delivery/dashboard/attendance' },
+  { name: 'Leave', icon: CalendarClock, route: '/delivery/dashboard/leave-management' },
+  { name: 'Tasks', icon: CheckSquare, route: '/delivery/dashboard/tasks' },
+  { name: 'Stationary', icon: Briefcase, route: '/delivery/dashboard/stationary' },
+  { name: 'Wallet', icon: Wallet, route: '/delivery/dashboard/wallet' },
+  { name: 'Notifications', icon: Bell, route: '/delivery/dashboard/notifications' },
+  { name: 'Payslips', icon: FileText, route: '/delivery/dashboard/payslips' },
   { name: 'My Orders', icon: Package, route: '/delivery/dashboard/orders' },
   { name: 'Profile', icon: User, route: '/delivery/dashboard/profile' },
 ];

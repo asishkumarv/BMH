@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar } from 'react-native';
+import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar, DeviceEventEmitter } from 'react-native';
 import { Slot } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { DeliverySidebar } from '../../../components/ui/DeliverySidebar';
@@ -8,6 +8,14 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 
 export default function EmployeeLayout() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('global_refresh', () => {
+      setRefreshKey(prev => prev + 1);
+    });
+    return () => sub.remove();
+  }, []);
   const { isDesktop } = useResponsive();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -37,11 +45,11 @@ export default function EmployeeLayout() {
           isDesktop && { marginLeft: 260 } // Offset for fixed sidebar on web
         ]}>
           <TopHeader 
-            userType="employee" 
-            title={!isDesktop ? "Employee Portal" : undefined}
+            userType="delivery" 
+            title={!isDesktop ? "Delivery Portal" : undefined}
             onMenuPress={!isDesktop ? () => setIsMobileSidebarOpen(true) : undefined}
           />
-          <Slot />
+          <View key={refreshKey} style={{flex: 1}}><Slot /></View>
         </View>
       </View>
     </SafeAreaView>

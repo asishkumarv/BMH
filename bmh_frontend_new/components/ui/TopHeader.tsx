@@ -7,7 +7,7 @@ import { Colors } from '../../constants/Colors';
 import axios from 'axios';
 
 type TopHeaderProps = {
-  userType: 'super_admin' | 'department_admin' | 'employee';
+  userType: 'super_admin' | 'department_admin' | 'employee' | 'delivery';
   title?: string;
   onMenuPress?: () => void;
 };
@@ -26,10 +26,12 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
         if (userType === 'super_admin') dataStr = localStorage.getItem('superAdminUser');
         else if (userType === 'department_admin') dataStr = localStorage.getItem('subAdminUser');
         else if (userType === 'employee') dataStr = localStorage.getItem('employeeUser');
+        else if (userType === 'delivery') dataStr = localStorage.getItem('employeeUser'); // Delivery boy uses same key or 'deliveryUser'?
       } else {
         if (userType === 'super_admin') dataStr = await AsyncStorage.getItem('superAdminUser');
         else if (userType === 'department_admin') dataStr = await AsyncStorage.getItem('subAdminUser');
         else if (userType === 'employee') dataStr = await AsyncStorage.getItem('employeeUser');
+        else if (userType === 'delivery') dataStr = await AsyncStorage.getItem('employeeUser'); // Assumes same employeeUser key
       }
 
       if (dataStr) {
