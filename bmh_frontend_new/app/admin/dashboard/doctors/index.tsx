@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform, KeyboardAvoidingView } from 'react-native';
-import { Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X } from 'lucide-react-native';
+import {  Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X , RefreshCcw } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../../constants/Colors';
 import { useResponsive } from '../../../../hooks/useResponsive';
@@ -1040,8 +1040,12 @@ const fetchData = async () => {
                   </View>
                   <View style={[styles.filterCol, {minWidth: 150, justifyContent: 'flex-end'}]}>
                     <TouchableOpacity style={styles.clearBtn} onPress={() => { setBDept(''); setBDoctor(''); setBEmployee(''); setBDate(''); setBPatient(''); }}>
-                      <Text style={styles.clearBtnText}>Clear Filters</Text>
-                    </TouchableOpacity>
+                        <Text style={styles.clearBtnText}>Clear Filters</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.clearBtn, {marginTop: 8, backgroundColor: '#eff6ff', borderColor: '#bfdbfe', flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center'}]} onPress={fetchBookings}>
+                        <RefreshCcw size={16} color="#3b82f6" />
+                        <Text style={[styles.clearBtnText, {color: '#3b82f6'}]}>Refresh Data</Text>
+                      </TouchableOpacity>
                   </View>
                 </View>
 
