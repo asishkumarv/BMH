@@ -203,14 +203,14 @@ exports.getAssignedOrders = async (req, res) => {
 };
 
 exports.getDeliveryFleet = async (req, res) => {
-  try {
-    // Get all delivery boys who are approved
-    const boysRes = await pool.query(`
-      SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
-      FROM employees 
-      WHERE department = 'Delivery' AND status = 'approved' AND id::varchar IN (SELECT employee_id FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)
-    `);
-    const boys = boysRes.rows;
+    try {
+      // Get all delivery boys who are approved
+      const boysRes = await pool.query(`
+        SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, created_at AS updated_at 
+        FROM employees 
+        WHERE department = 'Delivery' AND status = 'approved' AND id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)
+      `);
+      const boys = boysRes.rows;
 
     for (let boy of boys) {
       // Get pending orders count for each boy

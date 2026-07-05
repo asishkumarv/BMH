@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
-import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon } from 'lucide-react-native';
+import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Colors } from '../../../constants/Colors';
 
@@ -140,7 +140,7 @@ export default function DeliveryDashboard() {
         }
         setOrders(res.data.data);
           if (Platform.OS !== 'web') {
-            res.data.data.forEach(order => {
+            res.data.data.forEach((order: any) => {
               if (order.is_scheduled && order.scheduled_date && order.scheduled_time && order.status !== 'Delivered') {
                 const scheduledDateTime = new Date(`${order.scheduled_date.split('T')[0]}T${order.scheduled_time}`);
                 const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
@@ -479,17 +479,40 @@ export default function DeliveryDashboard() {
         </View>
         
         {/* Creative Attendance Widget */}
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {!summary || summary.can_check_in ? (
+        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {(!summary || summary.can_check_in) && (
             <TouchableOpacity style={{ backgroundColor: '#10b981', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('login')}>
               <Sun size={16} color="#fff" />
               <Text style={{ color: '#fff', fontWeight: 'bold' }}>Check In</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={{ backgroundColor: '#f43f5e', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('logout')} disabled={!summary.can_check_out}>
-              <Moon size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>{summary.can_check_out ? 'Check Out' : 'Off Duty'}</Text>
+          )}
+
+          {summary && summary.can_break_in && !summary.can_check_in && (
+            <TouchableOpacity style={{ backgroundColor: '#f59e0b', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('break_in')}>
+              <Coffee size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Break In</Text>
             </TouchableOpacity>
+          )}
+
+          {summary && summary.can_break_out && !summary.can_check_in && (
+            <TouchableOpacity style={{ backgroundColor: '#8b5cf6', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('break_out')}>
+              <Coffee size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Break Out</Text>
+            </TouchableOpacity>
+          )}
+
+          {summary && summary.can_check_out && !summary.can_check_in && (
+            <TouchableOpacity style={{ backgroundColor: '#f43f5e', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('logout')}>
+              <Moon size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Check Out</Text>
+            </TouchableOpacity>
+          )}
+
+          {summary && !summary.can_check_in && !summary.can_check_out && !summary.can_break_in && !summary.can_break_out && (
+            <View style={{ backgroundColor: '#94a3b8', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Moon size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Off Duty</Text>
+            </View>
           )}
         </View>
       </View>
@@ -510,16 +533,15 @@ export default function DeliveryDashboard() {
         </TouchableOpacity>
       </View>
 
-        <View style={{flexDirection:'row', gap: 10}}>
-          {alarmSound && (
-            <TouchableOpacity style={[styles.refreshBtn, {backgroundColor: '#ef4444'}]} onPress={stopAlarm}>
-              <Text style={[styles.refreshBtnText, {color: '#fff'}]}>Stop Alarm</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.refreshBtn} onPress={() => user && fetchOrders(user.id)}>
-            <Text style={styles.refreshBtnText}>Refresh</Text>
+      <View style={{flexDirection:'row', gap: 10, paddingHorizontal: 15, marginBottom: 15}}>
+        {alarmSound && (
+          <TouchableOpacity style={[styles.refreshBtn, {backgroundColor: '#ef4444'}]} onPress={stopAlarm}>
+            <Text style={[styles.refreshBtnText, {color: '#fff'}]}>Stop Alarm</Text>
           </TouchableOpacity>
-        </View>
+        )}
+        <TouchableOpacity style={styles.refreshBtn} onPress={() => user && fetchOrders(user.id)}>
+          <Text style={styles.refreshBtnText}>Refresh</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -535,6 +557,7 @@ export default function DeliveryDashboard() {
           data={orders.filter(o => { if (filterState === 'Completed') return o.status === 'Delivered'; if (filterState === 'Pending') return o.status !== 'Delivered'; return true; })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}
+
           contentContainerStyle={styles.listContainer}
         />
       )}
