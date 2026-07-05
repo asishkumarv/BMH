@@ -1,20 +1,4 @@
-const executeCancel = async (b: any) => {
-    try {
-      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/bookings/${b.booking_id || b.id}/cancel`, {
-        cancelled_by_id: user.id,
-        cancelled_by_name: user.name || user.full_name,
-        cancelled_by_role: user.role,
-        cancelled_by_dept: user.department || '',
-        refund_type: cancelRefundMode,
-        refund_tnx: cancelRefundTnx
-      });
-      if (res.data.success) {
-        alert('Booking cancelled successfully');
-        setCancelBookingSelected(null);
-        setCancelRefundTnx('');
-        fetchAllBookings();
-      }
-    } catch (err) {import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search, User, Edit, XCircle } from 'lucide-react-native';
 import * as Print from 'expo-print';
@@ -203,21 +187,25 @@ export default function PatientBooking() {
   };
 
   const executeCancel = async (b: any) => {
-    try {
-      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/bookings/${b.booking_id}/cancel`, {
-        cancelled_by_id: user.id,
-        cancelled_by_name: user.name || user.full_name,
-        cancelled_by_role: user.role,
-        cancelled_by_dept: user.department || ''
-      });
-      if (res.data.success) {
-        alert('Booking cancelled successfully');
-        fetchAllBookings();
+      try {
+        const res = await axios.post(`https://napi.bharatmedicalhallplus.com/bookings/${b.booking_id || b.id}/cancel`, {
+          cancelled_by_id: user.id,
+          cancelled_by_name: user.name || user.full_name,
+          cancelled_by_role: user.role,
+          cancelled_by_dept: user.department || '',
+          refund_type: cancelRefundMode,
+          refund_tnx: cancelRefundTnx
+        });
+        if (res.data.success) {
+          alert('Booking cancelled successfully');
+          setCancelBookingSelected(null);
+          setCancelRefundTnx('');
+          fetchAllBookings();
+        }
+      } catch(err: any) {
+        alert(err?.response?.data?.message || 'Failed to cancel booking');
       }
-    } catch(err: any) {
-      alert(err?.response?.data?.message || 'Failed to cancel booking');
-    }
-  };
+    };
 
   const [myBookings, setMyBookings] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState('');
