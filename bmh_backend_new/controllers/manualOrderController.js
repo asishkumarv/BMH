@@ -64,8 +64,31 @@ exports.createOrder = async (req, res) => {
     ];
 
     const result = await pool.query(insertQuery, values);
-    res.status(201).json({ success: true, data: result.rows[0] });
 
+    // If an address is provided, try to update the patient's addresses array
+    if (customer_phone && address) {
+      try {
+        const patientRes = await pool.query('SELECT id, addresses FROM patients WHERE mobile = $1', [customer_phone]);
+        if (patientRes.rowCount > 0) {
+          const patientId = patientRes.rows[0].id;
+          let currentAddresses = patientRes.rows[0].addresses || [];
+          
+          if (typeof currentAddresses === 'string') {
+            try { currentAddresses = JSON.parse(currentAddresses); } catch(e) { currentAddresses = []; }
+          }
+          
+          const addressExists = currentAddresses.some(a => a.address === address);
+          if (!addressExists) {
+            currentAddresses.push({ address, location_link: location_link || '' });
+            await pool.query('UPDATE patients SET addresses = $1 WHERE id = $2', [JSON.stringify(currentAddresses), patientId]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to update patient addresses:', err);
+      }
+    }
+
+    res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error creating manual order:', error);
     res.status(500).json({ success: false, message: 'Failed to create order' });
@@ -84,7 +107,7 @@ exports.getOrders = async (req, res) => {
     const { customer_phone, delivery_boy_id, status } = req.query;
     let query = `
       SELECT mo.*,
-        emp.full_name as delivery_boy_name, emp.profile_data as delivery_boy_profile,
+        emp.full_name as delivery_boy_name, emp.profile_data as delivery_boy_profile, emp.mobile as delivery_boy_phone,
         cre.full_name as creator_name, cre.profile_data as creator_profile,
         admin.full_name as admin_creator_name, admin.image as admin_creator_profile
       FROM manual_orders mo

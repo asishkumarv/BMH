@@ -107,7 +107,10 @@ exports.reviewProfileUpdate = async (req, res) => {
     if (status === 'approved') {
       // Apply the updates to the respective table
       const tableName = updateRequest.user_type === 'sub_admin' ? 'department_admins' : 'employees';
-      const updates = updateRequest.requested_data;
+      let updates = updateRequest.requested_data;
+      if (typeof updates === 'string') {
+        try { updates = JSON.parse(updates); } catch (e) { updates = {}; }
+      }
       
       // Update basic columns if they exist in the payload
       const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email', 'department', 'department_id', 'role'];

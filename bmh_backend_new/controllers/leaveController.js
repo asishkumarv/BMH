@@ -127,10 +127,14 @@ exports.applyLeave = async (req, res) => {
 
     // Check active approved leaves overlapping with these dates
     const overlapRes = await pool.query(`
-      SELECT lr.*, e.department 
+      SELECT lr.*, u.department
       FROM leave_requests lr
-      JOIN employees e ON lr.employee_id = e.id
-      WHERE e.department = $1 AND lr.status = 'approved'
+      JOIN (
+        SELECT id, department, 'employee' as user_type FROM employees
+        UNION ALL
+        SELECT id, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'sub_admin' as user_type FROM department_admins
+      ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
+      WHERE u.department = $1 AND lr.status = 'approved'
         AND (lr.start_date <= $3 AND lr.end_date >= $2)
     `, [department, start_date, end_date]);
 

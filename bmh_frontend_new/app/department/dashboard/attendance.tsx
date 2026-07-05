@@ -619,11 +619,12 @@ export default function SubAdminAttendanceDashboard() {
             <View style={styles.tableRowHeader}>
             <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
             <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
-            <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
-            <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
-            <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Date</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Shift</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Check In</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Check Out</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Worked</Text>
             <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
-            <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
             <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
             </View>
           {reports.map((r, i) => (
@@ -644,23 +645,20 @@ export default function SubAdminAttendanceDashboard() {
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>
               </View>
-              <Text style={[styles.tableCell, { width: 120 }]}>{new Date(r.date).toLocaleDateString()}</Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, { width: 100 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <View style={[styles.tableCellView, { width: 100 }]}>
+                {r.shiftIn && r.shiftOut ? <Text style={{fontSize: 12, color: Colors.light.text}}>{r.shiftIn} - {r.shiftOut}</Text> : <Text style={{fontSize: 12, color: Colors.light.icon}}>-</Text>}
+              </View>
+              <Text style={[styles.tableCell, { width: 100 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, { width: 100 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCellView, { width: 100 }]}>
+                <Text style={{fontWeight: 'bold', color: Colors.light.text}}>{r.worked_mins ? formatMins(r.worked_mins) : '-'}</Text>
+              </View>
               <View style={[styles.tableCellView, { width: 120 }]}>
                 {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
                 {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
                 {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
-              </View>
-              <View style={[styles.tableCellView, { width: 200 }]}>
-                {r.breaks && r.breaks.length > 0 ? (
-                  r.breaks.map((b: any, bi: number) => (
-                    <Text key={bi} style={{fontSize: 11, color: '#6b7280'}}>
-                      {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </Text>
-                  ))
-                ) : <Text style={{fontSize: 11, color: '#9ca3af'}}>-</Text>}
               </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
             </TouchableOpacity>

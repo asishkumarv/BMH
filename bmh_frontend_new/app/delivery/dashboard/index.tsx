@@ -455,24 +455,27 @@ export default function DeliveryDashboard() {
              </TouchableOpacity>
           )}
 
-          {item.type === 'manual_order' && item.status === 'Assigned' && (
-            <TouchableOpacity 
-              style={[styles.deliverBtn, {backgroundColor: '#F59E0B'}]} 
-              onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}
-            >
-              <Package color="#fff" size={16} style={{marginRight: 6}} />
-              <Text style={styles.deliverBtnText}>Pickup</Text>
-            </TouchableOpacity>
-          )}
-
-          {item.type === 'manual_order' && item.status === 'Picked Up' && (
-            <TouchableOpacity 
-              style={[styles.deliverBtn, {backgroundColor: '#3B82F6'}]} 
-              onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}
-            >
-              <Navigation color="#fff" size={16} style={{marginRight: 6}} />
-              <Text style={styles.deliverBtnText}>Start</Text>
-            </TouchableOpacity>
+          {item.type === 'manual_order' && item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && (
+            <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 10}}>
+              {item.status === 'Assigned' && (
+                <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#F59E0B', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
+                  <Package color="#fff" size={14} style={{marginRight: 4}} />
+                  <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Pickup</Text>
+                </TouchableOpacity>
+              )}
+              {item.status === 'Picked Up' && (
+                <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#3B82F6', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}>
+                  <Navigation color="#fff" size={14} style={{marginRight: 4}} />
+                  <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Start</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Customer Not Available')}>
+                <Text style={[styles.deliverBtnText, {fontSize: 12}]}>No Show</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#64748B', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Cancelled')}>
+                <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {((item.type === 'manual_order' && item.status === 'Out for Delivery') || 

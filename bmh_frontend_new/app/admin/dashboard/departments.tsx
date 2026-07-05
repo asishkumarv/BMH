@@ -71,17 +71,16 @@ export default function DepartmentsScreen() {
     }
   };
 
-  const handleApproveAdmin = async (adminId: string) => {
+  const handleUpdateAdminStatus = async (id: string, status: string) => {
     try {
-      const response = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${adminId}/status`, {
-        status: 'approved'
-      });
-      if (response.data.success) {
-        setAdmins(admins.map(a => a.id === adminId ? { ...a, status: 'approved' } : a));
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${id}/status`, { status });
+      if (res.data.success) {
+        Alert.alert('Success', `Sub admin ${status} successfully`);
+        fetchData();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to approve admin');
-      console.error(error);
+      console.error('Error updating admin status', error);
+      Alert.alert('Error', 'Failed to update admin status');
     }
   };
 
@@ -213,17 +212,20 @@ export default function DepartmentsScreen() {
                     <Pressable onPress={() => setSelectedUser({ data: admin, type: 'admin' })}>
                       <Text style={{ color: Colors.light.primary, fontSize: 13, fontWeight: '700' }}>Details</Text>
                     </Pressable>
-                    {admin.status === 'pending' ? (
+                    {admin.status === 'pending' || admin.status === 'deactivated' || admin.status === 'rejected' ? (
                       <Pressable 
                         style={[styles.statusBadge, { backgroundColor: Colors.light.primary }]}
-                        onPress={() => handleApproveAdmin(admin.id)}
+                        onPress={() => handleUpdateAdminStatus(admin.id, 'approved')}
                       >
                         <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Approve</Text>
                       </Pressable>
                     ) : (
-                      <View style={[styles.statusBadge, styles.statusApproved]}>
-                        <Text style={[styles.statusText, styles.textApproved]}>{admin.status}</Text>
-                      </View>
+                      <Pressable 
+                        style={[styles.statusBadge, { backgroundColor: '#f97316' }]}
+                        onPress={() => handleUpdateAdminStatus(admin.id, 'deactivated')}
+                      >
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Deactivate</Text>
+                      </Pressable>
                     )}
                   </View>
                 </View>

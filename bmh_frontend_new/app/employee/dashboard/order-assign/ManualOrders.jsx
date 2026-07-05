@@ -29,6 +29,8 @@ export default function ManualOrders({ deliveryBoys }) {
   // Patient auto-fill state
   const [patients, setPatients] = useState([]);
   const [patientSearch, setPatientSearch] = useState('');
+  const [patientAddresses, setPatientAddresses] = useState([]);
+  const [isNewAddress, setIsNewAddress] = useState(false);
 
   // Create Form State
   const initialFormData = {
@@ -121,8 +123,14 @@ export default function ManualOrders({ deliveryBoys }) {
         const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patient/by-mobile/${text}`);
         if (res.data && res.data.success) {
           const p = res.data.patient || res.data.data;
-          let defaultAddress = p.addresses && p.addresses.length > 0 ? p.addresses[0].address : '';
-          let defaultLink = p.addresses && p.addresses.length > 0 ? p.addresses[0].location_link : '';
+          const addrs = p.addresses || [];
+          setPatientAddresses(addrs);
+          
+          let defaultAddress = addrs.length > 0 ? addrs[0].address : '';
+          let defaultLink = addrs.length > 0 ? addrs[0].location_link : '';
+          
+          setIsNewAddress(addrs.length === 0);
+
           setFormData({
             ...formData,
             customer_phone: p.mobile,
@@ -132,11 +140,18 @@ export default function ManualOrders({ deliveryBoys }) {
             address: defaultAddress,
             location_link: defaultLink
           });
+        } else {
+            setPatientAddresses([]);
+            setIsNewAddress(true);
+            setFormData({ ...formData, customer_phone: text });
         }
       } catch (e) {
+        setPatientAddresses([]);
+        setIsNewAddress(true);
         setFormData({ ...formData, customer_phone: text });
       }
     } else {
+      setPatientAddresses([]);
       setFormData({ ...formData, customer_phone: text });
     }
   };
@@ -214,12 +229,14 @@ export default function ManualOrders({ deliveryBoys }) {
 
   const handleShareOrder = async (item) => {
     try {
-      const msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'}\nOTP: ${item.delivery_otp || 'N/A'}`;
+      const msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAddress: ${item.address || 'N/A'}\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'} (${item.delivery_boy_phone || 'N/A'})\nOTP: ${item.delivery_otp || 'N/A'}`;
+      
       if (Platform.OS === 'web') {
-        if (navigator.share) {
-          await navigator.share({ title: 'Order Details', text: msg });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(msg);
+          alert('Details copied to clipboard!');
         } else {
-          alert('Sharing not supported on this browser');
+          alert('Clipboard not supported on this browser');
         }
       } else {
         await Share.share({ message: msg });
@@ -317,7 +334,7 @@ export default function ManualOrders({ deliveryBoys }) {
                 onValueChange={(val) => { if(val) handleAssignBoy(item.id, val); }}
                 style={styles.inlinePicker}
               >
-                <Picker.Item label={item.delivery_boy_id ? "Reassign To" : "Assign To"} value="" />
+                <Picker.Item label={(item.delivery_boy_id && item.delivery_boy_id !== 'null') ? "Reassign To" : "Assign To"} value="" />
                 {availableBoys?.map(boy => (
                   <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
                 ))}
@@ -457,15 +474,48 @@ export default function ManualOrders({ deliveryBoys }) {
                 </View>
               </View>
               <View style={styles.formRow}>
-                <View style={styles.formCol}>
-                  <Text style={styles.label}>Address</Text>
-                  <TextInput style={styles.input} value={formData.address || ''} onChangeText={(t) => setFormData({...formData, address: t})} placeholder="Full Address" />
-                </View>
-                <View style={styles.formCol}>
-                  <Text style={styles.label}>Delivery Location Link</Text>
-                  <TextInput style={styles.input} value={formData.location_link || ''} onChangeText={(t) => setFormData({...formData, location_link: t})} placeholder="Google Maps URL" />
+                <View style={[styles.formCol, { flex: 2 }]}>
+                  <Text style={styles.label}>Select Address</Text>
+                  <View style={styles.dropdownWrapper}>
+                    <Picker
+                      selectedValue={isNewAddress ? 'new' : formData.address}
+                      onValueChange={(val) => {
+                        if (val === 'new') {
+                          setIsNewAddress(true);
+                          setFormData({...formData, address: '', location_link: ''});
+                        } else {
+                          setIsNewAddress(false);
+                          const selected = patientAddresses.find(a => a.address === val);
+                          setFormData({
+                            ...formData, 
+                            address: val, 
+                            location_link: selected ? selected.location_link : ''
+                          });
+                        }
+                      }}
+                      style={styles.picker}
+                    >
+                      {patientAddresses.map((addr, idx) => (
+                        <Picker.Item key={idx} label={addr.address} value={addr.address} />
+                      ))}
+                      <Picker.Item label="(Enter New Address)" value="new" />
+                    </Picker>
+                  </View>
                 </View>
               </View>
+
+              {isNewAddress && (
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>New Address</Text>
+                    <TextInput style={styles.input} value={formData.address || ''} onChangeText={(t) => setFormData({...formData, address: t})} placeholder="Full Address" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Delivery Location Link</Text>
+                    <TextInput style={styles.input} value={formData.location_link || ''} onChangeText={(t) => setFormData({...formData, location_link: t})} placeholder="Google Maps URL" />
+                  </View>
+                </View>
+              )}
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Order No</Text>

@@ -316,16 +316,16 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
 
     // 1. Get today's attendance
     const attResult = await pool.query(
-      `SELECT id, timestamp as check_in, checkout_timestamp as check_out, status 
+      `SELECT id, timestamp as check_in, checkout_timestamp as check_out, status, late_duration 
        FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,
       [employeeId, userType]
     );
 
-    // 2. Get last break log today
+    // 2. Get all break logs today for calculating total break time
     const breakResult = await pool.query(
       `SELECT break_type, timestamp FROM break_logs 
        WHERE employee_id = $1 AND user_type = $2 AND DATE(timestamp) = CURRENT_DATE 
-       ORDER BY timestamp DESC LIMIT 1`,
+       ORDER BY timestamp ASC`,
       [employeeId, userType]
     );
 
@@ -340,7 +340,23 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
     );
 
     let att = attResult.rowCount > 0 ? attResult.rows[0] : null;
-    let lastBreak = breakResult.rowCount > 0 ? breakResult.rows[0] : null;
+    let breaks = breakResult.rows;
+    let lastBreak = breaks.length > 0 ? breaks[breaks.length - 1] : null;
+    
+    // Calculate total break duration in seconds
+    let total_break_seconds = 0;
+    let current_break_start = null;
+    for (let b of breaks) {
+      if (b.break_type === 'Break In') current_break_start = new Date(b.timestamp).getTime();
+      else if (b.break_type === 'Break Out' && current_break_start) {
+        total_break_seconds += Math.floor((new Date(b.timestamp).getTime() - current_break_start) / 1000);
+        current_break_start = null;
+      }
+    }
+    // If currently on break, add ongoing break time to total
+    if (current_break_start && (!att || !att.check_out)) {
+       total_break_seconds += Math.floor((new Date().getTime() - current_break_start) / 1000);
+    }
     
     let state = {
       status_string: "Off Duty",
@@ -350,6 +366,7 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
       can_check_out: false,
       check_in_time: null,
       check_out_time: null,
+      total_break_seconds: total_break_seconds,
       total_tasks: parseInt(taskResult.rows[0].total_tasks, 10) || 0,
       pending_tasks: parseInt(taskResult.rows[0].pending_tasks, 10) || 0,
       completed_tasks: parseInt(taskResult.rows[0].completed_tasks, 10) || 0
@@ -368,7 +385,11 @@ exports.getEmployeeDashboardStatus = async (req, res) => {
         state.status_string = "On Break";
         state.can_break_out = true;
       } else {
-        state.status_string = "On Duty";
+        if (att.late_duration && att.late_duration !== '0h 0m') {
+          state.status_string = "Late Check In";
+        } else {
+          state.status_string = "On Time";
+        }
         state.can_break_in = true;
         state.can_check_out = true;
       }

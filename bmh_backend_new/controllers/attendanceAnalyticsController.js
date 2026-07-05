@@ -198,11 +198,8 @@ exports.getAdvancedReports = async (req, res) => {
         else if (diffMins < 0) early_checkout_mins = Math.round(Math.abs(diffMins));
       }
 
-      // Calculate break overstay
-      if (row.breaks && row.breaks.length > 0 && breakStart && breakEnd) {
-        const schedBreakMins = (parseTime(breakEnd, row.date) - parseTime(breakStart, row.date)) / 60000;
-        
-        let totalBreakMins = 0;
+      let totalBreakMins = 0;
+      if (row.breaks && row.breaks.length > 0) {
         row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         let currentBreakIn = null;
         row.breaks.forEach(b => {
@@ -215,6 +212,14 @@ exports.getAdvancedReports = async (req, res) => {
           }
         });
         
+        // If currently on break and there's no check_out, we can add ongoing break time?
+        // But since reports are usually for past days or current day, we might not need live updates here.
+        // The dashboard handles live timer.
+      }
+
+      // Calculate break overstay
+      if (breakStart && breakEnd) {
+        const schedBreakMins = (parseTime(breakEnd, row.date) - parseTime(breakStart, row.date)) / 60000;
         if (totalBreakMins > schedBreakMins && schedBreakMins > 0) {
           extra_break_mins = Math.round(totalBreakMins - schedBreakMins);
         }
@@ -224,18 +229,32 @@ exports.getAdvancedReports = async (req, res) => {
       const rowDateStr = new Date(row.date).toISOString().split('T')[0];
       const todayStr = new Date().toISOString().split('T')[0];
 
+      let worked_mins = 0;
+
       if (row.check_out || rowDateStr < todayStr) {
         dynamic_status = 'Checked Out';
+        if (row.check_in && row.check_out) {
+            worked_mins = Math.max(0, (new Date(row.check_out).getTime() - new Date(row.check_in).getTime()) / 60000 - totalBreakMins);
+        }
       } else if (row.breaks && row.breaks.length > 0) {
-        row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         const lastBreak = row.breaks[row.breaks.length - 1];
         if (lastBreak.break_type === 'Break In') {
           dynamic_status = 'On Break';
         }
       }
+      
+      // Calculate live worked_mins if still on duty today
+      if (!row.check_out && row.check_in && rowDateStr === todayStr) {
+          let ongoingBreakMins = 0;
+          if (dynamic_status === 'On Break') {
+             const lastBreak = row.breaks[row.breaks.length - 1];
+             ongoingBreakMins = (new Date().getTime() - new Date(lastBreak.timestamp).getTime()) / 60000;
+          }
+          worked_mins = Math.max(0, (new Date().getTime() - new Date(row.check_in).getTime()) / 60000 - totalBreakMins - ongoingBreakMins);
+      }
 
       const { profile_data, ...rest } = row; // remove raw profile data
-      return { ...rest, status: dynamic_status, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
+      return { ...rest, status: dynamic_status, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut, worked_mins: Math.round(worked_mins) };
     });
 
     res.json({ success: true, data: processedData, hasMore });

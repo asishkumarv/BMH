@@ -19,6 +19,7 @@ export default function EmployeeDashboardScreen() {
   const [actionType, setActionType] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
   const [summary, setSummary] = useState<any>(null);
+  const [activeWorkingHours, setActiveWorkingHours] = useState<string>('0h 0m');
   const [cameraMessage, setCameraMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
   const cameraRef = useRef<any>(null);
 
@@ -64,6 +65,37 @@ export default function EmployeeDashboardScreen() {
       console.log("Error fetching personal attendance", err);
     }
   };
+
+  useEffect(() => {
+    if (!summary) return;
+    
+    const updateActiveHours = () => {
+      if (summary.check_in_time && !summary.check_out_time) {
+        const checkInMs = new Date(summary.check_in_time).getTime();
+        const nowMs = new Date().getTime();
+        let activeSeconds = Math.floor((nowMs - checkInMs) / 1000) - (summary.total_break_seconds || 0);
+        if (activeSeconds < 0) activeSeconds = 0;
+        
+        const h = Math.floor(activeSeconds / 3600);
+        const m = Math.floor((activeSeconds % 3600) / 60);
+        setActiveWorkingHours(`${h}h ${m}m`);
+      } else if (summary.check_in_time && summary.check_out_time) {
+         const checkInMs = new Date(summary.check_in_time).getTime();
+         const checkOutMs = new Date(summary.check_out_time).getTime();
+         let activeSeconds = Math.floor((checkOutMs - checkInMs) / 1000) - (summary.total_break_seconds || 0);
+         if (activeSeconds < 0) activeSeconds = 0;
+         const h = Math.floor(activeSeconds / 3600);
+         const m = Math.floor((activeSeconds % 3600) / 60);
+         setActiveWorkingHours(`${h}h ${m}m`);
+      } else {
+         setActiveWorkingHours('0h 0m');
+      }
+    };
+
+    updateActiveHours();
+    const interval = setInterval(updateActiveHours, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [summary]);
 
   const handleAction = async (type: string) => {
     if (!permission?.granted) {
@@ -196,7 +228,7 @@ export default function EmployeeDashboardScreen() {
           <View style={[styles.statCard, { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' }]}>
             <Clock color="#4f46e5" size={28} style={{ marginBottom: 12 }} />
             <Text style={[styles.statTitle, { color: '#4f46e5' }]}>Attendance</Text>
-            <Text style={[styles.statValue, { color: '#3730a3' }]}>{summary ? summary.status_string : "Off Duty"}</Text>
+            <Text style={[styles.statValue, { color: '#3730a3', fontSize: 20 }]}>{summary ? summary.status_string : "Off Duty"}</Text>
             <Text style={styles.statSub}>
               {summary 
                 ? (summary.check_out_time 
@@ -204,6 +236,9 @@ export default function EmployeeDashboardScreen() {
                     : (summary.check_in_time ? `Checked in: ${new Date(summary.check_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : "Start your day!")) 
                 : "Start your day!"}
             </Text>
+            {summary && summary.check_in_time && (
+               <Text style={[styles.statSub, {marginTop: 4, fontWeight: 'bold', color: '#4338ca'}]}>Active: {activeWorkingHours}</Text>
+            )}
           </View>
 
           <View style={[styles.statCard, { backgroundColor: '#f3e8ff', borderColor: '#e9d5ff' }]}>
