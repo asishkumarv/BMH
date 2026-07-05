@@ -517,7 +517,108 @@ export default function PatientBooking() {
     `;
 
     try {
-      await Print.printAsync({ html: htmlContent });
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.write(htmlContent);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 250);
+      } else {
+        await Print.printAsync({ html: htmlContent });
+      }
+    } catch (err) {
+      console.error('Print error', err);
+    }
+  };
+
+  
+  const handlePrintMyBookings = async () => {
+    if (!myBookings || myBookings.length === 0) return;
+    
+    let completed = myBookings.reduce((sum, b) => sum + (b.status === 'Completed' ? parseFloat(b.fee || 0) : 0), 0);
+    let refund = myBookings.reduce((sum, b) => sum + (b.status === 'Cancelled' ? parseFloat(b.fee || 0) : 0), 0);
+    let toRefund = myBookings.reduce((sum, b) => sum + (b.status === 'Booked' ? parseFloat(b.fee || 0) : 0), 0);
+
+    const htmlContent = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; font-size: 24px; }
+            .header-info { text-align: center; margin-bottom: 20px; font-size: 14px; color: #666; }
+            .summary-box { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-around; border: 1px solid #e2e8f0; }
+            .summary-item { text-align: center; font-size: 14px; }
+            .summary-item span { display: block; font-size: 18px; font-weight: bold; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f1f5f9; color: #1e293b; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Bharat Medical Hall</h1>
+          <div class="header-info">
+            <p><strong>My Booked Patients Report</strong></p>
+            <p>Date: ${filterDate || 'All'} | Doctor: ${filterDoctor || 'All'} | Patient: ${filterPatient || 'All'}</p>
+          </div>
+          <div class="summary-box">
+            <div class="summary-item" style="color: #16a34a;">Completed<span>₹${completed}</span></div>
+            <div class="summary-item" style="color: #ef4444;">Refund<span>₹${refund}</span></div>
+            <div class="summary-item" style="color: #f59e0b;">To Refund<span>₹${toRefund}</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Patient</th>
+                <th>Mobile</th>
+                <th>Doctor</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th>Fee</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${myBookings.map((b: any) => `
+                <tr>
+                  <td>#${b.token_number}</td>
+                  <td>${b.patient_name}</td>
+                  <td>${b.mobile}</td>
+                  <td>${b.doctor_name}</td>
+                  <td>${new Date(b.date).toLocaleDateString('en-GB')} ${b.start_time}</td>
+                  <td>${b.status}</td>
+                  <td>₹${b.fee} (${b.payment_mode})</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.write(htmlContent);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 250);
+      } else {
+        await Print.printAsync({ html: htmlContent });
+      }
     } catch (err) {
       console.error('Print error', err);
     }
