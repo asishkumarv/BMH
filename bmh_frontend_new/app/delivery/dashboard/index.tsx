@@ -4,7 +4,9 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
-import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
+import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon } from 'lucide-react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Colors } from '../../../constants/Colors';
 
 export default function DeliveryDashboard() {
@@ -25,6 +27,69 @@ export default function DeliveryDashboard() {
   const [paymentImage, setPaymentImage] = useState<any>(null);
   const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '', payment_mode: '' });
   const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
+
+  // New State
+  const [filterState, setFilterState] = useState('All');
+  const [summary, setSummary] = useState<any>(null);
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [actionType, setActionType] = useState('');
+  const [cameraMessage, setCameraMessage] = useState({ text: '', type: '' });
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<any>(null);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  const fetchSummary = async (empId: number) => {
+    try {
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/today/${empId}`);
+      if (res.data.success) setSummary(res.data.data);
+    } catch (error) {}
+  };
+  
+  const handleAction = async (type: string) => {
+    if (!permission?.granted) {
+      const { status } = await requestPermission();
+      if (status !== 'granted') return Alert.alert('Camera permission required.');
+    }
+    let { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+    if (locStatus !== 'granted') return Alert.alert('Location permission required.');
+    
+    setActionType(type);
+    setCameraMessage({ text: '', type: '' });
+    setCameraVisible(true);
+  };
+  
+  const handleCapture = async () => {
+    if (!cameraRef.current) return;
+    try {
+      setLoadingAction(true);
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
+      const location = await Location.getCurrentPositionAsync({});
+      
+      const payload: any = {
+        employee_id: user.id,
+        image: `data:image/jpeg;base64,${photo.base64}`,
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      };
+      
+      payload.action = actionType;
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/verify-face', payload);
+      
+      if (res.data.success) {
+        setCameraMessage({ text: res.data.message, type: 'success' });
+        setTimeout(() => setCameraVisible(false), 2000);
+      } else {
+        setCameraMessage({ text: res.data.message, type: 'error' });
+      }
+      fetchSummary(user.id);
+    } catch (error: any) {
+      setCameraMessage({ text: error.response?.data?.message || "Something went wrong.", type: 'error' });
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
   useEffect(() => {
     let interval: any;
     if (user) {
@@ -48,6 +113,7 @@ export default function DeliveryDashboard() {
         setUser(storedUser);
         if (storedUser) {
           fetchOrders(storedUser.id);
+          fetchSummary(storedUser.id);
           startLocationTracking(storedUser.id);
         }
       } catch (err) {
@@ -73,6 +139,24 @@ export default function DeliveryDashboard() {
            } catch (e) { console.log("Audio play failed:", e); }
         }
         setOrders(res.data.data);
+          if (Platform.OS !== 'web') {
+            res.data.data.forEach(order => {
+              if (order.is_scheduled && order.scheduled_date && order.scheduled_time && order.status !== 'Delivered') {
+                const scheduledDateTime = new Date(`${order.scheduled_date.split('T')[0]}T${order.scheduled_time}`);
+                const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
+                if (alarmTime > new Date()) {
+                  Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: 'Scheduled Delivery Alert',
+                      body: `You have a scheduled delivery for ${order.patient_name} at ${order.scheduled_time}! (Order #${order.id})`,
+                      sound: true,
+                    },
+                    trigger: { date: alarmTime } as any,
+                  });
+                }
+              }
+            });
+          }
       }
     } catch (err) {
       console.error(err);
@@ -155,9 +239,10 @@ export default function DeliveryDashboard() {
     try {
       if (type === 'online_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, {
-          status: 'DELIVERED',
-          delivery_otp: otp
-        });
+            status: 'DELIVERED',
+            delivery_otp: otp,
+            pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null
+          });
       } else if (type === 'sales_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/status`, {
           status: 'DELIVERED',
@@ -167,9 +252,9 @@ export default function DeliveryDashboard() {
         const payload: any = {
           status: 'Delivered',
           delivery_otp: otp,
-          payment_mode: paymentMode,
-          paid_amount: paidAmount,
-          payment_txn_id: paymentTxnId
+            pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null,
+            paid_amount: paidAmount,
+            payment_txn_id: paymentTxnId
         };
         // For image upload, if we want to use form data we should implement it, but for now we send raw json without image since it's complex via put in this generic function.
         await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, payload);
@@ -363,13 +448,68 @@ export default function DeliveryDashboard() {
     </View>
   );
 
-  return (
+    return (
     <View style={styles.container}>
+      {cameraVisible && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '90%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' }}>Confirm {actionType}</Text>
+            <View style={{ width: '100%', height: 300, borderRadius: 12, overflow: 'hidden', marginBottom: 15 }}>
+              <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
+            </View>
+            {cameraMessage.text ? (
+              <Text style={{ textAlign: 'center', marginBottom: 15, color: cameraMessage.type === 'error' ? 'red' : 'green', fontWeight: 'bold' }}>{cameraMessage.text}</Text>
+            ) : null}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity style={{ flex: 1, padding: 12, backgroundColor: '#e2e8f0', borderRadius: 8, marginRight: 10 }} onPress={() => setCameraVisible(false)} disabled={loadingAction}>
+                <Text style={{ textAlign: 'center', color: '#475569', fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1, padding: 12, backgroundColor: '#10b981', borderRadius: 8 }} onPress={handleCapture} disabled={loadingAction}>
+                {loadingAction ? <ActivityIndicator color="#fff" /> : <Text style={{ textAlign: 'center', color: '#fff', fontWeight: 'bold' }}>Capture & Verify</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Welcome, {user?.full_name}</Text>
           <Text style={styles.subtitle}>GPS: {locationStatus}</Text>
         </View>
+        
+        {/* Creative Attendance Widget */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {!summary || summary.can_check_in ? (
+            <TouchableOpacity style={{ backgroundColor: '#10b981', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('login')}>
+              <Sun size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Check In</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={{ backgroundColor: '#f43f5e', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('logout')} disabled={!summary.can_check_out}>
+              <Moon size={16} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>{summary.can_check_out ? 'Check Out' : 'Off Duty'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Stats Widget */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 15, marginBottom: 15, gap: 10 }}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'All' ? '#3b82f6' : '#e0e7ff', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('All')}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'All' ? '#fff' : '#1e40af' }}>{orders.length}</Text>
+          <Text style={{ fontSize: 12, color: filterState === 'All' ? '#fff' : '#1e40af' }}>Total</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'Pending' ? '#f59e0b' : '#fef3c7', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Pending')}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => o.status !== 'Delivered').length}</Text>
+          <Text style={{ fontSize: 12, color: filterState === 'Pending' ? '#fff' : '#b45309' }}>Pending</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'Completed' ? '#10b981' : '#d1fae5', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Completed')}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Completed' ? '#fff' : '#047857' }}>{orders.filter(o => o.status === 'Delivered').length}</Text>
+          <Text style={{ fontSize: 12, color: filterState === 'Completed' ? '#fff' : '#047857' }}>Completed</Text>
+        </TouchableOpacity>
+      </View>
+
         <View style={{flexDirection:'row', gap: 10}}>
           {alarmSound && (
             <TouchableOpacity style={[styles.refreshBtn, {backgroundColor: '#ef4444'}]} onPress={stopAlarm}>
@@ -392,7 +532,7 @@ export default function DeliveryDashboard() {
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={orders.filter(o => { if (filterState === 'Completed') return o.status === 'Delivered'; if (filterState === 'Pending') return o.status !== 'Delivered'; return true; })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}
           contentContainerStyle={styles.listContainer}

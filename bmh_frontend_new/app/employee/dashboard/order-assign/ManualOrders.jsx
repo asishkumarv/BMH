@@ -46,7 +46,10 @@ export default function ManualOrders({ deliveryBoys }) {
     order_time: new Date().toTimeString().substring(0,5),
     notes: '',
     payment_mode: 'POD',
-    payment_txn_id: ''
+    payment_txn_id: '',
+      is_scheduled: false,
+      scheduled_date: '',
+      scheduled_time: ''
   });
 
   const fetchManualOrders = async () => {
@@ -421,6 +424,7 @@ export default function ManualOrders({ deliveryBoys }) {
                       style={styles.picker}
                     >
                       <Picker.Item label="Counter" value="Counter" />
+                        <Picker.Item label="Schedule Delivery" value="Schedule Delivery" />
                       <Picker.Item label="Local" value="Local" />
                       <Picker.Item label="Bus" value="Bus" />
                     </Picker>

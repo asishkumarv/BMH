@@ -178,11 +178,11 @@ export default function OrderAssignScreen() {
     if (filterType !== 'All' && o.type !== filterType) return false;
     
     if (assignmentFilter === 'Unassigned') {
-       if (o.delivery_boy_id || o.status === 'DELIVERED') return false;
+       if (o.delivery_boy_id || o.status?.toUpperCase() === 'DELIVERED') return false;
     } else if (assignmentFilter === 'Assigned') {
-       if (!o.delivery_boy_id || o.status === 'DELIVERED') return false;
+       if (!o.delivery_boy_id || o.status?.toUpperCase() === 'DELIVERED') return false;
     } else if (assignmentFilter === 'Completed') {
-       if (o.status !== 'DELIVERED') return false;
+       if (o.status?.toUpperCase() !== 'DELIVERED') return false;
     }
 
     if (searchQuery) {

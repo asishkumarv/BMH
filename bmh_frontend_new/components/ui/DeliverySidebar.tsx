@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { name: 'Notifications', icon: Bell, route: '/delivery/dashboard/notifications' },
   { name: 'Payslips', icon: FileText, route: '/delivery/dashboard/payslips' },
   { name: 'My Orders', icon: Package, route: '/delivery/dashboard/orders' },
+  { name: 'History', icon: FileText, route: '/delivery/dashboard/delivery-history' },
   { name: 'Profile', icon: User, route: '/delivery/dashboard/profile' },
 ];
 

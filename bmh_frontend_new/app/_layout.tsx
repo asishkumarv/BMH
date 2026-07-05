@@ -28,7 +28,8 @@ if (Platform.OS !== 'web') {
       AsyncStorage.clear().catch(err => console.error('localStorage clear error:', err));
     },
     key: (index: number) => Array.from(store.keys())[index] || null,
-    get length() { return store.size; }
+    get length() { return store.size; },
+    __setRaw: (key: string, value: string) => store.set(key, value)
   };
   (global as any).localStorage = localStorageMock;
 }
@@ -45,11 +46,9 @@ export default function RootLayout() {
           pairs.forEach(([key, value]) => {
             if (value !== null) {
               const store = (global as any).localStorage;
-              if (store && typeof store.setItem === 'function') {
-                // Directly set in memory store map to avoid redundant AsyncStorage writes during startup
-                // Our mock implementation uses a Map under the hood, but since we wrapped it, let's write to it
-                // using setItem which is safe. To avoid infinite loops, the mock's setItem writes to AsyncStorage,
-                // which is redundant but fast enough. Let's just use setItem.
+              if (store && typeof store.__setRaw === 'function') {
+                store.__setRaw(key, value);
+              } else if (store && typeof store.setItem === 'function') {
                 store.setItem(key, value);
               }
             }

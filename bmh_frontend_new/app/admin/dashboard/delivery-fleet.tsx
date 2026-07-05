@@ -11,6 +11,7 @@ if (Platform.OS === 'web' && typeof window !== 'undefined') {
   TileLayer = RL.TileLayer;
   Marker = RL.Marker;
   Popup = RL.Popup;
+  var useMap = RL.useMap;
   L = require('leaflet');
 
   // Fix Leaflet's default icon path issues in React
@@ -20,6 +21,19 @@ if (Platform.OS === 'web' && typeof window !== 'undefined') {
     iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
   });
+}
+
+
+function MapBoundsFitter({ fleet }: { fleet: any[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const validMarkers = fleet.filter(b => b.location_lat && b.location_lng);
+    if (validMarkers.length > 0) {
+      const bounds = L.latLngBounds(validMarkers.map(m => [parseFloat(m.location_lat), parseFloat(m.location_lng)]));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [fleet, map]);
+  return null;
 }
 
 export default function DeliveryFleetScreen() {

@@ -27,8 +27,8 @@ exports.createOrder = async (req, res) => {
         order_date, order_time, customer_phone, customer_name,
         ship_to_phone, ship_to_name, address, location_link,
         status, created_by_id, created_by_type, delivery_otp, notes,
-        payment_mode, payment_txn_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19)
+        payment_mode, payment_txn_id, is_scheduled, scheduled_date, scheduled_time
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *
     `;
 
@@ -51,7 +51,10 @@ exports.createOrder = async (req, res) => {
       delivery_otp, 
       initialNotes,
       req.body.payment_mode || null,
-      req.body.payment_txn_id || null
+      req.body.payment_txn_id || null,
+        req.body.is_scheduled || false,
+        req.body.scheduled_date || null,
+        req.body.scheduled_time || null
     ];
 
     const result = await pool.query(insertQuery, values);
@@ -118,7 +121,7 @@ exports.updateOrder = async (req, res) => {
       payment_mode, paid_amount, payment_txn_id, hand_over_to,
       bus_travels_name, bus_driver_name, bus_driver_number, bus_number,
       dispatch_time, est_reach_time,
-      new_note, note_author, delivery_otp, address
+      new_note, note_author, delivery_otp, address, pod_payment_mode
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -148,6 +151,7 @@ exports.updateOrder = async (req, res) => {
     addField('dispatch_time', dispatch_time);
     addField('est_reach_time', est_reach_time);
     addField('address', address);
+    addField('pod_payment_mode', pod_payment_mode);
     
     // Automatically capture exact time transitions
     if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);
@@ -203,7 +207,28 @@ exports.updateOrder = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    
+    const updatedOrder = result.rows[0];
+    
+    // Wallet update logic for POD Cash Orders
+    if (updatedOrder.status === 'Delivered' && updatedOrder.payment_mode === 'POD' && updatedOrder.delivery_boy_id) {
+      if (updatedOrder.pod_payment_mode === 'Cash') {
+        const amt = updatedOrder.amount || 0;
+        await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [amt, updatedOrder.delivery_boy_id]);
+        
+        // Optionally add a transaction
+        await pool.query('INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode) VALUES ($1, $2, $3, $4, $5, $6)', 
+          [updatedOrder.delivery_boy_id, 'cash_collection', amt, `Order ${updatedOrder.order_no} Delivered (POD Cash)`, 'completed', 'Cash']);
+      } else if (updatedOrder.pod_payment_mode === 'Online') {
+        const amt = updatedOrder.amount || 0;
+        await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [amt, updatedOrder.delivery_boy_id]);
+        
+        await pool.query('INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode) VALUES ($1, $2, $3, $4, $5, $6)', 
+          [updatedOrder.delivery_boy_id, 'online_collection', amt, `Order ${updatedOrder.order_no} Delivered (POD Online)`, 'completed', 'Online']);
+      }
+    }
+    
+    res.json({ success: true, data: updatedOrder });
 
   } catch (error) {
     console.error('Error updating manual order:', error);

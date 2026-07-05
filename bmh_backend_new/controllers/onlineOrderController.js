@@ -83,7 +83,7 @@ exports.getOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, delivery_otp } = req.body;
+        const { status, delivery_otp, pod_payment_mode } = req.body;
         
         if (status === 'DELIVERED') {
             const checkQuery = 'SELECT delivery_otp FROM online_orders WHERE id = $1';
