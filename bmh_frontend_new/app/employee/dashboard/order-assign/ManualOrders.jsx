@@ -469,50 +469,56 @@ export default function ManualOrders({ deliveryBoys }) {
                     </Picker>
                   </View>
                 </View>
-                {formData.mode_of_delivery === 'Schedule Delivery' && (
-                  <>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Scheduled Date</Text>
-                      <TextInput style={styles.input} value={formData.scheduled_date || ''} onChangeText={(t) => setFormData({...formData, scheduled_date: t})} placeholder="YYYY-MM-DD" />
-                    </View>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Scheduled Time</Text>
-                      <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
-                    </View>
-                  </>
-                )}
-                {formData.mode_of_delivery === 'Bus' && (
-                  <>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Select Bus Route</Text>
-                      <View style={styles.dropdownWrapper}>
-                        <Picker
-                          selectedValue=""
-                          onValueChange={(val) => handleBusSelection(val)}
-                          style={styles.picker}
-                        >
-                          <Picker.Item label="-- Choose from Database --" value="" />
-                          {buses.map(b => (
-                            <Picker.Item key={b.id} label={`${b.bus_name} (${b.departure_time || 'N/A'}) - to ${b.destination}`} value={b.id.toString()} />
-                          ))}
-                        </Picker>
-                      </View>
-                    </View>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Bus Driver Number</Text>
-                      <TextInput style={styles.input} value={formData.bus_driver_number || ''} onChangeText={(t) => setFormData({...formData, bus_driver_number: t})} placeholder="Driver No" />
-                    </View>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Bus Number</Text>
-                      <TextInput style={styles.input} value={formData.bus_number || ''} onChangeText={(t) => setFormData({...formData, bus_number: t})} placeholder="OD-XX..." />
-                    </View>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Travels Name</Text>
-                      <TextInput style={styles.input} value={formData.bus_travels_name || ''} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="Travels" />
-                    </View>
-                  </>
-                )}
               </View>
+
+              {formData.mode_of_delivery === 'Schedule Delivery' && (
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Scheduled Date</Text>
+                    <TextInput style={styles.input} value={formData.scheduled_date || ''} onChangeText={(t) => setFormData({...formData, scheduled_date: t})} placeholder="YYYY-MM-DD" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Scheduled Time</Text>
+                    <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
+                  </View>
+                </View>
+              )}
+
+              {formData.mode_of_delivery === 'Bus' && (
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Select Bus Route</Text>
+                    <View style={styles.dropdownWrapper}>
+                      <Picker
+                        selectedValue=""
+                        onValueChange={(val) => handleBusSelection(val)}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="-- Choose from Database --" value="" />
+                        {buses.map(b => (
+                          <Picker.Item key={b.id} label={`${b.bus_name} (${b.departure_time || 'N/A'}) - to ${b.destination}`} value={b.id.toString()} />
+                        ))}
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Driver Name</Text>
+                    <TextInput style={styles.input} value={formData.bus_driver_name || ''} onChangeText={(t) => setFormData({...formData, bus_driver_name: t})} placeholder="Driver Name" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Driver Number</Text>
+                    <TextInput style={styles.input} value={formData.bus_driver_number || ''} onChangeText={(t) => setFormData({...formData, bus_driver_number: t})} placeholder="Driver No" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Number</Text>
+                    <TextInput style={styles.input} value={formData.bus_number || ''} onChangeText={(t) => setFormData({...formData, bus_number: t})} placeholder="OD-XX..." />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Travels Name</Text>
+                    <TextInput style={styles.input} value={formData.bus_travels_name || ''} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="Travels" />
+                  </View>
+                </View>
+              )}
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Payment Mode</Text>

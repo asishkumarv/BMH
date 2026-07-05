@@ -98,8 +98,12 @@ app.listen(PORT, () => {
     const { startMedicineCron } = require('./cron/medicineSync');
     const { startPurchaseOrderCron } = require('./cron/purchaseOrderSync');
     
-    startMedicineCron();
-    startPurchaseOrderCron();
+    if (typeof startMedicineCron === 'function') {
+      startMedicineCron().catch(e => console.error("startMedicineCron async error:", e.message));
+    }
+    if (typeof startPurchaseOrderCron === 'function') {
+      startPurchaseOrderCron().catch(e => console.error("startPurchaseOrderCron async error:", e.message));
+    }
   } catch (err) {
     console.error("Failed to start medicine cron:", err.message);
   }
@@ -107,8 +111,22 @@ app.listen(PORT, () => {
   // Initialize Online Orders DB
   try {
     const { initOnlineOrdersDB } = require('./controllers/onlineOrderController');
-    initOnlineOrdersDB();
+    if (typeof initOnlineOrdersDB === 'function') {
+      initOnlineOrdersDB().catch(e => console.error("initOnlineOrdersDB async error:", e.message));
+    } else {
+      initOnlineOrdersDB();
+    }
   } catch (err) {
     console.error("Failed to initialize online orders db:", err.message);
+  }
+
+  // Initialize Buses DB
+  try {
+    const { initBusesDB } = require('./controllers/busController');
+    if (typeof initBusesDB === 'function') {
+      initBusesDB().catch(e => console.error("initBusesDB async error:", e.message));
+    }
+  } catch (err) {
+    console.error("Failed to initialize buses db:", err.message);
   }
 });
