@@ -2,6 +2,27 @@ const cron = require('node-cron');
 const pool = require('../db');
 const { sendExpoPushNotification } = require('../utils/pushNotification');
 
+function parseTime(timeStr, dateStr) {
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!match) return new Date(`${dateStr}T${timeStr}`);
+  let [_, h, m, ampm] = match;
+  h = parseInt(h, 10);
+  if (ampm) {
+    if (ampm.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+  }
+  const hStr = h.toString().padStart(2, '0');
+  return new Date(`${dateStr}T${hStr}:${m}:00`);
+}
+
+function getTodayString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 const startDeliveryCron = () => {
   // Run every minute
   cron.schedule('* * * * *', async () => {
@@ -23,9 +44,9 @@ const startDeliveryCron = () => {
       for (let order of manualRes.rows) {
         if (order.is_scheduled && !order.scheduled_notified && order.scheduled_date && order.scheduled_time) {
           const sDate = typeof order.scheduled_date === 'string' ? order.scheduled_date.split('T')[0] : order.scheduled_date.toISOString().split('T')[0];
-          const scheduledDateTime = new Date(`${sDate}T${order.scheduled_time}`);
+          const scheduledDateTime = parseTime(order.scheduled_time, sDate);
           
-          if (scheduledDateTime <= twentyMinsFromNow && scheduledDateTime > now) {
+          if (scheduledDateTime && scheduledDateTime <= twentyMinsFromNow && scheduledDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Scheduled Delivery Due Soon', `Order #${order.order_no || order.id} is scheduled for delivery at ${order.scheduled_time}!`);
             }
@@ -34,11 +55,13 @@ const startDeliveryCron = () => {
         }
 
         if (order.mode_of_delivery === 'Bus' && !order.bus_notified && order.est_reach_time) {
-          // est_reach_time could be just a time "14:30" or full datetime. Assuming it's time on the created_at date.
-          const cDate = typeof order.created_at === 'string' ? order.created_at.split('T')[0] : order.created_at.toISOString().split('T')[0];
-          const estReachDateTime = new Date(`${cDate}T${order.est_reach_time}`);
+          let cDate = getTodayString();
+          if (order.bus_date) {
+            cDate = typeof order.bus_date === 'string' ? order.bus_date.split('T')[0] : order.bus_date.toISOString().split('T')[0];
+          }
+          const estReachDateTime = parseTime(order.est_reach_time, cDate);
           
-          if (estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
+          if (estReachDateTime && estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Bus Arrival Due Soon', `Bus for Order #${order.order_no || order.id} is arriving at ${order.est_reach_time}!`);
             }
@@ -62,9 +85,9 @@ const startDeliveryCron = () => {
       for (let order of onlineRes.rows) {
         if (!order.scheduled_date || !order.scheduled_time) continue;
         const sDate = typeof order.scheduled_date === 'string' ? order.scheduled_date.split('T')[0] : order.scheduled_date.toISOString().split('T')[0];
-        const scheduledDateTime = new Date(`${sDate}T${order.scheduled_time}`);
+        const scheduledDateTime = parseTime(order.scheduled_time, sDate);
         
-        if (scheduledDateTime <= twentyMinsFromNow && scheduledDateTime > now) {
+        if (scheduledDateTime && scheduledDateTime <= twentyMinsFromNow && scheduledDateTime > now) {
           if (order.push_token) {
             sendExpoPushNotification(order.push_token, 'Scheduled Delivery Due Soon', `Order #${order.id} is scheduled for delivery at ${order.scheduled_time}!`);
           }
@@ -72,8 +95,6 @@ const startDeliveryCron = () => {
         }
       }
 
-      // Also need to check ecogreen_sales_orders and ecogreen_sales_invoices if they have bus_details.
-      // But based on DB schema, they have bus_details JSON column.
       const ecoSalesOrdersQuery = `
         SELECT e.*, d.push_token 
         FROM ecogreen_sales_orders e
@@ -87,9 +108,12 @@ const startDeliveryCron = () => {
       const ecoSalesOrdersRes = await pool.query(ecoSalesOrdersQuery);
       for (let order of ecoSalesOrdersRes.rows) {
         if (order.bus_details && order.bus_details.arrival_time) {
-          const cDate = typeof order.created_at === 'string' ? order.created_at.split('T')[0] : order.created_at.toISOString().split('T')[0];
-          const estReachDateTime = new Date(`${cDate}T${order.bus_details.arrival_time}`);
-          if (estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
+          let cDate = getTodayString();
+          if (order.bus_details.bus_date) {
+            cDate = order.bus_details.bus_date.split('T')[0];
+          }
+          const estReachDateTime = parseTime(order.bus_details.arrival_time, cDate);
+          if (estReachDateTime && estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Bus Arrival Due Soon', `Bus for Sales Order #${order.id} is arriving at ${order.bus_details.arrival_time}!`);
             }
@@ -112,9 +136,12 @@ const startDeliveryCron = () => {
       const ecoSalesInvoicesRes = await pool.query(ecoSalesInvoicesQuery);
       for (let order of ecoSalesInvoicesRes.rows) {
         if (order.bus_details && order.bus_details.arrival_time) {
-          const cDate = typeof order.created_at === 'string' ? order.created_at.split('T')[0] : order.created_at.toISOString().split('T')[0];
-          const estReachDateTime = new Date(`${cDate}T${order.bus_details.arrival_time}`);
-          if (estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
+          let cDate = getTodayString();
+          if (order.bus_details.bus_date) {
+            cDate = order.bus_details.bus_date.split('T')[0];
+          }
+          const estReachDateTime = parseTime(order.bus_details.arrival_time, cDate);
+          if (estReachDateTime && estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Bus Arrival Due Soon', `Bus for Sales Invoice #${order.id} is arriving at ${order.bus_details.arrival_time}!`);
             }

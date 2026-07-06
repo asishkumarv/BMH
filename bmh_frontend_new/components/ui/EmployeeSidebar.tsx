@@ -13,7 +13,6 @@ const NAV_ITEMS = [
   { name: 'Tasks', icon: CheckSquare, route: '/employee/dashboard/tasks' },
   { name: 'Stationary', icon: Package, route: '/employee/dashboard/stationary' },
   { name: 'Wallet', icon: Wallet, route: '/employee/dashboard/wallet' },
-  { name: 'Patient History', icon: User, route: '/employee/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/employee/dashboard/notifications' },
   { name: 'Payslips', icon: FileText, route: '/employee/dashboard/payslips' },
   { name: 'Profile', icon: User, route: '/employee/dashboard/profile' },
@@ -43,20 +42,7 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
       try {
         const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
         let dynamicNavItems = [...NAV_ITEMS];
-        
-        if (res.data.success && res.data.settings.doctor_management_access) {
-          let value = res.data.settings.doctor_management_access;
-          if (typeof value === 'string') value = JSON.parse(value);
-          
-          // Check if any department has employee: true OR the legacy value.employee === true
-          const hasAccess = value.employee === true || Object.values(value).some((dept: any) => dept && dept.employee === true);
-          
-          if (hasAccess) {
-            dynamicNavItems.push({ name: 'Patient Booking', icon: FileText, route: '/employee/dashboard/patient-booking' });
-          }
-        }
-        
-        // Fetch user to check role for Peon Queue and explicit ID access
+        // Fetch user to check role and explicit ID access
         let userDataStr = null;
         if (Platform.OS === 'web') {
           userDataStr = localStorage.getItem('employeeUser');
@@ -67,7 +53,29 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (userDataStr) {
           const u = JSON.parse(userDataStr);
           const r = u.role?.toLowerCase() || '';
-          if (r === 'peon' || r === 'poen' || r === 'nurse staff'|| r === 'staff nurse') {
+          const empId = u.id?.toString();
+
+          // Patient Booking Access (Granular Doctor Management)
+          if (res.data.success && res.data.settings.doctor_management_access) {
+            let value = res.data.settings.doctor_management_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            if (empId && value[empId] === true) {
+              dynamicNavItems.push({ name: 'Doctors', icon: Users, route: '/employee/dashboard/doctors' });
+              dynamicNavItems.push({ name: 'Patient Booking', icon: FileText, route: '/employee/dashboard/patient-booking' });
+              dynamicNavItems.push({ name: 'Patient History', icon: FileText, route: '/employee/dashboard/patient-history' });
+            }
+          }
+
+          // Peon Queue / Check In Access
+          let hasPeonAccess = false;
+          if (res.data.success && res.data.settings.peon_assignment_access) {
+            let value = res.data.settings.peon_assignment_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            if (empId && value[empId] === true) {
+               hasPeonAccess = true;
+            }
+          }
+          if (hasPeonAccess) {
             dynamicNavItems.splice(1, 0, { name: 'Live Queue', icon: Users, route: '/employee/dashboard/queue' });
             dynamicNavItems.splice(2, 0, { name: 'Check In', icon: User, route: '/employee/dashboard/check-in' });
           }

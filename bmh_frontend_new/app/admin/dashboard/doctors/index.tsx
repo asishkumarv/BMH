@@ -391,7 +391,7 @@ const fetchData = async () => {
       } else if (activeTab === 'Slots') {
         const [resSlots, resPeons, resDocs] = await Promise.all([
           axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots'),
-          axios.get('https://napi.bharatmedicalhallplus.com/doctors/peons'),
+          axios.get('https://napi.bharatmedicalhallplus.com/employees'),
           axios.get('https://napi.bharatmedicalhallplus.com/doctors')
         ]);
         setSlots(resSlots.data.data);

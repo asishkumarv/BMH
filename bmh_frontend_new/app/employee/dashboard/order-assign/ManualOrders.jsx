@@ -61,7 +61,7 @@ export default function ManualOrders({ deliveryBoys }) {
     bus_travels_name: '',
     bus_driver_name: '',
     bus_driver_number: '',
-    bus_number: ''
+    bus_number: '', bus_date: ''
   };
   const [formData, setFormData] = useState(initialFormData);
 
@@ -113,7 +113,7 @@ export default function ManualOrders({ deliveryBoys }) {
         bus_travels_name: bus.operator_name || bus.bus_name,
         bus_driver_name: bus.parcel_contact_person || bus.contact_person || '',
         bus_driver_number: bus.mobile_no || '',
-        bus_number: bus.bus_number || '',
+        bus_number: bus.bus_number || '', bus_date: bus.bus_date || '',
         mode_of_delivery: 'Bus',
         is_scheduled: true,
         scheduled_time: bus.departure_time || ''
@@ -660,8 +660,22 @@ export default function ManualOrders({ deliveryBoys }) {
                     <Text style={styles.label}>Travels Name</Text>
                     <TextInput style={styles.input} value={formData.bus_travels_name || ''} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="Travels" />
                   </View>
-                  <View style={styles.formCol}>
-                    <Text style={styles.label}>Bus Timing</Text>
+                  
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Bus Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="date" 
+                          value={formData.bus_date || ''} 
+                          onChange={(e) => setFormData({...formData, bus_date: e.target.value})}
+                          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 5 }}
+                        />
+                      ) : (
+                        <TextInput style={styles.input} value={formData.bus_date || ''} onChangeText={(t) => setFormData({...formData, bus_date: t})} placeholder="YYYY-MM-DD" />
+                      )}
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Bus Timing</Text>
                     <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
                   </View>
                 </View>
@@ -744,7 +758,18 @@ export default function ManualOrders({ deliveryBoys }) {
                     <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Travels Name" value={selectedOrder.bus_travels_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_travels_name: t})} />
                     <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Name" value={selectedOrder.bus_driver_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_name: t})} />
                     <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Number" value={selectedOrder.bus_driver_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_number: t})} />
-                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus No" value={selectedOrder.bus_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_number: t})} />
+                    
+                      <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus No" value={selectedOrder.bus_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_number: t})} />
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="date" 
+                          value={selectedOrder.bus_date || ''} 
+                          onChange={(e) => setSelectedOrder({...selectedOrder, bus_date: e.target.value})}
+                          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 5 }}
+                        />
+                      ) : (
+                        <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus Date (YYYY-MM-DD)" value={selectedOrder.bus_date || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_date: t})} />
+                      )}
                  </View>
                )}
 

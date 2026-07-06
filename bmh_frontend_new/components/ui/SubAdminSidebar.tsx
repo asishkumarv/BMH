@@ -16,7 +16,6 @@ const NAV_ITEMS = [
   { name: 'Allowances', icon: Wallet, route: '/department/dashboard/allowances' },
   { name: 'My Wallet', icon: Wallet, route: '/department/dashboard/wallet' },
   { name: 'Payslips', icon: FileText, route: '/department/dashboard/payslips' },
-  { name: 'Patient History', icon: Users, route: '/department/dashboard/patient-history' },
   { name: 'Notifications', icon: Bell, route: '/department/dashboard/notifications' },
   { name: 'Profile Requests', icon: Users, route: '/department/dashboard/profile-requests' },
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
@@ -48,20 +47,38 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
     const fetchSettings = async () => {
       try {
         const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
-        if (res.data.success && res.data.settings.doctor_management_access) {
-          let value = res.data.settings.doctor_management_access;
-          if (typeof value === 'string') value = JSON.parse(value);
-          
-          const userStr = Platform.OS === 'web' ? localStorage.getItem('subAdminUser') : await AsyncStorage.getItem('subAdminUser');
-          if (userStr) {
-            const user = JSON.parse(userStr);
-            const deptSettings = value[user.department];
+        let dynamicNavItems = [...NAV_ITEMS];
+        const userStr = Platform.OS === 'web' ? localStorage.getItem('subAdminUser') : await AsyncStorage.getItem('subAdminUser');
+        
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          const userId = user.id?.toString();
+
+          if (res.data.success && res.data.settings.doctor_management_access) {
+            let value = res.data.settings.doctor_management_access;
+            if (typeof value === 'string') value = JSON.parse(value);
             
-            if ((deptSettings && deptSettings.sub_admin) || value.sub_admin === true) {
-              setNavItems([...NAV_ITEMS.slice(0, 7), { name: 'Doctors', icon: Users, route: '/department/dashboard/doctors' }, ...NAV_ITEMS.slice(7)]);
+            if (userId && value[userId] === true) {
+              // Add Doctors menu after Allowances (index 7)
+              dynamicNavItems.splice(7, 0, { name: 'Doctors', icon: Users, route: '/department/dashboard/doctors' });
+              dynamicNavItems.push({ name: 'Patient Booking', icon: Users, route: '/department/dashboard/patient-booking' });
+              dynamicNavItems.push({ name: 'Patient History', icon: Users, route: '/department/dashboard/patient-history' });
+            }
+          }
+
+          if (res.data.success && res.data.settings.peon_assignment_access) {
+            let value = res.data.settings.peon_assignment_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            
+            if (userId && value[userId] === true) {
+              // Add Live Queue and Check In at the top
+              dynamicNavItems.splice(1, 0, { name: 'Live Queue', icon: Users, route: '/department/dashboard/queue' });
+              dynamicNavItems.splice(2, 0, { name: 'Check In', icon: Users, route: '/department/dashboard/check-in' });
             }
           }
         }
+        
+        setNavItems(dynamicNavItems);
       } catch (err) {
         console.error('Failed to fetch settings', err);
       }

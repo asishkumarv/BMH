@@ -149,7 +149,7 @@ exports.updateOrder = async (req, res) => {
       status, delivery_boy_id,
       payment_mode, paid_amount, payment_txn_id, hand_over_to,
       bus_travels_name, bus_driver_name, bus_driver_number, bus_number,
-      dispatch_time, est_reach_time,
+      dispatch_time, est_reach_time, bus_date,
       new_note, note_author, delivery_otp, address, pod_payment_mode
     } = req.body;
     
@@ -179,6 +179,7 @@ exports.updateOrder = async (req, res) => {
     addField('bus_number', bus_number);
     addField('dispatch_time', dispatch_time);
     addField('est_reach_time', est_reach_time);
+      addField('bus_date', bus_date);
     addField('address', address);
     addField('pod_payment_mode', pod_payment_mode);
     

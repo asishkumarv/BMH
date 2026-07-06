@@ -78,7 +78,7 @@ export default function DepartmentDoctorManagement() {
     }
     setProcessingRefund(true);
     try {
-      const userData = await AsyncStorage.getItem('subAdminUser') || await AsyncStorage.getItem('departmentUser') || await AsyncStorage.getItem('user');
+      const userData = await AsyncStorage.getItem('employeeUser') || await AsyncStorage.getItem('departmentUser') || await AsyncStorage.getItem('user');
       let userId = '1';
       if (userData) {
          const user = JSON.parse(userData);
@@ -248,7 +248,7 @@ export default function DepartmentDoctorManagement() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const userData = await AsyncStorage.getItem('subAdminUser');
+      const userData = await AsyncStorage.getItem('employeeUser');
       if (userData) {
         const u = JSON.parse(userData);
         setUser(u);

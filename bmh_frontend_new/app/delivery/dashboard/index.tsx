@@ -17,7 +17,7 @@ export default function DeliveryDashboard() {
   const [busModalVisible, setBusModalVisible] = useState(false);
   const [selectedBusOrder, setSelectedBusOrder] = useState<any>(null);
   const [busDetails, setBusDetails] = useState({
-    bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: ''
+    bus_number: '', bus_date: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: ''
   });
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [deliveryOtp, setDeliveryOtp] = useState('');
@@ -363,9 +363,9 @@ export default function DeliveryDashboard() {
       if (typeof parsed === 'string') {
         try { parsed = JSON.parse(parsed); } catch(e) {}
       }
-      setBusDetails(parsed || { bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
+      setBusDetails(parsed || { bus_number: '', bus_date: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
     } else {
-      setBusDetails({ bus_number: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
+      setBusDetails({ bus_number: '', bus_date: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
     }
     setBusModalVisible(true);
   };
@@ -380,6 +380,7 @@ export default function DeliveryDashboard() {
         url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedBusOrder.id}`;
         payload = {
           bus_number: busDetails.bus_number,
+            bus_date: busDetails.bus_date,
           bus_driver_name: busDetails.driver_name,
           bus_driver_number: busDetails.driver_number,
           est_reach_time: busDetails.arrival_time,
@@ -444,11 +445,17 @@ export default function DeliveryDashboard() {
               <Text style={styles.orderTypeBadge}>
                 {item.type === 'online_order' ? 'Online App Order' : item.type === 'sales_order' ? 'Ecogreen Sales Order' : item.type === 'purchase_order' ? 'Ecogreen Purchase Order' : 'Ecogreen Invoice'}
               </Text>
-              {item.delivery_type === 'Bus' && (
-                <View style={[styles.orderTypeBadge, {backgroundColor: '#FEF3C7'}]}>
-                  <Text style={{fontSize: 10, fontWeight: 'bold', color: '#B45309'}}>🚌 BUS DELIVERY</Text>
-                </View>
-              )}
+              
+                {item.delivery_type === 'Bus' && (
+                  <View style={[styles.orderTypeBadge, {backgroundColor: '#FEF3C7'}]}>
+                    <Text style={{fontSize: 10, fontWeight: 'bold', color: '#B45309'}}>BUS DELIVERY</Text>
+                  </View>
+                )}
+                {item.is_scheduled && (
+                  <View style={[styles.orderTypeBadge, {backgroundColor: '#E0E7FF'}]}>
+                    <Text style={{fontSize: 10, fontWeight: 'bold', color: '#4338CA'}}>SCHEDULED</Text>
+                  </View>
+                )}
             </View>
             <Text style={styles.orderId}>Order #{item.id}</Text>
           </View>
@@ -702,8 +709,23 @@ export default function DeliveryDashboard() {
             </Text>
             
             <ScrollView style={{width: '100%', maxHeight: '70%'}}>
-              <Text style={styles.label}>Bus Number</Text>
-              <TextInput style={styles.input} value={busDetails.bus_number} onChangeText={t => setBusDetails(p => ({...p, bus_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              
+                <Text style={styles.label}>Bus Number</Text>
+                <TextInput style={styles.input} value={busDetails.bus_number} onChangeText={t => setBusDetails(p => ({...p, bus_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+                
+                <Text style={styles.label}>Bus Date</Text>
+                {Platform.OS === 'web' ? (
+                  <input 
+                    type="date" 
+                    value={busDetails.bus_date || ''} 
+                    onChange={(e) => setBusDetails(p => ({...p, bus_date: e.target.value}))}
+                    style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 15 }}
+                    disabled={selectedBusOrder?.type === 'purchase_order'}
+                  />
+                ) : (
+                  <TextInput style={styles.input} value={busDetails.bus_date || ''} onChangeText={t => setBusDetails(p => ({...p, bus_date: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} placeholder="YYYY-MM-DD" />
+                )}
+
               
               <Text style={styles.label}>Reach Time / Incoming Time</Text>
               <TextInput style={styles.input} value={busDetails.arrival_time} onChangeText={t => setBusDetails(p => ({...p, arrival_time: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
