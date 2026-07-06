@@ -182,7 +182,7 @@ exports.getAssignedOrders = async (req, res) => {
 
     // Fetch from manual_orders
     const manualOrdersRes = await pool.query(
-      `SELECT id, 'manual_order' as type, status, amount as total_amount, customer_name as patient_name, customer_phone as mobile_no, address, NULL as map_lat, NULL as map_lng, location_link, created_at, mode_of_delivery as delivery_type, json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', COALESCE(est_reach_time, scheduled_time), 'bus_date', bus_date, 'waybill_number', bus_travels_name) as bus_details, delivery_otp, payment_mode, is_scheduled, scheduled_date, scheduled_time, notes
+      `SELECT id, 'manual_order' as type, status, amount as total_amount, customer_name as patient_name, customer_phone as mobile_no, address, NULL as map_lat, NULL as map_lng, location_link, created_at, mode_of_delivery as delivery_type, json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', COALESCE(est_reach_time::text, scheduled_time::text), 'bus_date', bus_date, 'waybill_number', bus_travels_name) as bus_details, delivery_otp, payment_mode, is_scheduled, scheduled_date, scheduled_time, notes
        FROM manual_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 
