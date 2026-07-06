@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
 require('./cron/taskScheduler');
+require('./cron/attendanceScheduler');
 
 const app = express();
 app.use(cors());

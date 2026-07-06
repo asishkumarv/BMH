@@ -15,12 +15,12 @@ async function sendExpoPushNotification(pushToken, title, body, data = {}) {
 
   const message = {
     to: pushToken,
-    sound: 'default',
+    sound: 'alarm.wav',
     title: title,
     body: body,
     data: data,
     priority: 'high',
-    channelId: 'default',
+    channelId: 'alarm-channel-v2',
   };
 
   try {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Platform, Modal, ScrollView } from 'react-native';
 import axios from 'axios';
-import { MapPin, User, Package, RefreshCw, X, Eye, CheckCircle, Navigation } from 'lucide-react-native';
+import { MapPin, User, Package, RefreshCw, X, Eye, CheckCircle, Navigation, Clock } from 'lucide-react-native';
+import { CustomTimePicker } from '../../../components/ui/CustomTimePicker';
 import 'leaflet/dist/leaflet.css';
 
 let MapContainer: any, TileLayer: any, Marker: any, Popup: any, L: any;
@@ -44,6 +45,12 @@ export default function DeliveryFleetScreen() {
   const [selectedBoy, setSelectedBoy] = useState<any>(null);
   const [boyOrders, setBoyOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [editShiftModalVisible, setEditShiftModalVisible] = useState(false);
+  const [editShiftIn, setEditShiftIn] = useState('');
+  const [editShiftOut, setEditShiftOut] = useState('');
+  const [editBreakIn, setEditBreakIn] = useState('');
+  const [editBreakOut, setEditBreakOut] = useState('');
+  const [savingShift, setSavingShift] = useState(false);
 
   const fetchFleet = async () => {
     setLoading(true);

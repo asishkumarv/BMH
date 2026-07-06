@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, TextInput, useWindowDimensions, Image, ScrollView } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation } from 'lucide-react-native';
 import { Share } from 'react-native';
 
@@ -31,6 +32,10 @@ export default function ManualOrders({ deliveryBoys }) {
   const [patientSearch, setPatientSearch] = useState('');
   const [patientAddresses, setPatientAddresses] = useState([]);
   const [isNewAddress, setIsNewAddress] = useState(false);
+
+  // Date/Time Picker State
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Create Form State
   const initialFormData = {
@@ -565,11 +570,59 @@ export default function ManualOrders({ deliveryBoys }) {
                 <View style={styles.formRow}>
                   <View style={styles.formCol}>
                     <Text style={styles.label}>Scheduled Date</Text>
-                    <TextInput style={styles.input} value={formData.scheduled_date || ''} onChangeText={(t) => setFormData({...formData, scheduled_date: t})} placeholder="YYYY-MM-DD" />
+                    {Platform.OS === 'web' ? (
+                      <input 
+                        type="date" 
+                        value={formData.scheduled_date || ''} 
+                        onChange={(e) => setFormData({...formData, scheduled_date: e.target.value})}
+                        style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit' }}
+                      />
+                    ) : (
+                      <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.input, {justifyContent: 'center'}]}>
+                        <Text style={{color: formData.scheduled_date ? '#000' : '#94a3b8'}}>{formData.scheduled_date || 'YYYY-MM-DD'}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={formData.scheduled_date ? new Date(formData.scheduled_date) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                          setShowDatePicker(false);
+                          if (selectedDate) {
+                            setFormData({...formData, scheduled_date: selectedDate.toISOString().split('T')[0]});
+                          }
+                        }}
+                      />
+                    )}
                   </View>
                   <View style={styles.formCol}>
                     <Text style={styles.label}>Scheduled Time</Text>
-                    <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
+                    {Platform.OS === 'web' ? (
+                      <input 
+                        type="time" 
+                        value={formData.scheduled_time || ''} 
+                        onChange={(e) => setFormData({...formData, scheduled_time: e.target.value})}
+                        style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit' }}
+                      />
+                    ) : (
+                      <TouchableOpacity onPress={() => setShowTimePicker(true)} style={[styles.input, {justifyContent: 'center'}]}>
+                        <Text style={{color: formData.scheduled_time ? '#000' : '#94a3b8'}}>{formData.scheduled_time || 'HH:MM'}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {showTimePicker && (
+                      <DateTimePicker
+                        value={formData.scheduled_time ? new Date(`2000-01-01T${formData.scheduled_time}:00`) : new Date()}
+                        mode="time"
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                          setShowTimePicker(false);
+                          if (selectedDate) {
+                            setFormData({...formData, scheduled_time: selectedDate.toTimeString().substring(0, 5)});
+                          }
+                        }}
+                      />
+                    )}
                   </View>
                 </View>
               )}

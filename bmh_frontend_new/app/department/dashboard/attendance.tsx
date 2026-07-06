@@ -254,6 +254,7 @@ function MyAttendanceHistory() {
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Worked Hrs</Text>
               <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
             </View>
@@ -270,6 +271,11 @@ function MyAttendanceHistory() {
               <Text style={[styles.tableCell, { width: 120 }]}>{new Date(r.date).toLocaleDateString()}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, { width: 120, fontWeight: '600' }]}>
+                {r.check_in && r.check_out 
+                  ? ((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / (1000 * 60 * 60)).toFixed(2) + ' h' 
+                  : '-'}
+              </Text>
               <View style={[styles.tableCellView, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (

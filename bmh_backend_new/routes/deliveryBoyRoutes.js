@@ -77,8 +77,8 @@ router.post(
 
 // ---------------- LOGIN ----------------
 // ---------------- LOGIN ----------------
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', async (req, res) => {
+  const { email, password, pushToken } = req.body;
 
   try {
     // 1️⃣ Find user by email
@@ -107,6 +107,11 @@ router.post("/login", async (req, res) => {
 
     // 4️⃣ Return user info (excluding password)
     const { password: _, ...userData } = user;
+
+    if (pushToken && pushToken !== user.push_token) {
+      await pool.query('UPDATE delivery_boys SET push_token = $1 WHERE id = $2', [pushToken, user.id]);
+      userData.push_token = pushToken;
+    }
 
     // Compress image if it exists to prevent AsyncStorage crashes
     if (userData.image) {
@@ -1010,5 +1015,45 @@ router.get('/location/:orderId', async (req, res) => {
 
 
 
-router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else return res.status(400).json({error:'Invalid type'}); await require('../db').query("UPDATE "+table+" SET notes = (CASE WHEN notes IS NULL OR notes = '' THEN '[]'::jsonb ELSE notes::jsonb END) || $1::jsonb WHERE id = $2", [JSON.stringify([{text: note, author: 'Delivery Boy', timestamp: new Date().toISOString()}]), id]); res.json({success:true}); } catch(e) { console.error(e); res.status(500).json({error:e.message}); } });
+router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else if(type==='ecogreen_invoice') table='ecogreen_sales_invoices'; else if(type==='purchase_order') table='ecogreenpurchase_orders'; else return res.status(400).json({error:'Invalid type: ' + type}); 
+      const db = require('../db');
+      const { rows } = await db.query(`SELECT notes FROM ${table} WHERE id = $1`, [id]);
+      if (rows.length === 0) return res.status(404).json({error: 'Order not found'});
+      
+      let existingNotesStr = rows[0].notes;
+      let notesArray = [];
+      
+      if (existingNotesStr && typeof existingNotesStr === 'string' && existingNotesStr.trim() !== '') {
+        try {
+          if (existingNotesStr.trim().startsWith('[')) {
+            notesArray = JSON.parse(existingNotesStr);
+          } else {
+            notesArray = [{ text: existingNotesStr, author: 'System', timestamp: new Date().toISOString() }];
+          }
+        } catch (e) {
+          notesArray = [{ text: existingNotesStr, author: 'System', timestamp: new Date().toISOString() }];
+        }
+      }
+      
+      notesArray.push({ text: note, author: 'Delivery Boy', timestamp: new Date().toISOString() });
+      
+      await db.query(`UPDATE ${table} SET notes = $1 WHERE id = $2`, [JSON.stringify(notesArray), id]);
+      res.json({success:true});
+ } catch(e) { console.error(e); res.status(500).json({error:e.message}); } });
+
+router.patch('/:id/shift', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { schedule_in, schedule_out, break_in, break_out } = req.body;
+    await require('../db').query(
+      'UPDATE delivery_boys SET schedule_in = $1, schedule_out = $2, break_in = $3, break_out = $4 WHERE id = $5',
+      [schedule_in, schedule_out, break_in, break_out, id]
+    );
+    res.json({ success: true, message: 'Shift updated successfully' });
+  } catch (error) {
+    console.error('Error updating delivery boy shift:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;

@@ -5,6 +5,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/Colors';
 import Toast from 'react-native-toast-message';
 import axios from 'axios';
+import * as Notifications from 'expo-notifications';
+
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('alarm-channel-v2', {
+    name: 'Alarm Notifications',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FF231F7C',
+    sound: 'alarm.wav',
+  });
+  
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 LogBox.ignoreLogs([
   'expo-notifications: Android Push notifications',

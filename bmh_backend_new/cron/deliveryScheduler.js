@@ -7,12 +7,12 @@ const startDeliveryCron = () => {
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
-      const fifteenMinsFromNow = new Date(now.getTime() + 15 * 60000);
+      const twentyMinsFromNow = new Date(now.getTime() + 20 * 60000);
       
       const manualQuery = `
-        SELECT m.*, e.push_token 
+        SELECT m.*, d.push_token 
         FROM manual_orders m
-        JOIN employees e ON m.delivery_boy_id = e.id::varchar
+        LEFT JOIN delivery_boys d ON m.delivery_boy_id = d.id::varchar
         WHERE m.status != 'Delivered' 
           AND m.delivery_boy_id IS NOT NULL
           AND (m.scheduled_notified = false OR m.bus_notified = false)
@@ -25,7 +25,7 @@ const startDeliveryCron = () => {
           const sDate = typeof order.scheduled_date === 'string' ? order.scheduled_date.split('T')[0] : order.scheduled_date.toISOString().split('T')[0];
           const scheduledDateTime = new Date(`${sDate}T${order.scheduled_time}`);
           
-          if (scheduledDateTime <= fifteenMinsFromNow && scheduledDateTime > now) {
+          if (scheduledDateTime <= twentyMinsFromNow && scheduledDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Scheduled Delivery Due Soon', `Order #${order.order_no || order.id} is scheduled for delivery at ${order.scheduled_time}!`);
             }
@@ -38,7 +38,7 @@ const startDeliveryCron = () => {
           const cDate = typeof order.created_at === 'string' ? order.created_at.split('T')[0] : order.created_at.toISOString().split('T')[0];
           const estReachDateTime = new Date(`${cDate}T${order.est_reach_time}`);
           
-          if (estReachDateTime <= fifteenMinsFromNow && estReachDateTime > now) {
+          if (estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Bus Arrival Due Soon', `Bus for Order #${order.order_no || order.id} is arriving at ${order.est_reach_time}!`);
             }
@@ -48,9 +48,9 @@ const startDeliveryCron = () => {
       }
       
       const onlineQuery = `
-        SELECT o.*, e.push_token 
+        SELECT o.*, d.push_token 
         FROM online_orders o
-        JOIN employees e ON o.delivery_boy_id = e.id::varchar
+        LEFT JOIN delivery_boys d ON o.delivery_boy_id = d.id
         WHERE o.is_scheduled = true 
           AND o.status != 'Delivered' 
           AND o.delivery_boy_id IS NOT NULL
@@ -64,7 +64,7 @@ const startDeliveryCron = () => {
         const sDate = typeof order.scheduled_date === 'string' ? order.scheduled_date.split('T')[0] : order.scheduled_date.toISOString().split('T')[0];
         const scheduledDateTime = new Date(`${sDate}T${order.scheduled_time}`);
         
-        if (scheduledDateTime <= fifteenMinsFromNow && scheduledDateTime > now) {
+        if (scheduledDateTime <= twentyMinsFromNow && scheduledDateTime > now) {
           if (order.push_token) {
             sendExpoPushNotification(order.push_token, 'Scheduled Delivery Due Soon', `Order #${order.id} is scheduled for delivery at ${order.scheduled_time}!`);
           }
@@ -75,9 +75,9 @@ const startDeliveryCron = () => {
       // Also need to check ecogreen_sales_orders and ecogreen_sales_invoices if they have bus_details.
       // But based on DB schema, they have bus_details JSON column.
       const ecoSalesOrdersQuery = `
-        SELECT e.*, emp.push_token 
+        SELECT e.*, d.push_token 
         FROM ecogreen_sales_orders e
-        JOIN employees emp ON e.delivery_boy_id = emp.id::varchar
+        LEFT JOIN delivery_boys d ON e.delivery_boy_id = d.id
         WHERE e.delivery_type = 'Bus'
           AND e.status != 'Delivered'
           AND e.delivery_boy_id IS NOT NULL
@@ -89,7 +89,7 @@ const startDeliveryCron = () => {
         if (order.bus_details && order.bus_details.arrival_time) {
           const cDate = typeof order.created_at === 'string' ? order.created_at.split('T')[0] : order.created_at.toISOString().split('T')[0];
           const estReachDateTime = new Date(`${cDate}T${order.bus_details.arrival_time}`);
-          if (estReachDateTime <= fifteenMinsFromNow && estReachDateTime > now) {
+          if (estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Bus Arrival Due Soon', `Bus for Sales Order #${order.id} is arriving at ${order.bus_details.arrival_time}!`);
             }
@@ -100,9 +100,9 @@ const startDeliveryCron = () => {
       }
 
       const ecoSalesInvoicesQuery = `
-        SELECT e.*, emp.push_token 
+        SELECT e.*, d.push_token 
         FROM ecogreen_sales_invoices e
-        JOIN employees emp ON e.delivery_boy_id = emp.id::varchar
+        LEFT JOIN delivery_boys d ON e.delivery_boy_id = d.id
         WHERE e.delivery_type = 'Bus'
           AND e.status != 'Delivered'
           AND e.delivery_boy_id IS NOT NULL
@@ -114,7 +114,7 @@ const startDeliveryCron = () => {
         if (order.bus_details && order.bus_details.arrival_time) {
           const cDate = typeof order.created_at === 'string' ? order.created_at.split('T')[0] : order.created_at.toISOString().split('T')[0];
           const estReachDateTime = new Date(`${cDate}T${order.bus_details.arrival_time}`);
-          if (estReachDateTime <= fifteenMinsFromNow && estReachDateTime > now) {
+          if (estReachDateTime <= twentyMinsFromNow && estReachDateTime > now) {
             if (order.push_token) {
               sendExpoPushNotification(order.push_token, 'Bus Arrival Due Soon', `Bus for Sales Invoice #${order.id} is arriving at ${order.bus_details.arrival_time}!`);
             }

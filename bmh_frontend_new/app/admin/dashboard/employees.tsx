@@ -158,11 +158,19 @@ export default function EmployeesScreen() {
 
   const handleUpdateStatus = async (employeeId: string, newStatus: string) => {
     try {
-      const response = await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${employeeId}/status`, {
+      let cleanId = String(employeeId);
+      if (cleanId.startsWith('SA-')) cleanId = cleanId.replace('SA-', '');
+      if (cleanId.startsWith('EMP-')) cleanId = cleanId.replace('EMP-', '');
+
+      const endpoint = selectedUserType === 'subadmin'
+        ? `https://napi.bharatmedicalhallplus.com/admin/department-admins/${cleanId}/status`
+        : `https://napi.bharatmedicalhallplus.com/employees/${cleanId}/status`;
+      
+      const response = await axios.put(endpoint, {
         status: newStatus
       });
       if (response.data.success) {
-        setEmployees(employees?.map(e => e.id === employeeId ? { ...e, status: newStatus } : e));
+        setEmployees(employees?.map(e => String(e.id) === String(employeeId) ? { ...e, status: newStatus } : e));
       }
     } catch (error) {
       Alert.alert('Error', `Failed to update status to ${newStatus}`);

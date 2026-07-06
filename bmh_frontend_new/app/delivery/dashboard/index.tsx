@@ -512,60 +512,63 @@ export default function DeliveryDashboard() {
 
       <View style={styles.cardFooter}>
         <TouchableOpacity 
-          style={styles.mapBtn} 
+          style={[styles.footerBtn, { backgroundColor: '#EFF6FF' }]} 
           onPress={() => openMap(item.map_lat, item.map_lng, item.address, item.location_link)}
         >
           <MapPin color="#3B82F6" size={16} style={{marginRight: 6}} />
-          <Text style={styles.mapBtnText}>Navigate</Text>
+          <Text style={[styles.footerBtnText, { color: '#3B82F6' }]}>Navigate</Text>
         </TouchableOpacity>
 
         {item.delivery_type === 'Bus' && item.type !== 'purchase_order' && (
              <TouchableOpacity 
-               style={[styles.mapBtn, {backgroundColor: '#FFFBEB', borderColor: '#FDE68A'}]} 
+               style={[styles.footerBtn, {backgroundColor: '#FFFBEB'}]} 
                onPress={() => handleOpenBusDetails(item)}
              >
                <Package color="#D97706" size={16} style={{marginRight: 6}} />
-               <Text style={[styles.mapBtnText, {color: '#D97706'}]}>Bus Info</Text>
+               <Text style={[styles.footerBtnText, {color: '#D97706'}]}>Bus Info</Text>
              </TouchableOpacity>
           )}
           {item.delivery_type === 'Bus' && item.type === 'purchase_order' && (
              <TouchableOpacity 
-               style={[styles.mapBtn, {backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}]} 
+               style={[styles.footerBtn, {backgroundColor: '#F0FDF4'}]} 
                onPress={() => handleOpenBusDetails(item)}
              >
                <Package color="#16A34A" size={16} style={{marginRight: 6}} />
-               <Text style={[styles.mapBtnText, {color: '#16A34A'}]}>View Bus</Text>
+               <Text style={[styles.footerBtnText, {color: '#16A34A'}]}>View Bus</Text>
              </TouchableOpacity>
           )}
 
           {item.type === 'manual_order' && item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && (
-            <View style={{flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 10}}>
+            <>
               {item.status === 'Assigned' && (
-                <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#F59E0B', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
+                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#F59E0B'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
                   <Package color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Pickup</Text>
+                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Pickup</Text>
                 </TouchableOpacity>
               )}
               {item.status === 'Picked Up' && (
-                <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#3B82F6', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}>
+                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#3B82F6'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}>
                   <Navigation color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Start</Text>
+                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Start</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#6366F1', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => openUpdateModal(item)}>
-                <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Update</Text>
+            </>
+          )}
+
+          {item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && (
+              <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#6366F1'}]} onPress={() => openUpdateModal(item)}>
+                <Text style={[styles.footerBtnText, {color: '#fff'}]}>Update</Text>
               </TouchableOpacity>
-            </View>
           )}
 
           {((item.type === 'manual_order' && item.status === 'Out for Delivery') || 
             (item.type !== 'manual_order' && item.status?.toLowerCase() !== 'delivered' && item.type !== 'purchase_order')) && (
             <TouchableOpacity 
-            style={styles.deliverBtn} 
+            style={[styles.footerBtn, {backgroundColor: '#10B981'}]} 
             onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode)}
             >
               <CheckCircle color="#fff" size={16} style={{marginRight: 6}} />
-              <Text style={styles.deliverBtnText}>Mark Delivered</Text>
+              <Text style={[styles.footerBtnText, {color: '#fff'}]}>Delivered</Text>
             </TouchableOpacity>
           )}
       </View>
@@ -813,15 +816,15 @@ export default function DeliveryDashboard() {
             
             {updateActionType === 'menu' && (
               <View style={{ gap: 12, marginTop: 10 }}>
-                <TouchableOpacity style={[styles.deliverBtn, { backgroundColor: '#3B82F6' }]} onPress={() => setUpdateActionType('note')}>
+                <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#3B82F6' }]} onPress={() => setUpdateActionType('note')}>
                   <FileText color="#fff" size={16} style={{marginRight: 8}} />
-                  <Text style={styles.deliverBtnText}>Add Note</Text>
+                  <Text style={styles.saveBtnText}>Add Note</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.deliverBtn, { backgroundColor: '#F59E0B' }]} onPress={submitNoShow}>
-                  <Text style={styles.deliverBtnText}>Mark as No Show</Text>
+                <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#F59E0B' }]} onPress={submitNoShow}>
+                  <Text style={styles.saveBtnText}>Mark as No Show</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.deliverBtn, { backgroundColor: '#EF4444' }]} onPress={() => setUpdateActionType('cancel')}>
-                  <Text style={styles.deliverBtnText}>Cancel Delivery</Text>
+                <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#EF4444' }]} onPress={() => setUpdateActionType('cancel')}>
+                  <Text style={styles.saveBtnText}>Cancel Delivery</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -906,11 +909,9 @@ const styles = StyleSheet.create({
   icon: { marginRight: 8 },
   infoText: { fontSize: 14, color: '#475569', flex: 1 },
   totalText: { fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 8 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 16, marginTop: 8 },
-  mapBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flex: 1, justifyContent: 'center', marginRight: 8 },
-  mapBtnText: { color: '#3B82F6', fontWeight: 'bold', fontSize: 14 },
-  deliverBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flex: 1, justifyContent: 'center', marginLeft: 8 },
-  deliverBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  cardFooter: { flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 16, marginTop: 8 },
+  footerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 10, borderRadius: 8, flex: 1 },
+  footerBtnText: { fontWeight: 'bold', fontSize: 13 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '90%', maxHeight: '80%' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, color: '#1E293B' },
@@ -920,5 +921,6 @@ const styles = StyleSheet.create({
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#F1F5F9' },
   cancelBtnText: { color: '#64748B', fontWeight: 'bold' },
   saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#3B82F6' },
-  saveBtnText: { color: '#fff', fontWeight: 'bold' }
+  saveBtnText: { color: '#fff', fontWeight: 'bold' },
+  modalActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8, paddingHorizontal: 16 }
 });
