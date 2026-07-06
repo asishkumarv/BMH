@@ -14,6 +14,7 @@ export default function EmployeeTasksScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'assigned_to_me' | 'assigned_by_me'>('assigned_to_me');
 
@@ -135,6 +136,27 @@ export default function EmployeeTasksScreen() {
     }
   };
 
+  const handleReassign = async () => {
+    if (!assigneeId) return Alert.alert('Error', 'Please select a new assignee.');
+    const selectedUser = globalUsers.find((u: any) => String(u.id) === String(assigneeId));
+    const newType = selectedUser?.type || 'employee';
+    const newDept = selectedUser?.department || empUser.department;
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/reassign`, {
+        assignee_type: newType,
+        assignee_id: parseInt(assigneeId),
+        department: newDept
+      });
+      setShowReassignModal(false);
+      setAssigneeId('');
+      fetchInitData();
+      Alert.alert('Success', 'Task reassigned successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to reassign task');
+    }
+  };
+
   const filteredTasks = activeTab === 'assigned_to_me' 
     ? tasks.filter(t => t.assignee_type === 'employee' && t.assignee_id === empUser.id)
     : tasks.filter(t => t.assigner_type === 'employee' && t.assigner_id === empUser.id);
@@ -248,7 +270,7 @@ export default function EmployeeTasksScreen() {
                   </View>
                 ) : null}
 
-                <View style={styles.taskActions}>
+                <View style={[styles.taskActions, { gap: 8 }]}>
                    <Pressable 
                      style={styles.actionBtn}
                      onPress={() => {
@@ -260,6 +282,16 @@ export default function EmployeeTasksScreen() {
                    >
                      <Text style={styles.actionBtnText}>Update Status</Text>
                    </Pressable>
+                   {task.status === 'rejected' &&
+                    task.assigner_type === 'employee' &&
+                    String(task.assigner_id) === String(empUser.id) && (
+                     <Pressable
+                       style={[styles.actionBtn, { backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fb923c' }]}
+                       onPress={() => { setSelectedTask(task); setAssigneeId(''); setShowReassignModal(true); }}
+                     >
+                       <Text style={[styles.actionBtnText, { color: '#ea580c' }]}>Reassign</Text>
+                     </Pressable>
+                   )}
                 </View>
               </View>
             ))
@@ -454,6 +486,56 @@ export default function EmployeeTasksScreen() {
             <View style={[styles.modalActions, { marginTop: 24 }]}>
               <Pressable style={styles.cancelBtn} onPress={() => setShowStatusModal(false)}>
                 <Text style={styles.cancelBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reassign Task Modal */}
+      <Modal visible={showReassignModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
+            <Text style={styles.modalTitle}>Reassign Task</Text>
+            {selectedTask && (
+              <Text style={{ fontSize: 14, color: Colors.light.icon, marginBottom: 16 }}>
+                Reassigning: "{selectedTask.title}"
+              </Text>
+            )}
+
+            <Text style={styles.label}>Select New Assignee</Text>
+            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+              {Platform.OS === 'web' ? (
+                <select
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                >
+                  <option value="">-- Choose New Assignee --</option>
+                  {globalUsers.map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.full_name} - {u.department} ({u.role})</option>
+                  ))}
+                </select>
+              ) : (
+                <Picker
+                  selectedValue={assigneeId}
+                  onValueChange={(val: any) => setAssigneeId(val)}
+                  style={{ width: '100%', height: 50 }}
+                >
+                  <Picker.Item label="-- Choose New Assignee --" value="" />
+                  {globalUsers.map((u: any) => (
+                    <Picker.Item key={u.id} label={`${u.full_name} - ${u.department} (${u.role})`} value={u.id} />
+                  ))}
+                </Picker>
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => { setShowReassignModal(false); setAssigneeId(''); }}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.saveBtn, { backgroundColor: '#ea580c' }]} onPress={handleReassign}>
+                <Text style={styles.saveBtnText}>Reassign Task</Text>
               </Pressable>
             </View>
           </View>

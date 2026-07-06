@@ -133,6 +133,45 @@ exports.updateTaskStatus = async (req, res) => {
   }
 };
 
+exports.reassignTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignee_type, assignee_id, department } = req.body;
+
+    if (!assignee_id || !assignee_type) {
+      return res.status(400).json({ success: false, message: 'assignee_id and assignee_type are required' });
+    }
+
+    const existingResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+    const task = existingResult.rows[0];
+
+    const result = await pool.query(
+      `UPDATE tasks
+       SET assignee_type = $1, assignee_id = $2, department = COALESCE($3, department),
+           status = 'assigned', rejection_reason = NULL, notes = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [assignee_type, assignee_id, department || null, id]
+    );
+
+    const updated = result.rows[0];
+
+    // Notify new assignee
+    await createNotification(
+      assignee_type,
+      assignee_id,
+      `You have been assigned a task: "${task.title}" by a ${task.assigner_type.replace('_', ' ')}.`
+    );
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error reassigning task:', error);
+    res.status(500).json({ success: false, message: 'Server error reassigning task' });
+  }
+};
+
 exports.createRecurringTask = async (req, res) => {
   try {
     const { title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days } = req.body;

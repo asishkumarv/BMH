@@ -5,6 +5,7 @@ const taskController = require('../controllers/taskController');
 router.post('/', taskController.createTask);
 router.get('/', taskController.getTasks);
 router.put('/:id/status', taskController.updateTaskStatus);
+router.put('/:id/reassign', taskController.reassignTask);
 
 // Recurring tasks
 router.post('/recurring', taskController.createRecurringTask);
