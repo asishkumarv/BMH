@@ -20,7 +20,7 @@ export default function EmployeeWalletScreen() {
   const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Allowance');
 
   // Accordion Expand/Collapse States
-  const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
+  const [isBookingsExpanded, setIsBookingsExpanded] = useState(true);
   const [isHandoversExpanded, setIsHandoversExpanded] = useState(true);
 
   // User

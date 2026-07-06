@@ -1,24 +1,32 @@
-const { Pool } = require('pg');
-const pool = new Pool({ connectionString: 'postgresql://bmh_user:StrivenestBMHPassword7869@187.127.166.240:5432/bmh_asish' });
-
-async function check() {
+const pool = require('./db');
+(async () => {
   try {
-    const res = await pool.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'employee_wallets'`);
-    console.log("employee_wallets columns:");
-    console.table(res.rows);
+    const r = await pool.query(`
+      SELECT ew.employee_id, ew.cash_in_hand, e.full_name
+      FROM employee_wallets ew
+      JOIN employees e ON ew.employee_id = e.id::text
+      WHERE ew.cash_in_hand > 0
+    `);
+    console.log('Employees with cash_in_hand:', r.rows);
 
-    const res2 = await pool.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'manual_orders'`);
-    console.log("manual_orders columns:");
-    console.table(res2.rows.map(r => r.column_name));
-    
-    // check employee shifts structure for the scheduled delivery part
-    const res3 = await pool.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'employees'`);
-    console.log("employees columns:");
-    console.table(res3.rows.map(r => r.column_name));
-  } catch(e) {
-    console.error(e);
-  } finally {
+    const r2 = await pool.query(`
+      SELECT mo.delivery_boy_id, mo.order_no, mo.amount, mo.pod_payment_mode, mo.status
+      FROM manual_orders mo
+      WHERE mo.status = 'Delivered' AND mo.payment_mode = 'POD'
+      ORDER BY mo.id
+    `);
+    console.log('POD deliveries:', r2.rows);
+
+    const r3 = await pool.query(`
+      SELECT wt.employee_id, wt.type, wt.amount, wt.note, wt.payment_mode
+      FROM wallet_transactions wt
+      WHERE wt.type IN ('cash_collection', 'online_collection')
+    `);
+    console.log('Collection transactions:', r3.rows);
+
     process.exit(0);
+  } catch(e) {
+    console.error('Error:', e.message);
+    process.exit(1);
   }
-}
-check();
+})();

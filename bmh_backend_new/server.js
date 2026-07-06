@@ -90,6 +90,14 @@ app.listen(PORT, () => {
   pool.query('ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS note TEXT')
     .then(() => console.log('Successfully checked/patched note column in cash_handovers table.'))
     .catch(err => console.error('Error patching cash_handovers table:', err.message));
+
+  pool.query('ALTER TABLE wallet_transactions ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched payment_mode column in wallet_transactions table.'))
+    .catch(err => console.error('Error patching wallet_transactions table (payment_mode):', err.message));
+
+  pool.query('ALTER TABLE wallet_transactions ADD COLUMN IF NOT EXISTS payment_txn_id VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched payment_txn_id column in wallet_transactions table.'))
+    .catch(err => console.error('Error patching wallet_transactions table (payment_txn_id):', err.message));
   
   // Initialize Pharmacy Background Sync
   try {
