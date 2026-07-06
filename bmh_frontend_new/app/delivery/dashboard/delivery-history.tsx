@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, TextInput } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
@@ -100,11 +100,11 @@ export default function DeliveryHistoryScreen() {
         </ScrollView>
         <View style={{flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 5, borderRadius: 8}}>
           <Calendar size={18} color="#64748B" style={{marginHorizontal: 8}} />
-          <input 
-            type="date"
+          <TextInput 
+            placeholder="YYYY-MM-DD"
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            style={{ border: 'none', outline: 'none', padding: 8, fontSize: 14 }}
+            onChangeText={setDateFilter}
+            style={{ padding: 8, fontSize: 14, minWidth: 100 }}
           />
           {dateFilter ? (
              <TouchableOpacity onPress={() => setDateFilter('')} style={{padding: 8}}>

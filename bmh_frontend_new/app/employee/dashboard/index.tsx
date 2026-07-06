@@ -228,7 +228,14 @@ export default function EmployeeDashboardScreen() {
           <View style={[styles.statCard, { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' }]}>
             <Clock color="#4f46e5" size={28} style={{ marginBottom: 12 }} />
             <Text style={[styles.statTitle, { color: '#4f46e5' }]}>Attendance</Text>
-            <Text style={[styles.statValue, { color: '#3730a3', fontSize: 20 }]}>{summary ? summary.status_string : "Off Duty"}</Text>
+            {summary && summary.check_in_time ? (
+               <View style={{ backgroundColor: '#c7d2fe', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginVertical: 6 }}>
+                 <Text style={[styles.statValue, { color: '#312e81', fontSize: 32 }]}>{activeWorkingHours}</Text>
+               </View>
+            ) : (
+               <Text style={[styles.statValue, { color: '#3730a3', fontSize: 28 }]}>--</Text>
+            )}
+            <Text style={[styles.statSub, {marginTop: 4, fontWeight: '600', color: '#4338ca', fontSize: 11}]}>{summary ? summary.status_string : "Off Duty"}</Text>
             <Text style={styles.statSub}>
               {summary 
                 ? (summary.check_out_time 
@@ -236,9 +243,6 @@ export default function EmployeeDashboardScreen() {
                     : (summary.check_in_time ? `Checked in: ${new Date(summary.check_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : "Start your day!")) 
                 : "Start your day!"}
             </Text>
-            {summary && summary.check_in_time && (
-               <Text style={[styles.statSub, {marginTop: 4, fontWeight: 'bold', color: '#4338ca'}]}>Active: {activeWorkingHours}</Text>
-            )}
           </View>
 
           <View style={[styles.statCard, { backgroundColor: '#f3e8ff', borderColor: '#e9d5ff' }]}>

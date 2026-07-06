@@ -227,6 +227,19 @@ export default function ManualOrders({ deliveryBoys }) {
     }
   };
 
+  const handleResetStatus = async () => {
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
+        status: 'Pending',
+        delivery_boy_id: null
+      });
+      alert('Order reset to Pending');
+      fetchManualOrders();
+      setViewModalVisible(false);
+    } catch (err) { alert('Failed to reset'); }
+  };
+
+
   const handleShareOrder = async (item) => {
     try {
       const msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAddress: ${item.address || 'N/A'}\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'} (${item.delivery_boy_phone || 'N/A'})\nOTP: ${item.delivery_otp || 'N/A'}`;
@@ -736,6 +749,11 @@ export default function ManualOrders({ deliveryBoys }) {
 
             </ScrollView>
             <View style={styles.modalFooter}>
+               {selectedOrder.status === 'Customer Not Available' && (
+                 <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#f59e0b', marginRight: 'auto'}]} onPress={handleResetStatus}>
+                   <Text style={styles.saveBtnText}>Reset to Pending</Text>
+                 </TouchableOpacity>
+               )}
                <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateOrderDetails}>
                  <Text style={styles.saveBtnText}>Save Updates</Text>
                </TouchableOpacity>

@@ -5,7 +5,7 @@ import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { API_URL } from '@/config';
-import { Settings, Users, CalendarDays, CheckCircle2, XCircle, Clock, Save, Building } from 'lucide-react-native';
+import { Settings, User, CalendarDays, CheckCircle2, XCircle, Clock, Save, Building } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 export default function AdminLeaveManagement() {
@@ -60,10 +60,10 @@ export default function AdminLeaveManagement() {
           setDDept(depts[0].name);
         }
       }
-      let allUsers: any[] = [];
+      let allUser: any[] = [];
       if (empRes.data && empRes.data.success) {
         const emps = (empRes.data.data || []).map((e: any) => ({ ...e, user_type: 'employee' }));
-        allUsers = [...allUsers, ...emps];
+        allUser = [...allUser, ...emps];
       }
       if (adminRes.data && adminRes.data.data) {
         const admins = (adminRes.data.data || []).map((a: any) => {
@@ -79,9 +79,9 @@ export default function AdminLeaveManagement() {
             user_type: 'sub_admin'
           };
         });
-        allUsers = [...allUsers, ...admins];
+        allUser = [...allUser, ...admins];
       }
-      setEmployees(allUsers);
+      setEmployees(allUser);
     } catch (error) {
       console.error("Dropdown fetch error:", error);
     }
@@ -229,7 +229,7 @@ export default function AdminLeaveManagement() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={{flexGrow: 1}}>
         <Pressable style={[styles.tab, activeTab === 'requests' && styles.activeTab]} onPress={() => setActiveTab('requests')}>
-          <Users size={18} color={activeTab === 'requests' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+          <User size={18} color={activeTab === 'requests' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Leave Requests</Text>
         </Pressable>
         <Pressable style={[styles.tab, activeTab === 'settings' && styles.activeTab]} onPress={() => setActiveTab('settings')}>
@@ -266,7 +266,7 @@ export default function AdminLeaveManagement() {
                   <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
                   <Text style={styles.reqDates}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</Text>
                 </View>
-                <Text style={styles.reqReason}>"{req.reason}"</Text>
+                <Text style={styles.reqReason}>"{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"</Text>
                 
                 {req.status === 'pending' && (
                   <View style={styles.actionRow}>

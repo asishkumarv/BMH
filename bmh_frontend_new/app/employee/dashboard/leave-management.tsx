@@ -460,7 +460,9 @@ export default function LeaveManagement() {
                     ]}>{req.status.toUpperCase()}</Text>
                   </View>
                 </View>
-                <Text style={styles.reqReason}>{req.reason}</Text>
+                <Text style={styles.reqReason}>
+                  {typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}
+                </Text>
               </View>
             ))
           )}

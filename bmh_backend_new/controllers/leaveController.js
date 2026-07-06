@@ -189,7 +189,7 @@ exports.getRequests = async (req, res) => {
       values.push(employee_id);
     }
     if (department && department !== 'All') {
-      query += ` AND e.department = $${idx++}`;
+      query += ` AND u.department = $${idx++}`;
       values.push(department);
     }
     if (month) {

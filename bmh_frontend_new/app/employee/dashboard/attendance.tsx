@@ -7,6 +7,15 @@ import { useResponsive } from '../../../hooks/useResponsive';
 
 import { Clock, CheckCircle, AlertTriangle, Coffee, Download } from 'lucide-react-native';
 
+const formatMins = (mins: number) => {
+  if (!mins) return '0m';
+  const h = Math.floor(mins / 60);
+  const m = Math.floor(mins % 60);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+};
+
 const Dropdown = ({ options, value, onChange }: any) => {
   if (Platform.OS === 'web') {
     return (
@@ -188,6 +197,7 @@ export default function EmployeeAttendanceHistory() {
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { width: 100 }]}>Worked</Text>
               <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
               <Text style={[styles.tableCellHeader, { width: 100 }]}>Status</Text>
             </View>
@@ -204,6 +214,9 @@ export default function EmployeeAttendanceHistory() {
               <Text style={[styles.tableCell, {width: 120}]}>{new Date(r.date).toLocaleDateString()}</Text>
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <View style={[styles.tableCell, {width: 100}]}>
+                <Text style={{fontWeight: 'bold', color: Colors.light.text}}>{r.worked_mins != null ? formatMins(r.worked_mins) : (r.check_in && r.check_out ? formatMins(Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000)) : '-')}</Text>
+              </View>
               <View style={[styles.tableCell, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (

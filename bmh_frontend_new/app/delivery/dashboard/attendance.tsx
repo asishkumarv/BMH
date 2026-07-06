@@ -188,6 +188,7 @@ export default function EmployeeAttendanceHistory() {
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
+              <Text style={[styles.tableCellHeader, { width: 100 }]}>Worked</Text>
               <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
               <Text style={[styles.tableCellHeader, { width: 100 }]}>Status</Text>
             </View>
@@ -204,6 +205,9 @@ export default function EmployeeAttendanceHistory() {
               <Text style={[styles.tableCell, {width: 120}]}>{new Date(r.date).toLocaleDateString()}</Text>
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
+              <Text style={[styles.tableCell, {width: 100}]}>
+                {r.worked_mins ? `${Math.floor(r.worked_mins / 60)}h ${r.worked_mins % 60}m` : '-'}
+              </Text>
               <View style={[styles.tableCell, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (

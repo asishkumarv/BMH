@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { CalendarDays, Send, Clock, CheckCircle2, XCircle, Info } from 'lucide-react-native';
+import { CalendarDays, Send, Clock, CheckCircle2, XCircle, Info, User } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -27,6 +27,8 @@ export default function LeaveManagement() {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [empRequests, setEmpRequests] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'apply' | 'approvals'>('apply');
 
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
@@ -55,10 +57,11 @@ export default function LeaveManagement() {
       const emp = JSON.parse(empData);
       setEmployee(emp);
 
-      const [reqRes, sumRes, holRes] = await Promise.all([
+      const [reqRes, sumRes, holRes, empReqRes] = await Promise.all([
         fetch(`${API_URL}/leave/requests?employee_id=${emp.id}&user_type=sub_admin`),
         fetch(`${API_URL}/leave/summary/${emp.id}?user_type=sub_admin`),
-        fetch(`${API_URL}/holidays?department=${emp.department || (emp.department_id ? 'Department ID: ' + emp.department_id : '')}`)
+        fetch(`${API_URL}/holidays?department=${emp.department || (emp.department_id ? 'Department ID: ' + emp.department_id : '')}`),
+        fetch(`${API_URL}/leave/requests?department=${emp.department || (emp.department_id ? 'Department ID: ' + emp.department_id : '')}`)
       ]);
       if (reqRes.ok) {
         const data = await reqRes.json();
@@ -71,6 +74,10 @@ export default function LeaveManagement() {
       if (holRes.ok) {
         const data = await holRes.json();
         setHolidays(data);
+      }
+      if (empReqRes.ok) {
+        const data = await empReqRes.json();
+        setEmpRequests(data.filter((r: any) => r.user_type === 'employee'));
       }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
@@ -241,6 +248,26 @@ export default function LeaveManagement() {
     }
   };
 
+  const updateStatus = async (id: number, status: string) => {
+    try {
+      const res = await fetch(`${API_URL}/leave/request/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        Alert.alert('Success', `Leave request ${status}`);
+        fetchEmployeeAndRequests();
+      } else {
+        const data = await res.json();
+        Alert.alert('Error', data.message || 'Failed to update status');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'An error occurred');
+    }
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -278,6 +305,18 @@ export default function LeaveManagement() {
         </View>
       )}
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={{flexGrow: 1}}>
+        <Pressable style={[styles.tab, activeTab === 'apply' && styles.activeTab]} onPress={() => setActiveTab('apply')}>
+          <CalendarDays size={18} color={activeTab === 'apply' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+          <Text style={[styles.tabText, activeTab === 'apply' && styles.activeTabText]}>My Leaves</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'approvals' && styles.activeTab]} onPress={() => setActiveTab('approvals')}>
+          <User size={18} color={activeTab === 'approvals' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+          <Text style={[styles.tabText, activeTab === 'approvals' && styles.activeTabText]}>Team Requests</Text>
+        </Pressable>
+      </ScrollView>
+
+      {activeTab === 'apply' && (
       <View style={[styles.layout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
         {/* Form Section */}
         <View style={[styles.section, isDesktop && { flex: 1 }]}>
@@ -461,12 +500,61 @@ export default function LeaveManagement() {
                     ]}>{req.status.toUpperCase()}</Text>
                   </View>
                 </View>
-                <Text style={styles.reqReason}>{req.reason}</Text>
+                <Text style={styles.reqReason}>
+                  {typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}
+                </Text>
               </View>
             ))
           )}
         </View>
       </View>
+      )}
+
+      {activeTab === 'approvals' && (
+        <View>
+          {empRequests.length === 0 ? (
+            <View style={styles.emptyState}>
+              <CalendarDays size={48} color={Colors.light.border} />
+              <Text style={styles.emptyStateText}>No pending employee leave requests.</Text>
+            </View>
+          ) : null}
+          <View style={[styles.grid, !isDesktop && { flexDirection: 'column' }]}>
+            {empRequests.map(req => (
+              <View key={req.id} style={[styles.empCard, !isDesktop ? { width: '100%' } : { width: '48%' }]}>
+                <View style={styles.reqHeader}>
+                  <View>
+                    <Text style={styles.reqName}>{req.full_name}</Text>
+                    <Text style={styles.reqRole}>{req.role}</Text>
+                  </View>
+                  <View style={[styles.statusBadge, req.status === 'approved' ? styles.statusApproved : req.status === 'rejected' ? styles.statusRejected : styles.statusPending]}>
+                    <Text style={styles.statusText}>{req.status.toUpperCase()}</Text>
+                  </View>
+                </View>
+                <View style={styles.dateRow}>
+                  <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
+                  <Text style={styles.reqDates}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</Text>
+                </View>
+                <Text style={styles.reqReason}>
+                  "{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"
+                </Text>
+                
+                {req.status === 'pending' && (
+                  <View style={styles.actionRow}>
+                    <Pressable style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => updateStatus(req.id, 'approved')}>
+                      <CheckCircle2 size={16} color="white" style={{ marginRight: 6 }} />
+                      <Text style={styles.actionBtnText}>Approve</Text>
+                    </Pressable>
+                    <Pressable style={[styles.actionBtn, { backgroundColor: '#EF4444', flex: 1 }]} onPress={() => updateStatus(req.id, 'rejected')}>
+                      <XCircle size={16} color="white" style={{ marginRight: 6 }} />
+                      <Text style={styles.actionBtnText}>Reject</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -510,4 +598,17 @@ const styles = StyleSheet.create({
   projectionBox: { backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' },
   projectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 },
   projectionText: { fontSize: 14, color: Colors.light.text, marginBottom: 4 },
+  tabs: { flexDirection: 'row', marginBottom: 24, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tab: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeTab: { borderBottomColor: Colors.light.primary },
+  tabText: { fontSize: 15, fontWeight: '600', color: Colors.light.icon },
+  activeTabText: { color: Colors.light.primary },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+  empCard: { backgroundColor: Colors.light.card, padding: 24, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2, marginBottom: 16 },
+  reqName: { fontSize: 16, fontWeight: '700', color: Colors.light.text },
+  reqRole: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16 },
+  actionRow: { flexDirection: 'row', gap: 12, marginTop: 16, borderTopWidth: 1, borderTopColor: Colors.light.border, paddingTop: 16 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
+  actionBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
 });

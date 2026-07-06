@@ -58,7 +58,7 @@ exports.addEmployee = async (req, res) => {
 
 exports.loginEmployee = async (req, res) => {
   try {
-    let { email, password } = req.body;
+    let { email, password, pushToken } = req.body;
     if (email) email = email.toLowerCase();
     
     const result = await pool.query('SELECT * FROM employees WHERE email = $1 AND password = $2', [email, password]);
@@ -95,6 +95,11 @@ exports.loginEmployee = async (req, res) => {
       }
     }
 
+
+    if (pushToken && pushToken !== user.push_token) {
+      await pool.query('UPDATE employees SET push_token = $1 WHERE id = $2', [pushToken, user.id]);
+      user.push_token = pushToken;
+    }
 
     res.json({ success: true, data: user });
   } catch (error) {

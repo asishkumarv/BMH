@@ -1010,4 +1010,5 @@ router.get('/location/:orderId', async (req, res) => {
 
 
 
+router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else return res.status(400).json({error:'Invalid type'}); await require('../db').query(UPDATE  SET notes = CONCAT(COALESCE(notes, \'\'), ::text) WHERE id = , ['\n[Delivery Boy]: '+note, id]); res.json({success:true}); } catch(e) { console.error(e); res.status(500).json({error:e.message}); } });
 module.exports = router;

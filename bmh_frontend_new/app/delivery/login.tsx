@@ -24,9 +24,11 @@ export default function EmployeePortal() {
     }
     setLoggingIn(true);
     try {
+      const pushToken = await registerForPushNotificationsAsync();
       const response = await axios.post('https://napi.bharatmedicalhallplus.com/employees/login', {
         email,
-        password
+        password,
+        pushToken
       });
       if (response.data.success) {
         if (response.data.data.department !== 'Delivery') {

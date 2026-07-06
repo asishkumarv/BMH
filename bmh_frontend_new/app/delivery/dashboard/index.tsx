@@ -28,6 +28,13 @@ export default function DeliveryDashboard() {
   const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '', payment_mode: '' });
   const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
 
+  // Update Modal State
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [updateActionType, setUpdateActionType] = useState('menu'); // 'menu' | 'note' | 'cancel'
+  const [updateNote, setUpdateNote] = useState('');
+  const [cancelOtp, setCancelOtp] = useState('');
+  const [updateOrder, setUpdateOrder] = useState<any>(null);
+
   // New State
   const [filterState, setFilterState] = useState('All');
   const [summary, setSummary] = useState<any>(null);
@@ -259,6 +266,62 @@ export default function DeliveryDashboard() {
     }
   };
 
+  const openUpdateModal = (order: any) => {
+    setUpdateOrder(order);
+    setUpdateActionType('menu');
+    setUpdateNote('');
+    setCancelOtp('');
+    setUpdateModalVisible(true);
+  };
+
+  const submitUpdateNote = async () => {
+    try {
+      await axios.patch(`https://napi.bharatmedicalhallplus.com/delivery/update-notes`, {
+        id: updateOrder.id,
+        type: updateOrder.type,
+        note: updateNote
+      });
+      alert('Note added successfully');
+      setUpdateModalVisible(false);
+      if (user) fetchOrders(user.id);
+    } catch(err) { alert('Failed to add note'); }
+  };
+
+  const submitCancel = async () => {
+    try {
+      if (updateOrder.type === 'manual_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${updateOrder.id}`, {
+          status: 'Cancelled',
+          delivery_otp: cancelOtp
+        });
+        alert('Order Cancelled');
+      } else {
+        alert('Cancellation not supported for this type yet');
+      }
+      setUpdateModalVisible(false);
+      if (user) fetchOrders(user.id);
+    } catch(err: any) {
+      alert("Error: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const submitNoShow = async () => {
+    try {
+      if (updateOrder.type === 'manual_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${updateOrder.id}`, {
+          status: 'Customer Not Available'
+        });
+        alert('Order marked as Customer Not Available');
+      } else {
+         alert('No Show not supported for this type yet');
+      }
+      setUpdateModalVisible(false);
+      if (user) fetchOrders(user.id);
+    } catch(err) {
+      alert('Failed to update status');
+    }
+  };
+
   const processDelivery = async (orderId: string | number, type: string, otp?: string) => {
     try {
       if (type === 'online_order') {
@@ -407,6 +470,15 @@ export default function DeliveryDashboard() {
           <Clock size={16} color="#64748B" style={styles.icon} />
           <Text style={styles.infoText}>{new Date(item.created_at).toLocaleString()}</Text>
         </View>
+        
+        {item.delivery_type === 'Bus' && item.bus_details && (
+          <View style={styles.infoRow}>
+            <Clock size={16} color="#D97706" style={styles.icon} />
+            <Text style={[styles.infoText, {color: '#D97706', fontWeight: 'bold'}]}>
+              Bus Arrival: {typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || 'N/A') : (item.bus_details.arrival_time || 'N/A')}
+            </Text>
+          </View>
+        )}
         <Text style={styles.totalText}>Total: ₹{parseFloat(item.total_amount || 0).toFixed(2)}</Text>
         {item.notes ? (
           <View style={{marginTop: 10, backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
@@ -414,14 +486,25 @@ export default function DeliveryDashboard() {
               <FileText size={14} color="#64748B" style={{marginRight: 4}} />
               <Text style={{fontSize: 12, fontWeight: 'bold', color: '#475569'}}>Notes</Text>
             </View>
-            {typeof item.notes === 'string' && item.notes.startsWith('[') ? (
+            {Array.isArray(item.notes) ? (
+              item.notes.map((n: any, i: number) => (
+                <Text key={i} style={{fontSize: 13, color: '#334155', marginTop: 2}}>
+                  • {n.text} <Text style={{fontSize: 10, color: '#94a3b8'}}>({n.author})</Text>
+                </Text>
+              ))
+            ) : typeof item.notes === 'string' && item.notes.startsWith('[') ? (
               JSON.parse(item.notes).map((n: any, i: number) => (
                 <Text key={i} style={{fontSize: 13, color: '#334155', marginTop: 2}}>
                   • {n.text} <Text style={{fontSize: 10, color: '#94a3b8'}}>({n.author})</Text>
                 </Text>
               ))
+            ) : typeof item.notes === 'object' && item.notes !== null ? (
+              <Text style={{fontSize: 13, color: '#334155'}}>
+                • {item.notes.text || JSON.stringify(item.notes)} 
+                {item.notes.author && <Text style={{fontSize: 10, color: '#94a3b8'}}> ({item.notes.author})</Text>}
+              </Text>
             ) : (
-              <Text style={{fontSize: 13, color: '#334155'}}>{item.notes}</Text>
+              <Text style={{fontSize: 13, color: '#334155'}}>{String(item.notes)}</Text>
             )}
           </View>
         ) : null}
@@ -469,11 +552,8 @@ export default function DeliveryDashboard() {
                   <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Start</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Customer Not Available')}>
-                <Text style={[styles.deliverBtnText, {fontSize: 12}]}>No Show</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#64748B', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Cancelled')}>
-                <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Cancel</Text>
+              <TouchableOpacity style={[styles.deliverBtn, {backgroundColor: '#6366F1', paddingHorizontal: 10, paddingVertical: 8, flex: 1}]} onPress={() => openUpdateModal(item)}>
+                <Text style={[styles.deliverBtnText, {fontSize: 12}]}>Update</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -719,6 +799,85 @@ export default function DeliveryDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Update Order Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={updateModalVisible}
+        onRequestClose={() => setUpdateModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Order #{updateOrder?.id}</Text>
+            
+            {updateActionType === 'menu' && (
+              <View style={{ gap: 12, marginTop: 10 }}>
+                <TouchableOpacity style={[styles.deliverBtn, { backgroundColor: '#3B82F6' }]} onPress={() => setUpdateActionType('note')}>
+                  <FileText color="#fff" size={16} style={{marginRight: 8}} />
+                  <Text style={styles.deliverBtnText}>Add Note</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.deliverBtn, { backgroundColor: '#F59E0B' }]} onPress={submitNoShow}>
+                  <Text style={styles.deliverBtnText}>Mark as No Show</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.deliverBtn, { backgroundColor: '#EF4444' }]} onPress={() => setUpdateActionType('cancel')}>
+                  <Text style={styles.deliverBtnText}>Cancel Delivery</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {updateActionType === 'note' && (
+              <View>
+                <Text style={styles.label}>Enter your note</Text>
+                <TextInput 
+                  style={[styles.input, { height: 100, textAlignVertical: 'top' }]} 
+                  multiline
+                  value={updateNote}
+                  onChangeText={setUpdateNote}
+                  placeholder="e.g. Customer requested delivery at a different time"
+                />
+              </View>
+            )}
+
+            {updateActionType === 'cancel' && (
+              <View>
+                <Text style={styles.label}>Ask the customer for the 4-digit Delivery OTP to cancel</Text>
+                <TextInput 
+                  style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
+                  value={cancelOtp} 
+                  onChangeText={setCancelOtp} 
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  placeholder="0000"
+                />
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              {updateActionType !== 'menu' && (
+                <TouchableOpacity style={[styles.cancelBtn, {marginRight: 'auto'}]} onPress={() => setUpdateActionType('menu')}>
+                  <Text style={styles.cancelBtnText}>Back</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setUpdateModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </TouchableOpacity>
+              
+              {updateActionType === 'note' && (
+                <TouchableOpacity style={[styles.saveBtn, !updateNote && {opacity: 0.5}]} onPress={submitUpdateNote} disabled={!updateNote}>
+                  <Text style={styles.saveBtnText}>Save Note</Text>
+                </TouchableOpacity>
+              )}
+              {updateActionType === 'cancel' && (
+                <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#EF4444'}, cancelOtp.length !== 4 && {opacity: 0.5}]} onPress={submitCancel} disabled={cancelOtp.length !== 4}>
+                  <Text style={styles.saveBtnText}>Confirm Cancel</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
