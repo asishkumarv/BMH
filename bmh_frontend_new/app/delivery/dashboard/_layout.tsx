@@ -6,9 +6,27 @@ import { DeliverySidebar } from '../../../components/ui/DeliverySidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
 
 export default function EmployeeLayout() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [user, setUser] = useState<any>(null);
+
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      let userDataStr = null;
+      if (Platform.OS === 'web') {
+        userDataStr = localStorage.getItem('employeeUser');
+      } else {
+        userDataStr = await AsyncStorage.getItem('employeeUser');
+      }
+      if (userDataStr) setUser(JSON.parse(userDataStr));
+    };
+    fetchUser();
+  }, []);
+
+  useAttendanceReminder(user);
 
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener('global_refresh', () => {

@@ -85,6 +85,11 @@ app.use('/buses', busRoutes);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+
+  // Run DB Patches / Migrations
+  pool.query('ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS note TEXT')
+    .then(() => console.log('Successfully checked/patched note column in cash_handovers table.'))
+    .catch(err => console.error('Error patching cash_handovers table:', err.message));
   
   // Initialize Pharmacy Background Sync
   try {

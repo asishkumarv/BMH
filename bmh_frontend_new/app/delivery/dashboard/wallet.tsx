@@ -1,19 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
-import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins } from 'lucide-react-native';
+import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins, ChevronDown, ChevronUp, Calendar } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; };
-type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; };
+type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; payment_mode?: string; payment_txn_id?: string; };
+type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; note?: string; };
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
 type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
 
 export default function EmployeeWalletScreen() {
   const { isDesktop } = useResponsive();
   const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Allowance');
+
+  // Accordion Expand/Collapse States
+  const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
+  const [isHandoversExpanded, setIsHandoversExpanded] = useState(true);
+
+  // User
+  const [user, setUser] = useState<any>(null);
+
+  // Filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   // Allowances
   const [balance, setBalance] = useState('0.00');
@@ -50,8 +67,9 @@ export default function EmployeeWalletScreen() {
         userStr = await AsyncStorage.getItem('employeeUser');
       }
       if (userStr) {
-        const user = JSON.parse(userStr);
-        empId = user.id;
+        const u = JSON.parse(userStr);
+        setUser(u);
+        empId = u.id;
         setEmployeeId(empId);
       }
       if (empId) {
@@ -62,6 +80,141 @@ export default function EmployeeWalletScreen() {
     };
     loadUser();
   }, []);
+
+  const formatDateDMY = (dateStr: string, includeTime = false) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      
+      let formatted = `${day}-${month}-${year}`;
+      
+      if (includeTime) {
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        formatted += ` ${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+      }
+      
+      return formatted;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const exportToCSV = async (data: any[], filename: string, headers: string[], rowMapper: (item: any) => string[]) => {
+    try {
+      const headerRows = [
+        `"Bharat Medical Hall"`,
+        `"Employee Name:","${user?.full_name || 'N/A'}"`,
+        `"Department:","${user?.department || 'N/A'}"`,
+        `"Role:","${user?.role || 'Delivery Boy'}"`,
+        `"Date Range:","${startDate || 'All'} to ${endDate || 'All'}"`,
+        ``,
+        headers.map(h => `"${h}"`).join(',')
+      ];
+
+      const dataRows = data.map(item => rowMapper(item).map(val => `"${String(val).replace(/"/g, '""')}"`).join(','));
+      const csvContent = [...headerRows, ...dataRows].join('\n');
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${filename}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // @ts-ignore
+        const path = `${FileSystem.documentDirectory}${filename}.csv`;
+        // @ts-ignore
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+        await Sharing.shareAsync(path);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", "Failed to export CSV: " + e.message);
+    }
+  };
+
+  const handlePrint = async (title: string, headers: string[], rows: any[], rowMapper: (item: any) => string[]) => {
+    try {
+      const tableHeadersHtml = headers.map(h => `<th>${h}</th>`).join('');
+      const tableRowsHtml = rows.map(row => {
+        const cells = rowMapper(row).map(val => `<td>${val}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+
+      const htmlContent = `
+        <html>
+          <head>
+            <style>
+              body { font-family: sans-serif; padding: 20px; color: #334155; }
+              h1 { color: #0f172a; margin-bottom: 5px; text-align: center; font-size: 24px; }
+              .meta-section { margin-top: 15px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+              .meta-row { display: flex; margin-bottom: 6px; font-size: 14px; }
+              .meta-label { font-weight: bold; width: 150px; color: #475569; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+              th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+              th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
+              tr:nth-child(even) { background-color: #f8fafc; }
+            </style>
+          </head>
+          <body>
+            <h1>Bharat Medical Hall</h1>
+            <div class="meta-section">
+              <div class="meta-row"><span class="meta-label">Report:</span><span>${title}</span></div>
+              <div class="meta-row"><span class="meta-label">Employee Name:</span><span>${user?.full_name || 'N/A'}</span></div>
+              <div class="meta-row"><span class="meta-label">Department:</span><span>${user?.department || 'N/A'}</span></div>
+              <div class="meta-row"><span class="meta-label">Role:</span><span>${user?.role || 'Delivery Boy'}</span></div>
+              <div class="meta-row"><span class="meta-label">Date Range:</span><span>${startDate || 'All'} to ${endDate || 'All'}</span></div>
+            </div>
+            <table>
+              <thead>
+                <tr>${tableHeadersHtml}</tr>
+              </thead>
+              <tbody>
+                ${tableRowsHtml}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `;
+
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentWindow?.document || iframe.contentDocument;
+        if (doc) {
+          doc.open();
+          doc.write(htmlContent);
+          doc.close();
+          setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+          }, 500);
+        }
+      } else {
+        await Print.printAsync({ html: htmlContent });
+      }
+    } catch (e: any) {
+      Alert.alert("Error", "Failed to print: " + e.message);
+    }
+  };
 
   const fetchData = async (id: string) => {
     setLoading(true);
@@ -166,12 +319,13 @@ export default function EmployeeWalletScreen() {
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/wallet/handover/request', {
         from_employee_id: employeeId,
         to_employee_id: selectedPeerId,
-        amount: Number(amount)
+        amount: Number(amount),
+        note: note
       });
       if (res.data.success) {
         Alert.alert('Success', 'Handover requested successfully');
         setHandoverModalVisible(false);
-        setAmount(''); setSelectedPeerId('');
+        setAmount(''); setSelectedPeerId(''); setNote('');
         fetchData(employeeId);
       }
     } catch (error: any) {
@@ -196,9 +350,33 @@ export default function EmployeeWalletScreen() {
   const pendingAllocations = transactions.filter(t => t.type === 'allocation_granted' && t.status === 'pending');
   const incomingHandovers = handovers.filter(h => h.to_employee_id == employeeId && h.status === 'Pending');
 
-  // Bookings calculations
-  const totalCashBooked = bookings.filter(b => b.payment_mode === 'Cash').reduce((acc, b) => acc + Number(b.fee || 0), 0);
-  const totalOnlineBooked = bookings.filter(b => b.payment_mode === 'Online').reduce((acc, b) => acc + Number(b.fee || 0), 0);
+  const filteredTransactions = transactions.filter(tx => {
+    if (!tx.created_at) return true;
+    const txDate = new Date(tx.created_at).toISOString().split('T')[0];
+    if (startDate && txDate < startDate) return false;
+    if (endDate && txDate > endDate) return false;
+    return true;
+  });
+
+  const allowanceTransactions = filteredTransactions.filter(tx => 
+    tx.type !== 'cash_collection' && tx.type !== 'online_collection'
+  );
+
+  const collectedTransactions = filteredTransactions.filter(tx => 
+    tx.type === 'cash_collection' || tx.type === 'online_collection'
+  );
+
+  const filteredHandovers = handovers.filter(h => {
+    if (!h.created_at) return true;
+    const hDate = new Date(h.created_at).toISOString().split('T')[0];
+    if (startDate && hDate < startDate) return false;
+    if (endDate && hDate > endDate) return false;
+    return true;
+  });
+
+  // Collected cash/online calculations
+  const totalCashBooked = collectedTransactions.filter(tx => tx.payment_mode === 'Cash').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+  const totalOnlineBooked = collectedTransactions.filter(tx => tx.payment_mode === 'Online').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
@@ -223,6 +401,90 @@ export default function EmployeeWalletScreen() {
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <View style={styles.filterCard}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text, marginBottom: 16 }}>Filter by Date Range</Text>
+            <View style={styles.filterRow}>
+              <View style={styles.filterCol}>
+                <Text style={styles.filterLabel}>Start Date</Text>
+                {Platform.OS === 'web' ? (
+                  <View style={styles.webDateInputContainer}>
+                    <Calendar size={16} color="#64748b" style={styles.webCalendarIcon} />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={e => setStartDate(e.target.value)}
+                      style={styles.webDateInput as any}
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <Pressable style={styles.mobileDateBtn} onPress={() => setShowStartPicker(true)}>
+                      <Calendar size={16} color="#64748b" />
+                      <Text style={styles.mobileDateBtnText}>
+                        {startDate ? formatDateDMY(startDate, false) : 'Select Start Date'}
+                      </Text>
+                    </Pressable>
+                    {showStartPicker && (
+                      <DateTimePicker
+                        value={startDate ? new Date(startDate) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event: any, date?: Date) => {
+                          setShowStartPicker(Platform.OS === 'ios');
+                          if (date) {
+                            const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                            setStartDate(offsetDate.toISOString().split('T')[0]);
+                          }
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+              <View style={styles.filterCol}>
+                <Text style={styles.filterLabel}>End Date</Text>
+                {Platform.OS === 'web' ? (
+                  <View style={styles.webDateInputContainer}>
+                    <Calendar size={16} color="#64748b" style={styles.webCalendarIcon} />
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={e => setEndDate(e.target.value)}
+                      style={styles.webDateInput as any}
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <Pressable style={styles.mobileDateBtn} onPress={() => setShowEndPicker(true)}>
+                      <Calendar size={16} color="#64748b" />
+                      <Text style={styles.mobileDateBtnText}>
+                        {endDate ? formatDateDMY(endDate, false) : 'Select End Date'}
+                      </Text>
+                    </Pressable>
+                    {showEndPicker && (
+                      <DateTimePicker
+                        value={endDate ? new Date(endDate) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event: any, date?: Date) => {
+                          setShowEndPicker(Platform.OS === 'ios');
+                          if (date) {
+                            const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                            setEndDate(offsetDate.toISOString().split('T')[0]);
+                          }
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+              {(startDate !== '' || endDate !== '') && (
+                <Pressable style={styles.clearFilterBtn} onPress={() => { setStartDate(''); setEndDate(''); }}>
+                  <Text style={styles.clearFilterBtnText}>Clear</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
           
           {incomingHandovers.length > 0 && activeTab === 'Cash' && (
             <View style={styles.pendingSection}>
@@ -233,7 +495,7 @@ export default function EmployeeWalletScreen() {
                     <Text style={styles.pendingAmount}>₹{h.amount}</Text>
                     <Text style={styles.pendingNote}>From: {h.from_name} ({h.from_employee_id})</Text>
                     <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>{h.from_role} • {h.from_department}</Text>
-                    <Text style={styles.txDate}>{new Date(h.created_at).toLocaleString()}</Text>
+                    <Text style={styles.txDate}>{formatDateDMY(h.created_at, true)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable style={[styles.acceptBtn, {backgroundColor: '#ef4444'}]} onPress={() => handleAcceptHandover(h.id, 'Rejected')}>
@@ -277,7 +539,7 @@ export default function EmployeeWalletScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.pendingAmount}>₹{tx.amount}</Text>
                         {tx.note ? <Text style={styles.pendingNote}>Note: {tx.note}</Text> : null}
-                        <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
+                        <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
                       </View>
                       <Pressable style={styles.acceptBtn} onPress={() => handleAcceptAllocation(tx.id)}>
                         <CheckCircle2 size={16} color="#FFF" />
@@ -288,8 +550,30 @@ export default function EmployeeWalletScreen() {
                 </View>
               )}
 
-              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>Transaction History</Text>
-              {transactions.map(tx => (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Transaction History</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(allowanceTransactions, 'Allowance_History', ['Date', 'Type', 'Amount', 'Note', 'Status'], (tx) => [
+                    formatDateDMY(tx.created_at, true),
+                    tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
+                    `₹${tx.amount}`,
+                    tx.note || '',
+                    tx.status
+                  ])}>
+                    <Text style={styles.actionIconText}>CSV</Text>
+                  </Pressable>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Allowance Transaction History', ['Date', 'Type', 'Amount', 'Note', 'Status'], allowanceTransactions, (tx) => [
+                    formatDateDMY(tx.created_at, true),
+                    tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
+                    `₹${tx.amount}`,
+                    tx.note || '',
+                    tx.status
+                  ])}>
+                    <Text style={styles.actionIconText}>Print</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {allowanceTransactions.map(tx => (
                 <View key={tx.id} style={styles.txCard}>
                   <View style={[styles.txIconWrapper, { backgroundColor: tx.type === 'usage' ? '#fee2e2' : '#dcfce7' }]}>
                     {tx.type === 'usage' ? <ArrowUpRight size={20} color="#ef4444" /> : <ArrowDownRight size={20} color="#22c55e" />}
@@ -298,7 +582,7 @@ export default function EmployeeWalletScreen() {
                     <Text style={styles.txType}>
                       {tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}
                     </Text>
-                    <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
+                    <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
                     {tx.note ? <Text style={styles.txNote}>{tx.note}</Text> : null}
                   </View>
                   <View style={styles.txAmountSection}>
@@ -342,29 +626,96 @@ export default function EmployeeWalletScreen() {
                 </View>
               </View>
 
-              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>My Order Collections</Text>
-              {bookings.slice(0, 10).map(b => (
-                <View key={b.booking_id} style={styles.txCard}>
-                  <View style={[styles.txIconWrapper, { backgroundColor: b.payment_mode === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
-                    {b.payment_mode === 'Cash' ? <Banknote size={20} color="#16a34a" /> : <RefreshCcw size={20} color={Colors.light.primary} />}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }} onPress={() => setIsBookingsExpanded(!isBookingsExpanded)}>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>My Order Collections</Text>
+                  {isBookingsExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
+                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(collectedTransactions, 'Order_Collections', ['Tx ID', 'Date', 'Amount', 'Payment Mode', 'Details'], (tx) => [
+                    tx.id,
+                    formatDateDMY(tx.created_at, true),
+                    `₹${tx.amount}`,
+                    tx.payment_mode || 'Cash',
+                    tx.note || ''
+                  ])}>
+                    <Text style={styles.actionIconText}>CSV</Text>
+                  </Pressable>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('My Order Collections', ['Tx ID', 'Date', 'Amount', 'Payment Mode', 'Details'], collectedTransactions, (tx) => [
+                    tx.id,
+                    formatDateDMY(tx.created_at, true),
+                    `₹${tx.amount}`,
+                    tx.payment_mode || 'Cash',
+                    tx.note || ''
+                  ])}>
+                    <Text style={styles.actionIconText}>Print</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {isBookingsExpanded && collectedTransactions.map(tx => (
+                <View key={tx.id} style={styles.txCard}>
+                  <View style={[styles.txIconWrapper, { backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
+                    {(tx.payment_mode || 'Cash') === 'Cash' ? <Banknote size={20} color="#16a34a" /> : <RefreshCcw size={20} color={Colors.light.primary} />}
                   </View>
                   <View style={styles.txDetails}>
-                    <Text style={styles.txType}>Patient: {b.patient_name}</Text>
-                    <Text style={styles.txDate}>{new Date(b.date).toLocaleDateString()} - Dr. {b.doctor_name}</Text>
+                    <Text style={styles.txType}>{tx.note || 'Order Collection'}</Text>
+                    <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
                   </View>
                   <View style={styles.txAmountSection}>
-                    <Text style={[styles.txAmount, { color: b.payment_mode === 'Cash' ? '#16a34a' : Colors.light.primary }]}>
-                      +₹{b.fee || 0}
+                    <Text style={[styles.txAmount, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#16a34a' : Colors.light.primary }]}>
+                      +₹{tx.amount || 0}
                     </Text>
-                    <Text style={[styles.txStatus, { color: b.payment_mode === 'Cash' ? '#166534' : '#075985', backgroundColor: b.payment_mode === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
-                      {b.payment_mode}
+                    <Text style={[styles.txStatus, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#166534' : '#075985', backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
+                      {tx.payment_mode || 'Cash'}
                     </Text>
                   </View>
                 </View>
               ))}
+              {!isBookingsExpanded && collectedTransactions.length > 0 && (
+                <Pressable onPress={() => setIsBookingsExpanded(true)} style={{ padding: 12, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Show {collectedTransactions.length} Order Collections</Text>
+                </Pressable>
+              )}
 
-              <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginTop: 32, marginBottom: 16 }}>Handover History</Text>
-              {handovers.map(h => (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }} onPress={() => setIsHandoversExpanded(!isHandoversExpanded)}>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Handover History</Text>
+                  {isHandoversExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
+                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredHandovers, 'Handover_History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Status', 'Note'], (h) => {
+                    const isOut = h.from_employee_id == employeeId;
+                    return [
+                      formatDateDMY(h.created_at, true),
+                      isOut ? 'Handed Over' : 'Received',
+                      isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
+                      isOut ? h.to_role || '' : h.from_role || '',
+                      isOut ? h.to_department || '' : h.from_department || '',
+                      `₹${h.amount}`,
+                      h.status,
+                      h.note || ''
+                    ];
+                  })}>
+                    <Text style={styles.actionIconText}>CSV</Text>
+                  </Pressable>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Handover History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Status', 'Note'], filteredHandovers, (h) => {
+                    const isOut = h.from_employee_id == employeeId;
+                    return [
+                      formatDateDMY(h.created_at, true),
+                      isOut ? 'Handed Over' : 'Received',
+                      isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
+                      isOut ? h.to_role || '' : h.from_role || '',
+                      isOut ? h.to_department || '' : h.from_department || '',
+                      `₹${h.amount}`,
+                      h.status,
+                      h.note || ''
+                    ];
+                  })}>
+                    <Text style={styles.actionIconText}>Print</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {isHandoversExpanded && filteredHandovers.map(h => (
                 <View key={h.id} style={styles.txCard}>
                   <View style={styles.txDetails}>
                     <Text style={styles.txType}>
@@ -373,7 +724,8 @@ export default function EmployeeWalletScreen() {
                     <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>
                       {h.from_employee_id == employeeId ? `${h.to_role} • ${h.to_department}` : `${h.from_role} • ${h.from_department}`}
                     </Text>
-                    <Text style={styles.txDate}>{new Date(h.created_at).toLocaleString()}</Text>
+                    <Text style={styles.txDate}>{formatDateDMY(h.created_at, true)}</Text>
+                    {h.note ? <Text style={styles.txNote}>{h.note}</Text> : null}
                   </View>
                   <View style={styles.txAmountSection}>
                     <Text style={[styles.txAmount, { color: h.from_employee_id == employeeId ? '#ef4444' : '#16a34a' }]}>
@@ -388,6 +740,11 @@ export default function EmployeeWalletScreen() {
                   </View>
                 </View>
               ))}
+              {!isHandoversExpanded && filteredHandovers.length > 0 && (
+                <Pressable onPress={() => setIsHandoversExpanded(true)} style={{ padding: 12, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Show {filteredHandovers.length} Handover Records</Text>
+                </Pressable>
+              )}
             </>
           )}
 
@@ -437,8 +794,16 @@ export default function EmployeeWalletScreen() {
               onChangeText={setAmount}
             />
 
+            <Text style={styles.inputLabel}>Note (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Booking Collections handover"
+              value={note}
+              onChangeText={setNote}
+            />
+
             <View style={styles.modalButtons}>
-              <Pressable style={styles.modalCancelBtn} onPress={() => {setHandoverModalVisible(false); setSelectedPeerId('');}}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => {setHandoverModalVisible(false); setSelectedPeerId(''); setNote(''); setAmount('');}}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalSubmitBtn, submitting && styles.btnDisabled]} onPress={handleRequestHandover} disabled={submitting}>
@@ -551,5 +916,18 @@ const styles = StyleSheet.create({
   modalCancelText: { color: '#475569', fontWeight: '600' },
   modalSubmitBtn: { flex: 1, padding: 14, borderRadius: 8, backgroundColor: Colors.light.primary, alignItems: 'center' },
   modalSubmitText: { color: '#FFF', fontWeight: '600' },
-  btnDisabled: { opacity: 0.7 }
+  btnDisabled: { opacity: 0.7 },
+  filterCard: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
+  filterCol: { flex: 1, minWidth: 200 },
+  filterLabel: { fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  webDateInputContainer: { position: 'relative', flexDirection: 'row', alignItems: 'center' },
+  webCalendarIcon: { position: 'absolute', left: 12, zIndex: 10, pointerEvents: 'none' },
+  webDateInput: { paddingVertical: 10, paddingLeft: 36, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#F8FAFC', fontSize: 14, width: '100%', outlineWidth: 0, color: '#334155' },
+  mobileDateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#F8FAFC' },
+  mobileDateBtnText: { fontSize: 14, color: '#334155' },
+  clearFilterBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fca5a5', justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-end', height: 42 },
+  clearFilterBtnText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
+  actionIconButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
+  actionIconText: { fontSize: 12, fontWeight: '600', color: '#1E40AF' }
 });

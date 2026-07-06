@@ -210,7 +210,7 @@ exports.logUsage = async (req, res) => {
 
 exports.requestHandover = async (req, res) => {
   try {
-    const { from_employee_id, to_employee_id, amount } = req.body;
+    const { from_employee_id, to_employee_id, amount, note } = req.body;
     
     // Check if sender has enough cash_in_hand
     const wCheck = await pool.query('SELECT cash_in_hand FROM employee_wallets WHERE employee_id = $1', [from_employee_id]);
@@ -219,8 +219,8 @@ exports.requestHandover = async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, status) VALUES ($1, $2, $3, $4) RETURNING *',
-      [from_employee_id, to_employee_id, amount, 'Pending']
+      'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [from_employee_id, to_employee_id, amount, note || null, 'Pending']
     );
 
     // Deduct immediately so they can't double-handover

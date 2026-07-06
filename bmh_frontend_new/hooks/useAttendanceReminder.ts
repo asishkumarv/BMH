@@ -23,12 +23,15 @@ export function useAttendanceReminder(user: any) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!user || !user.schedule_in || !user.schedule_out) return;
+    if (!user) return;
+    const hasShift = user.schedule_in && user.schedule_out;
+    const hasBreak = user.break_in && user.break_out;
+    if (!hasShift && !hasBreak) return;
 
     if (Platform.OS === 'web') {
-      setupWebReminder(user.schedule_in, user.schedule_out);
+      setupWebReminder(user.schedule_in, user.schedule_out, user.break_in, user.break_out);
     } else {
-      setupMobileReminder(user.schedule_in, user.schedule_out);
+      setupMobileReminder(user.schedule_in, user.schedule_out, user.break_in, user.break_out);
     }
 
     return () => {
@@ -39,37 +42,76 @@ export function useAttendanceReminder(user: any) {
   }, [user]);
 
   const parseTimeString = (timeStr: string) => {
-    // Expects "HH:mm"
-    const parts = timeStr.split(':');
-    const hours = parts[0] ? parseInt(parts[0], 10) : 0;
+    if (!timeStr) return { hours: 0, minutes: 0 };
+    const cleanStr = timeStr.toLowerCase().trim();
+    const isPm = cleanStr.includes('pm');
+    const isAm = cleanStr.includes('am');
+    const timeOnly = cleanStr.replace('am', '').replace('pm', '').trim();
+    
+    const parts = timeOnly.split(':');
+    let hours = parts[0] ? parseInt(parts[0], 10) : 0;
     const minutes = parts[1] ? parseInt(parts[1], 10) : 0;
+    
+    if (isPm && hours < 12) {
+      hours += 12;
+    } else if (isAm && hours === 12) {
+      hours = 0;
+    }
     return { hours, minutes };
   };
 
-  const setupWebReminder = (scheduleIn: string, scheduleOut: string) => {
-    const { hours: inHours, minutes: inMinutes } = parseTimeString(scheduleIn);
-    const { hours: outHours, minutes: outMinutes } = parseTimeString(scheduleOut);
+  const setupWebReminder = (scheduleIn?: string, scheduleOut?: string, breakIn?: string, breakOut?: string) => {
+    let reminderInMins = 0, reminderInHours = 0;
+    let reminderOutMins = 0, reminderOutHours = 0;
+    let reminderBreakInMins = 0, reminderBreakInHours = 0;
+    let reminderBreakOutMins = 0, reminderBreakOutHours = 0;
 
-    // Calculate 15 mins before
-    let reminderInMins = inMinutes - 15;
-    let reminderInHours = inHours;
-    if (reminderInMins < 0) {
-      reminderInMins += 60;
-      reminderInHours -= 1;
+    if (scheduleIn && scheduleOut) {
+      const { hours: inHours, minutes: inMinutes } = parseTimeString(scheduleIn);
+      const { hours: outHours, minutes: outMinutes } = parseTimeString(scheduleOut);
+
+      reminderInMins = inMinutes - 15;
+      reminderInHours = inHours;
+      if (reminderInMins < 0) {
+        reminderInMins += 60;
+        reminderInHours -= 1;
+      }
+      if (reminderInHours < 0) reminderInHours += 24;
+
+      reminderOutMins = outMinutes - 15;
+      reminderOutHours = outHours;
+      if (reminderOutMins < 0) {
+        reminderOutMins += 60;
+        reminderOutHours -= 1;
+      }
+      if (reminderOutHours < 0) reminderOutHours += 24;
     }
-    if (reminderInHours < 0) reminderInHours += 24;
 
-    let reminderOutMins = outMinutes - 15;
-    let reminderOutHours = outHours;
-    if (reminderOutMins < 0) {
-      reminderOutMins += 60;
-      reminderOutHours -= 1;
+    if (breakIn && breakOut) {
+      const { hours: bInHours, minutes: bInMinutes } = parseTimeString(breakIn);
+      const { hours: bOutHours, minutes: bOutMinutes } = parseTimeString(breakOut);
+
+      reminderBreakInMins = bInMinutes - 5;
+      reminderBreakInHours = bInHours;
+      if (reminderBreakInMins < 0) {
+        reminderBreakInMins += 60;
+        reminderBreakInHours -= 1;
+      }
+      if (reminderBreakInHours < 0) reminderBreakInHours += 24;
+
+      reminderBreakOutMins = bOutMinutes - 5;
+      reminderBreakOutHours = bOutHours;
+      if (reminderBreakOutMins < 0) {
+        reminderBreakOutMins += 60;
+        reminderBreakOutHours -= 1;
+      }
+      if (reminderBreakOutHours < 0) reminderBreakOutHours += 24;
     }
-    if (reminderOutHours < 0) reminderOutHours += 24;
 
-    // We only want to alert once per day for each
     let hasAlertedIn = false;
     let hasAlertedOut = false;
+    let hasAlertedBreakIn = false;
+    let hasAlertedBreakOut = false;
 
     // Run initially
     checkWebAlarms();
@@ -86,9 +128,11 @@ export function useAttendanceReminder(user: any) {
       if (currentH === 0 && currentM === 0) {
         hasAlertedIn = false;
         hasAlertedOut = false;
+        hasAlertedBreakIn = false;
+        hasAlertedBreakOut = false;
       }
 
-      if (!hasAlertedIn && currentH === reminderInHours && currentM === reminderInMins) {
+      if (scheduleIn && !hasAlertedIn && currentH === reminderInHours && currentM === reminderInMins) {
         hasAlertedIn = true;
         Toast.show({
           type: 'info',
@@ -99,7 +143,7 @@ export function useAttendanceReminder(user: any) {
         });
       }
 
-      if (!hasAlertedOut && currentH === reminderOutHours && currentM === reminderOutMins) {
+      if (scheduleOut && !hasAlertedOut && currentH === reminderOutHours && currentM === reminderOutMins) {
         hasAlertedOut = true;
         Toast.show({
           type: 'info',
@@ -109,70 +153,176 @@ export function useAttendanceReminder(user: any) {
           visibilityTime: 10000,
         });
       }
+
+      if (breakIn && !hasAlertedBreakIn && currentH === reminderBreakInHours && currentM === reminderBreakInMins) {
+        hasAlertedBreakIn = true;
+        Toast.show({
+          type: 'info',
+          text1: 'Break Reminder',
+          text2: `Your break starts in 5 minutes! Don't forget to Break-in.`,
+          position: 'top',
+          visibilityTime: 10000,
+        });
+      }
+
+      if (breakOut && !hasAlertedBreakOut && currentH === reminderBreakOutHours && currentM === reminderBreakOutMins) {
+        hasAlertedBreakOut = true;
+        Toast.show({
+          type: 'info',
+          text1: 'Break Reminder',
+          text2: `Your break ends in 5 minutes! Prepare to Break-out.`,
+          position: 'top',
+          visibilityTime: 10000,
+        });
+      }
     }
   };
 
-  const setupMobileReminder = async (scheduleIn: string, scheduleOut: string) => {
-    if (!Device.isDevice) return;
-
+  const setupMobileReminder = async (scheduleIn?: string, scheduleOut?: string, breakIn?: string, breakOut?: string) => {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-    if (finalStatus !== 'granted') return;
+    if (finalStatus !== 'granted') {
+      console.log("Notifications permission not granted.");
+      return;
+    }
 
-    const { hours: inHours, minutes: inMinutes } = parseTimeString(scheduleIn);
-    const { hours: outHours, minutes: outMinutes } = parseTimeString(scheduleOut);
+    if (Platform.OS === 'android') {
+      try {
+        await Notifications.setNotificationChannelAsync('alarm-channel-v2', {
+          name: 'Alarm Notifications',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          sound: 'alarm.wav',
+        });
+      } catch (e) {
+        console.log("Error creating channel inside hook:", e);
+      }
+    }
+
+    console.log(`Setting up mobile reminders. CheckIn: ${scheduleIn}, CheckOut: ${scheduleOut}, BreakIn: ${breakIn}, BreakOut: ${breakOut}`);
 
     // Cancel previously scheduled notifications to avoid duplicates
-    await Notifications.cancelAllScheduledNotificationsAsync();
-
-    // 15 mins before check-in
-    let reminderInMins = inMinutes - 15;
-    let reminderInHours = inHours;
-    if (reminderInMins < 0) {
-      reminderInMins += 60;
-      reminderInHours -= 1;
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch (e) {
+      console.log("Error cancelling old notifications:", e);
     }
-    if (reminderInHours < 0) reminderInHours += 24;
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Attendance Reminder',
-        body: `Your shift starts in 15 minutes! Don't forget to Check-in.`,
-        sound: true,
-      },
-      trigger: {
-        type: 'calendar',
-        hour: reminderInHours,
-        minute: reminderInMins,
-        repeats: true,
-      } as any,
-    });
+    // 1. Shift Check-in (15 mins before)
+    if (scheduleIn) {
+      const { hours: inHours, minutes: inMinutes } = parseTimeString(scheduleIn);
+      let reminderInMins = inMinutes - 15;
+      let reminderInHours = inHours;
+      if (reminderInMins < 0) {
+        reminderInMins += 60;
+        reminderInHours -= 1;
+      }
+      if (reminderInHours < 0) reminderInHours += 24;
 
-    // 15 mins before check-out
-    let reminderOutMins = outMinutes - 15;
-    let reminderOutHours = outHours;
-    if (reminderOutMins < 0) {
-      reminderOutMins += 60;
-      reminderOutHours -= 1;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Attendance Reminder',
+          body: `Your shift starts in 15 minutes! Don't forget to Check-in.`,
+          sound: true,
+        },
+        trigger: {
+          type: 'calendar',
+          hour: reminderInHours,
+          minute: reminderInMins,
+          repeats: true,
+          channelId: 'alarm-channel-v2'
+        } as any,
+      });
+      console.log(`Scheduled Check-in alarm for ${reminderInHours}:${reminderInMins}`);
     }
-    if (reminderOutHours < 0) reminderOutHours += 24;
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Attendance Reminder',
-        body: `Your shift ends in 15 minutes! Prepare to Check-out.`,
-        sound: true,
-      },
-      trigger: {
-        type: 'calendar',
-        hour: reminderOutHours,
-        minute: reminderOutMins,
-        repeats: true,
-      } as any,
-    });
+    // 2. Shift Check-out (15 mins before)
+    if (scheduleOut) {
+      const { hours: outHours, minutes: outMinutes } = parseTimeString(scheduleOut);
+      let reminderOutMins = outMinutes - 15;
+      let reminderOutHours = outHours;
+      if (reminderOutMins < 0) {
+        reminderOutMins += 60;
+        reminderOutHours -= 1;
+      }
+      if (reminderOutHours < 0) reminderOutHours += 24;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Attendance Reminder',
+          body: `Your shift ends in 15 minutes! Prepare to Check-out.`,
+          sound: true,
+        },
+        trigger: {
+          type: 'calendar',
+          hour: reminderOutHours,
+          minute: reminderOutMins,
+          repeats: true,
+          channelId: 'alarm-channel-v2'
+        } as any,
+      });
+      console.log(`Scheduled Check-out alarm for ${reminderOutHours}:${reminderOutMins}`);
+    }
+
+    // 3. Break-in (5 mins before)
+    if (breakIn) {
+      const { hours: bInHours, minutes: bInMinutes } = parseTimeString(breakIn);
+      let reminderBreakInMins = bInMinutes - 5;
+      let reminderBreakInHours = bInHours;
+      if (reminderBreakInMins < 0) {
+        reminderBreakInMins += 60;
+        reminderBreakInHours -= 1;
+      }
+      if (reminderBreakInHours < 0) reminderBreakInHours += 24;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Break Reminder',
+          body: `Your break starts in 5 minutes! Don't forget to Break-in.`,
+          sound: true,
+        },
+        trigger: {
+          type: 'calendar',
+          hour: reminderBreakInHours,
+          minute: reminderBreakInMins,
+          repeats: true,
+          channelId: 'alarm-channel-v2'
+        } as any,
+      });
+      console.log(`Scheduled Break-in alarm for ${reminderBreakInHours}:${reminderBreakInMins}`);
+    }
+
+    // 4. Break-out (5 mins before)
+    if (breakOut) {
+      const { hours: bOutHours, minutes: bOutMinutes } = parseTimeString(breakOut);
+      let reminderBreakOutMins = bOutMinutes - 5;
+      let reminderBreakOutHours = bOutHours;
+      if (reminderBreakOutMins < 0) {
+        reminderBreakOutMins += 60;
+        reminderBreakOutHours -= 1;
+      }
+      if (reminderBreakOutHours < 0) reminderBreakOutHours += 24;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Break Reminder',
+          body: `Your break ends in 5 minutes! Prepare to Break-out.`,
+          sound: true,
+        },
+        trigger: {
+          type: 'calendar',
+          hour: reminderBreakOutHours,
+          minute: reminderBreakOutMins,
+          repeats: true,
+          channelId: 'alarm-channel-v2'
+        } as any,
+      });
+      console.log(`Scheduled Break-out alarm for ${reminderBreakOutHours}:${reminderBreakOutMins}`);
+    }
   };
 }

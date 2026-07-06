@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {  View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView , Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
 import { Plus, Search, MoreVertical, Shield, Building, User } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
@@ -26,9 +26,9 @@ export default function EmployeesScreen() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
-  
+
   const [rolesModalVisible, setRolesModalVisible] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -51,8 +51,8 @@ export default function EmployeesScreen() {
   const [editSalary, setEditSalary] = useState('');
   const [editShiftIn, setEditShiftIn] = useState('');
   const [editShiftOut, setEditShiftOut] = useState('');
-    const [editBreakStart, setEditBreakStart] = useState('');
-    const [editBreakEnd, setEditBreakEnd] = useState('');
+  const [editBreakStart, setEditBreakStart] = useState('');
+  const [editBreakEnd, setEditBreakEnd] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function EmployeesScreen() {
           axios.get('https://napi.bharatmedicalhallplus.com/department'),
           axios.get('https://napi.bharatmedicalhallplus.com/roles')
         ]);
-        
+
         let depts: any[] = [];
         if (deptRes.data.success) {
           depts = deptRes.data.data;
@@ -91,7 +91,7 @@ export default function EmployeesScreen() {
         setLoading(false);
       }
     };
-    
+
     fetchEmployees();
   }, [selectedUserType]);
 
@@ -162,10 +162,10 @@ export default function EmployeesScreen() {
       if (cleanId.startsWith('SA-')) cleanId = cleanId.replace('SA-', '');
       if (cleanId.startsWith('EMP-')) cleanId = cleanId.replace('EMP-', '');
 
-      const endpoint = selectedUserType === 'subadmin'
+      const endpoint = selectedUserType === 'sub_admin'
         ? `https://napi.bharatmedicalhallplus.com/admin/department-admins/${cleanId}/status`
         : `https://napi.bharatmedicalhallplus.com/employees/${cleanId}/status`;
-      
+
       const response = await axios.put(endpoint, {
         status: newStatus
       });
@@ -211,8 +211,8 @@ export default function EmployeesScreen() {
           </View>
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-              <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : {backgroundColor: '#fee2e2'}]}>
-                <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : {color: '#dc2626'}]}>
+              <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : { backgroundColor: '#fee2e2' }]}>
+                <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : { color: '#dc2626' }]}>
                   {item.status}
                 </Text>
               </View>
@@ -237,8 +237,8 @@ export default function EmployeesScreen() {
                 </Pressable>
               )}
             </View>
-            <Pressable 
-              style={styles.actionBtnMobile} 
+            <Pressable
+              style={styles.actionBtnMobile}
               onPress={() => { setSelectedEmployee(item); setProfileModalVisible(true); }}
             >
               <MoreVertical size={20} color={Colors.light.icon} />
@@ -255,8 +255,8 @@ export default function EmployeesScreen() {
         <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
         <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
         <View style={{ width: 180, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : {backgroundColor: '#fee2e2'}]}>
-            <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : {color: '#dc2626'}]}>{item.status}</Text>
+          <View style={[styles.statusBadge, item.status === 'approved' ? styles.statusApproved : item.status === 'pending' ? styles.statusPending : { backgroundColor: '#fee2e2' }]}>
+            <Text style={[styles.statusText, item.status === 'approved' ? styles.textApproved : item.status === 'pending' ? styles.textPending : { color: '#dc2626' }]}>{item.status}</Text>
           </View>
           {item.status === 'pending' && (
             <>
@@ -279,8 +279,8 @@ export default function EmployeesScreen() {
             </Pressable>
           )}
         </View>
-        <Pressable 
-          style={styles.actionBtn} 
+        <Pressable
+          style={styles.actionBtn}
           onPress={() => { setSelectedEmployee(item); setProfileModalVisible(true); }}
         >
           <MoreVertical size={20} color={Colors.light.icon} />
@@ -298,13 +298,13 @@ export default function EmployeesScreen() {
         </View>
         <View style={[styles.headerButtons, !isDesktop && styles.headerButtonsMobile]}>
           <View style={styles.userTypeToggle}>
-            <Pressable 
+            <Pressable
               style={[styles.toggleBtn, selectedUserType === 'employee' && styles.toggleBtnActive]}
               onPress={() => setSelectedUserType('employee')}
             >
               <Text style={[styles.toggleText, selectedUserType === 'employee' && styles.toggleTextActive]}>Employees</Text>
             </Pressable>
-            <Pressable 
+            <Pressable
               style={[styles.toggleBtn, selectedUserType === 'sub_admin' && styles.toggleBtnActive]}
               onPress={() => setSelectedUserType('sub_admin')}
             >
@@ -322,10 +322,10 @@ export default function EmployeesScreen() {
 
       <View style={styles.card}>
         <View style={styles.toolbar}>
-           <View style={styles.searchBox}>
-              <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
-              <Text style={styles.searchPlaceholder}>Search employees...</Text>
-           </View>
+          <View style={styles.searchBox}>
+            <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
+            <Text style={styles.searchPlaceholder}>Search employees...</Text>
+          </View>
         </View>
 
         {loading ? (
@@ -350,25 +350,25 @@ export default function EmployeesScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDesktop && { width: 600 }]}>
             <Text style={styles.modalTitle}>Manage Roles</Text>
-            
+
             <View style={styles.addRoleSection}>
               <Text style={styles.sectionLabel}>Add New Role</Text>
               <View style={styles.addRoleRow}>
-                <TextInput 
-                  style={[styles.input, { flex: 1, marginBottom: 0 }]} 
-                  placeholder="e.g. Senior Surgeon" 
-                  value={newRoleName} 
-                  onChangeText={setNewRoleName} 
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  placeholder="e.g. Senior Surgeon"
+                  value={newRoleName}
+                  onChangeText={setNewRoleName}
                 />
-                <Pressable 
-                  style={[styles.submitBtn, { paddingVertical: 14 }]} 
-                  onPress={handleAddRole} 
+                <Pressable
+                  style={[styles.submitBtn, { paddingVertical: 14 }]}
+                  onPress={handleAddRole}
                   disabled={addingRole}
                 >
                   <Text style={styles.submitBtnText}>{addingRole ? 'Adding...' : 'Add'}</Text>
                 </Pressable>
               </View>
-              
+
               <Text style={[styles.label, { marginTop: 15, marginBottom: 5 }]}>Assign to Department</Text>
               <View style={{ zIndex: 1000, elevation: 1000, marginBottom: 15 }}>
                 <CustomDropdown
@@ -420,28 +420,28 @@ export default function EmployeesScreen() {
       <Modal visible={profileModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '80%' }, isDesktop && { width: 600 }]}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
-              <Text style={[styles.modalTitle, {marginBottom: 0}]}>Employee Profile</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }]}>Employee Profile</Text>
               {!isEditingProfile ? (
                 <Pressable onPress={() => {
                   if (selectedEmployee) {
                     let pd: any = {};
                     if (selectedEmployee.profile_data) {
-                      try { pd = JSON.parse(selectedEmployee.profile_data); } catch(e){}
+                      try { pd = JSON.parse(selectedEmployee.profile_data); } catch (e) { }
                     }
                     setEditSalary(pd.salary || '');
                     setEditShiftIn(pd.shiftIn || (selectedEmployee as any).schedule_in || '');
                     setEditShiftOut(pd.shiftOut || (selectedEmployee as any).schedule_out || '');
-                      setEditBreakStart(pd.breakStart || '');
-                      setEditBreakEnd(pd.breakEnd || '');
+                    setEditBreakStart(pd.breakStart || '');
+                    setEditBreakEnd(pd.breakEnd || '');
                     setIsEditingProfile(true);
                   }
                 }}>
-                  <Text style={{color: Colors.light.primary, fontWeight: '600'}}>Edit Details</Text>
+                  <Text style={{ color: Colors.light.primary, fontWeight: '600' }}>Edit Details</Text>
                 </Pressable>
               ) : (
                 <Pressable onPress={() => setIsEditingProfile(false)}>
-                  <Text style={{color: Colors.light.icon, fontWeight: '600'}}>Cancel Edit</Text>
+                  <Text style={{ color: Colors.light.icon, fontWeight: '600' }}>Cancel Edit</Text>
                 </Pressable>
               )}
             </View>
@@ -449,13 +449,13 @@ export default function EmployeesScreen() {
               {selectedEmployee && (() => {
                 let pd: any = {};
                 if (selectedEmployee.profile_data) {
-                  try { pd = JSON.parse(selectedEmployee.profile_data); } catch(e){}
+                  try { pd = JSON.parse(selectedEmployee.profile_data); } catch (e) { }
                 }
                 return (
                   <View style={{ gap: 12 }}>
                     <View style={{ alignItems: 'center', marginBottom: 20 }}>
                       {pd.photo && pd.photo.length > 5 && pd.photo !== 'null' ? (
-                        <Image source={{ uri: pd.photo }} style={{ width: 100, height: 100, borderRadius: 50}} resizeMode="cover" />
+                        <Image source={{ uri: pd.photo }} style={{ width: 100, height: 100, borderRadius: 50 }} resizeMode="cover" />
                       ) : (
                         <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' }}>
                           <User size={48} color="#1E40AF" />
@@ -470,13 +470,13 @@ export default function EmployeesScreen() {
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Mobile:</Text><Text style={styles.profileVal}>{(selectedEmployee as any).mobile || pd.mobile || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Age/Blood:</Text><Text style={styles.profileVal}>{pd.age || 'N/A'} yrs / {pd.bloodGroup || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Emergency Contact:</Text><Text style={styles.profileVal}>{pd.emergencyContact || 'N/A'}</Text></View>
-                    
-                    <Text style={[styles.sectionLabel, {marginTop: 16}]}>Statutory & Compliance</Text>
+
+                    <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Statutory & Compliance</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Aadhaar ID:</Text><Text style={styles.profileVal}>{pd.aadhaar || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>PAN Card:</Text><Text style={styles.profileVal}>{pd.pan || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>ESI ID:</Text><Text style={styles.profileVal}>{pd.esi || 'N/A'}</Text></View>
 
-                    <Text style={[styles.sectionLabel, {marginTop: 16}]}>Payroll & Banking</Text>
+                    <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Payroll & Banking</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Base Salary:</Text><Text style={styles.profileVal}>{pd.salary ? `₹${pd.salary}` : 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Bank Name:</Text><Text style={styles.profileVal}>{pd.bankName || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Account No:</Text><Text style={styles.profileVal}>{pd.accountNo || 'N/A'}</Text></View>
@@ -484,7 +484,7 @@ export default function EmployeesScreen() {
 
                     {employeePayslips && employeePayslips.length > 0 && (
                       <View>
-                        <Text style={[styles.sectionLabel, {marginTop: 16}]}>Recent Payslips</Text>
+                        <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Recent Payslips</Text>
                         {employeePayslips.slice(0, 3)?.map((ps, i) => (
                           <View key={i} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 8 }}>
                             <Text style={{ fontWeight: '700', marginBottom: 4 }}>{ps.month}</Text>
@@ -505,7 +505,7 @@ export default function EmployeesScreen() {
                     )}
 
                     <View style={{ backgroundColor: '#F1F5F9', padding: 16, borderRadius: 12, marginTop: 16 }}>
-                      <Text style={[styles.sectionLabel, {marginTop: 0, marginBottom: 12}]}>Generate Payslip (Super Admin)</Text>
+                      <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 12 }]}>Generate Payslip (Super Admin)</Text>
                       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Month (YYYY-MM)</Text>
@@ -527,48 +527,48 @@ export default function EmployeesScreen() {
                       </Pressable>
                     </View>
 
-                    <Text style={[styles.sectionLabel, {marginTop: 16}]}>Operations & Shifts</Text>
+                    <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Operations & Shifts</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Manager:</Text><Text style={styles.profileVal}>{pd.manager || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Shift Clock:</Text><Text style={styles.profileVal}>{pd.shiftIn || (selectedEmployee as any).schedule_in || 'N/A'} to {pd.shiftOut || (selectedEmployee as any).schedule_out || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Break Window:</Text><Text style={styles.profileVal}>{pd.breakStart || 'N/A'} to {pd.breakEnd || 'N/A'}</Text></View>
-                    
+
                     {isEditingProfile && (
                       <View style={{ backgroundColor: '#FFFBEB', padding: 16, borderRadius: 12, marginTop: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
-                        <Text style={[styles.sectionLabel, {marginTop: 0, marginBottom: 12}]}>Edit Super Admin Overrides</Text>
+                        <Text style={[styles.sectionLabel, { marginTop: 0, marginBottom: 12 }]}>Edit Super Admin Overrides</Text>
                         <View style={{ gap: 12 }}>
                           <View>
                             <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Base Salary (₹)</Text>
                             <TextInput style={styles.input} keyboardType="numeric" value={editSalary} onChangeText={setEditSalary} />
                           </View>
                           <View style={{ flexDirection: 'row', gap: 12 }}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift In (HH:MM)</Text>
-                                <CustomTimePicker value={editShiftIn} onChange={setEditShiftIn} placeholder="09:00" />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift Out (HH:MM)</Text>
-                                <CustomTimePicker value={editShiftOut} onChange={setEditShiftOut} placeholder="17:00" />
-                              </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift In (HH:MM)</Text>
+                              <CustomTimePicker value={editShiftIn} onChange={setEditShiftIn} placeholder="09:00" />
                             </View>
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Break Start (HH:MM)</Text>
-                                <CustomTimePicker value={editBreakStart} onChange={setEditBreakStart} placeholder="13:00" />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Break End (HH:MM)</Text>
-                                <CustomTimePicker value={editBreakEnd} onChange={setEditBreakEnd} placeholder="14:00" />
-                              </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Shift Out (HH:MM)</Text>
+                              <CustomTimePicker value={editShiftOut} onChange={setEditShiftOut} placeholder="17:00" />
                             </View>
                           </View>
-                        <Pressable 
-                          style={[styles.submitBtn, {marginTop: 12}]} 
+                          <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Break Start (HH:MM)</Text>
+                              <CustomTimePicker value={editBreakStart} onChange={setEditBreakStart} placeholder="13:00" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Break End (HH:MM)</Text>
+                              <CustomTimePicker value={editBreakEnd} onChange={setEditBreakEnd} placeholder="14:00" />
+                            </View>
+                          </View>
+                        </View>
+                        <Pressable
+                          style={[styles.submitBtn, { marginTop: 12 }]}
                           disabled={savingProfile}
                           onPress={async () => {
                             setSavingProfile(true);
                             try {
                               let newPd = { ...pd, salary: editSalary, shiftIn: editShiftIn, shiftOut: editShiftOut, breakStart: editBreakStart, breakEnd: editBreakEnd };
-                              
+
                               if (selectedEmployee.role === 'Sub Admin') {
                                 await axios.put(`https://napi.bharatmedicalhallplus.com/admin/department-admins/${selectedEmployee.id}/profile`, {
                                   profile_data: newPd,
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
   addRoleRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },
   input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 14, fontSize: 14, color: Colors.light.text, marginBottom: 20, ...Platform.select({ web: { outlineWidth: 0 as any } }) },
-  
+
   deptOptionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   deptOption: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: Colors.light.border, backgroundColor: '#FFF' },
   deptOptionSelected: { backgroundColor: '#EFF6FF', borderColor: Colors.light.primary },

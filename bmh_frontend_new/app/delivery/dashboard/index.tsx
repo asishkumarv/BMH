@@ -49,6 +49,35 @@ const formatDateTime = (dateStr: string, timeStr?: string) => {
   return `${formattedTime} ${formattedDate}`;
 };
 
+const formatTime12h = (timeStr: string) => {
+  if (!timeStr) return '';
+  
+  // If it's a full ISO string
+  if (timeStr.includes('T')) {
+    const dateObj = new Date(timeStr);
+    if (isNaN(dateObj.getTime())) return timeStr;
+    let hour = dateObj.getHours();
+    const min = String(dateObj.getMinutes()).padStart(2, '0');
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12;
+    return `${String(hour).padStart(2, '0')}:${min} ${ampm}`;
+  }
+
+  // If it's a standard HH:MM:SS or HH:MM string
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr; // fallback
+  
+  let hour = parseInt(parts[0], 10);
+  const min = parts[1];
+  if (isNaN(hour)) return timeStr;
+
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12;
+  hour = hour ? hour : 12;
+  return `${String(hour).padStart(2, '0')}:${min} ${ampm}`;
+};
+
 export default function DeliveryDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +115,11 @@ export default function DeliveryDashboard() {
   const cameraRef = useRef<any>(null);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const [refreshing, setRefreshing] = useState(false);
+  const ordersRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -178,10 +212,10 @@ export default function DeliveryDashboard() {
     if (user) {
       interval = setInterval(() => {
         fetchOrders(user.id);
-      }, 5000); // Check every 15 seconds
+      }, 5000); // Check every 5 seconds
     }
     return () => clearInterval(interval);
-  }, [user, orders]);
+  }, [user]);
 
   useEffect(() => {
     const init = async () => {
@@ -211,7 +245,7 @@ export default function DeliveryDashboard() {
       const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/${userId}/assigned-orders`);
       if (res.data && res.data.success) {
         // If we have more orders now than before, it means a new order was assigned
-        if (orders.length > 0 && res.data.data.length > orders.length) {
+        if (ordersRef.current.length > 0 && res.data.data.length > ordersRef.current.length) {
            try {
              const { sound } = await Audio.Sound.createAsync(
                 { uri: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' },
@@ -432,7 +466,12 @@ export default function DeliveryDashboard() {
       if (typeof parsed === 'string') {
         try { parsed = JSON.parse(parsed); } catch(e) {}
       }
-      setBusDetails(parsed || { bus_number: '', bus_date: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
+      const formattedDetails = parsed ? {
+        ...parsed,
+        arrival_time: parsed.arrival_time ? formatTime12h(parsed.arrival_time) : ''
+      } : { bus_number: '', bus_date: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' };
+
+      setBusDetails(formattedDetails);
     } else {
       setBusDetails({ bus_number: '', bus_date: '', arrival_time: '', driver_name: '', driver_number: '', waybill_number: '', drop_location: '' });
     }
