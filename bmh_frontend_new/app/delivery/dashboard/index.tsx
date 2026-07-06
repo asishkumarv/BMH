@@ -465,9 +465,16 @@ export default function DeliveryDashboard() {
       </View>
 
       <View style={styles.cardBody}>
-        <View style={styles.infoRow}>
-          <User size={16} color="#64748B" style={styles.icon} />
-          <Text style={styles.infoText}>{item.patient_name} {item.mobile_no ? `(${item.mobile_no})` : ''}</Text>
+        <View style={[styles.infoRow, { justifyContent: 'space-between' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <User size={16} color="#64748B" style={styles.icon} />
+            <Text style={styles.infoText}>{item.patient_name} {item.mobile_no ? `(${item.mobile_no})` : ''}</Text>
+          </View>
+          {item.mobile_no && (
+            <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.mobile_no}`)} style={{ padding: 6, backgroundColor: '#e0e7ff', borderRadius: 20 }}>
+              <Phone size={14} color="#4338ca" />
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.infoRow}>
           <MapPin size={16} color="#64748B" style={styles.icon} />

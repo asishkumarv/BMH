@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
 
   searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: '#f8fafc' },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 15, color: '#334155', padding: 0, outlineStyle: 'none' },
+  searchInput: { flex: 1, fontSize: 15, color: '#334155', padding: 0, outlineStyle: 'none' as any },
 
   modalBody: { padding: 20 },
   

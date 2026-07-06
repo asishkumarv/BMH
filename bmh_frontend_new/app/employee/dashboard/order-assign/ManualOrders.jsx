@@ -247,7 +247,7 @@ export default function ManualOrders({ deliveryBoys }) {
 
   const handleShareOrder = async (item) => {
     try {
-              let msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAddress: ${item.address || 'N/A'}\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'} (${item.delivery_boy_phone || 'N/A'})\nOTP: ${item.delivery_otp || 'N/A'}`;
+      let msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAddress: ${item.address || 'N/A'}\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'} ( https://wa.me/91${item.delivery_boy_phone || ''} )\nOTP: ${item.delivery_otp || 'N/A'}`;
         if (item.mode_of_delivery === 'Bus' || item.delivery_type === 'Bus') {
             msg += `\n\nBus Details:\nBus No: ${item.bus_number || 'N/A'}\nTravels: ${item.bus_travels_name || 'N/A'}\nDriver: ${item.bus_driver_name || 'N/A'} (${item.bus_driver_number || 'N/A'})\nDate: ${item.bus_date ? item.bus_date.substring(0, 10) : 'N/A'}\nTime: ${item.est_reach_time || 'N/A'}`;
         }

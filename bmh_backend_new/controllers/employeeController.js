@@ -143,7 +143,7 @@ exports.updateEmployeeLocation = async (req, res) => {
     }
 
     const result = await pool.query(
-      'UPDATE employees SET location_lat = $1, location_lng = $2 WHERE id = $3 RETURNING *',
+      'UPDATE employees SET location_lat = $1, location_lng = $2, location_updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
       [lat, lng, id]
     );
 
@@ -211,7 +211,7 @@ exports.getDeliveryFleet = async (req, res) => {
       try {
         // Get all delivery boys who are approved
         const boysRes = await pool.query(`
-          SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, schedule_in, schedule_out, created_at AS updated_at,
+          SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, schedule_in, schedule_out, COALESCE(location_updated_at, created_at) AS updated_at,
           (id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)) as is_active
           FROM employees 
           WHERE department = 'Delivery' AND status = 'approved'
