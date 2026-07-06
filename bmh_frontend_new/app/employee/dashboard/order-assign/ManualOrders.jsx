@@ -679,8 +679,32 @@ export default function ManualOrders({ deliveryBoys }) {
                     </View>
                     <View style={styles.formCol}>
                       <Text style={styles.label}>Bus Timing</Text>
-                    <TextInput style={styles.input} value={formData.scheduled_time || ''} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="HH:MM" />
-                  </View>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="time" 
+                          value={formData.scheduled_time || ''} 
+                          onChange={(e) => setFormData({...formData, scheduled_time: e.target.value})}
+                          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit' }}
+                        />
+                      ) : (
+                        <TouchableOpacity onPress={() => setShowTimePicker(true)} style={[styles.input, {justifyContent: 'center', height: 40}]}>
+                          <Text style={{color: formData.scheduled_time ? '#000' : '#94a3b8'}}>{formData.scheduled_time || 'HH:MM'}</Text>
+                        </TouchableOpacity>
+                      )}
+                      {showTimePicker && (
+                        <DateTimePicker
+                          value={formData.scheduled_time ? new Date(`2000-01-01T${formData.scheduled_time}:00`) : new Date()}
+                          mode="time"
+                          display="default"
+                          onChange={(event, selectedDate) => {
+                            setShowTimePicker(false);
+                            if (selectedDate) {
+                              setFormData({...formData, scheduled_time: selectedDate.toTimeString().substring(0, 5)});
+                            }
+                          }}
+                        />
+                      )}
+                    </View>
                 </View>
               )}
               <View style={styles.formRow}>
@@ -772,6 +796,16 @@ export default function ManualOrders({ deliveryBoys }) {
                         />
                       ) : (
                         <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus Date (YYYY-MM-DD)" value={selectedOrder.bus_date ? selectedOrder.bus_date.substring(0, 10) : ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_date: t})} />
+                      )}
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="time" 
+                          value={selectedOrder.scheduled_time || ''} 
+                          onChange={(e) => setSelectedOrder({...selectedOrder, scheduled_time: e.target.value})}
+                          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 5 }}
+                        />
+                      ) : (
+                        <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus Timing (HH:MM)" value={selectedOrder.scheduled_time || ''} onChangeText={t => setSelectedOrder({...selectedOrder, scheduled_time: t})} />
                       )}
                  </View>
                )}

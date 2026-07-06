@@ -13,8 +13,8 @@ exports.createOrder = async (req, res) => {
     const created_by_id = req.user?.id || req.body.created_by_id || null;
     const created_by_type = req.user?.role || req.body.created_by_type || 'Employee';
 
-    // Generate random 4 digit OTP for local delivery
-    const delivery_otp = mode_of_delivery === 'Local' ? Math.floor(1000 + Math.random() * 9000).toString() : null;
+    // Generate random 4 digit OTP for local and scheduled deliveries
+    const delivery_otp = (mode_of_delivery === 'Local' || mode_of_delivery === 'Schedule Delivery') ? Math.floor(1000 + Math.random() * 9000).toString() : null;
 
     const initialNotes = notes ? JSON.stringify([{
       text: notes,
@@ -153,7 +153,8 @@ exports.updateOrder = async (req, res) => {
       payment_mode, paid_amount, payment_txn_id, hand_over_to,
       bus_travels_name, bus_driver_name, bus_driver_number, bus_number,
       dispatch_time, est_reach_time, bus_date,
-      new_note, note_author, delivery_otp, address, pod_payment_mode
+      new_note, note_author, delivery_otp, address, pod_payment_mode,
+      scheduled_time, scheduled_date
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -182,9 +183,11 @@ exports.updateOrder = async (req, res) => {
     addField('bus_number', bus_number);
     addField('dispatch_time', dispatch_time);
     addField('est_reach_time', est_reach_time);
-      addField('bus_date', bus_date);
+    addField('bus_date', bus_date);
     addField('address', address);
     addField('pod_payment_mode', pod_payment_mode);
+    addField('scheduled_time', scheduled_time);
+    addField('scheduled_date', scheduled_date);
     
     // Automatically capture exact time transitions
     if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);
@@ -200,7 +203,7 @@ exports.updateOrder = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    if (status === 'Delivered' && currentOrder.rows[0].mode_of_delivery === 'Local') {
+    if (status === 'Delivered' && (currentOrder.rows[0].mode_of_delivery === 'Local' || currentOrder.rows[0].mode_of_delivery === 'Schedule Delivery')) {
       if (currentOrder.rows[0].delivery_otp && currentOrder.rows[0].delivery_otp !== delivery_otp) {
         return res.status(400).json({ success: false, message: 'Invalid OTP' });
       }

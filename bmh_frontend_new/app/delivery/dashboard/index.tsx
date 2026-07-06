@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated, RefreshControl } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -8,6 +8,46 @@ import * as Notifications from 'expo-notifications';
 import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee, FileText } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Colors } from '../../../constants/Colors';
+
+const formatDateTime = (dateStr: string, timeStr?: string) => {
+  if (!dateStr) return 'N/A';
+  
+  let dateObj: Date;
+  if (dateStr.includes('T') && !timeStr) {
+    // It's a full ISO string
+    dateObj = new Date(dateStr);
+  } else if (dateStr && timeStr) {
+    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const cleanTime = timeStr.includes(':') && timeStr.split(':').length === 2 ? timeStr + ':00' : timeStr;
+    dateObj = new Date(`${cleanDate}T${cleanTime}`);
+  } else {
+    // Just a date string YYYY-MM-DD
+    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const parts = cleanDate.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+
+  if (isNaN(dateObj.getTime())) {
+    return dateStr;
+  }
+
+  // Format Date: DD-MM-YYYY
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+  const formattedDate = `${day}-${month}-${year}`;
+
+  // Format Time: hh:mm am/pm
+  let hour = dateObj.getHours();
+  const min = String(dateObj.getMinutes()).padStart(2, '0');
+  const ampm = hour >= 12 ? 'pm' : 'am';
+  hour = hour % 12;
+  hour = hour ? hour : 12; // the hour '0' should be '12'
+  const formattedTime = `${String(hour).padStart(2, '0')}:${min} ${ampm}`;
+
+  return `${formattedTime} ${formattedDate}`;
+};
 
 export default function DeliveryDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -45,6 +85,18 @@ export default function DeliveryDashboard() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (user) {
+      await Promise.all([
+        fetchOrders(user.id),
+        fetchSummary(user.id)
+      ]);
+    }
+    setRefreshing(false);
+  };
   
   const fetchSummary = async (empId: number) => {
     try {
@@ -171,22 +223,39 @@ export default function DeliveryDashboard() {
         }
         setOrders(res.data.data);
           if (Platform.OS !== 'web') {
-            res.data.data.forEach((order: any) => {
-              if (order.is_scheduled && order.scheduled_date && order.scheduled_time && order.status !== 'Delivered') {
-                const scheduledDateTime = new Date(`${order.scheduled_date.split('T')[0]}T${order.scheduled_time}`);
-                const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
-                if (alarmTime > new Date()) {
-                  Notifications.scheduleNotificationAsync({
-                    content: {
-                      title: 'Scheduled Delivery Alert',
-                      body: `You have a scheduled delivery for ${order.patient_name} at ${order.scheduled_time}! (Order #${order.id})`,
-                      sound: true,
-                    },
-                    trigger: { date: alarmTime } as any,
-                  });
+            try {
+              await Notifications.cancelAllScheduledNotificationsAsync();
+              res.data.data.forEach((order: any) => {
+                const isScheduled = order.is_scheduled && order.scheduled_date && order.scheduled_time;
+                const isBus = (order.delivery_type === 'Bus' || order.mode_of_delivery === 'Bus') && (order.bus_date || order.scheduled_date) && order.scheduled_time;
+                
+                if ((isScheduled || isBus) && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Cancelled') {
+                  const dateStr = (order.bus_date || order.scheduled_date).split('T')[0];
+                  const timeStr = order.scheduled_time;
+                  // Construct date string and parse
+                  const scheduledDateTime = new Date(`${dateStr}T${timeStr.includes(':') && timeStr.split(':').length === 2 ? timeStr + ':00' : timeStr}`);
+                  const alarmTime = new Date(scheduledDateTime.getTime() - 15 * 60000); // 15 mins prior
+                  
+                  if (alarmTime > new Date()) {
+                    Notifications.scheduleNotificationAsync({
+                      content: {
+                        title: isBus ? 'Bus Delivery Alert' : 'Scheduled Delivery Alert',
+                        body: isBus 
+                          ? `Bus delivery scheduled at ${order.scheduled_time}! (Order #${order.id})`
+                          : `You have a scheduled delivery for ${order.patient_name} at ${order.scheduled_time}! (Order #${order.id})`,
+                        sound: true,
+                      },
+                      trigger: {
+                        seconds: Math.max(1, Math.floor((alarmTime.getTime() - Date.now()) / 1000)),
+                        channelId: 'alarm-channel-v2'
+                      } as any,
+                    });
+                  }
                 }
-              }
-            });
+              });
+            } catch (e) {
+              console.log("Error scheduling notifications:", e);
+            }
           }
       }
     } catch (err) {
@@ -225,7 +294,7 @@ export default function DeliveryDashboard() {
   };
 
   const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string, amount: string = '', paymentMode: string = '') => {
-    if ((type === 'online_order' || type === 'sales_order' || type === 'manual_order') && deliveryType === 'Local') {
+    if ((type === 'online_order' || type === 'sales_order' || type === 'manual_order') && (deliveryType === 'Local' || deliveryType === 'Schedule Delivery')) {
       setCurrentOrder({ id: String(orderId), type, amount: String(amount), payment_mode: paymentMode });
       setDeliveryOtp('');
       setPaymentMode('Cash');
@@ -276,7 +345,7 @@ export default function DeliveryDashboard() {
 
   const submitUpdateNote = async () => {
     try {
-      await axios.patch(`https://napi.bharatmedicalhallplus.com/delivery/update-notes`, {
+      await axios.patch(`https://napi.bharatmedicalhallplus.com/delivery-boy/update-notes`, {
         id: updateOrder.id,
         type: updateOrder.type,
         note: updateNote
@@ -489,7 +558,7 @@ export default function DeliveryDashboard() {
           <View style={styles.infoRow}>
             <Clock size={16} color="#4338CA" style={styles.icon} />
             <Text style={[styles.infoText, {color: '#4338CA', fontWeight: 'bold'}]}>
-              Scheduled: {item.scheduled_date ? item.scheduled_date.substring(0, 10) : ''} {item.scheduled_time || ''}
+              Scheduled: {formatDateTime(item.scheduled_date, item.scheduled_time)}
             </Text>
           </View>
         )}
@@ -500,8 +569,8 @@ export default function DeliveryDashboard() {
             <Text style={[styles.infoText, {color: '#D97706', fontWeight: 'bold'}]}>
               Bus Arrival: {
                 item.bus_details 
-                  ? (typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || 'N/A') : (item.bus_details.arrival_time || 'N/A')) 
-                  : ((item.est_reach_time || item.bus_date) ? `${item.bus_date ? item.bus_date.substring(0,10) : ''} ${item.est_reach_time || ''}`.trim() : 'N/A')
+                  ? formatDateTime(typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || '') : (item.bus_details.arrival_time || '')) 
+                  : (item.bus_date ? formatDateTime(item.bus_date, item.est_reach_time || item.scheduled_time) : 'N/A')
               }
             </Text>
           </View>
@@ -700,19 +769,27 @@ export default function DeliveryDashboard() {
 
       {loading ? (
         <ActivityIndicator size="large" color="#3B82F6" style={{ marginTop: 50 }} />
-      ) : orders.length === 0 ? (
-        <View style={styles.noDataContainer}>
-          <Package size={48} color="#CBD5E1" />
-          <Text style={styles.noData}>No orders assigned to you yet.</Text>
-          <Text style={styles.noDataSub}>We will notify you when a new order arrives.</Text>
-        </View>
       ) : (
         <FlatList
           data={orders.filter(o => { if (filterState === 'Completed') return o.status === 'Delivered'; if (filterState === 'Pending') return o.status !== 'Delivered'; return true; })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}
-
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, orders.length === 0 && {flex: 1, justifyContent: 'center'}]}
+          ListEmptyComponent={
+            <View style={styles.noDataContainer}>
+              <Package size={48} color="#CBD5E1" />
+              <Text style={styles.noData}>No orders assigned to you yet.</Text>
+              <Text style={styles.noDataSub}>We will notify you when a new order arrives.</Text>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#3B82F6"]}
+              tintColor="#3B82F6"
+            />
+          }
         />
       )}
 
