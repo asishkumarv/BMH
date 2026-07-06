@@ -485,15 +485,28 @@ export default function DeliveryDashboard() {
           <Text style={styles.infoText}>{new Date(item.created_at).toLocaleString()}</Text>
         </View>
         
-        {item.delivery_type === 'Bus' && item.bus_details && (
+        {item.is_scheduled && (
           <View style={styles.infoRow}>
-            <Clock size={16} color="#D97706" style={styles.icon} />
-            <Text style={[styles.infoText, {color: '#D97706', fontWeight: 'bold'}]}>
-              Bus Arrival: {typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || 'N/A') : (item.bus_details.arrival_time || 'N/A')}
+            <Clock size={16} color="#4338CA" style={styles.icon} />
+            <Text style={[styles.infoText, {color: '#4338CA', fontWeight: 'bold'}]}>
+              Scheduled: {item.scheduled_date ? item.scheduled_date.substring(0, 10) : ''} {item.scheduled_time || ''}
             </Text>
           </View>
         )}
-        <Text style={styles.totalText}>Total: ₹{parseFloat(item.total_amount || 0).toFixed(2)}</Text>
+
+        {(item.delivery_type === 'Bus' || item.mode_of_delivery === 'Bus' || (item.type === 'manual_order' && item.bus_number)) && (
+          <View style={styles.infoRow}>
+            <Clock size={16} color="#D97706" style={styles.icon} />
+            <Text style={[styles.infoText, {color: '#D97706', fontWeight: 'bold'}]}>
+              Bus Arrival: {
+                item.bus_details 
+                  ? (typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || 'N/A') : (item.bus_details.arrival_time || 'N/A')) 
+                  : ((item.est_reach_time || item.bus_date) ? `${item.bus_date ? item.bus_date.substring(0,10) : ''} ${item.est_reach_time || ''}`.trim() : 'N/A')
+              }
+            </Text>
+          </View>
+        )}
+        <Text style={styles.totalText}>Total: ₹{parseFloat(item.total_amount || item.amount || 0).toFixed(2)}</Text>
         {item.notes ? (
           <View style={{marginTop: 10, backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
             <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>

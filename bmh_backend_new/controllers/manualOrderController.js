@@ -29,8 +29,9 @@ exports.createOrder = async (req, res) => {
         ship_to_phone, ship_to_name, address, location_link,
         status, created_by_id, created_by_type, delivery_otp, notes,
         payment_mode, payment_txn_id, is_scheduled, scheduled_date, scheduled_time,
-        bus_travels_name, bus_driver_name, bus_driver_number, bus_number
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        bus_travels_name, bus_driver_name, bus_driver_number, bus_number,
+        bus_date, est_reach_time
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Pending', $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
       RETURNING *
     `;
 
@@ -60,7 +61,9 @@ exports.createOrder = async (req, res) => {
         bus_travels_name || null,
         bus_driver_name || null,
         bus_driver_number || null,
-        bus_number || null
+        bus_number || null,
+        req.body.bus_date || null,
+        req.body.est_reach_time || req.body.arrival_time || null
     ];
 
     const result = await pool.query(insertQuery, values);
