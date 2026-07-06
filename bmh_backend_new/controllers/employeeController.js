@@ -211,9 +211,10 @@ exports.getDeliveryFleet = async (req, res) => {
       try {
         // Get all delivery boys who are approved
         const boysRes = await pool.query(`
-          SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, schedule_in, schedule_out, created_at AS updated_at 
+          SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, schedule_in, schedule_out, created_at AS updated_at,
+          (id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)) as is_active
           FROM employees 
-          WHERE department = 'Delivery' AND status = 'approved' AND id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)
+          WHERE department = 'Delivery' AND status = 'approved'
         `);
       const boys = boysRes.rows;
 

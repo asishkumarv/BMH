@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Platform, Modal, ScrollView } from 'react-native';
 import axios from 'axios';
 import { MapPin, User, Package, RefreshCw, X, Eye, CheckCircle, Navigation, Clock } from 'lucide-react-native';
-import { CustomTimePicker } from '../../../components/ui/CustomTimePicker';
+import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 import 'leaflet/dist/leaflet.css';
 
 let MapContainer: any, TileLayer: any, Marker: any, Popup: any, L: any;
@@ -181,7 +181,8 @@ export default function DeliveryFleetScreen() {
                       attribution='&copy; OpenStreetMap contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {fleet.map((boy: any) => boy.location_lat ? (
+                    <MapBoundsFitter fleet={fleet.filter((b: any) => b.is_active)} />
+                    {fleet.filter((b: any) => b.is_active).map((boy: any) => boy.location_lat ? (
                       <Marker key={boy.id} position={[parseFloat(boy.location_lat), parseFloat(boy.location_lng)]}>
                         <Popup>
                           <Text style={{fontWeight:'bold'}}>{boy.full_name}</Text>

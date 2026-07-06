@@ -1015,7 +1015,7 @@ router.get('/location/:orderId', async (req, res) => {
 
 
 
-router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else if(type==='ecogreen_invoice') table='ecogreen_sales_invoices'; else if(type==='purchase_order') table='ecogreenpurchase_orders'; else return res.status(400).json({error:'Invalid type: ' + type}); 
+router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else if(type==='ecogreen_invoice' || type==='sales_invoice') table='ecogreen_sales_invoices'; else if(type==='sales_order') table='ecogreen_sales_orders'; else if(type==='purchase_order') table='ecogreenpurchase_orders'; else return res.status(400).json({error:'Invalid type: ' + type}); 
       const db = require('../db');
       const { rows } = await db.query(`SELECT notes FROM ${table} WHERE id = $1`, [id]);
       if (rows.length === 0) return res.status(404).json({error: 'Order not found'});
