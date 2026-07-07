@@ -976,7 +976,147 @@ export default function ManualOrders({ deliveryBoys }) {
       </Modal>
       )}
 
-    </View>
+          {/* Buses Modal */}
+      <Modal visible={busesModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: isDesktop ? 900 : '95%', height: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingBus ? 'Edit Bus Details' : isAddingBus ? 'Add New Bus' : 'Manage Buses'}
+              </Text>
+              <TouchableOpacity onPress={() => {
+                if (editingBus || isAddingBus) {
+                  setEditingBus(null);
+                  setIsAddingBus(false);
+                } else {
+                  setBusesModalVisible(false);
+                }
+              }}>
+                <Text style={{fontSize:20, color:'#64748b'}}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {(editingBus || isAddingBus) ? (
+              <ScrollView style={styles.modalBody}>
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Name</Text>
+                    <TextInput style={styles.input} value={busForm.bus_name} onChangeText={t => setBusForm({...busForm, bus_name: t})} placeholder="e.g. Biswakarma" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Travels / Operator Name</Text>
+                    <TextInput style={styles.input} value={busForm.operator_name} onChangeText={t => setBusForm({...busForm, operator_name: t})} placeholder="e.g. Travels Co" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Number</Text>
+                    <TextInput style={styles.input} value={busForm.bus_number} onChangeText={t => setBusForm({...busForm, bus_number: t})} placeholder="e.g. OD-11G-6920" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Route Code</Text>
+                    <TextInput style={styles.input} value={busForm.route_code} onChangeText={t => setBusForm({...busForm, route_code: t})} placeholder="e.g. R001" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Source Stop</Text>
+                    <TextInput style={styles.input} value={busForm.source} onChangeText={t => setBusForm({...busForm, source: t})} placeholder="e.g. Golei Stop" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Destination Stop</Text>
+                    <TextInput style={styles.input} value={busForm.destination} onChangeText={t => setBusForm({...busForm, destination: t})} placeholder="e.g. Udla" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Departure Time</Text>
+                    <TextInput style={styles.input} value={busForm.departure_time} onChangeText={t => setBusForm({...busForm, departure_time: t})} placeholder="e.g. 18:00" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Parcel Contact Person</Text>
+                    <TextInput style={styles.input} value={busForm.parcel_contact_person} onChangeText={t => setBusForm({...busForm, parcel_contact_person: t})} placeholder="e.g. Driver Name" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Driver Mobile Number</Text>
+                    <TextInput style={styles.input} value={busForm.mobile_no} onChangeText={t => setBusForm({...busForm, mobile_no: t})} placeholder="Driver Phone" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Remarks</Text>
+                    <TextInput style={styles.input} value={busForm.remarks} onChangeText={t => setBusForm({...busForm, remarks: t})} placeholder="Any special notes..." />
+                  </View>
+                </View>
+
+                <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20, gap: 10}}>
+                  <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#ef4444'}]} onPress={() => { setEditingBus(null); setIsAddingBus(false); }}>
+                    <Text style={styles.saveBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBus}>
+                    <Text style={styles.saveBtnText}>Save Bus</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            ) : (
+              <View style={{flex: 1}}>
+                <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10}}>
+                  <TouchableOpacity style={[styles.addBtn, {backgroundColor: '#10b981'}]} onPress={startAddBus}>
+                    <Plus size={16} color="#fff" style={{marginRight: 6}} />
+                    <Text style={styles.addBtnText}>Add New Bus</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={{flex: 1}}>
+                  <View style={{borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden'}}>
+                    <View style={{flexDirection: 'row', backgroundColor: '#f8fafc', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0'}}>
+                      <Text style={{flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569'}}>Bus Details</Text>
+                      <Text style={{flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569'}}>Route Stop</Text>
+                      <Text style={{flex: 1, fontWeight: '700', fontSize: 13, color: '#475569'}}>Timing</Text>
+                      <Text style={{flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569'}}>Contact</Text>
+                      <Text style={{flex: 0.8, fontWeight: '700', fontSize: 13, color: '#475569', textAlign: 'center'}}>Actions</Text>
+                    </View>
+
+                    {buses.length === 0 ? (
+                      <View style={{padding: 20, alignItems: 'center'}}><Text style={{color: '#64748b'}}>No buses found.</Text></View>
+                    ) : (
+                      buses.map((bus, idx) => (
+                        <View key={bus.id} style={{flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc'}}>
+                          <View style={{flex: 1.5}}>
+                            <Text style={{fontWeight: '600', fontSize: 14, color: '#0f172a'}}>{bus.bus_name}</Text>
+                            <Text style={{fontSize: 12, color: '#64748b'}}>{bus.bus_number}</Text>
+                          </View>
+                          <View style={{flex: 1.2}}>
+                            <Text style={{fontSize: 13, color: '#334155'}}>{bus.source || 'N/A'} ➔ {bus.destination || 'N/A'}</Text>
+                            {bus.route_code && <Text style={{fontSize: 11, color: '#64748b'}}>Code: {bus.route_code}</Text>}
+                          </View>
+                          <View style={{flex: 1}}>
+                            <Text style={{fontSize: 13, color: '#334155'}}>{bus.departure_time || 'N/A'}</Text>
+                          </View>
+                          <View style={{flex: 1.2}}>
+                            <Text style={{fontSize: 13, color: '#334155', fontWeight: '500'}}>{bus.parcel_contact_person || 'N/A'}</Text>
+                            {bus.mobile_no && <Text style={{fontSize: 12, color: '#3b82f6'}}>{bus.mobile_no}</Text>}
+                          </View>
+                          <View style={{flex: 0.8, alignItems: 'center'}}>
+                            <TouchableOpacity style={{backgroundColor: '#e0e7ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6}} onPress={() => startEditBus(bus)}>
+                              <Text style={{color: '#4338ca', fontSize: 12, fontWeight: '600'}}>Edit</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+</View>
   );
 }
 
