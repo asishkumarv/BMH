@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar, DeviceEventEmitter } from 'react-native';
-import { Slot } from 'expo-router';
+import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar, DeviceEventEmitter, ActivityIndicator } from 'react-native';
+import { Slot, useRouter, useRootNavigationState } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { DeliverySidebar } from '../../../components/ui/DeliverySidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
@@ -12,19 +12,40 @@ import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
 export default function EmployeeLayout() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   React.useEffect(() => {
-    const fetchUser = async () => {
-      let userDataStr = null;
-      if (Platform.OS === 'web') {
-        userDataStr = localStorage.getItem('employeeUser');
-      } else {
-        userDataStr = await AsyncStorage.getItem('employeeUser');
+    if (!rootNavigationState?.key) return;
+
+    const checkAuth = async () => {
+      try {
+        let userDataStr = null;
+        if (Platform.OS === 'web') {
+          userDataStr = localStorage.getItem('employeeUser');
+        } else {
+          userDataStr = await AsyncStorage.getItem('employeeUser');
+        }
+
+        if (!userDataStr) {
+          router.replace('/delivery/login');
+        } else {
+          const u = JSON.parse(userDataStr);
+          if (u.department !== 'Delivery') {
+            router.replace('/employee/dashboard');
+          } else {
+            setUser(u);
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        router.replace('/delivery/login');
       }
-      if (userDataStr) setUser(JSON.parse(userDataStr));
     };
-    fetchUser();
-  }, []);
+    checkAuth();
+  }, [rootNavigationState?.key]);
 
   useAttendanceReminder(user);
 
@@ -35,7 +56,13 @@ export default function EmployeeLayout() {
     return () => sub.remove();
   }, []);
   const { isDesktop } = useResponsive();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

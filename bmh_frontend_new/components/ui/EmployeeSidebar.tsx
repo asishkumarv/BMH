@@ -192,11 +192,13 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
           );
         })}
       </ScrollView>
-
-      <Pressable style={styles.logoutBtn} onPress={() => {
+      <Pressable style={styles.logoutBtn} onPress={async () => {
         if (onClose) onClose();
+        await AsyncStorage.clear();
         if (Platform.OS === 'web') {
-          localStorage.removeItem('employeeUser');
+          localStorage.clear();
+        } else if ((global as any).localStorage) {
+          (global as any).localStorage.clear();
         }
         router.replace('/roles');
       }}>

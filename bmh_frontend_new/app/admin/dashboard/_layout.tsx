@@ -1,14 +1,42 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar, DeviceEventEmitter } from 'react-native';
-import { Slot } from 'expo-router';
+import { Slot, useRouter, useRootNavigationState } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { AdminSidebar } from '../../../components/ui/AdminSidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ActivityIndicator } from 'react-native';
 
 export default function AdminLayout() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
+
+  React.useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
+    const checkAuth = async () => {
+      try {
+        let userStr = null;
+        if (Platform.OS === 'web') {
+          userStr = localStorage.getItem('superAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('superAdminUser');
+        }
+        if (!userStr) {
+          router.replace('/admin/login');
+        } else {
+          setLoading(false);
+        }
+      } catch (e) {
+        router.replace('/admin/login');
+      }
+    };
+    checkAuth();
+  }, [rootNavigationState?.key]);
 
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener('global_refresh', () => {
@@ -18,6 +46,14 @@ export default function AdminLayout() {
   }, []);
   const { isDesktop } = useResponsive();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

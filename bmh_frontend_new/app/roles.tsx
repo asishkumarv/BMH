@@ -1,13 +1,85 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform, ScrollView , Image, Linking } from 'react-native';
 import { ArrowLeft, User, Briefcase, Building, ShieldCheck, Stethoscope, Truck } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useRootNavigationState } from 'expo-router';
 import { Colors } from '../constants/Colors';
 import { useResponsive } from '../hooks/useResponsive';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RolesScreen() {
   const router = useRouter();
   const { isMobile } = useResponsive();
+  const rootNavigationState = useRootNavigationState();
+
+  useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
+    const checkAuth = async () => {
+      try {
+        if (Platform.OS === 'web') {
+          // Super Admin
+          if (localStorage.getItem('superAdminUser')) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+          // Sub Admin (Department)
+          if (localStorage.getItem('subAdminUser')) {
+            router.replace('/department/dashboard');
+            return;
+          }
+          // Employee / Delivery
+          const empStr = localStorage.getItem('employeeUser');
+          if (empStr) {
+            const user = JSON.parse(empStr);
+            if (user.department === 'Delivery') {
+              router.replace('/delivery/dashboard');
+            } else {
+              router.replace('/employee/dashboard');
+            }
+            return;
+          }
+          // Doctor
+          const doctorRole = localStorage.getItem('userRole');
+          const doctorData = localStorage.getItem('userData');
+          if (doctorRole === 'Doctor' && doctorData) {
+            router.replace('/doctor/dashboard');
+            return;
+          }
+        } else {
+          // AsyncStorage (Native)
+          const superAdminUser = await AsyncStorage.getItem('superAdminUser');
+          if (superAdminUser) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+          const subAdminUser = await AsyncStorage.getItem('subAdminUser');
+          if (subAdminUser) {
+            router.replace('/department/dashboard');
+            return;
+          }
+          const empUser = await AsyncStorage.getItem('employeeUser');
+          if (empUser) {
+            const user = JSON.parse(empUser);
+            if (user.department === 'Delivery') {
+              router.replace('/delivery/dashboard');
+            } else {
+              router.replace('/employee/dashboard');
+            }
+            return;
+          }
+          const doctorRole = await AsyncStorage.getItem('userRole');
+          const doctorData = await AsyncStorage.getItem('userData');
+          if (doctorRole === 'Doctor' && doctorData) {
+            router.replace('/doctor/dashboard');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkAuth();
+  }, [rootNavigationState?.key]);
 
   const handlePress = (role: any) => {
     if (role.id === 'patient') {

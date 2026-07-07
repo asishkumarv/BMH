@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Platform, SafeAreaView, Pressable, Text, Modal, StatusBar, DeviceEventEmitter } from 'react-native';
-import { Slot } from 'expo-router';
+import { Slot, useRouter, useRootNavigationState } from 'expo-router';
 import { Menu } from 'lucide-react-native';
 import { EmployeeSidebar } from '../../../components/ui/EmployeeSidebar';
 import { TopHeader } from '../../../components/ui/TopHeader';
@@ -8,6 +8,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
+import { ActivityIndicator } from 'react-native';
 
 export default function EmployeeLayout() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -22,20 +23,47 @@ export default function EmployeeLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  React.useEffect(() => {
-    const fetchUser = async () => {
-      let userDataStr = null;
-      if (Platform.OS === 'web') {
-        userDataStr = localStorage.getItem('employeeUser');
-      } else {
-        userDataStr = await AsyncStorage.getItem('employeeUser');
-      }
-      if (userDataStr) setUser(JSON.parse(userDataStr));
-    };
-    fetchUser();
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
-  useAttendanceReminder(user);
+  React.useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
+    const checkAuth = async () => {
+      try {
+        let userDataStr = null;
+        if (Platform.OS === 'web') {
+          userDataStr = localStorage.getItem('employeeUser');
+        } else {
+          userDataStr = await AsyncStorage.getItem('employeeUser');
+        }
+
+        if (!userDataStr) {
+          router.replace('/employee/login');
+        } else {
+          const u = JSON.parse(userDataStr);
+          if (u.department === 'Delivery') {
+            router.replace('/delivery/dashboard');
+          } else {
+            setUser(u);
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        router.replace('/employee/login');
+      }
+    };
+    checkAuth();
+  }, [rootNavigationState?.key]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

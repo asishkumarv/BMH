@@ -24,10 +24,17 @@ export default function LandingPage() {
     const checkAuth = async () => {
       try {
         if (Platform.OS === 'web') {
-          if (localStorage.getItem('adminUser')) {
+          // Super Admin
+          if (localStorage.getItem('superAdminUser')) {
             router.replace('/admin/dashboard');
             return;
           }
+          // Sub Admin (Department)
+          if (localStorage.getItem('subAdminUser')) {
+            router.replace('/department/dashboard');
+            return;
+          }
+          // Employee / Delivery
           const empStr = localStorage.getItem('employeeUser');
           if (empStr) {
             const user = JSON.parse(empStr);
@@ -38,10 +45,23 @@ export default function LandingPage() {
             }
             return;
           }
+          // Doctor
+          const doctorRole = localStorage.getItem('userRole');
+          const doctorData = localStorage.getItem('userData');
+          if (doctorRole === 'Doctor' && doctorData) {
+            router.replace('/doctor/dashboard');
+            return;
+          }
         } else {
-          const adminUser = await AsyncStorage.getItem('adminUser');
-          if (adminUser) {
+          // AsyncStorage (Native)
+          const superAdminUser = await AsyncStorage.getItem('superAdminUser');
+          if (superAdminUser) {
             router.replace('/admin/dashboard');
+            return;
+          }
+          const subAdminUser = await AsyncStorage.getItem('subAdminUser');
+          if (subAdminUser) {
+            router.replace('/department/dashboard');
             return;
           }
           const empUser = await AsyncStorage.getItem('employeeUser');
@@ -52,6 +72,12 @@ export default function LandingPage() {
             } else {
               router.replace('/employee/dashboard');
             }
+            return;
+          }
+          const doctorRole = await AsyncStorage.getItem('userRole');
+          const doctorData = await AsyncStorage.getItem('userData');
+          if (doctorRole === 'Doctor' && doctorData) {
+            router.replace('/doctor/dashboard');
             return;
           }
         }

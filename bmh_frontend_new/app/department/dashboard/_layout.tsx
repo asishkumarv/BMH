@@ -29,22 +29,23 @@ export default function SubAdminLayout() {
   useEffect(() => {
     if (!rootNavigationState?.key) return;
 
-    // Basic auth check
     const init = async () => {
-      if (Platform.OS === 'web') {
-        const userStr = localStorage.getItem('subAdminUser');
+      try {
+        let userStr = null;
+        if (Platform.OS === 'web') {
+          userStr = localStorage.getItem('subAdminUser');
+        } else {
+          userStr = await AsyncStorage.getItem('subAdminUser');
+        }
+        
         if (!userStr) {
           router.replace('/department/login');
         } else {
           setUser(JSON.parse(userStr));
           setLoading(false);
         }
-      } else {
-        const userStr = await AsyncStorage.getItem('subAdminUser');
-        if (userStr) {
-          setUser(JSON.parse(userStr));
-        }
-        setLoading(false);
+      } catch (e) {
+        router.replace('/department/login');
       }
     };
     init();

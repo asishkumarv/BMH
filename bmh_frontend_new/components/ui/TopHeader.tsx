@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
-import {  Wallet, User, LogOut, Menu , RefreshCcw } from 'lucide-react-native';
+import { Wallet, User, LogOut, Menu, RefreshCcw } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -16,7 +16,6 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
   const router = useRouter();
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [ringColor, setRingColor] = useState<string>('transparent');
-
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,12 +25,12 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
         if (userType === 'super_admin') dataStr = localStorage.getItem('superAdminUser');
         else if (userType === 'department_admin') dataStr = localStorage.getItem('subAdminUser');
         else if (userType === 'employee') dataStr = localStorage.getItem('employeeUser');
-        else if (userType === 'delivery') dataStr = localStorage.getItem('employeeUser'); // Delivery boy uses same key or 'deliveryUser'?
+        else if (userType === 'delivery') dataStr = localStorage.getItem('employeeUser');
       } else {
         if (userType === 'super_admin') dataStr = await AsyncStorage.getItem('superAdminUser');
         else if (userType === 'department_admin') dataStr = await AsyncStorage.getItem('subAdminUser');
         else if (userType === 'employee') dataStr = await AsyncStorage.getItem('employeeUser');
-        else if (userType === 'delivery') dataStr = await AsyncStorage.getItem('employeeUser'); // Assumes same employeeUser key
+        else if (userType === 'delivery') dataStr = await AsyncStorage.getItem('employeeUser');
       }
 
       if (dataStr) {
@@ -42,12 +41,12 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
           try {
             let pd = user.profile_data;
             if (typeof pd === 'string') {
-               pd = JSON.parse(pd);
+              pd = JSON.parse(pd);
             }
             if (pd.photo && pd.photo.length > 5 && pd.photo !== 'null') {
               setProfilePhoto(pd.photo);
             }
-          } catch(e) {}
+          } catch (e) {}
         }
         if (userType === 'employee' && user.id) {
           fetchAttendanceStatus(user.id);
@@ -60,10 +59,10 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
   const fetchAttendanceStatus = async (userId: string | number) => {
     try {
       const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/today/${userId}`);
-        if (res.data.success && res.data.data) {
-           const color = res.data.data.color;
-           setRingColor(color === 'green' ? '#22c55e' : color === 'yellow' ? '#eab308' : '#ef4444');
-        }
+      if (res.data.success && res.data.data) {
+        const color = res.data.data.color;
+        setRingColor(color === 'green' ? '#22c55e' : color === 'yellow' ? '#eab308' : '#ef4444');
+      }
     } catch (e) {
       console.log('Error fetching attendance status', e);
     }
@@ -80,6 +79,8 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
       router.push('/department/dashboard/wallet');
     } else if (userType === 'employee') {
       router.push('/employee/dashboard/wallet');
+    } else if (userType === 'delivery') {
+      router.push('/delivery/dashboard/wallet');
     }
   };
 
@@ -90,6 +91,8 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
       router.push('/department/dashboard/profile');
     } else if (userType === 'employee') {
       router.push('/employee/dashboard/profile');
+    } else if (userType === 'delivery') {
+      router.push('/delivery/dashboard/profile');
     }
     setDropdownVisible(false);
   };
@@ -124,12 +127,15 @@ export function TopHeader({ userType, title, onMenuPress }: TopHeaderProps) {
         </TouchableOpacity>
 
         <View style={styles.profileContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.profileButton, userType === 'employee' && { borderColor: ringColor, borderWidth: 3 }]}
             onPress={() => setDropdownVisible(!dropdownVisible)}
           >
             {profilePhoto ? (
-              <Image source={{ uri: profilePhoto.startsWith('http') || profilePhoto.startsWith('data:image') ? profilePhoto : `https://napi.bharatmedicalhallplus.com${profilePhoto}` }} style={styles.profileImage} />
+              <Image
+                source={{ uri: profilePhoto.startsWith('http') || profilePhoto.startsWith('data:image') ? profilePhoto : `https://napi.bharatmedicalhallplus.com${profilePhoto}` }}
+                style={styles.profileImage}
+              />
             ) : (
               <User size={24} color={Colors.light.text} />
             )}
@@ -164,7 +170,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    zIndex: 100, // For dropdown
+    zIndex: 100,
   },
   leftSection: {
     flexDirection: 'row',
@@ -227,7 +233,7 @@ const styles = StyleSheet.create({
       },
       web: {
         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-      },
+      } as any,
     }),
   },
   dropdownItem: {
@@ -248,5 +254,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.light.border,
     marginVertical: 4,
-  }
+  },
 });

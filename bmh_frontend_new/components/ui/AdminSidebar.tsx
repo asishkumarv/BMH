@@ -3,6 +3,7 @@ import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from
 import { LayoutDashboard, Users, Building, Activity, Settings, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: '/admin/dashboard' },
@@ -120,8 +121,14 @@ export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         })}
       </ScrollView>
 
-      <Pressable style={styles.logoutBtn} onPress={() => {
+      <Pressable style={styles.logoutBtn} onPress={async () => {
         if (onClose) onClose();
+        await AsyncStorage.clear();
+        if (Platform.OS === 'web') {
+          localStorage.clear();
+        } else if ((global as any).localStorage) {
+          (global as any).localStorage.clear();
+        }
         router.replace('/roles');
       }}>
         <LogOut color={Colors.light.error} size={20} />
