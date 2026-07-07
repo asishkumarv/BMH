@@ -159,7 +159,8 @@ exports.updateOrder = async (req, res) => {
       new_note, note_author, delivery_otp, address, pod_payment_mode,
       scheduled_time, scheduled_date,
       customer_name, customer_phone, amount, order_no, location_link, mode_of_delivery,
-      modified_by_id, modified_by_type, modified_by_name
+      modified_by_id, modified_by_type, modified_by_name,
+      invoice_no
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -202,6 +203,7 @@ exports.updateOrder = async (req, res) => {
     addField('modified_by_id', modified_by_id);
     addField('modified_by_type', modified_by_type);
     addField('modified_by_name', modified_by_name);
+    addField('invoice_no', invoice_no);
     
     // Automatically capture exact time transitions
     if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);

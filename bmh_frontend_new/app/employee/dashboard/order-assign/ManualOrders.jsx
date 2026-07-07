@@ -255,6 +255,7 @@ export default function ManualOrders({ deliveryBoys }) {
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/manual-orders', payload);
       if (res.data.success) {
         alert('Order created successfully!');
+        setFormData(initialFormData);
         setCreateModalVisible(false);
         fetchManualOrders();
       }
@@ -1068,6 +1069,10 @@ export default function ManualOrders({ deliveryBoys }) {
                  <View style={styles.formCol}>
                    <Text style={styles.label}>Order Number</Text>
                    <TextInput style={styles.input} value={selectedOrder.order_no || ''} onChangeText={t => setSelectedOrder({...selectedOrder, order_no: t})} placeholder="Order No" />
+                 </View>
+                 <View style={styles.formCol}>
+                   <Text style={styles.label}>Invoice Number</Text>
+                   <TextInput style={styles.input} value={selectedOrder.invoice_no || ''} onChangeText={t => setSelectedOrder({...selectedOrder, invoice_no: t})} placeholder="Invoice No" />
                  </View>
                  <View style={styles.formCol}>
                    <Text style={styles.label}>Amount (₹)</Text>
