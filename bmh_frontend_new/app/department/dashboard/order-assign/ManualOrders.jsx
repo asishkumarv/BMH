@@ -140,10 +140,11 @@ export default function ManualOrders({ deliveryBoys }) {
   };
 
   const handlePatientSearch = async (text) => {
-    setPatientSearch(text);
-    if (text.length >= 10) {
+    const sanitized = text.replace(/\s+/g, '');
+    setPatientSearch(sanitized);
+    if (sanitized.length >= 10) {
       try {
-        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patient/by-mobile/${text}`);
+        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patient/by-mobile/${sanitized}`);
         if (res.data && res.data.success) {
           const p = res.data.patient || res.data.data;
           const addrs = p.addresses || [];
@@ -166,16 +167,16 @@ export default function ManualOrders({ deliveryBoys }) {
         } else {
             setPatientAddresses([]);
             setIsNewAddress(true);
-            setFormData({ ...formData, customer_phone: text });
+            setFormData({ ...formData, customer_phone: sanitized });
         }
       } catch (e) {
         setPatientAddresses([]);
         setIsNewAddress(true);
-        setFormData({ ...formData, customer_phone: text });
+        setFormData({ ...formData, customer_phone: sanitized });
       }
     } else {
       setPatientAddresses([]);
-      setFormData({ ...formData, customer_phone: text });
+      setFormData({ ...formData, customer_phone: sanitized });
     }
   };
 
@@ -779,7 +780,7 @@ export default function ManualOrders({ deliveryBoys }) {
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Ship to Phone No</Text>
-                  <TextInput style={styles.input} value={formData.ship_to_phone || ''} onChangeText={(t) => setFormData({...formData, ship_to_phone: t})} placeholder="Ship Phone" />
+                  <TextInput style={styles.input} value={formData.ship_to_phone || ''} onChangeText={(t) => setFormData({...formData, ship_to_phone: t.replace(/\s+/g, '')})} placeholder="Ship Phone" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Ship to Name</Text>
@@ -941,7 +942,7 @@ export default function ManualOrders({ deliveryBoys }) {
                   </View>
                   <View style={styles.formCol}>
                     <Text style={styles.label}>Bus Driver Number</Text>
-                    <TextInput style={styles.input} value={formData.bus_driver_number || ''} onChangeText={(t) => setFormData({...formData, bus_driver_number: t})} placeholder="Driver No" />
+                    <TextInput style={styles.input} value={formData.bus_driver_number || ''} onChangeText={(t) => setFormData({...formData, bus_driver_number: t.replace(/\s+/g, '')})} placeholder="Driver No" />
                   </View>
                   <View style={styles.formCol}>
                     <Text style={styles.label}>Bus Number</Text>
@@ -1081,7 +1082,7 @@ export default function ManualOrders({ deliveryBoys }) {
                  </View>
                  <View style={styles.formCol}>
                    <Text style={styles.label}>Customer Phone</Text>
-                   <TextInput style={styles.input} value={selectedOrder.customer_phone || ''} onChangeText={t => setSelectedOrder({...selectedOrder, customer_phone: t})} placeholder="Customer Phone" />
+                   <TextInput style={styles.input} value={selectedOrder.customer_phone || ''} onChangeText={t => setSelectedOrder({...selectedOrder, customer_phone: t.replace(/\s+/g, '')})} placeholder="Customer Phone" />
                  </View>
                </View>
 
@@ -1112,7 +1113,7 @@ export default function ManualOrders({ deliveryBoys }) {
                     <Text style={{fontWeight:'bold', marginBottom: 10}}>Bus Info</Text>
                     <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Travels Name" value={selectedOrder.bus_travels_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_travels_name: t})} />
                     <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Name" value={selectedOrder.bus_driver_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_name: t})} />
-                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Number" value={selectedOrder.bus_driver_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_number: t})} />
+                    <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Driver Number" value={selectedOrder.bus_driver_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_driver_number: t.replace(/\s+/g, '')})} />
                     
                       <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus No" value={selectedOrder.bus_number || ''} onChangeText={t => setSelectedOrder({...selectedOrder, bus_number: t})} />
                       {Platform.OS === 'web' ? (
