@@ -97,13 +97,22 @@ async function syncPurchaseOrders() {
 
 async function startPurchaseOrderCron() {
     // Initial sync
-    await syncPurchaseOrders();
+    setTimeout(syncPurchaseOrders, 5000);
 
-    // Schedule every 20 minutes
-    cron.schedule('*/20 * * * *', async () => {
-        console.log("⏰ Running scheduled purchase order background sync...");
-        await syncPurchaseOrders();
-    });
+    // Schedule every 30 seconds with a concurrency lock
+    let isRunning = false;
+    setInterval(async () => {
+        if (isRunning) return;
+        isRunning = true;
+        try {
+            console.log("⏰ Running scheduled purchase order background sync...");
+            await syncPurchaseOrders();
+        } catch (e) {
+            console.error("Cron execution error:", e);
+        } finally {
+            isRunning = false;
+        }
+    }, 30000);
 }
 
 module.exports = {

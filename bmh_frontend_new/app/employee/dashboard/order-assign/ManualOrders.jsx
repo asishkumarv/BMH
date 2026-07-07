@@ -765,7 +765,7 @@ export default function ManualOrders({ deliveryBoys }) {
           <View style={[styles.modalContent, { width: isDesktop ? 800 : '95%' }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create New Order</Text>
-              <TouchableOpacity onPress={() => setCreateModalVisible(false)}><Text style={{fontSize:20, color:'#64748b'}}>✕</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setCreateModalVisible(false); setFormData(initialFormData); }}><Text style={{fontSize:20, color:'#64748b'}}>✕</Text></TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
               <View style={styles.formRow}>
