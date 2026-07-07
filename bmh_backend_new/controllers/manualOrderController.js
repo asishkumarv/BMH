@@ -105,6 +105,9 @@ exports.getOrders = async (req, res) => {
     await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`);
     await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
     await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS modified_by_id VARCHAR(50)`);
+    await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS modified_by_type VARCHAR(50)`);
+    await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS modified_by_name VARCHAR(255)`);
 
     // Optionally filter by customer_phone, delivery_boy_id, status
     const { customer_phone, delivery_boy_id, status } = req.query;
@@ -155,7 +158,8 @@ exports.updateOrder = async (req, res) => {
       dispatch_time, est_reach_time, bus_date,
       new_note, note_author, delivery_otp, address, pod_payment_mode,
       scheduled_time, scheduled_date,
-      customer_name, customer_phone, amount, order_no, location_link, mode_of_delivery
+      customer_name, customer_phone, amount, order_no, location_link, mode_of_delivery,
+      modified_by_id, modified_by_type, modified_by_name
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -195,6 +199,9 @@ exports.updateOrder = async (req, res) => {
     addField('order_no', order_no);
     addField('location_link', location_link);
     addField('mode_of_delivery', mode_of_delivery);
+    addField('modified_by_id', modified_by_id);
+    addField('modified_by_type', modified_by_type);
+    addField('modified_by_name', modified_by_name);
     
     // Automatically capture exact time transitions
     if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);

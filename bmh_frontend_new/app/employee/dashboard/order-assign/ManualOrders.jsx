@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation, ChevronDown } from 'lucide-react-native';
 import { Share } from 'react-native';
 
 export default function ManualOrders({ deliveryBoys }) {
@@ -24,6 +24,16 @@ export default function ManualOrders({ deliveryBoys }) {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [busesModalVisible, setBusesModalVisible] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedBoyId, setSelectedBoyId] = useState('All');
+  const [deliveryBoySearchQuery, setDeliveryBoySearchQuery] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [riderDropdownOpen, setRiderDropdownOpen] = useState(false);
+  const [assignOrder, setAssignOrder] = useState(null);
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [assignSearchQuery, setAssignSearchQuery] = useState('');
   const [editingBus, setEditingBus] = useState(null);
   const [isAddingBus, setIsAddingBus] = useState(false);
   const [busForm, setBusForm] = useState({
@@ -256,15 +266,33 @@ export default function ManualOrders({ deliveryBoys }) {
     if (!selectedOrder) return;
     try {
       let authName = 'Employee';
+      let modifiedById = null;
+      let modifiedByType = 'Employee';
+
       if (typeof window !== 'undefined') {
-        const u = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser') || localStorage.getItem('employeeUser');
-        if (u) authName = JSON.parse(u).full_name || authName;
+        const adminUser = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser');
+        const empUser = localStorage.getItem('employeeUser');
+        if (adminUser) {
+          const auth = JSON.parse(adminUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Admin';
+        } else if (empUser) {
+          const auth = JSON.parse(empUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Employee';
+        }
       }
+
       await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
         ...selectedOrder,
         address: editAddress,
         new_note: newNote,
-        note_author: authName
+        note_author: authName,
+        modified_by_id: modifiedById,
+        modified_by_type: modifiedByType,
+        modified_by_name: authName
       });
       alert('Order updated successfully!');
       setNewNote('');
@@ -276,11 +304,35 @@ export default function ManualOrders({ deliveryBoys }) {
   };
 
   const handleAssignBoy = async (orderId, boyId) => {
-    if (!boyId) return;
     try {
+      const isUnassign = boyId === 'null' || !boyId;
+      
+      let authName = 'Employee';
+      let modifiedById = null;
+      let modifiedByType = 'Employee';
+
+      if (typeof window !== 'undefined') {
+        const adminUser = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser');
+        const empUser = localStorage.getItem('employeeUser');
+        if (adminUser) {
+          const auth = JSON.parse(adminUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Admin';
+        } else if (empUser) {
+          const auth = JSON.parse(empUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Employee';
+        }
+      }
+
       await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, {
-        delivery_boy_id: boyId,
-        status: 'Assigned'
+        delivery_boy_id: isUnassign ? null : boyId,
+        status: isUnassign ? 'Pending' : 'Assigned',
+        modified_by_id: modifiedById,
+        modified_by_type: modifiedByType,
+        modified_by_name: authName
       });
       fetchManualOrders();
     } catch (err) {
@@ -405,18 +457,21 @@ export default function ManualOrders({ deliveryBoys }) {
                <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name}</Text>
             </View>
           ) : (
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={item.delivery_boy_id || ''}
-                onValueChange={(val) => { if(val) handleAssignBoy(item.id, val); }}
-                style={styles.inlinePicker}
-              >
-                <Picker.Item label={(item.delivery_boy_id && item.delivery_boy_id !== 'null') ? "Reassign To" : "Assign To"} value="" />
-                {availableBoys?.map(boy => (
-                  <Picker.Item key={boy.id} label={boy.full_name} value={boy.id} />
-                ))}
-              </Picker>
-            </View>
+            <TouchableOpacity 
+              style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 32, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
+              onPress={() => {
+                setAssignOrder(item);
+                setAssignSearchQuery('');
+                setAssignModalVisible(true);
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, color: '#334155' }} numberOfLines={1}>
+                  {item.delivery_boy_name || 'Assign To'}
+                </Text>
+                <ChevronDown size={14} color="#64748b" style={{ marginLeft: 4 }} />
+              </View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -436,9 +491,16 @@ export default function ManualOrders({ deliveryBoys }) {
         </View>
         
         {/* Created By */}
-        <View style={[styles.cell, { flex: 1.2, flexDirection: 'row', alignItems: 'center' }]}>
-           {creatorImg ? <Image source={{uri: creatorImg}} style={styles.avatar} /> : <User size={20} color="#94a3b8" style={{marginRight: 4}}/>}
-           <Text style={styles.cellText} numberOfLines={1}>{item.admin_creator_name || item.creator_name}</Text>
+        <View style={[styles.cell, { flex: 1.2, justifyContent: 'center' }]}>
+           <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              {creatorImg ? <Image source={{uri: creatorImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
+              <Text style={styles.cellText} numberOfLines={1}>{item.admin_creator_name || item.creator_name}</Text>
+           </View>
+           {item.modified_by_name && (
+             <Text style={[styles.cellSubText, { color: '#6366f1', marginTop: 2 }]} numberOfLines={1}>
+               Mod: {item.modified_by_name}
+             </Text>
+           )}
         </View>
         
         {/* Actions */}
@@ -463,16 +525,18 @@ export default function ManualOrders({ deliveryBoys }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.filters}>
+          {/* General Search */}
           <View style={styles.searchContainer}>
             <Search size={18} color="#94a3b8" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search..."
+              placeholder="Search Customer/Order..."
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
           
+          {/* Status Filter */}
           <View style={styles.dropdownWrapper}>
             <Picker
               selectedValue={assignmentFilter}
@@ -484,6 +548,157 @@ export default function ManualOrders({ deliveryBoys }) {
               <Picker.Item label="Assigned" value="Assigned" />
               <Picker.Item label="Delivered" value="Delivered" />
             </Picker>
+          </View>
+
+          {/* Delivery Boy Filter Search & Select */}
+          <View style={{ zIndex: 100, position: 'relative' }}>
+            <TouchableOpacity 
+              style={styles.dropdownWrapper}
+              onPress={() => setRiderDropdownOpen(!riderDropdownOpen)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, justifyContent: 'space-between', height: 40 }}>
+                <Text style={{ fontSize: 14, color: '#0f172a' }}>
+                  {selectedBoyId === 'All' ? 'All Riders' : 
+                   selectedBoyId === 'unassigned' ? 'Unassigned' : 
+                   deliveryBoys?.find(b => b.id.toString() === selectedBoyId)?.full_name || 'Select Rider'}
+                </Text>
+                <ChevronDown size={16} color="#64748b" />
+              </View>
+            </TouchableOpacity>
+
+            {riderDropdownOpen && (
+              <View style={{
+                position: 'absolute',
+                top: 45,
+                left: 0,
+                width: 250,
+                backgroundColor: '#fff',
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                borderRadius: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 4,
+                padding: 8,
+                zIndex: 1000
+              }}>
+                <View style={[styles.searchContainer, { width: '100%', marginBottom: 8, height: 36 }]}>
+                  <Search size={14} color="#94a3b8" style={{ marginRight: 6 }} />
+                  <TextInput
+                    style={[styles.searchInput, { fontSize: 13 }]}
+                    placeholder="Search Rider..."
+                    value={deliveryBoySearchQuery}
+                    onChangeText={setDeliveryBoySearchQuery}
+                    autoFocus
+                  />
+                </View>
+
+                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true}>
+                  <TouchableOpacity 
+                    style={{ padding: 8, borderRadius: 6, backgroundColor: selectedBoyId === 'All' ? '#f1f5f9' : 'transparent' }}
+                    onPress={() => {
+                      setSelectedBoyId('All');
+                      setRiderDropdownOpen(false);
+                      setDeliveryBoySearchQuery('');
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: selectedBoyId === 'All' ? '600' : 'normal' }}>All Riders</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={{ padding: 8, borderRadius: 6, backgroundColor: selectedBoyId === 'unassigned' ? '#f1f5f9' : 'transparent', marginTop: 2 }}
+                    onPress={() => {
+                      setSelectedBoyId('unassigned');
+                      setRiderDropdownOpen(false);
+                      setDeliveryBoySearchQuery('');
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: selectedBoyId === 'unassigned' ? '600' : 'normal' }}>Unassigned</Text>
+                  </TouchableOpacity>
+
+                  {deliveryBoys?.filter(boy => 
+                    boy.full_name?.toLowerCase().includes(deliveryBoySearchQuery.toLowerCase())
+                  ).map(boy => {
+                    const isSelected = selectedBoyId === boy.id.toString();
+                    return (
+                      <TouchableOpacity 
+                        key={boy.id}
+                        style={{ padding: 8, borderRadius: 6, backgroundColor: isSelected ? '#f1f5f9' : 'transparent', marginTop: 2 }}
+                        onPress={() => {
+                          setSelectedBoyId(boy.id.toString());
+                          setRiderDropdownOpen(false);
+                          setDeliveryBoySearchQuery('');
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: isSelected ? '600' : 'normal' }}>{boy.full_name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Date Range Filter */}
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>Date Range:</Text>
+            {Platform.OS === 'web' ? (
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', backgroundColor: '#fff', outlineStyle: 'none' }}
+              />
+            ) : (
+              <TouchableOpacity onPress={() => setShowStartPicker(true)} style={{ padding: 8, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff' }}>
+                <Text style={{ fontSize: 13 }}>{startDate || 'Start Date'}</Text>
+              </TouchableOpacity>
+            )}
+            {showStartPicker && (
+              <DateTimePicker
+                value={startDate ? new Date(startDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setShowStartPicker(false);
+                  if (date) setStartDate(date.toISOString().split('T')[0]);
+                }}
+              />
+            )}
+
+            <Text style={{ fontSize: 13, color: '#64748b' }}>to</Text>
+            
+            {Platform.OS === 'web' ? (
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', backgroundColor: '#fff', outlineStyle: 'none' }}
+              />
+            ) : (
+              <TouchableOpacity onPress={() => setShowEndPicker(true)} style={{ padding: 8, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff' }}>
+                <Text style={{ fontSize: 13 }}>{endDate || 'End Date'}</Text>
+              </TouchableOpacity>
+            )}
+            {showEndPicker && (
+              <DateTimePicker
+                value={endDate ? new Date(endDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setShowEndPicker(false);
+                  if (date) setEndDate(date.toISOString().split('T')[0]);
+                }}
+              />
+            )}
+
+            {(startDate || endDate) && (
+              <TouchableOpacity onPress={() => { setStartDate(''); setEndDate(''); }} style={{ padding: 6, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Clear</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         
@@ -516,11 +731,26 @@ export default function ManualOrders({ deliveryBoys }) {
           <ActivityIndicator size="large" color="#4338ca" style={{marginTop: 50}} />
         ) : (
           <FlatList
-            data={orders.filter(o => 
-              o.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-              o.customer_phone?.includes(searchQuery) ||
-              o.order_no?.includes(searchQuery)
-            )}
+            data={orders.filter(o => {
+              const matchesSearch = o.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                    o.customer_phone?.includes(searchQuery) ||
+                                    o.order_no?.includes(searchQuery);
+                                    
+              const orderDateStr = o.order_date ? o.order_date.substring(0, 10) : '';
+              const matchesStartDate = !startDate || orderDateStr >= startDate;
+              const matchesEndDate = !endDate || orderDateStr <= endDate;
+              
+              let matchesBoy = true;
+              if (selectedBoyId !== 'All') {
+                if (selectedBoyId === 'unassigned') {
+                  matchesBoy = !o.delivery_boy_id || o.delivery_boy_id === 'null';
+                } else {
+                  matchesBoy = o.delivery_boy_id?.toString() === selectedBoyId.toString();
+                }
+              }
+              
+              return matchesSearch && matchesStartDate && matchesEndDate && matchesBoy;
+            })}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderOrderItem}
           />
@@ -1116,14 +1346,81 @@ export default function ManualOrders({ deliveryBoys }) {
           </View>
         </View>
       </Modal>
-</View>
+      {/* Searchable Rider Assignment Modal */}
+      {assignOrder && (
+        <Modal visible={assignModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: isDesktop ? 450 : '90%', maxHeight: '70%', padding: 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Assign Rider (Order #{assignOrder.order_no})</Text>
+                <TouchableOpacity onPress={() => { setAssignModalVisible(false); setAssignOrder(null); }}>
+                  <Text style={{ fontSize: 20, color: '#64748b' }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.searchContainer, { width: '100%', marginBottom: 15 }]}>
+                <Search size={18} color="#94a3b8" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search Rider..."
+                  value={assignSearchQuery}
+                  onChangeText={setAssignSearchQuery}
+                  autoFocus
+                />
+              </View>
+
+              <ScrollView style={{ flex: 1 }}>
+                {/* Option to clear assignment (unassign) */}
+                <TouchableOpacity 
+                  style={{ padding: 12, borderRadius: 8, backgroundColor: '#fee2e2', marginBottom: 10 }}
+                  onPress={() => {
+                    handleAssignBoy(assignOrder.id, 'null');
+                    setAssignModalVisible(false);
+                    setAssignOrder(null);
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: '#ef4444', fontWeight: '600', textAlign: 'center' }}>Unassign Rider</Text>
+                </TouchableOpacity>
+
+                {deliveryBoys?.filter(boy => 
+                  boy.full_name?.toLowerCase().includes(assignSearchQuery.toLowerCase())
+                ).map((boy) => (
+                  <TouchableOpacity 
+                    key={boy.id}
+                    style={{ 
+                      padding: 12, 
+                      borderRadius: 8, 
+                      backgroundColor: assignOrder.delivery_boy_id?.toString() === boy.id.toString() ? '#e0e7ff' : '#f8fafc',
+                      marginBottom: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                    onPress={() => {
+                      handleAssignBoy(assignOrder.id, boy.id);
+                      setAssignModalVisible(false);
+                      setAssignOrder(null);
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                    {assignOrder.delivery_boy_id?.toString() === boy.id.toString() && (
+                      <CheckCircle size={16} color="#4338ca" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
-  filters: { flexDirection: 'row', gap: 12, flex: 1, flexWrap: 'wrap' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10, zIndex: 100, elevation: 10, position: 'relative' },
+  filters: { flexDirection: 'row', gap: 12, flex: 1, flexWrap: 'wrap', zIndex: 100, elevation: 10, position: 'relative' },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 12, height: 40, width: 250 },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, height: '100%', outlineStyle: 'none' },
