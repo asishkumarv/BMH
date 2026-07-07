@@ -416,9 +416,200 @@ async function fetchOrderStatusData(apiKey, orderNo) {
     }
 }
 
+const bcrypt = require('bcrypt');
+
+async function syncLocalCustomersToPatientsTable(apiKey, fromDate, toDate) {
+    try {
+        console.log(`[Customer Sync] Fetching local customers from ${fromDate} to ${toDate}...`);
+        const payload = {
+            "c2Code": "P00000",
+            "storeId": "001",
+            "prodCode": "02",
+            "apiKey": apiKey,
+            "fromDate": fromDate,
+            "toDate": toDate
+        };
+        const res = await axios.post("http://117.211.64.158:21000/ws_c2_services_so_refno_fetch", payload, {timeout: 30000});
+        
+        let customers = [];
+        if (res.data) {
+            if (Array.isArray(res.data)) {
+                customers = res.data;
+            } else if (res.data.data && Array.isArray(res.data.data)) {
+                customers = res.data.data;
+            }
+        }
+        
+        console.log(`[Customer Sync] Fetched ${customers.length} records for range ${fromDate} to ${toDate}. Syncing to database...`);
+        
+        // Generate default password hash for new patients
+        const defaultPasswordHash = await bcrypt.hash('123456', 10);
+        
+        for (const item of customers) {
+            const mobile = item.lcCode || item.mobileNo;
+            if (!mobile) continue;
+            
+            const name = item.lcName || 'Patient';
+            const email = item.mailId || null;
+            const age = item.age ? parseInt(item.age) : null;
+            const gender = item.gender || null;
+            const city = item.city || null;
+            const pin_code = item.pin || null;
+            const guardian_name = item.parentName || null;
+            
+            // Build addresses array
+            const newAddresses = [];
+            if (item.address1) newAddresses.push({ address: item.address1, location_link: "" });
+            if (item.address2) newAddresses.push({ address: item.address2, location_link: "" });
+            if (item.address3) newAddresses.push({ address: item.address3, location_link: "" });
+            
+            // Check if patient exists
+            const checkRes = await pool.query("SELECT id, addresses FROM patients WHERE mobile = $1", [mobile]);
+            if (checkRes.rowCount > 0) {
+                const existing = checkRes.rows[0];
+                let currentAddresses = [];
+                if (existing.addresses) {
+                    try {
+                        currentAddresses = typeof existing.addresses === 'string' ? JSON.parse(existing.addresses) : existing.addresses;
+                    } catch (e) {
+                        currentAddresses = [];
+                    }
+                }
+                if (!Array.isArray(currentAddresses)) {
+                    currentAddresses = [];
+                }
+                // Merge addresses
+                for (const newAddr of newAddresses) {
+                    const exists = currentAddresses.some(a => a.address === newAddr.address);
+                    if (!exists) {
+                        currentAddresses.push(newAddr);
+                    }
+                }
+                
+                await pool.query(
+                    `UPDATE patients 
+                     SET name = $1, email = COALESCE(email, $2), age = COALESCE(age, $3), gender = COALESCE(gender, $4), 
+                         city = COALESCE(city, $5), pin_code = COALESCE(pin_code, $6), guardian_name = COALESCE(guardian_name, $7),
+                         addresses = $8::jsonb
+                     WHERE id = $9`,
+                    [name, email, age, gender, city, pin_code, guardian_name, JSON.stringify(currentAddresses), existing.id]
+                );
+            } else {
+                // Insert
+                await pool.query(
+                    `INSERT INTO patients (name, mobile, email, age, gender, city, pin_code, guardian_name, password, addresses)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
+                    [name, mobile, email, age, gender, city, pin_code, guardian_name, defaultPasswordHash, JSON.stringify(newAddresses)]
+                );
+            }
+        }
+        console.log(`[Customer Sync] Completed database sync for range ${fromDate} to ${toDate}.`);
+    } catch (err) {
+        console.error(`[Customer Sync Error] Failed for range ${fromDate} to ${toDate}:`, err.message);
+    }
+}
+
+async function initLocalCustomerSync() {
+    console.log("🔄 Initializing Local Customer to Patient Sync...");
+    
+    const runSync = async () => {
+        try {
+            // Get token
+            let apiKey = cache.get("default_token");
+            if (!apiKey) {
+                const tokenData = await fetchToken();
+                apiKey = tokenData?.apiKey;
+            }
+            if (!apiKey) {
+                console.error("[Customer Sync] No API key available, skipping initial catch-up.");
+                return;
+            }
+            
+            // Check if initial full sync has run
+            const checkInit = await pool.query("SELECT * FROM settings WHERE key = 'local_customer_sync_init'");
+            if (checkInit.rowCount === 0) {
+                console.log("[Customer Sync] Starting initial catch-up sync from 2020-01-01 to today...");
+                
+                // Fetch in 6-month blocks to avoid large payloads/timeouts
+                let currentStart = new Date("2020-01-01");
+                const today = new Date();
+                
+                while (currentStart < today) {
+                    let currentEnd = new Date(currentStart);
+                    currentEnd.setMonth(currentEnd.getMonth() + 6); // 6-month chunk
+                    if (currentEnd > today) currentEnd = today;
+                    
+                    const fromDateStr = currentStart.toISOString().split('T')[0];
+                    const toDateStr = currentEnd.toISOString().split('T')[0];
+                    
+                    await syncLocalCustomersToPatientsTable(apiKey, fromDateStr, toDateStr);
+                    
+                    currentStart = new Date(currentEnd);
+                    currentStart.setDate(currentStart.getDate() + 1); // step past previous end
+                }
+                
+                // Store in settings table that it's complete
+                await pool.query(
+                    "INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+                    ['local_customer_sync_init', JSON.stringify({ completed: true })]
+                );
+                console.log("[Customer Sync] Initial copy from 01-01-2020 completed and flag stored.");
+            }
+            
+            // Run recent sync on startup
+            const today = new Date();
+            const pastDate = new Date();
+            pastDate.setDate(pastDate.getDate() - 2); // 2 days ago
+            const fromDateStr = pastDate.toISOString().split('T')[0];
+            const toDateStr = today.toISOString().split('T')[0];
+            await syncLocalCustomersToPatientsTable(apiKey, fromDateStr, toDateStr);
+            
+        } catch (err) {
+            console.error("[Customer Sync Init Error] Initialization flow failed:", err.message);
+        }
+    };
+    
+    // Execute initial catch-up shortly after startup
+    setTimeout(runSync, 5000);
+    
+    // Periodically sync every 5 seconds
+    let isSyncing = false;
+    setInterval(async () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        try {
+            let apiKey = cache.get("default_token");
+            if (!apiKey) {
+                const tokenData = await fetchToken();
+                apiKey = tokenData?.apiKey;
+            }
+            if (apiKey) {
+                const today = new Date();
+                const pastDate = new Date();
+                pastDate.setDate(pastDate.getDate() - 1); // last 24 hours to keep it fast
+                const fromStr = pastDate.toISOString().split('T')[0];
+                const toStr = today.toISOString().split('T')[0];
+                
+                await syncLocalCustomersToPatientsTable(apiKey, fromStr, toStr);
+            }
+        } catch (e) {
+            console.error("[Customer Sync Periodic Error] Failed:", e.message);
+        } finally {
+            isSyncing = false;
+        }
+    }, 5000);
+}
+
 // Global initialization function to start the auto-fetch timers
 exports.initPharmacySync = () => {
     console.log("🚀 Initializing EcoGreen Pharmacy Background Sync...");
+    
+    // Initialize Local Customer to Patient Database Sync
+    try {
+        initLocalCustomerSync();
+    } catch(err) {
+        console.error("Failed to start local customer sync:", err.message);
+    }
     
     const autoFetchAll = async () => {
         try {
