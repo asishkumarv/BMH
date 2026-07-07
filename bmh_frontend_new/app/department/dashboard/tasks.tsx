@@ -13,7 +13,13 @@ export default function DepartmentTasksScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [directRejectTask, setDirectRejectTask] = useState<any>(null);
+  const [directRejectText, setDirectRejectText] = useState('');
+  const [showDirectRejectModal, setShowDirectRejectModal] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+  const [reassignDropdownOpen, setReassignDropdownOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'co_admins' | 'employees' | 'recurring'>('all');
   const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
@@ -123,7 +129,7 @@ export default function DepartmentTasksScreen() {
         assignee_type: finalAssigneeType,
         assignee_id: finalAssigneeId.startsWith('SA-') ? parseInt(finalAssigneeId.replace('SA-', '')) : parseInt(finalAssigneeId),
         department: finalDept,
-        due_date: dueDate || null,
+        due_date: dueDate ? new Date(dueDate.replace(' ', 'T')).toISOString() : null,
         priority
       });
       }
@@ -140,6 +146,87 @@ export default function DepartmentTasksScreen() {
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to assign task');
+    }
+  };
+
+  const formatTaskDate = (dateVal: any) => {
+    if (!dateVal) return '';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return dateVal;
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const day = pad(d.getDate());
+      const month = pad(d.getMonth() + 1);
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = pad(d.getMinutes());
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${day}-${month}-${year}, ${hours}:${minutes} ${ampm}`;
+    } catch (e) {
+      return dateVal;
+    }
+  };
+
+  const getDurationString = (startVal: any, endVal: any) => {
+    if (!startVal || !endVal) return null;
+    try {
+      const start = new Date(startVal);
+      const end = new Date(endVal);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs <= 0) return '0m';
+      
+      const diffMins = Math.floor(diffMs / 60000);
+      const days = Math.floor(diffMins / 1440);
+      const hours = Math.floor((diffMins % 1440) / 60);
+      const mins = diffMins % 60;
+      
+      let parts = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+      
+      return parts.join(' ');
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const handleDirectAccept = async (task: any) => {
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${task.id}/status`, {
+        status: 'accepted',
+        rejection_reason: '',
+        notes: task.notes || '',
+        updater_type: 'department_admin',
+        updater_id: adminUser.id
+      });
+      fetchInitData();
+      Alert.alert('Success', 'Task accepted successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to accept task');
+    }
+  };
+
+  const handleDirectRejectSubmit = async () => {
+    if (!directRejectTask) return;
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${directRejectTask.id}/status`, {
+        status: 'rejected',
+        rejection_reason: directRejectText || '',
+        notes: directRejectTask.notes || '',
+        updater_type: 'department_admin',
+        updater_id: adminUser.id
+      });
+      setShowDirectRejectModal(false);
+      setDirectRejectTask(null);
+      fetchInitData();
+      Alert.alert('Success', 'Task rejected successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to reject task');
     }
   };
 
@@ -254,7 +341,7 @@ export default function DepartmentTasksScreen() {
         {task.due_date ? (
           <View style={styles.metaItem}>
             <Clock color={Colors.light.icon} size={16} />
-            <Text style={styles.metaText}>Due: {new Date(task.due_date).toLocaleString()}</Text>
+            <Text style={styles.metaText}>Due: {formatTaskDate(task.due_date)}</Text>
           </View>
         ) : null}
       </View>
@@ -273,18 +360,38 @@ export default function DepartmentTasksScreen() {
         </View>
       ) : null}
 
-      <View style={[styles.taskActions, { gap: 8 }]}>
-          <Pressable 
-            style={styles.actionBtn}
-            onPress={() => {
-              setSelectedTask(task);
-              setStatusNotes(task.notes || '');
-              setRejectionReason(task.rejection_reason || '');
-              setShowStatusModal(true);
-            }}
-          >
-            <Text style={styles.actionBtnText}>Update Status</Text>
-          </Pressable>
+      <View style={[styles.taskActions, { gap: 8, flexDirection: 'row', flexWrap: 'wrap' }]}>
+                    {task.status === 'assigned' && task.assignee_type === 'department_admin' && String(task.assignee_id) === String(adminUser.id) && (
+                      <>
+                        <Pressable 
+                          style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
+                          onPress={() => handleDirectAccept(task)}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Accept</Text>
+                        </Pressable>
+                        <Pressable 
+                          style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                          onPress={() => {
+                            setDirectRejectTask(task);
+                            setDirectRejectText('');
+                            setShowDirectRejectModal(true);
+                          }}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Reject</Text>
+                        </Pressable>
+                      </>
+                    )}
+                    <Pressable 
+                      style={styles.actionBtn}
+                      onPress={() => {
+                        setSelectedTask(task);
+                        setStatusNotes(task.notes || '');
+                        setRejectionReason(task.rejection_reason || '');
+                        setShowStatusModal(true);
+                      }}
+                    >
+                      <Text style={styles.actionBtnText}>Update Status</Text>
+                    </Pressable>
           {task.status === 'rejected' &&
            task.assigner_type === 'department_admin' &&
            String(task.assigner_id) === String(adminUser.id) && (
@@ -406,29 +513,101 @@ export default function DepartmentTasksScreen() {
                 {assigneeType !== 'self' && (
                   <>
                     <Text style={styles.label}>Select Assignee</Text>
-                    <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
-                      {Platform.OS === 'web' ? (
-                        <select 
-                          style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                          value={assigneeId}
-                          onChange={(e) => setAssigneeId(e.target.value)}
-                        >
-                          <option value="">-- Choose Assignee --</option>
-                          {globalUsers.map(e => (
-                            <option key={e.id} value={e.id}>{e.full_name} - {e.department} ({e.role})</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <Picker
-                          selectedValue={assigneeId}
-                          onValueChange={(val) => setAssigneeId(val)}
-                          style={{ width: '100%', height: 50 }}
-                        >
-                          <Picker.Item label="-- Choose Assignee --" value="" />
-                          {globalUsers.map(e => (
-                            <Picker.Item key={e.id} label={`${e.full_name} - ${e.department} (${e.role})`} value={e.id.toString()} />
-                          ))}
-                        </Picker>
+                    <View style={{ position: 'relative', zIndex: 9999, marginBottom: 16 }}>
+                      <Pressable 
+                        style={{ 
+                          borderWidth: 1, 
+                          borderColor: Colors.light.border, 
+                          borderRadius: 8, 
+                          backgroundColor: Colors.light.background,
+                          padding: 12,
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+                      >
+                        <Text style={{ fontSize: 15, color: assigneeId ? Colors.light.text : Colors.light.icon }}>
+                          {assigneeId 
+                            ? (globalUsers.find(u => String(u.id) === String(assigneeId))
+                                ? `${globalUsers.find(u => String(u.id) === String(assigneeId)).full_name} - ${globalUsers.find(u => String(u.id) === String(assigneeId)).department} (${globalUsers.find(u => String(u.id) === String(assigneeId)).role})`
+                                : '-- Choose Assignee --')
+                            : '-- Choose Assignee --'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
+                      </Pressable>
+
+                      {assigneeDropdownOpen && (
+                        <View style={{
+                          position: 'absolute',
+                          top: 50,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: '#FFF',
+                          borderWidth: 1,
+                          borderColor: Colors.light.border,
+                          borderRadius: 8,
+                          maxHeight: 250,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 4,
+                          elevation: 4,
+                          padding: 8,
+                          zIndex: 10000
+                        }}>
+                          <TextInput
+                            style={{ 
+                              borderWidth: 1, 
+                              borderColor: Colors.light.border, 
+                              borderRadius: 6, 
+                              padding: 8, 
+                              fontSize: 14,
+                              marginBottom: 8,
+                              backgroundColor: '#f8fafc'
+                            }}
+                            placeholder="Search employee..."
+                            value={assigneeSearchQuery}
+                            onChangeText={setAssigneeSearchQuery}
+                            autoFocus
+                          />
+                          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+                            <Pressable 
+                              style={{ padding: 10, borderRadius: 6 }}
+                              onPress={() => {
+                                setAssigneeId('');
+                                setAssigneeDropdownOpen(false);
+                                setAssigneeSearchQuery('');
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, color: Colors.light.text }}>-- Choose Assignee --</Text>
+                            </Pressable>
+                            {globalUsers.filter(u => 
+                              u.full_name?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+                              u.department?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+                              u.role?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())
+                            ).map(u => (
+                              <Pressable 
+                                key={u.id}
+                                style={{ 
+                                  padding: 10, 
+                                  borderRadius: 6, 
+                                  backgroundColor: String(assigneeId) === String(u.id) ? '#f1f5f9' : 'transparent',
+                                  marginTop: 2
+                                }}
+                                onPress={() => {
+                                  setAssigneeId(String(u.id));
+                                  setAssigneeDropdownOpen(false);
+                                  setAssigneeSearchQuery('');
+                                }}
+                              >
+                                <Text style={{ fontSize: 14, color: Colors.light.text }}>
+                                  {u.full_name} - {u.department} ({u.role})
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
                       )}
                     </View>
                   </>
@@ -572,24 +751,10 @@ export default function DepartmentTasksScreen() {
             <Text style={styles.label}>Notes</Text>
             <TextInput style={[styles.input, { height: 80 }]} multiline value={statusNotes} onChangeText={setStatusNotes} placeholder="Add progress notes..." />
 
-            {selectedTask?.status === 'assigned' && selectedTask?.assignee_type === 'department_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (
-              <>
-                <Text style={styles.label}>Rejection Reason (only if rejecting)</Text>
-                <TextInput style={[styles.input, { height: 80 }]} multiline value={rejectionReason} onChangeText={setRejectionReason} placeholder="Reason for rejection..." />
-              </>
-            )}
+
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-              {selectedTask?.status === 'assigned' && selectedTask?.assignee_type === 'department_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (
-                <>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#10B981' }]} onPress={() => handleUpdateStatus('accepted')}>
-                    <Text style={styles.saveBtnText}>Accept</Text>
-                  </Pressable>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#EF4444' }]} onPress={() => handleUpdateStatus('rejected')}>
-                    <Text style={styles.saveBtnText}>Reject</Text>
-                  </Pressable>
-                </>
-              )}
+
               {selectedTask?.assignee_type === 'department_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
                 <>
                   <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus('in_progress')}>
@@ -668,7 +833,38 @@ export default function DepartmentTasksScreen() {
         </View>
       </Modal>
 
-    </View>
+          {/* Direct Rejection Reason Modal */}
+      {directRejectTask && (
+        <Modal visible={showDirectRejectModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: isDesktop ? 450 : '90%', padding: 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Rejection Reason</Text>
+                <Pressable onPress={() => { setShowDirectRejectModal(false); setDirectRejectTask(null); }}>
+                  <Text style={{ fontSize: 20, color: '#64748b' }}>✕</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                style={[styles.input, { height: 100, textAlignVertical: 'top', marginVertical: 15, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 }]}
+                placeholder="Enter rejection reason (optional)..."
+                value={directRejectText}
+                onChangeText={setDirectRejectText}
+                multiline
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                <Pressable style={[styles.cancelBtn, { backgroundColor: '#ef4444' }]} onPress={() => { setShowDirectRejectModal(false); setDirectRejectTask(null); }}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.actionBtn, { backgroundColor: '#1e293b' }]} onPress={handleDirectRejectSubmit}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Submit</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+</View>
   );
 }
 

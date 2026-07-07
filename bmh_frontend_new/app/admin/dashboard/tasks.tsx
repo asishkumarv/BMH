@@ -13,7 +13,13 @@ export default function AdminTasksScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [directRejectTask, setDirectRejectTask] = useState<any>(null);
+  const [directRejectText, setDirectRejectText] = useState('');
+  const [showDirectRejectModal, setShowDirectRejectModal] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+  const [reassignDropdownOpen, setReassignDropdownOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'super_admins' | 'department_admins' | 'employees' | 'recurring'>('all');
   const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
@@ -145,7 +151,7 @@ export default function AdminTasksScreen() {
         assignee_type: finalAssigneeType,
         assignee_id: parseInt(finalAssigneeId),
         department: finalDept,
-        due_date: dueDate || null,
+        due_date: dueDate ? new Date(dueDate.replace(' ', 'T')).toISOString() : null,
         priority
       });
       }
@@ -162,6 +168,87 @@ export default function AdminTasksScreen() {
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to create task');
+    }
+  };
+
+  const formatTaskDate = (dateVal: any) => {
+    if (!dateVal) return '';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return dateVal;
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const day = pad(d.getDate());
+      const month = pad(d.getMonth() + 1);
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = pad(d.getMinutes());
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${day}-${month}-${year}, ${hours}:${minutes} ${ampm}`;
+    } catch (e) {
+      return dateVal;
+    }
+  };
+
+  const getDurationString = (startVal: any, endVal: any) => {
+    if (!startVal || !endVal) return null;
+    try {
+      const start = new Date(startVal);
+      const end = new Date(endVal);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs <= 0) return '0m';
+      
+      const diffMins = Math.floor(diffMs / 60000);
+      const days = Math.floor(diffMins / 1440);
+      const hours = Math.floor((diffMins % 1440) / 60);
+      const mins = diffMins % 60;
+      
+      let parts = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+      
+      return parts.join(' ');
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const handleDirectAccept = async (task: any) => {
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${task.id}/status`, {
+        status: 'accepted',
+        rejection_reason: '',
+        notes: task.notes || '',
+        updater_type: 'super_admin',
+        updater_id: adminUser.id || 1
+      });
+      fetchInitData();
+      Alert.alert('Success', 'Task accepted successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to accept task');
+    }
+  };
+
+  const handleDirectRejectSubmit = async () => {
+    if (!directRejectTask) return;
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${directRejectTask.id}/status`, {
+        status: 'rejected',
+        rejection_reason: directRejectText || '',
+        notes: directRejectTask.notes || '',
+        updater_type: 'super_admin',
+        updater_id: adminUser.id || 1
+      });
+      setShowDirectRejectModal(false);
+      setDirectRejectTask(null);
+      fetchInitData();
+      Alert.alert('Success', 'Task rejected successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to reject task');
     }
   };
 
@@ -294,7 +381,7 @@ export default function AdminTasksScreen() {
         {task.due_date && (
           <View style={styles.metaItem}>
             <Clock color={Colors.light.icon} size={16} />
-            <Text style={styles.metaText}>Due: {new Date(task.due_date).toLocaleString()}</Text>
+            <Text style={styles.metaText}>Due: {formatTaskDate(task.due_date)}</Text>
           </View>
         )}
       </View>
@@ -313,18 +400,38 @@ export default function AdminTasksScreen() {
         </View>
       ) : null}
 
-      <View style={[styles.taskActions, { gap: 8 }]}>
-          <Pressable 
-            style={styles.actionBtn}
-            onPress={() => {
-              setSelectedTask(task);
-              setStatusNotes(task.notes || '');
-              setRejectionReason(task.rejection_reason || '');
-              setShowStatusModal(true);
-            }}
-          >
-            <Text style={styles.actionBtnText}>Update Status</Text>
-          </Pressable>
+      <View style={[styles.taskActions, { gap: 8, flexDirection: 'row', flexWrap: 'wrap' }]}>
+                    {task.status === 'assigned' && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id) && (
+                      <>
+                        <Pressable 
+                          style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
+                          onPress={() => handleDirectAccept(task)}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Accept</Text>
+                        </Pressable>
+                        <Pressable 
+                          style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                          onPress={() => {
+                            setDirectRejectTask(task);
+                            setDirectRejectText('');
+                            setShowDirectRejectModal(true);
+                          }}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Reject</Text>
+                        </Pressable>
+                      </>
+                    )}
+                    <Pressable 
+                      style={styles.actionBtn}
+                      onPress={() => {
+                        setSelectedTask(task);
+                        setStatusNotes(task.notes || '');
+                        setRejectionReason(task.rejection_reason || '');
+                        setShowStatusModal(true);
+                      }}
+                    >
+                      <Text style={styles.actionBtnText}>Update Status</Text>
+                    </Pressable>
           {task.status === 'rejected' &&
            task.assigner_type === 'super_admin' &&
            String(task.assigner_id) === String(adminUser.id || 1) && (
@@ -666,24 +773,10 @@ export default function AdminTasksScreen() {
             <Text style={styles.label}>Notes</Text>
             <TextInput style={[styles.input, { height: 80 }]} multiline value={statusNotes} onChangeText={setStatusNotes} placeholder="Add progress notes..." />
 
-            {selectedTask?.status === 'assigned' && selectedTask?.assignee_type === 'super_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (
-              <>
-                <Text style={styles.label}>Rejection Reason (only if rejecting)</Text>
-                <TextInput style={[styles.input, { height: 80 }]} multiline value={rejectionReason} onChangeText={setRejectionReason} placeholder="Reason for rejection..." />
-              </>
-            )}
+
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-              {selectedTask?.status === 'assigned' && selectedTask?.assignee_type === 'super_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (
-                <>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#10B981' }]} onPress={() => handleUpdateStatus('accepted')}>
-                    <Text style={styles.saveBtnText}>Accept</Text>
-                  </Pressable>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#EF4444' }]} onPress={() => handleUpdateStatus('rejected')}>
-                    <Text style={styles.saveBtnText}>Reject</Text>
-                  </Pressable>
-                </>
-              )}
+
               {selectedTask?.assignee_type === 'super_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
                 <>
                   <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus('in_progress')}>
@@ -761,7 +854,38 @@ export default function AdminTasksScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+          {/* Direct Rejection Reason Modal */}
+      {directRejectTask && (
+        <Modal visible={showDirectRejectModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: isDesktop ? 450 : '90%', padding: 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Rejection Reason</Text>
+                <Pressable onPress={() => { setShowDirectRejectModal(false); setDirectRejectTask(null); }}>
+                  <Text style={{ fontSize: 20, color: '#64748b' }}>✕</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                style={[styles.input, { height: 100, textAlignVertical: 'top', marginVertical: 15, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 }]}
+                placeholder="Enter rejection reason (optional)..."
+                value={directRejectText}
+                onChangeText={setDirectRejectText}
+                multiline
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                <Pressable style={[styles.cancelBtn, { backgroundColor: '#ef4444' }]} onPress={() => { setShowDirectRejectModal(false); setDirectRejectTask(null); }}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.actionBtn, { backgroundColor: '#1e293b' }]} onPress={handleDirectRejectSubmit}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Submit</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+</View>
   );
 }
 

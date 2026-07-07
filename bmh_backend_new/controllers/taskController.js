@@ -37,6 +37,10 @@ exports.createTask = async (req, res) => {
 
 exports.getTasks = async (req, res) => {
   try {
+    // Run schema migrations for duration metrics tracking
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+
     const { user_type, user_id, department } = req.query;
 
     const fields = `
@@ -97,17 +101,44 @@ exports.updateTaskStatus = async (req, res) => {
     }
     const task = existingTaskResult.rows[0];
 
-    const result = await pool.query(
-      `UPDATE tasks 
-       SET status = $1, rejection_reason = $2, notes = $3, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $4 RETURNING *`,
-      [
-        status || task.status,
-        rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
-        notes !== undefined ? notes : task.notes,
-        id
-      ]
-    );
+    let result;
+    if (status === 'accepted') {
+      result = await pool.query(
+        `UPDATE tasks 
+         SET status = $1, rejection_reason = $2, notes = $3, accepted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $4 RETURNING *`,
+        [
+          status || task.status,
+          rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
+          notes !== undefined ? notes : task.notes,
+          id
+        ]
+      );
+    } else if (status === 'completed') {
+      result = await pool.query(
+        `UPDATE tasks 
+         SET status = $1, rejection_reason = $2, notes = $3, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $4 RETURNING *`,
+        [
+          status || task.status,
+          rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
+          notes !== undefined ? notes : task.notes,
+          id
+        ]
+      );
+    } else {
+      result = await pool.query(
+        `UPDATE tasks 
+         SET status = $1, rejection_reason = $2, notes = $3, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $4 RETURNING *`,
+        [
+          status || task.status,
+          rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
+          notes !== undefined ? notes : task.notes,
+          id
+        ]
+      );
+    }
 
     const updatedTask = result.rows[0];
 
