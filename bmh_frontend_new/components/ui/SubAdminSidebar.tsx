@@ -21,21 +21,12 @@ const NAV_ITEMS = [
   { name: 'Profile', icon: Users, route: '/department/dashboard/profile' },
 ];
 
-const PHARMACY_ITEMS = [
-  { name: 'Generate Token', route: '/dashboard/pharmacy/generate-token' },
-  { name: 'Create Order', route: '/dashboard/pharmacy/create-order' },
-  { name: 'Item Master', route: '/dashboard/pharmacy/items' },
-  { name: 'Stock Details', route: '/dashboard/pharmacy/stock' },
-  { name: 'Local Customers', route: '/dashboard/pharmacy/customers' },
-  { name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-order' },
-  { name: 'Order Status', route: '/dashboard/pharmacy/order-status' },
-];
-
 export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [navItems, setNavItems] = React.useState(NAV_ITEMS);
   const [pharmacyOpen, setPharmacyOpen] = React.useState(false);
+  const [pharmacyItems, setPharmacyItems] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (pathname.includes('/dashboard/pharmacy')) {
@@ -50,6 +41,10 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         let dynamicNavItems = [...NAV_ITEMS];
         const userStr = Platform.OS === 'web' ? localStorage.getItem('subAdminUser') : await AsyncStorage.getItem('subAdminUser');
         
+        let hasSalesOrder = false;
+        let hasPurchaseOrder = false;
+        let hasOrderAssign = false;
+
         if (userStr) {
           const user = JSON.parse(userStr);
           const userId = user.id?.toString();
@@ -76,8 +71,53 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.splice(2, 0, { name: 'Check In', icon: Users, route: '/department/dashboard/check-in' });
             }
           }
+
+          if (res.data.success && res.data.settings.sales_order_access) {
+            let value = res.data.settings.sales_order_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            if (userId && value[userId] === true) {
+              hasSalesOrder = true;
+              dynamicNavItems.push({ name: 'Create Sales Order', icon: Package, route: '/department/dashboard/pharmacy/sales-order' });
+              dynamicNavItems.push({ name: 'Sales Orders List', icon: FileText, route: '/department/dashboard/pharmacy/sales-order-list' });
+              dynamicNavItems.push({ name: 'Create Sales Invoice', icon: Package, route: '/department/dashboard/pharmacy/sales-invoice' });
+              dynamicNavItems.push({ name: 'Sales Invoices List', icon: FileText, route: '/department/dashboard/pharmacy/sales-invoice-list' });
+              dynamicNavItems.push({ name: 'Online Orders', icon: Package, route: '/department/dashboard/online-orders' });
+            }
+          }
+
+          if (res.data.success && res.data.settings.purchase_order_access) {
+            let value = res.data.settings.purchase_order_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            if (userId && value[userId] === true) {
+              hasPurchaseOrder = true;
+              dynamicNavItems.push({ name: 'Purchase Orders', icon: Package, route: '/department/dashboard/purchase-orders' });
+            }
+          }
+
+          if (res.data.success && res.data.settings.order_assign_access) {
+            let value = res.data.settings.order_assign_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            if (userId && value[userId] === true) {
+              hasOrderAssign = true;
+              dynamicNavItems.push({ name: 'Order Assign', icon: Package, route: '/department/dashboard/order-assign' });
+            }
+          }
         }
         
+        // Build dynamic pharmacy items
+        const subPharmacyItems = [];
+        if (hasSalesOrder) {
+          subPharmacyItems.push({ name: 'Generate Token', route: '/dashboard/pharmacy/generate-token' });
+          subPharmacyItems.push({ name: 'Create Order', route: '/dashboard/pharmacy/create-order' });
+          subPharmacyItems.push({ name: 'Item Master', route: '/dashboard/pharmacy/items' });
+          subPharmacyItems.push({ name: 'Stock Details', route: '/dashboard/pharmacy/stock' });
+          subPharmacyItems.push({ name: 'Local Customers', route: '/dashboard/pharmacy/customers' });
+          subPharmacyItems.push({ name: 'Order Status', route: '/dashboard/pharmacy/order-status' });
+        }
+        if (hasPurchaseOrder) {
+          subPharmacyItems.push({ name: 'Purchase Orders', route: '/dashboard/pharmacy/purchase-order' });
+        }
+        setPharmacyItems(subPharmacyItems);
         setNavItems(dynamicNavItems);
       } catch (err) {
         console.error('Failed to fetch settings', err);
@@ -119,42 +159,46 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         })}
 
         {/* EcoGreen APIs Collapsible Menu */}
-        <Pressable 
-          style={[styles.navItem, pathname.includes('/dashboard/pharmacy') && styles.navItemActive]} 
-          onPress={() => setPharmacyOpen(!pharmacyOpen)}
-        >
-          <Package color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={20} />
-          <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>EcoGreen APIs</Text>
-          <View style={{ marginLeft: 'auto' }}>
-            {pharmacyOpen ? (
-              <ChevronDown color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />
-            ) : (
-              <ChevronRight color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />
-            )}
-          </View>
-        </Pressable>
+        {pharmacyItems.length > 0 && (
+          <>
+            <Pressable 
+              style={[styles.navItem, pathname.includes('/dashboard/pharmacy') && styles.navItemActive]} 
+              onPress={() => setPharmacyOpen(!pharmacyOpen)}
+            >
+              <Package color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={20} />
+              <Text style={[styles.navText, pathname.includes('/dashboard/pharmacy') && styles.navTextActive]}>EcoGreen APIs</Text>
+              <View style={{ marginLeft: 'auto' }}>
+                {pharmacyOpen ? (
+                  <ChevronDown color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />
+                ) : (
+                  <ChevronRight color={pathname.includes('/dashboard/pharmacy') ? Colors.light.primary : Colors.light.icon} size={16} />
+                )}
+              </View>
+            </Pressable>
 
-        {pharmacyOpen && PHARMACY_ITEMS.map((subItem) => {
-          const fullRoute = `/department${subItem.route}`;
-          const isSubActive = pathname === fullRoute;
-          return (
-            <Link key={subItem.name} href={fullRoute as any} asChild>
-              <Pressable 
-                style={StyleSheet.flatten([
-                  styles.subNavItem, 
-                  isSubActive && styles.subNavItemActive
-                ])}
-                onPress={() => {
-                  if (onClose && !isSubActive) onClose();
-                }}
-              >
-                <Text style={[styles.subNavText, isSubActive && styles.subNavTextActive]}>
-                  •  {subItem.name}
-                </Text>
-              </Pressable>
-            </Link>
-          );
-        })}
+            {pharmacyOpen && pharmacyItems.map((subItem) => {
+              const fullRoute = `/department${subItem.route}`;
+              const isSubActive = pathname === fullRoute;
+              return (
+                <Link key={subItem.name} href={fullRoute as any} asChild>
+                  <Pressable 
+                    style={StyleSheet.flatten([
+                      styles.subNavItem, 
+                      isSubActive && styles.subNavItemActive
+                    ])}
+                    onPress={() => {
+                      if (onClose && !isSubActive) onClose();
+                    }}
+                  >
+                    <Text style={[styles.subNavText, isSubActive && styles.subNavTextActive]}>
+                      •  {subItem.name}
+                    </Text>
+                  </Pressable>
+                </Link>
+              );
+            })}
+          </>
+        )}
       </ScrollView>
 
       <Pressable style={styles.logoutBtn} onPress={async () => {

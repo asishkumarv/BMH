@@ -154,7 +154,8 @@ exports.updateOrder = async (req, res) => {
       bus_travels_name, bus_driver_name, bus_driver_number, bus_number,
       dispatch_time, est_reach_time, bus_date,
       new_note, note_author, delivery_otp, address, pod_payment_mode,
-      scheduled_time, scheduled_date
+      scheduled_time, scheduled_date,
+      customer_name, customer_phone, amount, order_no, location_link, mode_of_delivery
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -188,6 +189,12 @@ exports.updateOrder = async (req, res) => {
     addField('pod_payment_mode', pod_payment_mode);
     addField('scheduled_time', scheduled_time);
     addField('scheduled_date', scheduled_date);
+    addField('customer_name', customer_name);
+    addField('customer_phone', customer_phone);
+    addField('amount', amount);
+    addField('order_no', order_no);
+    addField('location_link', location_link);
+    addField('mode_of_delivery', mode_of_delivery);
     
     // Automatically capture exact time transitions
     if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);
