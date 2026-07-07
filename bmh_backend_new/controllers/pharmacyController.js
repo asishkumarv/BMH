@@ -571,7 +571,7 @@ async function initLocalCustomerSync() {
     };
     
     // Execute initial catch-up shortly after startup
-    setTimeout(runSync, 5000);
+    setTimeout(runSync,60000);
     
     // Periodically sync every 5 seconds
     let isSyncing = false;
@@ -598,7 +598,7 @@ async function initLocalCustomerSync() {
         } finally {
             isSyncing = false;
         }
-    }, 5000);
+    }, 60000);
 }
 
 // Global initialization function to start the auto-fetch timers
