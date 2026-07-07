@@ -536,16 +536,16 @@ export default function AdminTasksScreen() {
           <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
             <Text style={styles.modalTitle}>Create New Task</Text>
             
-            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: isDesktop ? 600 : 500 }} showsVerticalScrollIndicator={false}>
               <View style={{ paddingBottom: 8 }}>
                 <Text style={styles.label}>Title</Text>
                 <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Task Title" />
                 
                 <Text style={styles.label}>Description</Text>
-                <TextInput style={[styles.input, { height: 80 }]} multiline value={description} onChangeText={setDescription} placeholder="Task Details..." />
+                <TextInput style={[styles.input, { height: 50 }]} multiline value={description} onChangeText={setDescription} placeholder="Task Details..." />
 
             <Text style={styles.label}>Assignee Type</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
               {['employee', 'department_admin', 'super_admin', 'self'].map(type => (
                 <Pressable key={type} style={[styles.radioBtn, assigneeType === type && styles.radioActive]} onPress={() => { setAssigneeType(type); setAssigneeId(''); setSelectedDeptId(''); }}>
                   <Text style={{ color: assigneeType === type ? '#FFF' : Colors.light.text }}>{type.replace('_', ' ')}</Text>
@@ -556,7 +556,7 @@ export default function AdminTasksScreen() {
             {(assigneeType === 'employee' || assigneeType === 'department_admin') && (
               <>
                 <Text style={styles.label}>Select Department (Optional)</Text>
-                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
                   {Platform.OS === 'web' ? (
                     <select 
                       style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
@@ -587,7 +587,7 @@ export default function AdminTasksScreen() {
             {assigneeType !== 'self' && (
               <>
                 <Text style={styles.label}>Select Assignee</Text>
-                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
                   {Platform.OS === 'web' ? (
                     <select 
                       style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
@@ -637,7 +637,7 @@ export default function AdminTasksScreen() {
 
             
             <Text style={styles.label}>Schedule Type</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
               <Pressable style={[styles.radioBtn, !isRecurring && styles.radioActive]} onPress={() => setIsRecurring(false)}>
                 <Text style={{ color: !isRecurring ? '#FFF' : Colors.light.text }}>One-time Task</Text>
               </Pressable>
@@ -673,7 +673,7 @@ export default function AdminTasksScreen() {
             )}
 
             <Text style={styles.label}>Priority</Text>
-            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
               {Platform.OS === 'web' ? (
                 <select 
                   style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
@@ -817,7 +817,7 @@ export default function AdminTasksScreen() {
             )}
 
             <Text style={styles.label}>Select New Assignee</Text>
-            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
               {Platform.OS === 'web' ? (
                 <select
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
@@ -934,10 +934,10 @@ const styles = StyleSheet.create({
   actionBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.light.secondary, borderRadius: 8 },
   actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 14 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  modalContent: { backgroundColor: Colors.light.card, borderRadius: 24, padding: 32, width: '100%', maxHeight: '90%' },
-  modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.light.text, marginBottom: 24 },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.light.text, marginBottom: 8, marginTop: 16 },
-  input: { backgroundColor: Colors.light.background, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 12, padding: 16, fontSize: 15, color: Colors.light.text },
+  modalContent: { backgroundColor: Colors.light.card, borderRadius: 24, padding: 16, width: '100%', maxHeight: '95%' },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.light.text, marginBottom: 10 },
+  label: { fontSize: 13, fontWeight: '600', color: Colors.light.text, marginBottom: 2, marginTop: 6 },
+  input: { backgroundColor: Colors.light.background, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 8, fontSize: 14, color: Colors.light.text },
   radioBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: Colors.light.background, borderWidth: 1, borderColor: Colors.light.border },
   radioActive: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 32 },

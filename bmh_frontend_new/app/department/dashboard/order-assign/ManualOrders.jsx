@@ -22,6 +22,20 @@ export default function ManualOrders({ deliveryBoys }) {
 
   // Modals
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const phoneRef = React.useRef(null);
+  const nameRef = React.useRef(null);
+  const shipPhoneRef = React.useRef(null);
+  const shipNameRef = React.useRef(null);
+  const addressRef = React.useRef(null);
+  const linkRef = React.useRef(null);
+  const orderNoRef = React.useRef(null);
+  const invoiceNoRef = React.useRef(null);
+  const amountRef = React.useRef(null);
+  const txnRef = React.useRef(null);
+  const chargeRef = React.useRef(null);
+  const dateRef = React.useRef(null);
+  const timeRef = React.useRef(null);
+  const notesRef = React.useRef(null);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [busesModalVisible, setBusesModalVisible] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -762,7 +776,7 @@ export default function ManualOrders({ deliveryBoys }) {
       {/* Create Order Modal */}
       <Modal visible={createModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: isDesktop ? 800 : '95%' }]}>
+          <View style={[styles.modalContent, { width: isDesktop ? 1000 : '95%' }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create New Order</Text>
               <TouchableOpacity onPress={() => { setCreateModalVisible(false); setFormData(initialFormData); }}><Text style={{fontSize:20, color:'#64748b'}}>✕</Text></TouchableOpacity>
@@ -1449,14 +1463,14 @@ const styles = StyleSheet.create({
   inlinePicker: { height: 32, fontSize: 13, borderWidth: 0, backgroundColor: 'transparent', ...Platform.select({ web: { outlineStyle: 'none' } }) },
   actionBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', borderRadius: 12, maxHeight: '90%', padding: 24 },
+  modalContent: { backgroundColor: '#fff', borderRadius: 12, maxHeight: '95%', padding: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
   modalBody: { flex: 1 },
-  formRow: { flexDirection: 'row', gap: 16, marginBottom: 16, flexWrap: 'wrap' },
+  formRow: { flexDirection: 'row', gap: 8, marginBottom: 6, flexWrap: 'wrap' },
   formCol: { flex: 1, minWidth: 200 },
-  label: { fontSize: 14, fontWeight: '600', color: '#334155', marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, backgroundColor: '#f8fafc' },
+  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 2, marginTop: 4 },
+  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, backgroundColor: '#f8fafc' },
   modalFooter: { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 16, marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end' },
   saveBtn: { backgroundColor: '#1e293b', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   saveBtnText: { color: '#fff', fontWeight: 'bold' }
