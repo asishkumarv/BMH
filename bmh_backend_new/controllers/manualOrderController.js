@@ -68,7 +68,23 @@ exports.createOrder = async (req, res) => {
 
     const result = await pool.query(insertQuery, values);
 
-    // If an address is provided, try to update the patient's addresses array
+    // Save new bus route if mode_of_delivery is Bus and it doesn't exist
+    if (mode_of_delivery === 'Bus' && bus_number) {
+      try {
+        const busCheck = await pool.query('SELECT id FROM buses WHERE LOWER(bus_number) = LOWER($1)', [bus_number.trim()]);
+        if (busCheck.rowCount === 0) {
+          await pool.query(
+            `INSERT INTO buses (bus_name, bus_number, parcel_contact_person, mobile_no, status, destination) 
+             VALUES ($1, $2, $3, $4, 'Active', $5)`,
+            [bus_travels_name || null, bus_number.trim(), bus_driver_name || null, bus_driver_number || null, address || null]
+          );
+        }
+      } catch (err) {
+        console.error('Failed to save new bus:', err);
+      }
+    }
+
+    // If an address is provided, update patient's addresses array or create a new patient
     if (customer_phone && address) {
       try {
         const patientRes = await pool.query('SELECT id, addresses FROM patients WHERE mobile = $1', [customer_phone]);
@@ -85,6 +101,15 @@ exports.createOrder = async (req, res) => {
             currentAddresses.push({ address, location_link: location_link || '' });
             await pool.query('UPDATE patients SET addresses = $1 WHERE id = $2', [JSON.stringify(currentAddresses), patientId]);
           }
+        } else {
+          // Create new patient!
+          const bcrypt = require('bcrypt');
+          const hashedPassword = await bcrypt.hash(customer_phone, 10);
+          const initialAddress = [{ address, location_link: location_link || '' }];
+          await pool.query(
+            'INSERT INTO patients (name, mobile, password, addresses) VALUES ($1, $2, $3, $4)',
+            [customer_name || 'Customer', customer_phone, hashedPassword, JSON.stringify(initialAddress)]
+          );
         }
       } catch (err) {
         console.error('Failed to update patient addresses:', err);
@@ -302,7 +327,63 @@ exports.updateOrder = async (req, res) => {
           [updatedOrder.delivery_boy_id, 'online_collection', amt, `Order ${updatedOrder.order_no} Delivered (POD Online)`, 'completed', 'Online']);
       }
     }
-    
+    // Save new bus route on manual order update if mode_of_delivery is Bus
+    const finalBusTravels = bus_travels_name !== undefined ? bus_travels_name : currentOrder.rows[0].bus_travels_name;
+    const finalBusNo = bus_number !== undefined ? bus_number : currentOrder.rows[0].bus_number;
+    const finalBusDriver = bus_driver_name !== undefined ? bus_driver_name : currentOrder.rows[0].bus_driver_name;
+    const finalBusPhone = bus_driver_number !== undefined ? bus_driver_number : currentOrder.rows[0].bus_driver_number;
+    const finalDeliveryMode = mode_of_delivery !== undefined ? mode_of_delivery : currentOrder.rows[0].mode_of_delivery;
+    const finalAddress = address !== undefined ? address : currentOrder.rows[0].address;
+
+    if (finalDeliveryMode === 'Bus' && finalBusNo) {
+      try {
+        const busCheck = await pool.query('SELECT id FROM buses WHERE LOWER(bus_number) = LOWER($1)', [finalBusNo.trim()]);
+        if (busCheck.rowCount === 0) {
+          await pool.query(
+            `INSERT INTO buses (bus_name, bus_number, parcel_contact_person, mobile_no, status, destination) 
+             VALUES ($1, $2, $3, $4, 'Active', $5)`,
+            [finalBusTravels || null, finalBusNo.trim(), finalBusDriver || null, finalBusPhone || null, finalAddress || null]
+          );
+        }
+      } catch (err) {
+        console.error('Failed to save new bus on update:', err);
+      }
+    }
+
+    // Update patient address / create patient on manual order update
+    const finalPhone = customer_phone !== undefined ? customer_phone : currentOrder.rows[0].customer_phone;
+    const finalName = customer_name !== undefined ? customer_name : currentOrder.rows[0].customer_name;
+    const finalLink = location_link !== undefined ? location_link : currentOrder.rows[0].location_link;
+
+    if (finalPhone && finalAddress) {
+      try {
+        const patientRes = await pool.query('SELECT id, addresses FROM patients WHERE mobile = $1', [finalPhone]);
+        if (patientRes.rowCount > 0) {
+          const patientId = patientRes.rows[0].id;
+          let currentAddresses = patientRes.rows[0].addresses || [];
+          if (typeof currentAddresses === 'string') {
+            try { currentAddresses = JSON.parse(currentAddresses); } catch(e) { currentAddresses = []; }
+          }
+          const addressExists = currentAddresses.some(a => a.address === finalAddress);
+          if (!addressExists) {
+            currentAddresses.push({ address: finalAddress, location_link: finalLink || '' });
+            await pool.query('UPDATE patients SET addresses = $1, name = COALESCE($2, name) WHERE id = $3', [JSON.stringify(currentAddresses), finalName || null, patientId]);
+          }
+        } else {
+          // Create new patient!
+          const bcrypt = require('bcrypt');
+          const hashedPassword = await bcrypt.hash(finalPhone, 10);
+          const initialAddress = [{ address: finalAddress, location_link: finalLink || '' }];
+          await pool.query(
+            'INSERT INTO patients (name, mobile, password, addresses) VALUES ($1, $2, $3, $4)',
+            [finalName || 'Customer', finalPhone, hashedPassword, JSON.stringify(initialAddress)]
+          );
+        }
+      } catch (err) {
+        console.error('Failed to update patient addresses on update:', err);
+      }
+    }
+
     res.json({ success: true, data: updatedOrder });
 
   } catch (error) {
