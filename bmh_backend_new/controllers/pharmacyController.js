@@ -429,7 +429,7 @@ async function syncLocalCustomersToPatientsTable(apiKey, fromDate, toDate) {
             "fromDate": fromDate,
             "toDate": toDate
         };
-        const res = await axios.post("http://117.211.64.158:21000/ws_c2_services_so_refno_fetch", payload, {timeout: 30000});
+        const res = await axios.post("http://117.211.64.158:21000/ws_c2_services_fetch_local_customer", payload, {timeout: 30000});
         
         let customers = [];
         if (res.data) {
@@ -506,6 +506,7 @@ async function syncLocalCustomersToPatientsTable(apiKey, fromDate, toDate) {
         console.log(`[Customer Sync] Completed database sync for range ${fromDate} to ${toDate}.`);
     } catch (err) {
         console.error(`[Customer Sync Error] Failed for range ${fromDate} to ${toDate}:`, err.message);
+        throw err;
     }
 }
 
@@ -526,7 +527,7 @@ async function initLocalCustomerSync() {
             }
             
             // Check if initial full sync has run
-            const checkInit = await pool.query("SELECT * FROM settings WHERE key = 'local_customer_sync_init'");
+            const checkInit = await pool.query("SELECT * FROM settings WHERE key = 'local_customer_sync_init_v2'");
             if (checkInit.rowCount === 0) {
                 console.log("[Customer Sync] Starting initial catch-up sync from 2020-01-01 to today...");
                 
@@ -551,7 +552,7 @@ async function initLocalCustomerSync() {
                 // Store in settings table that it's complete
                 await pool.query(
                     "INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
-                    ['local_customer_sync_init', JSON.stringify({ completed: true })]
+                    ['local_customer_sync_init_v2', JSON.stringify({ completed: true })]
                 );
                 console.log("[Customer Sync] Initial copy from 01-01-2020 completed and flag stored.");
             }
