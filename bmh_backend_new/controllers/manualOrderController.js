@@ -1,4 +1,13 @@
 const pool = require('../db');
+const fs = require('fs');
+
+const logErrorToFile = (err, context) => {
+  try {
+    const time = new Date().toISOString();
+    const message = `[${time}] [${context}] Error: ${err.stack || err}\n`;
+    fs.appendFileSync('c:/Users/Lohitha Asish/Desktop/BMH/bmh_backend_new/error_logs.txt', message, 'utf8');
+  } catch(e) {}
+};
 
 // Create Manual Order
 exports.createOrder = async (req, res) => {
@@ -81,6 +90,7 @@ exports.createOrder = async (req, res) => {
         }
       } catch (err) {
         console.error('Failed to save new bus:', err);
+        logErrorToFile(err, 'createOrder - save bus');
       }
     }
 
@@ -113,12 +123,14 @@ exports.createOrder = async (req, res) => {
         }
       } catch (err) {
         console.error('Failed to update patient addresses:', err);
+        logErrorToFile(err, 'createOrder - patient addresses');
       }
     }
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error creating manual order:', error);
+    logErrorToFile(error, 'createOrder - main');
     res.status(500).json({ success: false, message: 'Failed to create order' });
   }
 };
