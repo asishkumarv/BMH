@@ -186,20 +186,20 @@ export default function AdminPerformance() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Reporting Filters</Text>
         <View style={styles.filtersRow}>
-          <View style={styles.filterGroup}>
+          <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
             <Text style={styles.filterLabel}>Rider ID (Optional)</Text>
             {Platform.OS === 'web' ? (
               <select
                 value={filterRiderId}
                 onChange={(e) => setFilterRiderId(e.target.value)}
-                style={styles.webSelect}
+                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
                 <option value="">All Executives</option>
                 {riders.map(r => <option key={r.riderId} value={r.riderId}>{r.name}</option>)}
               </select>
             ) : (
               <TextInput
-                style={styles.input}
+                style={[styles.input, { height: 36, fontSize: 13 }]}
                 placeholder="Rider ID"
                 value={filterRiderId}
                 onChangeText={setFilterRiderId}
@@ -208,13 +208,13 @@ export default function AdminPerformance() {
             )}
           </View>
 
-          <View style={styles.filterGroup}>
+          <View style={[styles.filterGroup, { minWidth: 170, maxWidth: 200 }]}>
             <Text style={styles.filterLabel}>Period Selection</Text>
-            <View style={styles.periodTabs}>
+            <View style={[styles.periodTabs, { height: 36, padding: 3 }]}>
               {(['daily', 'monthly', 'yearly'] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab}
-                  style={[styles.periodTab, filterPeriod === tab && styles.periodTabActive]}
+                  style={[styles.periodTab, { paddingVertical: 4 }, filterPeriod === tab && styles.periodTabActive]}
                   onPress={() => {
                     setFilterPeriod(tab);
                     const today = new Date().toISOString();
@@ -233,13 +233,13 @@ export default function AdminPerformance() {
             </View>
           </View>
 
-          <View style={styles.filterGroup}>
+          <View style={[styles.filterGroup, { minWidth: 130, maxWidth: 160 }]}>
             <Text style={styles.filterLabel}>
-              {filterPeriod === 'daily' ? 'Date (YYYY-MM-DD)' :
-               filterPeriod === 'monthly' ? 'Month (YYYY-MM)' : 'Year (YYYY)'}
+              {filterPeriod === 'daily' ? 'Date' :
+               filterPeriod === 'monthly' ? 'Month' : 'Year'}
             </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { height: 36, fontSize: 13 }]}
               value={filterValue}
               onChangeText={setFilterValue}
               placeholder={filterPeriod === 'daily' ? 'e.g. 2026-07-09' : 'e.g. 2026-07'}
@@ -247,12 +247,12 @@ export default function AdminPerformance() {
           </View>
 
           {Platform.OS === 'web' && (
-            <View style={styles.filterGroup}>
+            <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Area</Text>
               <select
                 value={filterArea}
                 onChange={(e) => setFilterArea(e.target.value)}
-                style={styles.webSelect}
+                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
                 <option value="">All Areas</option>
                 {areasList.map(a => <option key={a} value={a}>{a}</option>)}
@@ -261,12 +261,12 @@ export default function AdminPerformance() {
           )}
 
           {Platform.OS === 'web' && (
-            <View style={styles.filterGroup}>
+            <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Shift</Text>
               <select
                 value={filterShift}
                 onChange={(e) => setFilterShift(e.target.value)}
-                style={styles.webSelect}
+                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
                 <option value="">All Shifts</option>
                 <option value="Morning">Morning Shift (09:00)</option>
@@ -277,12 +277,12 @@ export default function AdminPerformance() {
           )}
 
           {Platform.OS === 'web' && (
-            <View style={styles.filterGroup}>
+            <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Payment Mode</Text>
               <select
                 value={filterPaymentMode}
                 onChange={(e) => setFilterPaymentMode(e.target.value)}
-                style={styles.webSelect}
+                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
                 <option value="">All Payments</option>
                 {paymentModesList.map(pm => <option key={pm} value={pm}>{pm}</option>)}
@@ -290,7 +290,7 @@ export default function AdminPerformance() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
+          <TouchableOpacity style={[styles.resetBtn, { height: 36, paddingVertical: 0, justifyContent: 'center', minWidth: 70 }]} onPress={resetFilters}>
             <Text style={styles.resetBtnText}>Reset</Text>
           </TouchableOpacity>
         </View>
