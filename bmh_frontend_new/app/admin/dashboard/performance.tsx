@@ -39,6 +39,7 @@ const getTrendLabel = (label: string, period: string) => {
 };
 
 export default function AdminPerformance() {
+  const [dashboardType, setDashboardType] = useState<'delivery' | 'doctor'>('delivery');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [riders, setRiders] = useState<any[]>([]);
@@ -66,19 +67,34 @@ export default function AdminPerformance() {
     setFilterValue(currentMonth);
   }, []);
 
+  const handleDashboardTypeChange = (type: 'delivery' | 'doctor') => {
+    setDashboardType(type);
+    setFilterRiderId('');
+    setFilterArea('');
+    setFilterShift('');
+    setFilterPaymentMode('');
+  };
+
   useEffect(() => {
     if (filterValue !== '') {
       fetchPerformanceData();
     }
-  }, [filterRiderId, filterPeriod, filterValue, filterArea, filterShift, filterPaymentMode]);
+  }, [dashboardType, filterRiderId, filterPeriod, filterValue, filterArea, filterShift, filterPaymentMode]);
 
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
       let queryParams = [];
-      if (filterRiderId) queryParams.push(`delivery_boy_id=${filterRiderId}`);
-      if (filterArea) queryParams.push(`area=${encodeURIComponent(filterArea)}`);
-      if (filterShift) queryParams.push(`shift=${encodeURIComponent(filterShift)}`);
+      
+      if (dashboardType === 'doctor') {
+        queryParams.push('type=doctor');
+        if (filterRiderId) queryParams.push(`doctor_id=${filterRiderId}`);
+        if (filterArea) queryParams.push(`department=${encodeURIComponent(filterArea)}`);
+      } else {
+        if (filterRiderId) queryParams.push(`delivery_boy_id=${filterRiderId}`);
+        if (filterArea) queryParams.push(`area=${encodeURIComponent(filterArea)}`);
+        if (filterShift) queryParams.push(`shift=${encodeURIComponent(filterShift)}`);
+      }
       if (filterPaymentMode) queryParams.push(`payment_mode=${encodeURIComponent(filterPaymentMode)}`);
       
       if (filterPeriod === 'daily') {
@@ -92,12 +108,22 @@ export default function AdminPerformance() {
       const url = `${API_URL}/performance/admin-stats?${queryParams.join('&')}`;
       const res = await axios.get(url);
       if (res.data && res.data.success) {
-        setStats(res.data.executiveDashboard);
-        setRiders(res.data.riders || []);
-        if (res.data.executiveDashboard) {
-          if (res.data.executiveDashboard.uniqueAreas) setAreasList(res.data.executiveDashboard.uniqueAreas);
-          if (res.data.executiveDashboard.uniqueShifts) setShiftsList(res.data.executiveDashboard.uniqueShifts);
-          if (res.data.executiveDashboard.uniquePaymentModes) setPaymentModesList(res.data.executiveDashboard.uniquePaymentModes);
+        if (dashboardType === 'doctor') {
+          setStats(res.data.data);
+          setRiders(res.data.data.doctorsList || []);
+          if (res.data.data.filters) {
+            if (res.data.data.filters.departments) setAreasList(res.data.data.filters.departments);
+            setShiftsList([]);
+            if (res.data.data.filters.paymentModes) setPaymentModesList(res.data.data.filters.paymentModes);
+          }
+        } else {
+          setStats(res.data.executiveDashboard);
+          setRiders(res.data.riders || []);
+          if (res.data.executiveDashboard) {
+            if (res.data.executiveDashboard.uniqueAreas) setAreasList(res.data.executiveDashboard.uniqueAreas);
+            if (res.data.executiveDashboard.uniqueShifts) setShiftsList(res.data.executiveDashboard.uniqueShifts);
+            if (res.data.executiveDashboard.uniquePaymentModes) setPaymentModesList(res.data.executiveDashboard.uniquePaymentModes);
+          }
         }
       }
     } catch (e) {
@@ -123,33 +149,62 @@ export default function AdminPerformance() {
   const showInfoAlert = (type: string) => {
     let title = '';
     let message = '';
+    const isDoc = dashboardType === 'doctor';
     
-    if (type === 'kpis') {
-      title = 'Overview KPIs Calculation';
-      message = '• Deliveries Success %:\nCalculated as (Delivered Orders / Total Assigned Orders) × 100\n\n' +
-                '• On-Time Delivery %:\nCalculated as (Delivered orders completed ≤ 45 mins / Total Delivered Orders) × 100\n\n' +
-                '• Average Delivery Cycle:\nAverage duration in minutes from rider "Picked Up" to "Delivered" timestamp\n\n' +
-                '• Distance Covered:\nTotal Haversine straight-line aerial distance from the department store coordinates to customer destinations\n\n' +
-                '• Total Revenue:\nTotal payments collected (COD Cash + Online payments combined) from successfully delivered orders\n\n' +
-                '• Total Delivery Charges:\nBilled delivery charges for manual/custom deliveries';
-    } else if (type === 'financial') {
-      title = 'Financial Breakdown Definitions';
-      message = '• Total Order Value:\nSum of all assigned orders (COD + Online + Pending Collection)\n\n' +
-                '• COD Collected:\nCash payment collections brought back by delivery boys\n\n' +
-                '• Online Payments:\nPre-paid or digital payments received for orders\n\n' +
-                '• Pending Cash:\nCash collections expected for orders currently in transit (not yet delivered)\n\n' +
-                '• Bus Parcel Shipments:\nCount and value of parcels dispatched via third-party Bus carriers\n\n' +
-                '• Scheduled Deliveries:\nScheduled local orders set to be processed later';
-    } else if (type === 'area') {
-      title = 'Area Performance Breakdown';
-      message = '• Area Names:\nNeighborhood parsing heuristics from customer delivery addresses\n\n' +
-                '• Orders Billed:\nTotal orders dispatched to each neighborhood area\n\n' +
-                '• Revenue Generated:\nSum of completed/delivered sales in the area\n\n' +
-                '• Pending Orders:\nActive transit orders in the area';
-    } else if (type === 'trends') {
-      title = 'Operations Trends & Peak Hours';
-      message = '• Orders & Revenue Trend:\nShows chronological transaction volume distribution (daily, monthly, or yearly) and revenue to evaluate system throughput\n\n' +
-                '• Peak Delivery Hours:\nHour of day distribution (0-23) based on order assignment times. Helps identify high-traffic intervals and adjust shift timings';
+    if (isDoc) {
+      if (type === 'kpis') {
+        title = 'Doctor KPIs Calculation';
+        message = '• Consultations Completed %:\nCalculated as (Completed Consultations / Total Bookings) × 100\n\n' +
+                  '• Total Bookings:\nTotal patient tokens booked in slots (excluding cancelled)\n\n' +
+                  '• Completed Consultations:\nTokens marked as Consulted or Completed\n\n' +
+                  '• Cancelled Bookings:\nCancelled patient tokens\n\n' +
+                  '• Total Revenue:\nTotal slot consultation fees collected (excluding cancelled tokens)\n\n' +
+                  '• Doctors Share:\nTotal commission payout earned by doctors (Fee × Fee Share %)\n\n' +
+                  '• BMH Net Share:\nTotal commission kept by BMH (Fee × (1 - Fee Share %))';
+      } else if (type === 'financial') {
+        title = 'Doctor Payout Definitions';
+        message = '• Total Billing Value:\nTotal consultation billing value of active slots\n\n' +
+                  '• Cash Collected (Counter):\nConsultation fees collected in cash at the counter\n\n' +
+                  '• Online Received:\nConsultation fees received online/pre-paid';
+      } else if (type === 'area' || type === 'dept') {
+        title = 'Department Performance Breakdown';
+        message = '• Specialization Department:\nStatistics summarized by medical departments (e.g. Cardiology, Pediatrics)\n\n' +
+                  '• Total Bookings:\nTotal token booking load per department\n\n' +
+                  '• Revenue:\nSum of consultation fee revenue per department\n\n' +
+                  '• Pending Tokens:\nActive patient tokens awaiting consultation';
+      } else if (type === 'trends') {
+        title = 'Doctor Trends & Peak Hours';
+        message = '• Bookings & Revenue Trend:\nShows daily, monthly, or yearly distribution of token bookings and consultation revenue\n\n' +
+                  '• Peak Booking Hours:\nHour of day distribution (0-23) based on slot start times. Helps track peak consulting hours';
+      }
+    } else {
+      if (type === 'kpis') {
+        title = 'Overview KPIs Calculation';
+        message = '• Deliveries Success %:\nCalculated as (Delivered Orders / Total Assigned Orders) × 100\n\n' +
+                  '• On-Time Delivery %:\nCalculated as (Delivered orders completed ≤ 45 mins / Total Delivered Orders) × 100\n\n' +
+                  '• Average Delivery Cycle:\nAverage duration in minutes from rider "Picked Up" to "Delivered" timestamp\n\n' +
+                  '• Distance Covered:\nTotal Haversine straight-line aerial distance from the department store coordinates to customer destinations\n\n' +
+                  '• Total Revenue:\nTotal payments collected (COD Cash + Online payments combined) from successfully delivered orders\n\n' +
+                  '• Total Delivery Charges:\nBilled delivery charges for manual/custom deliveries';
+      } else if (type === 'financial') {
+        title = 'Financial Breakdown Definitions';
+        message = '• Total Order Value:\nSum of all assigned orders (COD + Online + Pending Collection)\n\n' +
+                  '• COD Collected:\nCash payment collections brought back by delivery boys\n\n' +
+                  '• Online Payments:\nPre-paid or digital payments received for orders\n\n' +
+                  '• Pending Cash:\nCash collections expected for orders currently in transit (not yet delivered)\n\n' +
+                  '• Bus Parcel Shipments:\nCount and value of parcels dispatched via third-party Bus carriers\n\n' +
+                  '• Scheduled Deliveries:\nScheduled local orders set to be processed later';
+      } else if (type === 'area') {
+        title = 'Area Performance Breakdown';
+        message = '• Area Names:\nNeighborhood parsing heuristics from customer delivery addresses\n\n' +
+                  '• Orders Billed:\nTotal orders dispatched to each neighborhood area\n\n' +
+                  '• Revenue Generated:\nSum of completed/delivered sales in the area\n\n' +
+                  '• Pending Orders:\nActive transit orders in the area';
+      } else if (type === 'trends') {
+        title = 'Operations Trends & Peak Hours';
+        message = '• Orders & Revenue Trend:\nShows chronological transaction volume distribution (daily, monthly, or yearly) and revenue to evaluate system throughput\n\n' +
+                  '• Peak Delivery Hours:\nHour of day distribution (0-23) based on order assignment times. Helps identify high-traffic intervals and adjust shift timings';
+      }
     }
     
     setInfoModalTitle(title);
@@ -168,13 +223,41 @@ export default function AdminPerformance() {
 
   const executive = stats || {};
 
+  const isDoctorMode = dashboardType === 'doctor';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
+      {/* Dashboard Toggle Segment */}
+      <View style={styles.toggleTabContainer}>
+        <TouchableOpacity
+          style={[styles.toggleTabButton, dashboardType === 'delivery' && styles.toggleTabButtonActive]}
+          onPress={() => handleDashboardTypeChange('delivery')}
+        >
+          <Text style={[styles.toggleTabButtonText, dashboardType === 'delivery' && styles.toggleTabButtonActiveText]}>
+            Delivery Boys
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleTabButton, dashboardType === 'doctor' && styles.toggleTabButtonActive]}
+          onPress={() => handleDashboardTypeChange('doctor')}
+        >
+          <Text style={[styles.toggleTabButtonText, dashboardType === 'doctor' && styles.toggleTabButtonActiveText]}>
+            Doctors
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Page Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Delivery Performance & KPA Dashboard</Text>
-          <Text style={styles.subtitle}>Measure productivity, quality, and service levels of delivery executives</Text>
+          <Text style={styles.title}>
+            {isDoctorMode ? 'Doctors Performance KPI & KRI Dashboard' : 'Delivery Performance KPI & KRI  Dashboard'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isDoctorMode
+              ? 'Measure booking loads, consultant payouts, and department statistics'
+              : 'Measure productivity, quality, and service levels of delivery executives'}
+          </Text>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchPerformanceData}>
           <RefreshCw size={18} color="#fff" />
@@ -187,23 +270,31 @@ export default function AdminPerformance() {
         <Text style={styles.sectionTitle}>Reporting Filters</Text>
         <View style={styles.filtersRow}>
           <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
-            <Text style={styles.filterLabel}>Rider ID (Optional)</Text>
+            <Text style={styles.filterLabel}>{isDoctorMode ? 'Doctor ID (Optional)' : 'Rider ID (Optional)'}</Text>
             {Platform.OS === 'web' ? (
               <select
                 value={filterRiderId}
                 onChange={(e) => setFilterRiderId(e.target.value)}
                 style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
-                <option value="">All Executives</option>
-                {riders.map(r => <option key={r.riderId} value={r.riderId}>{r.name}</option>)}
+                {isDoctorMode ? (
+                  <>
+                    <option value="">All Doctors</option>
+                    {riders.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </>
+                ) : (
+                  <>
+                    <option value="">All Executives</option>
+                    {riders.map(r => <option key={r.riderId} value={r.riderId}>{r.name}</option>)}
+                  </>
+                )}
               </select>
             ) : (
               <TextInput
                 style={[styles.input, { height: 36, fontSize: 13 }]}
-                placeholder="Rider ID"
+                placeholder={isDoctorMode ? 'Doctor ID' : 'Rider ID'}
                 value={filterRiderId}
                 onChangeText={setFilterRiderId}
-                keyboardType="numeric"
               />
             )}
           </View>
@@ -248,19 +339,19 @@ export default function AdminPerformance() {
 
           {Platform.OS === 'web' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
-              <Text style={styles.filterLabel}>Area</Text>
+              <Text style={styles.filterLabel}>{isDoctorMode ? 'Department' : 'Area'}</Text>
               <select
                 value={filterArea}
                 onChange={(e) => setFilterArea(e.target.value)}
                 style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
-                <option value="">All Areas</option>
+                <option value="">{isDoctorMode ? 'All Specializations' : 'All Areas'}</option>
                 {areasList.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </View>
           )}
 
-          {Platform.OS === 'web' && (
+          {!isDoctorMode && Platform.OS === 'web' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Shift</Text>
               <select
@@ -305,209 +396,323 @@ export default function AdminPerformance() {
       </View>
 
       {/* KPI Cards Grid */}
-      <View style={styles.grid}>
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
-            <Award size={20} color="#4F46E5" />
+      {isDoctorMode ? (
+        <View style={styles.grid}>
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <Award size={20} color="#4F46E5" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Consultations Completed %</Text>
+              <Text style={[styles.kpiValue, { color: getStatusColor(executive.overview?.completedRate || 0, 'success') }]}>
+                {executive.overview?.completedRate || 0}%
+              </Text>
+              <Text style={styles.kpiSub}>Target: High completed rate</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Deliveries Success %</Text>
-            <Text style={[styles.kpiValue, { color: getStatusColor(executive.deliverySuccessRate || 0, 'success') }]}>
-              {executive.deliverySuccessRate || 0}%
-            </Text>
-            <Text style={styles.kpiSub}>Target: ≥98% Success</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-            <Clock size={20} color="#0284C7" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <User size={20} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Bookings</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.totalBookings || 0}</Text>
+              <Text style={styles.kpiSub}>Allocated slots load</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>On-Time Delivery %</Text>
-            <Text style={[styles.kpiValue, { color: getStatusColor(executive.onTimeDeliveryRate || 0, 'on_time') }]}>
-              {executive.onTimeDeliveryRate || 0}%
-            </Text>
-            <Text style={styles.kpiSub}>Target: ≥95% On-Time</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#F1F5F9' }]}>
-            <TrendingUp size={20} color="#475569" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <ShieldCheck size={20} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Completed Consultations</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.completedBookings || 0}</Text>
+              <Text style={styles.kpiSub}>Consulted successfully</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Total Orders Assigned</Text>
-            <Text style={styles.kpiValue}>{executive.totalOrdersAssigned || 0}</Text>
-            <Text style={styles.kpiSub}>Total allocated load</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
-            <ShieldCheck size={20} color="#10B981" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+              <AlertCircle size={20} color="#EF4444" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Cancelled Bookings</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.cancelledBookings || 0}</Text>
+              <Text style={styles.kpiSub}>Refunded tokens</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Total Orders Delivered</Text>
-            <Text style={styles.kpiValue}>{executive.totalOrdersDelivered || 0}</Text>
-            <Text style={styles.kpiSub}>Success count</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-            <Clock size={20} color="#D97706" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <DollarSign size={20} color="#059669" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Revenue</Text>
+              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{(executive.overview?.totalRevenue || 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.kpiSub}>Fee from active bookings</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Pending Deliveries</Text>
-            <Text style={styles.kpiValue}>{executive.pendingDeliveries || 0}</Text>
-            <Text style={styles.kpiSub}>Currently in transit</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-            <AlertCircle size={20} color="#EF4444" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <DollarSign size={20} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Doctors Share</Text>
+              <Text style={[styles.kpiValue, { color: '#0284C7' }]}>₹{(executive.overview?.totalDoctorShare || 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.kpiSub}>Commission payout</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Failed & Returned</Text>
-            <Text style={styles.kpiValue}>{(executive.failedDeliveries || 0) + (executive.returnedOrders || 0)}</Text>
-            <Text style={styles.kpiSub}>Fail: {executive.failedDeliveries || 0} | Ret: {executive.returnedOrders || 0}</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#F3F4F6' }]}>
-            <AlertCircle size={20} color="#6B7280" />
-          </View>
-          <View>
-            <Text style={styles.kpiLabel}>Cancelled Orders</Text>
-            <Text style={styles.kpiValue}>{executive.cancelledOrders || 0}</Text>
-            <Text style={styles.kpiSub}>Void/Cancelled load</Text>
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <DollarSign size={20} color="#4F46E5" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>BMH Net Share</Text>
+              <Text style={[styles.kpiValue, { color: '#4F46E5' }]}>₹{(executive.overview?.totalBMHShare || 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.kpiSub}>Hospital revenue share</Text>
+            </View>
           </View>
         </View>
+      ) : (
+        <View style={styles.grid}>
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <Award size={20} color="#4F46E5" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Deliveries Success %</Text>
+              <Text style={[styles.kpiValue, { color: getStatusColor(executive.deliverySuccessRate || 0, 'success') }]}>
+                {executive.deliverySuccessRate || 0}%
+              </Text>
+              <Text style={styles.kpiSub}>Target: ≥98% Success</Text>
+            </View>
+          </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-            <Clock size={20} color="#D97706" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <Clock size={20} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>On-Time Delivery %</Text>
+              <Text style={[styles.kpiValue, { color: getStatusColor(executive.onTimeDeliveryRate || 0, 'on_time') }]}>
+                {executive.onTimeDeliveryRate || 0}%
+              </Text>
+              <Text style={styles.kpiSub}>Target: ≥95% On-Time</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Avg. Delivery Cycle</Text>
-            <Text style={styles.kpiValue}>{executive.averageDeliveryTimeMin || 0}m</Text>
-            <Text style={styles.kpiSub}>In-Transit Duration</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#FDF2F8' }]}>
-            <MapPin size={20} color="#DB2777" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#F1F5F9' }]}>
+              <TrendingUp size={20} color="#475569" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Orders Assigned</Text>
+              <Text style={styles.kpiValue}>{executive.totalOrdersAssigned || 0}</Text>
+              <Text style={styles.kpiSub}>Total allocated load</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Distance Covered</Text>
-            <Text style={styles.kpiValue}>{executive.totalDistanceKM || 0} KM</Text>
-            <Text style={styles.kpiSub}>Calculated via coordinates</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
-            <DollarSign size={20} color="#059669" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <ShieldCheck size={20} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Orders Delivered</Text>
+              <Text style={styles.kpiValue}>{executive.totalOrdersDelivered || 0}</Text>
+              <Text style={styles.kpiSub}>Success count</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Total Revenue</Text>
-            <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{((executive.totalCashCollected || 0) + (executive.totalOnlinePayments || 0))?.toLocaleString('en-IN')}</Text>
-            <Text style={styles.kpiSub}>From delivered orders</Text>
-          </View>
-        </View>
 
-        <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
-            <DollarSign size={20} color="#4F46E5" />
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Clock size={20} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Pending Deliveries</Text>
+              <Text style={styles.kpiValue}>{executive.pendingDeliveries || 0}</Text>
+              <Text style={styles.kpiSub}>Currently in transit</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.kpiLabel}>Total Delivery Charges</Text>
-            <Text style={styles.kpiValue}>₹{executive.totalDeliveryCharges?.toLocaleString('en-IN') || 0}</Text>
-            <Text style={styles.kpiSub}>Dynamic charges billed</Text>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+              <AlertCircle size={20} color="#EF4444" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Failed & Returned</Text>
+              <Text style={styles.kpiValue}>{(executive.failedDeliveries || 0) + (executive.returnedOrders || 0)}</Text>
+              <Text style={styles.kpiSub}>Fail: {executive.failedDeliveries || 0} | Ret: {executive.returnedOrders || 0}</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#F3F4F6' }]}>
+              <AlertCircle size={20} color="#6B7280" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Cancelled Orders</Text>
+              <Text style={styles.kpiValue}>{executive.cancelledOrders || 0}</Text>
+              <Text style={styles.kpiSub}>Void/Cancelled load</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Clock size={20} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Avg. Delivery Cycle</Text>
+              <Text style={styles.kpiValue}>{executive.averageDeliveryTimeMin || 0}m</Text>
+              <Text style={styles.kpiSub}>In-Transit Duration</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FDF2F8' }]}>
+              <MapPin size={20} color="#DB2777" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Distance Covered</Text>
+              <Text style={styles.kpiValue}>{executive.totalDistanceKM || 0} KM</Text>
+              <Text style={styles.kpiSub}>Calculated via coordinates</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <DollarSign size={20} color="#059669" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Revenue</Text>
+              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{((executive.totalCashCollected || 0) + (executive.totalOnlinePayments || 0))?.toLocaleString('en-IN')}</Text>
+              <Text style={styles.kpiSub}>From delivered orders</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <DollarSign size={20} color="#4F46E5" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Delivery Charges</Text>
+              <Text style={styles.kpiValue}>₹{executive.totalDeliveryCharges?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={styles.kpiSub}>Dynamic charges billed</Text>
+            </View>
           </View>
         </View>
-      </View>
+      )}
 
       {/* Financial Summary Card */}
-      <View style={[styles.card, { marginTop: 24 }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Financial Summary & Operations Breakdown</Text>
-          <TouchableOpacity onPress={() => showInfoAlert('financial')} style={{ padding: 4 }}>
-            <Info size={15} color="#4F46E5" />
-          </TouchableOpacity>
+      {isDoctorMode ? (
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Financial Summary & Payout Breakdown</Text>
+            <TouchableOpacity onPress={() => showInfoAlert('financial')} style={{ padding: 4 }}>
+              <Info size={15} color="#4F46E5" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.paymentsSummary}>
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>Total Billing Value</Text>
+              <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{(executive.financials?.totalRevenue || 0).toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={styles.paymentDivider} />
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>Cash Billed (Counter)</Text>
+              <Text style={[styles.paymentValue, { color: '#059669' }]}>₹{(executive.financials?.cashCollected || 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.paymentSub}>Doctor Share: ₹{(executive.financials?.cashDoctorShare || 0).toLocaleString('en-IN')}</Text>
+            </View>
+            <View style={styles.paymentDivider} />
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>Online Received</Text>
+              <Text style={[styles.paymentValue, { color: '#0284C7' }]}>₹{(executive.financials?.onlineCollected || 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.paymentSub}>Doctor Share: ₹{(executive.financials?.onlineDoctorShare || 0).toLocaleString('en-IN')}</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.paymentsSummary}>
-          <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>Total Order Value</Text>
-            <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{executive.totalOrderValue?.toLocaleString('en-IN') || 0}</Text>
+      ) : (
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Financial Summary & Operations Breakdown</Text>
+            <TouchableOpacity onPress={() => showInfoAlert('financial')} style={{ padding: 4 }}>
+              <Info size={15} color="#4F46E5" />
+            </TouchableOpacity>
           </View>
-          <View style={styles.paymentDivider} />
-          <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>COD Collected (Cash)</Text>
-            <Text style={styles.paymentValue}>₹{executive.totalCashCollected?.toLocaleString('en-IN') || 0}</Text>
+          <View style={styles.paymentsSummary}>
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>Total Order Value</Text>
+              <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{executive.totalOrderValue?.toLocaleString('en-IN') || 0}</Text>
+            </View>
+            <View style={styles.paymentDivider} />
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>COD Collected (Cash)</Text>
+              <Text style={styles.paymentValue}>₹{executive.totalCashCollected?.toLocaleString('en-IN') || 0}</Text>
+            </View>
+            <View style={styles.paymentDivider} />
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>Online Payments</Text>
+              <Text style={styles.paymentValue}>₹{executive.totalOnlinePayments?.toLocaleString('en-IN') || 0}</Text>
+            </View>
+            <View style={styles.paymentDivider} />
+            <View style={styles.paymentCol}>
+              <Text style={styles.paymentLabel}>Pending Cash Collection</Text>
+              <Text style={[styles.paymentValue, { color: '#D97706' }]}>₹{executive.pendingCashCollection?.toLocaleString('en-IN') || 0}</Text>
+            </View>
           </View>
-          <View style={styles.paymentDivider} />
-          <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>Online Payments</Text>
-            <Text style={styles.paymentValue}>₹{executive.totalOnlinePayments?.toLocaleString('en-IN') || 0}</Text>
-          </View>
-          <View style={styles.paymentDivider} />
-          <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>Pending Cash Collection</Text>
-            <Text style={[styles.paymentValue, { color: '#D97706' }]}>₹{executive.pendingCashCollection?.toLocaleString('en-IN') || 0}</Text>
-          </View>
-        </View>
 
-        {/* Bus and Scheduled orders subrow */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
-            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Bus Parcel Shipments</Text>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
-              {executive.busOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
-            </Text>
-            <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.busOrdersValue?.toLocaleString('en-IN') || 0}</Text>
-          </View>
-          
-          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
-            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Scheduled Deliveries</Text>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
-              {executive.scheduledOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
-            </Text>
-            <Text style={{ fontSize: 13, color: '#0284C7', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.scheduledOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+          {/* Bus and Scheduled orders subrow */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+            <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Bus Parcel Shipments</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
+                {executive.busOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
+              </Text>
+              <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.busOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+            </View>
+            
+            <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Scheduled Deliveries</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
+                {executive.scheduledOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
+              </Text>
+              <Text style={{ fontSize: 13, color: '#0284C7', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.scheduledOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+            </View>
           </View>
         </View>
-      </View>
+      )}
 
       {/* Delivery Executive Summary */}
-      <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Delivery Executive Summary</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F0F9FF', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ backgroundColor: '#0284C7', padding: 8, borderRadius: 6 }}>
-              <User size={18} color="#fff" />
+      {!isDoctorMode && (
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <Text style={styles.sectionTitle}>Delivery Executive Summary</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F0F9FF', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ backgroundColor: '#0284C7', padding: 8, borderRadius: 6 }}>
+                <User size={18} color="#fff" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Total Delivery Boys</Text>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>{executive.totalRidersCount || 0}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Total Delivery Boys</Text>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>{executive.totalRidersCount || 0}</Text>
-            </View>
-          </View>
-          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ backgroundColor: '#10B981', padding: 8, borderRadius: 6 }}>
-              <ShieldCheck size={18} color="#fff" />
-            </View>
-            <View>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Active Delivery Boys</Text>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>{executive.activeRidersCount || 0}</Text>
+            <View style={{ flex: 1, minWidth: 200, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ backgroundColor: '#10B981', padding: 8, borderRadius: 6 }}>
+                <ShieldCheck size={18} color="#fff" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Active Delivery Boys</Text>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>{executive.activeRidersCount || 0}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      )}
 
-      {/* Area Performance */}
+      {/* Area / Department Performance */}
       <View style={[styles.card, { marginTop: 24 }]}>
         <TouchableOpacity
           style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
@@ -515,8 +720,10 @@ export default function AdminPerformance() {
           activeOpacity={0.7}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Area Performance Breakdown</Text>
-            <TouchableOpacity onPress={() => showInfoAlert('area')} style={{ padding: 4 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+              {isDoctorMode ? 'Specialization Department Breakdown' : 'Area Performance Breakdown'}
+            </Text>
+            <TouchableOpacity onPress={() => showInfoAlert(isDoctorMode ? 'dept' : 'area')} style={{ padding: 4 }}>
               <Info size={15} color="#4F46E5" />
             </TouchableOpacity>
           </View>
@@ -527,14 +734,16 @@ export default function AdminPerformance() {
           <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginTop: 12 }}>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.th, { width: 180 }]}>Area Name</Text>
-                <Text style={[styles.th, { width: 100 }]}>Orders Billed</Text>
+                <Text style={[styles.th, { width: 180 }]}>{isDoctorMode ? 'Department Name' : 'Area Name'}</Text>
+                <Text style={[styles.th, { width: 100 }]}>{isDoctorMode ? 'Total Bookings' : 'Total Orders'}</Text>
                 <Text style={[styles.th, { width: 120 }]}>Revenue Generated</Text>
-                <Text style={[styles.th, { width: 120 }]}>Pending Orders</Text>
+                <Text style={[styles.th, { width: 120 }]}>{isDoctorMode ? 'Pending Tokens' : 'Pending Orders'}</Text>
               </View>
               {(executive.areaPerformance || []).length === 0 ? (
                 <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ color: '#64748B', fontSize: 13 }}>No area data found for selected period.</Text>
+                  <Text style={{ color: '#64748B', fontSize: 13 }}>
+                    {isDoctorMode ? 'No department data found.' : 'No area data found for selected period.'}
+                  </Text>
                 </View>
               ) : (
                 (executive.areaPerformance || []).map((area: any, index: number) => (
@@ -542,7 +751,9 @@ export default function AdminPerformance() {
                     <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{area.area}</Text>
                     <Text style={[styles.td, { width: 100 }]}>{area.totalOrders}</Text>
                     <Text style={[styles.td, { width: 120, color: '#10B981', fontWeight: '600' }]}>₹{area.revenue?.toLocaleString('en-IN')}</Text>
-                    <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>{area.pendingOrders}</Text>
+                    <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>
+                      {isDoctorMode ? area.pending : area.pendingOrders}
+                    </Text>
                   </View>
                 ))
               )}
@@ -560,8 +771,10 @@ export default function AdminPerformance() {
           </TouchableOpacity>
         </View>
         
-        {/* Orders & Revenue Trend */}
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>Orders & Revenue Trend</Text>
+        {/* Bookings / Orders & Revenue Trend */}
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>
+          {isDoctorMode ? 'Bookings & Revenue Trend' : 'Orders & Revenue Trend'}
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 20 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', height: 160, paddingBottom: 24, paddingHorizontal: 12 }}>
             {(executive.performanceTrend || []).map((t: any, idx: number) => {
@@ -581,270 +794,398 @@ export default function AdminPerformance() {
           </View>
         </ScrollView>
 
-        {/* Peak Delivery Hours */}
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>Peak Delivery Hours (Distribution)</Text>
+        {/* Peak Hours distribution */}
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>
+          {isDoctorMode ? 'Peak Booking Hours (Distribution)' : 'Peak Delivery Hours (Distribution)'}
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={true}>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', height: 150, paddingBottom: 20, paddingHorizontal: 12 }}>
-            {(executive.hourStats || []).filter((h: any) => h.orders > 0).map((h: any, idx: number) => {
-              const maxVal = Math.max(...(executive.hourStats || []).map((x: any) => x.orders), 1);
-              const barHeight = Math.max((h.orders / maxVal) * 100, 10);
-              return (
-                <View key={h.hour || idx} style={{ alignItems: 'center', width: 40 }}>
-                  <View style={{ height: 90, justifyContent: 'flex-end', width: 16, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: `${barHeight}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+            {(() => {
+              const peakHoursArray = isDoctorMode ? executive.peakHours : executive.hourStats;
+              return (peakHoursArray || []).filter((h: any) => h.orders > 0).map((h: any, idx: number) => {
+                const maxVal = Math.max(...(peakHoursArray || []).map((x: any) => x.orders), 1);
+                const barHeight = Math.max((h.orders / maxVal) * 100, 10);
+                return (
+                  <View key={h.hour || idx} style={{ alignItems: 'center', width: 40 }}>
+                    <View style={{ height: 90, justifyContent: 'flex-end', width: 16, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: `${barHeight}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+                    </View>
+                    <Text style={{ fontSize: 9, color: '#475569', fontWeight: '700', marginTop: 4 }}>{h.orders}</Text>
+                    <Text style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{h.hour}</Text>
                   </View>
-                  <Text style={{ fontSize: 9, color: '#475569', fontWeight: '700', marginTop: 4 }}>{h.orders}</Text>
-                  <Text style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{h.hour}</Text>
-                </View>
-              );
-            })}
+                );
+              });
+            })()}
           </View>
         </ScrollView>
       </View>
 
       {/* Leaderboard/Ranking */}
-      <View style={styles.rankingsRow}>
-        <View style={[styles.card, { flex: 1 }]}>
-          <Text style={styles.sectionTitle}>Top Performing Executives</Text>
-          {(executive.topExecutives || []).map((exec: any, index: number) => (
-            <View key={exec.riderId} style={styles.rankItem}>
-              <View style={styles.rankBadge}>
-                <Text style={styles.rankText}>#{index + 1}</Text>
+      {!isDoctorMode && (
+        <View style={styles.rankingsRow}>
+          <View style={[styles.card, { flex: 1 }]}>
+            <Text style={styles.sectionTitle}>Top Performing Executives</Text>
+            {(executive.topExecutives || []).map((exec: any, index: number) => (
+              <View key={exec.riderId} style={styles.rankItem}>
+                <View style={styles.rankBadge}>
+                  <Text style={styles.rankText}>#{index + 1}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName}>{exec.name}</Text>
+                  <Text style={styles.rankDetails}>Delivered: {exec.delivered} orders | Rating: {exec.rating} ★</Text>
+                </View>
+                <Text style={[styles.rankScore, { color: '#10B981' }]}>{exec.successRate}%</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rankName}>{exec.name}</Text>
-                <Text style={styles.rankDetails}>Delivered: {exec.delivered} orders | Rating: {exec.rating} ★</Text>
-              </View>
-              <Text style={[styles.rankScore, { color: '#10B981' }]}>{exec.successRate}%</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
 
-        <View style={[styles.card, { flex: 1 }]}>
-          <Text style={styles.sectionTitle}>Needs Attention (Issues & Failures)</Text>
-          {(executive.bottomExecutives || []).map((exec: any, index: number) => (
-            <View key={exec.riderId} style={styles.rankItem}>
-              <View style={[styles.rankBadge, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={[styles.rankText, { color: '#EF4444' }]}>!</Text>
+          <View style={[styles.card, { flex: 1 }]}>
+            <Text style={styles.sectionTitle}>Needs Attention (Issues & Failures)</Text>
+            {(executive.bottomExecutives || []).map((exec: any, index: number) => (
+              <View key={exec.riderId} style={styles.rankItem}>
+                <View style={[styles.rankBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <Text style={[styles.rankText, { color: '#EF4444' }]}>!</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName}>{exec.name}</Text>
+                  <Text style={styles.rankDetails}>Failed/Returned: {exec.failed + exec.returned} | Rating: {exec.rating} ★</Text>
+                </View>
+                <Text style={[styles.rankScore, { color: '#EF4444' }]}>{exec.successRate}%</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rankName}>{exec.name}</Text>
-                <Text style={styles.rankDetails}>Failed/Returned: {exec.failed + exec.returned} | Rating: {exec.rating} ★</Text>
-              </View>
-              <Text style={[styles.rankScore, { color: '#EF4444' }]}>{exec.successRate}%</Text>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Detail Table */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Rider Breakdown Statistics</Text>
+        <Text style={styles.sectionTitle}>{isDoctorMode ? 'Doctor Bookings & Share Performance' : 'Rider Breakdown Statistics'}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={true}>
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.th, { width: 150 }]}>Executive</Text>
-              <Text style={[styles.th, { width: 100 }]}>Shift</Text>
-              <Text style={[styles.th, { width: 80 }]}>Assigned</Text>
-              <Text style={[styles.th, { width: 80 }]}>Delivered</Text>
-              <Text style={[styles.th, { width: 80 }]}>Success %</Text>
-              <Text style={[styles.th, { width: 100 }]}>Avg Time</Text>
-              <Text style={[styles.th, { width: 100 }]}>Distance</Text>
-              <Text style={[styles.th, { width: 100 }]}>Attendance</Text>
-              <Text style={[styles.th, { width: 80 }]}>Rating</Text>
-            </View>
+            {isDoctorMode ? (
+              <>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { width: 60 }]}>ID</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Doctor Name</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Department</Text>
+                  <Text style={[styles.th, { width: 140 }]}>Bookings (Total / Completed / Cancelled)</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Share %</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Total Fee</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Doctor Share</Text>
+                  <Text style={[styles.th, { width: 100 }]}>BMH Share</Text>
+                </View>
 
-            {riders.map((r) => (
-              <View key={r.riderId} style={styles.tableRow}>
-                <View style={[{ width: 150 }]}>
-                  <Text style={styles.riderName}>{r.name}</Text>
-                  <Text style={styles.riderPhone}>{r.phone}</Text>
+                {riders.map((d: any, index: number) => (
+                  <View key={d.id || index} style={styles.tableRow}>
+                    <Text style={[styles.td, { width: 60, fontWeight: 'bold' }]}>#{d.id}</Text>
+                    <Text style={[styles.td, { width: 150, fontWeight: '600' }]}>{d.name}</Text>
+                    <Text style={[styles.td, { width: 120 }]}>{d.department}</Text>
+                    <Text style={[styles.td, { width: 140 }]}>
+                      {d.totalBookings} ({d.completedConsultations} / {d.cancelledBookings})
+                    </Text>
+                    <Text style={[styles.td, { width: 80 }]}>{d.feePercent}%</Text>
+                    <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{d.revenue?.toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.td, { width: 100, color: '#0284C7', fontWeight: '600' }]}>₹{d.doctorShare?.toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.td, { width: 100, color: '#4F46E5', fontWeight: '600' }]}>₹{d.bmhShare?.toLocaleString('en-IN')}</Text>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { width: 150 }]}>Executive</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Shift</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Assigned</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Delivered</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Success %</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Avg Time</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Distance</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Attendance</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Rating</Text>
                 </View>
-                <Text style={[styles.td, { width: 100 }]}>{r.shift}</Text>
-                <Text style={[styles.td, { width: 80 }]}>{r.assigned}</Text>
-                <Text style={[styles.td, { width: 80 }]}>{r.delivered}</Text>
-                <View style={[styles.td, { width: 80 }]}>
-                  <Text style={[styles.badge, { backgroundColor: getStatusColor(r.successRate, 'success') + '15', color: getStatusColor(r.successRate, 'success') }]}>
-                    {r.successRate}%
-                  </Text>
-                </View>
-                <Text style={[styles.td, { width: 100 }]}>{r.avgDeliveryTimeMin} min</Text>
-                <Text style={[styles.td, { width: 100 }]}>{r.totalDistanceKM} KM</Text>
-                <Text style={[styles.td, { width: 100 }]}>{r.workingDays} days</Text>
-                <Text style={[styles.td, { width: 80, fontWeight: '700', color: getStatusColor(r.rating, 'rating') }]}>{r.rating} ★</Text>
-              </View>
-            ))}
+
+                {riders.map((r) => (
+                  <View key={r.riderId} style={styles.tableRow}>
+                    <View style={[{ width: 150 }]}>
+                      <Text style={styles.riderName}>{r.name}</Text>
+                      <Text style={styles.riderPhone}>{r.phone}</Text>
+                    </View>
+                    <Text style={[styles.td, { width: 100 }]}>{r.shift}</Text>
+                    <Text style={[styles.td, { width: 80 }]}>{r.assigned}</Text>
+                    <Text style={[styles.td, { width: 80 }]}>{r.delivered}</Text>
+                    <View style={[styles.td, { width: 80 }]}>
+                      <Text style={[styles.badge, { backgroundColor: getStatusColor(r.successRate, 'success') + '15', color: getStatusColor(r.successRate, 'success') }]}>
+                        {r.successRate}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.td, { width: 100 }]}>{r.avgDeliveryTimeMin} min</Text>
+                    <Text style={[styles.td, { width: 100 }]}>{r.totalDistanceKM} KM</Text>
+                    <Text style={[styles.td, { width: 100 }]}>{r.workingDays} days</Text>
+                    <Text style={[styles.td, { width: 80, fontWeight: '700', color: getStatusColor(r.rating, 'rating') }]}>{r.rating} ★</Text>
+                  </View>
+                ))}
+              </>
+            )}
           </View>
         </ScrollView>
       </View>
 
-      {/* Rider's Detailed Assigned Orders list (when filtered) */}
+      {/* Filtered Rider's deliveries OR Filtered Doctor's Patient Bookings */}
       {filterRiderId && (() => {
-        const filteredOrders = (executive.ordersList || []).filter((order: any) => {
-          const searchStr = tableSearch.toLowerCase().trim();
-          const matchesSearch = searchStr === '' ||
-            String(order.orderNo || '').toLowerCase().includes(searchStr) ||
-            String(order.invoiceNo || '').toLowerCase().includes(searchStr) ||
-            String(order.customerName || '').toLowerCase().includes(searchStr) ||
-            String(order.customerPhone || '').toLowerCase().includes(searchStr);
-          
-          // Use localized translation logic for table filter type matching to correspond to UI
-          let resolvedType = String(order.type || '').toLowerCase();
-          if (resolvedType === 'manual') {
-            resolvedType = String(order.modeOfDelivery || '').toLowerCase() === 'bus' ? 'bus' : String(order.modeOfDelivery || '').toLowerCase() === 'schedule delivery' ? 'scheduled' : 'local';
-          } else if (resolvedType === 'online') {
-            resolvedType = 'local';
-          } else if (resolvedType === 'sales_invoice' || resolvedType === 'sales_order') {
-            resolvedType = 'counter';
-          }
-          
-          const matchesType = tableType === '' || resolvedType === tableType.toLowerCase();
-          const matchesStatus = tableStatus === '' || String(order.status || '').toLowerCase() === tableStatus.toLowerCase();
-          
-          return matchesSearch && matchesType && matchesStatus;
-        });
+        if (isDoctorMode) {
+          const filteredBookings = (executive.bookingsList || []).filter((b: any) => {
+            const searchStr = tableSearch.toLowerCase().trim();
+            return searchStr === '' ||
+              String(b.id || '').toLowerCase().includes(searchStr) ||
+              String(b.patientName || '').toLowerCase().includes(searchStr) ||
+              String(b.patientPhone || '').toLowerCase().includes(searchStr);
+          });
 
-        const sortedOrders = [...filteredOrders].sort((a: any, b: any) => {
-          const tA = a.assignedAt ? new Date(a.assignedAt).getTime() : 0;
-          const tB = b.assignedAt ? new Date(b.assignedAt).getTime() : 0;
-          return tB - tA;
-        });
-
-        return (
-          <View style={[styles.card, { marginTop: 24 }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
-              <Text style={styles.sectionTitle}>Executive's Deliveries Details ({riders.find(r => r.riderId === filterRiderId)?.name || 'Filtered Executive'})</Text>
-              
-              {/* Table Filter Controls */}
-              {Platform.OS === 'web' && (
-                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          return (
+            <View style={[styles.card, { marginTop: 24 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
+                <Text style={styles.sectionTitle}>Doctor's Patient Bookings ({riders.find(r => String(r.id) === String(filterRiderId))?.name || 'Filtered Doctor'})</Text>
+                
+                {Platform.OS === 'web' && (
                   <TextInput
-                    style={[styles.input, { width: 220, height: 38, paddingVertical: 0 }]}
-                    placeholder="Search by Order, Name, Phone..."
+                    style={[styles.input, { width: 250, height: 38, paddingVertical: 0 }]}
+                    placeholder="Search by Patient, Phone, ID..."
                     value={tableSearch}
                     onChangeText={setTableSearch}
                   />
-                  
-                  <select
-                    value={tableType}
-                    onChange={(e) => setTableType(e.target.value)}
-                    style={StyleSheet.flatten([styles.webSelect, { height: 38, width: 140, minWidth: 120 }]) as any}
-                  >
-                    <option value="">All Types</option>
-                    <option value="Local">Local</option>
-                    <option value="Bus">Bus</option>
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Counter">Counter</option>
-                  </select>
-
-                  <select
-                    value={tableStatus}
-                    onChange={(e) => setTableStatus(e.target.value)}
-                    style={StyleSheet.flatten([styles.webSelect, { height: 38, width: 140, minWidth: 120 }]) as any}
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="picked up">Picked Up</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="returned">Returned</option>
-                    <option value="failed">Failed</option>
-                  </select>
-                </View>
-              )}
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-              <View style={styles.table}>
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.th, { width: 100 }]}>Order No</Text>
-                  <Text style={[styles.th, { width: 100 }]}>Invoice No</Text>
-                  <Text style={[styles.th, { width: 100 }]}>Method</Text>
-                  <Text style={[styles.th, { width: 150 }]}>Customer Name</Text>
-                  <Text style={[styles.th, { width: 100 }]}>Status</Text>
-                  <Text style={[styles.th, { width: 150 }]}>Assigned Time</Text>
-                  <Text style={[styles.th, { width: 150 }]}>Picked Up Time</Text>
-                  <Text style={[styles.th, { width: 150 }]}>Delivered Time</Text>
-                  <Text style={[styles.th, { width: 140 }]}>Assigned to Deliv.</Text>
-                  <Text style={[styles.th, { width: 140 }]}>Pickup to Deliv.</Text>
-                </View>
-
-                {sortedOrders.length === 0 ? (
-                  <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: '#64748B', fontSize: 13 }}>No matching deliveries found for the selected filters.</Text>
-                  </View>
-                ) : (
-                  sortedOrders.map((order: any, idx: number) => {
-                    const formatTime = (ts: string) => {
-                      if (!ts) return 'N/A';
-                      return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
-                    };
-                    const formatDuration = (mins: number) => {
-                      if (mins === null || mins === undefined) return 'N/A';
-                      if (mins < 60) return `${mins} mins`;
-                      const hrs = Math.floor(mins / 60);
-                      const rem = mins % 60;
-                      return `${hrs}h ${rem}m`;
-                    };
-                    return (
-                      <View key={order.id || idx} style={styles.tableRow}>
-                        <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>{order.orderNo}</Text>
-                        <Text style={[styles.td, { width: 100 }]}>{order.invoiceNo || 'N/A'}</Text>
-                        <Text style={[styles.td, { width: 100, textTransform: 'capitalize' }]}>
-                          {String(order.type).toLowerCase() === 'manual'
-                            ? (String(order.modeOfDelivery).toLowerCase() === 'bus' ? 'Bus' : String(order.modeOfDelivery).toLowerCase() === 'schedule delivery' ? 'Scheduled' : 'Local')
-                            : String(order.type).toLowerCase() === 'online'
-                            ? 'Local'
-                            : (String(order.type).toLowerCase() === 'sales_invoice' || String(order.type).toLowerCase() === 'sales_order')
-                            ? 'Counter'
-                            : order.type}
-                        </Text>
-                        <View style={{ width: 150, paddingVertical: 6 }}>
-                          <Text style={{ fontWeight: '600', fontSize: 12, color: '#1e293b' }}>{order.customerName}</Text>
-                          <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{order.customerPhone}</Text>
-                        </View>
-                        <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{order.status}</Text>
-                        <Text style={[styles.td, { width: 150 }]}>{formatTime(order.assignedAt)}</Text>
-                        <Text style={[styles.td, { width: 150 }]}>{formatTime(order.pickedUpAt)}</Text>
-                        <Text style={[styles.td, { width: 150 }]}>{formatTime(order.deliveredAt)}</Text>
-                        <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#4F46E5' }]}>{formatDuration(order.assignedToDeliveryDuration)}</Text>
-                        <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#10B981' }]}>{formatDuration(order.pickupToDeliveryDuration)}</Text>
-                      </View>
-                    );
-                  })
                 )}
               </View>
-            </ScrollView>
-          </View>
-        );
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                <View style={styles.table}>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.th, { width: 100 }]}>Booking ID</Text>
+                    <Text style={[styles.th, { width: 120 }]}>Date</Text>
+                    <Text style={[styles.th, { width: 180 }]}>Patient Name</Text>
+                    <Text style={[styles.th, { width: 130 }]}>Patient Phone</Text>
+                    <Text style={[styles.th, { width: 120 }]}>Status</Text>
+                    <Text style={[styles.th, { width: 120 }]}>Payment Mode</Text>
+                    <Text style={[styles.th, { width: 100 }]}>Booking Fee</Text>
+                    <Text style={[styles.th, { width: 100 }]}>Doctor Share</Text>
+                    <Text style={[styles.th, { width: 100 }]}>BMH Share</Text>
+                  </View>
+
+                  {filteredBookings.length === 0 ? (
+                    <View style={{ padding: 24, alignItems: 'center' }}>
+                      <Text style={{ color: '#64748B', fontSize: 13 }}>No patient bookings found for the selected filters.</Text>
+                    </View>
+                  ) : (
+                    filteredBookings.map((b: any, idx: number) => (
+                      <View key={b.id || idx} style={styles.tableRow}>
+                        <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>#{b.id}</Text>
+                        <Text style={[styles.td, { width: 120 }]}>{new Date(b.date).toLocaleDateString('en-IN')}</Text>
+                        <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{b.patientName}</Text>
+                        <Text style={[styles.td, { width: 130 }]}>{b.patientPhone}</Text>
+                        <View style={[styles.td, { width: 120 }]}>
+                          <Text style={[styles.badge, { 
+                            backgroundColor: b.status === 'Cancelled' ? '#fee2e2' : (b.status === 'Consulted' || b.status === 'Completed' ? '#dcfce7' : '#fef3c7'),
+                            color: b.status === 'Cancelled' ? '#ef4444' : (b.status === 'Consulted' || b.status === 'Completed' ? '#10b981' : '#d97706')
+                          }]}>
+                            {b.status}
+                          </Text>
+                        </View>
+                        <Text style={[styles.td, { width: 120, textTransform: 'capitalize' }]}>{b.paymentMode}</Text>
+                        <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{b.fee}</Text>
+                        <Text style={[styles.td, { width: 100, color: '#0284C7', fontWeight: '600' }]}>₹{b.doctorShare}</Text>
+                        <Text style={[styles.td, { width: 100, color: '#4F46E5', fontWeight: '600' }]}>₹{b.bmhShare}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          );
+        } else {
+          const filteredOrders = (executive.ordersList || []).filter((order: any) => {
+            const searchStr = tableSearch.toLowerCase().trim();
+            const matchesSearch = searchStr === '' ||
+              String(order.orderNo || '').toLowerCase().includes(searchStr) ||
+              String(order.invoiceNo || '').toLowerCase().includes(searchStr) ||
+              String(order.customerName || '').toLowerCase().includes(searchStr) ||
+              String(order.customerPhone || '').toLowerCase().includes(searchStr);
+            
+            let resolvedType = String(order.type || '').toLowerCase();
+            if (resolvedType === 'manual') {
+              resolvedType = String(order.modeOfDelivery || '').toLowerCase() === 'bus' ? 'bus' : String(order.modeOfDelivery || '').toLowerCase() === 'schedule delivery' ? 'scheduled' : 'local';
+            } else if (resolvedType === 'online') {
+              resolvedType = 'local';
+            } else if (resolvedType === 'sales_invoice' || resolvedType === 'sales_order') {
+              resolvedType = 'counter';
+            }
+            
+            const matchesType = tableType === '' || resolvedType === tableType.toLowerCase();
+            const matchesStatus = tableStatus === '' || String(order.status || '').toLowerCase() === tableStatus.toLowerCase();
+            
+            return matchesSearch && matchesType && matchesStatus;
+          });
+
+          const sortedOrders = [...filteredOrders].sort((a: any, b: any) => {
+            const tA = a.assignedAt ? new Date(a.assignedAt).getTime() : 0;
+            const tB = b.assignedAt ? new Date(b.assignedAt).getTime() : 0;
+            return tB - tA;
+          });
+
+          return (
+            <View style={[styles.card, { marginTop: 24 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
+                <Text style={styles.sectionTitle}>Executive's Deliveries Details ({riders.find(r => r.riderId === filterRiderId)?.name || 'Filtered Executive'})</Text>
+                
+                {Platform.OS === 'web' && (
+                  <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <TextInput
+                      style={[styles.input, { width: 220, height: 38, paddingVertical: 0 }]}
+                      placeholder="Search by Order, Name, Phone..."
+                      value={tableSearch}
+                      onChangeText={setTableSearch}
+                    />
+                    
+                    <select
+                      value={tableType}
+                      onChange={(e) => setTableType(e.target.value)}
+                      style={StyleSheet.flatten([styles.webSelect, { height: 38, width: 140, minWidth: 120 }]) as any}
+                    >
+                      <option value="">All Types</option>
+                      <option value="Local">Local</option>
+                      <option value="Bus">Bus</option>
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Counter">Counter</option>
+                    </select>
+
+                    <select
+                      value={tableStatus}
+                      onChange={(e) => setTableStatus(e.target.value)}
+                      style={StyleSheet.flatten([styles.webSelect, { height: 38, width: 140, minWidth: 120 }]) as any}
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="assigned">Assigned</option>
+                      <option value="picked up">Picked Up</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="returned">Returned</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </View>
+                )}
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                <View style={styles.table}>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.th, { width: 100 }]}>Order No</Text>
+                    <Text style={[styles.th, { width: 100 }]}>Invoice No</Text>
+                    <Text style={[styles.th, { width: 100 }]}>Method</Text>
+                    <Text style={[styles.th, { width: 150 }]}>Customer Name</Text>
+                    <Text style={[styles.th, { width: 100 }]}>Status</Text>
+                    <Text style={[styles.th, { width: 150 }]}>Assigned Time</Text>
+                    <Text style={[styles.th, { width: 150 }]}>Picked Up Time</Text>
+                    <Text style={[styles.th, { width: 150 }]}>Delivered Time</Text>
+                    <Text style={[styles.th, { width: 140 }]}>Assigned to Deliv.</Text>
+                    <Text style={[styles.th, { width: 140 }]}>Pickup to Deliv.</Text>
+                  </View>
+
+                  {sortedOrders.length === 0 ? (
+                    <View style={{ padding: 24, alignItems: 'center' }}>
+                      <Text style={{ color: '#64748B', fontSize: 13 }}>No matching deliveries found for the selected filters.</Text>
+                    </View>
+                  ) : (
+                    sortedOrders.map((order: any, idx: number) => {
+                      const formatTime = (ts: string) => {
+                        if (!ts) return 'N/A';
+                        return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+                      };
+                      const formatDuration = (mins: number) => {
+                        if (mins === null || mins === undefined) return 'N/A';
+                        if (mins < 60) return `${mins} mins`;
+                        const hrs = Math.floor(mins / 60);
+                        const rem = mins % 60;
+                        return `${hrs}h ${rem}m`;
+                      };
+                      return (
+                        <View key={order.id || idx} style={styles.tableRow}>
+                          <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>{order.orderNo}</Text>
+                          <Text style={[styles.td, { width: 100 }]}>{order.invoiceNo || 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 100, textTransform: 'capitalize' }]}>
+                            {String(order.type).toLowerCase() === 'manual'
+                              ? (String(order.modeOfDelivery).toLowerCase() === 'bus' ? 'Bus' : String(order.modeOfDelivery).toLowerCase() === 'schedule delivery' ? 'Scheduled' : 'Local')
+                              : String(order.type).toLowerCase() === 'online'
+                              ? 'Local'
+                              : (String(order.type).toLowerCase() === 'sales_invoice' || String(order.type).toLowerCase() === 'sales_order')
+                              ? 'Counter'
+                              : order.type}
+                          </Text>
+                          <View style={{ width: 150, paddingVertical: 6 }}>
+                            <Text style={{ fontWeight: '600', fontSize: 12, color: '#1e293b' }}>{order.customerName}</Text>
+                            <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{order.customerPhone}</Text>
+                          </View>
+                          <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{order.status}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{formatTime(order.assignedAt)}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{formatTime(order.pickedUpAt)}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{formatTime(order.deliveredAt)}</Text>
+                          <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#4F46E5' }]}>{formatDuration(order.assignedToDeliveryDuration)}</Text>
+                          <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#10B981' }]}>{formatDuration(order.pickupToDeliveryDuration)}</Text>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          );
+        }
       })()}
 
       {/* Stats KPI Calculation Legend */}
       <View style={[styles.card, { marginTop: 24, backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]}>
         <Text style={[styles.sectionTitle, { color: '#1e293b', marginBottom: 8 }]}>How Statistics are Calculated</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Success %</Text>
-            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Calculated as (Delivered Orders / Assigned Orders) × 100.</Text>
+        {isDoctorMode ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Completion Rate</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Calculated as (Completed Consultations / Total Booked Tokens) × 100.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Total Revenue</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Sum of all booking slot fees for consultations (excluding Cancelled tokens).</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Doctor Payout</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Commission payouts calculated as Booking Fee × Fee Share % for active slots.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>BMH Net Share</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Net revenue kept by BMH (Booking Fee × (1 - Fee Share %)).</Text>
+            </View>
           </View>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Avg Time</Text>
-            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Average duration in minutes from order "Picked Up" by the rider to "Delivered".</Text>
+        ) : (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Success %</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Calculated as (Delivered Orders / Assigned Orders) × 100.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Avg Time</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Average duration in minutes from order "Picked Up" by the rider to "Delivered".</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Distance</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Straight-line aerial distance (Haversine formula) from department store to order destination.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Attendance</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Total number of days the executive checked in / had attendance logs during the range.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Rating ★</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Starts at 5.0. Deducts -0.2 for each Failed delivery and -0.1 for each Cancelled delivery (Clamped between 1.0 and 5.0).</Text>
+            </View>
           </View>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Distance</Text>
-            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Straight-line aerial distance (Haversine formula) from department store to order destination.</Text>
-          </View>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Attendance</Text>
-            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Total number of days the executive checked in / had attendance logs during the range.</Text>
-          </View>
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Rating ★</Text>
-            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Starts at 5.0. Deducts -0.2 for each Failed delivery and -0.1 for each Cancelled delivery (Clamped between 1.0 and 5.0).</Text>
-          </View>
-        </View>
+        )}
       </View>
 
       {/* Custom Customized Info Popup Modal */}
@@ -1070,6 +1411,11 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginTop: 4,
   },
+  paymentSub: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+  },
   paymentDivider: {
     width: 1,
     height: 40,
@@ -1225,5 +1571,31 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 13
-  }
+  },
+  toggleTabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 4,
+    marginBottom: 24,
+    alignSelf: 'flex-start',
+    width: 320,
+  },
+  toggleTabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleTabButtonActive: {
+    backgroundColor: '#4F46E5',
+  },
+  toggleTabButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  toggleTabButtonActiveText: {
+    color: '#ffffff',
+  },
 });

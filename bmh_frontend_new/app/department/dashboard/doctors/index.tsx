@@ -117,7 +117,8 @@ export default function DepartmentDoctorManagement() {
   const [updating, setUpdating] = useState(false);
   const [newDoctor, setNewDoctor] = useState({
     full_name: '', email: '', mobile: '', password: '', 
-    department: '', role: 'Doctor', experience: '', gender: 'Male', description: ''
+    department: '', role: 'Doctor', experience: '', gender: 'Male', description: '',
+    fee_percent: '0'
   });
   const [adding, setAdding] = useState(false);
 
@@ -497,7 +498,8 @@ const fetchData = async () => {
       setShowAddForm(false);
       setNewDoctor({
         full_name: '', email: '', mobile: '', password: '', 
-        department: '', role: 'Doctor', experience: '', gender: 'Male', description: ''
+        department: '', role: 'Doctor', experience: '', gender: 'Male', description: '',
+        fee_percent: '0'
       });
       fetchData();
     } catch (err: any) {
@@ -623,6 +625,10 @@ const fetchData = async () => {
             <View style={[styles.formCol, isMobile && { width: '100%', marginBottom: 16 }]}>
               <Text style={styles.label}>Experience (Years)</Text>
               <TextInput style={styles.input} value={newDoctor.experience} onChangeText={(t) => setNewDoctor({...newDoctor, experience: t})} placeholder="e.g. 5" keyboardType="numeric" />
+            </View>
+            <View style={[styles.formCol, isMobile && { width: '100%', marginBottom: 16 }]}>
+              <Text style={styles.label}>Fee Share Percentage (%)</Text>
+              <TextInput style={styles.input} value={String(newDoctor.fee_percent || '')} onChangeText={(t) => setNewDoctor({...newDoctor, fee_percent: t.replace(/[^0-9.]/g, '')})} placeholder="e.g. 20" keyboardType="numeric" />
             </View>
             <View style={[styles.formCol, isMobile && { width: '100%', marginBottom: 16 }]}>
               <Text style={styles.label}>Gender</Text>
@@ -1297,6 +1303,10 @@ const fetchData = async () => {
                   <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Experience (Years)</Text>
                     <TextInput style={styles.input} value={String(editDoctor.experience || '')} onChangeText={(t) => setEditDoctor({...editDoctor, experience: parseInt(t) || 0})} keyboardType="numeric" />
+                  </View>
+                  <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
+                    <Text style={styles.label}>Fee Share Percentage (%)</Text>
+                    <TextInput style={styles.input} value={String(editDoctor.fee_percent || '')} onChangeText={(t) => setEditDoctor({...editDoctor, fee_percent: t.replace(/[^0-9.]/g, '')})} keyboardType="numeric" />
                   </View>
                 </View>
                 <TouchableOpacity style={styles.submitBtn} onPress={handleUpdateDoctor} disabled={updating}>

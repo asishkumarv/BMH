@@ -107,7 +107,11 @@ function getAreaFromAddress(address) {
 
 exports.getAdminPerformanceStats = async (req, res) => {
   try {
-    const { date, week, month, year, delivery_boy_id, shift, area, payment_mode } = req.query;
+    const { type, date, week, month, year, delivery_boy_id, shift, area, payment_mode } = req.query;
+
+    if (type === 'doctor') {
+      return await getDoctorPerformanceStats(req, res);
+    }
 
     // 1. Fetch delivery boys (employees where department = 'Delivery' or role = 'Hd delivery')
     let riderQuery = `
@@ -905,3 +909,241 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     res.status(500).json({ success: false, error: 'Internal Server Error' });
   }
 };
+
+async function getDoctorPerformanceStats(req, res) {
+  try {
+    const { date, month, year, doctor_id, department, payment_mode } = req.query;
+
+    // 1. Filter construction for Date
+    let dateFilter = '';
+    let queryParams = [];
+    let paramIdx = 1;
+
+    if (date) {
+      dateFilter = ` AND TO_CHAR(ds.date, 'YYYY-MM-DD') = $${paramIdx}`;
+      queryParams.push(date);
+      paramIdx++;
+    } else if (month) {
+      dateFilter = ` AND TO_CHAR(ds.date, 'YYYY-MM') = $${paramIdx}`;
+      queryParams.push(month);
+      paramIdx++;
+    } else if (year) {
+      dateFilter = ` AND TO_CHAR(ds.date, 'YYYY') = $${paramIdx}`;
+      queryParams.push(year);
+      paramIdx++;
+    }
+
+    // 2. Fetch Doctors
+    let docQuery = `SELECT id, full_name, department, experience, status, fee_percent FROM doctors`;
+    let docParams = [];
+    if (doctor_id) {
+      docQuery += ` WHERE id = $1`;
+      docParams.push(doctor_id);
+    }
+    const docsRes = await pool.query(docQuery, docParams);
+    const doctors = docsRes.rows;
+
+    // 3. Fetch patient bookings
+    let bookingsQuery = `
+      SELECT pb.*, ds.fee, ds.date as slot_date, ds.start_time, d.full_name as doctor_name, d.department, d.fee_percent,
+             p.name as patient_name, p.mobile as patient_mobile
+      FROM patient_bookings pb
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
+      LEFT JOIN patients p ON pb.patient_id = p.id
+      WHERE 1=1
+    `;
+
+    let filterParams = [...queryParams];
+    let curIdx = paramIdx;
+
+    if (dateFilter) {
+      bookingsQuery += dateFilter;
+    }
+    if (doctor_id) {
+      bookingsQuery += ` AND d.id = $${curIdx}`;
+      filterParams.push(doctor_id);
+      curIdx++;
+    }
+    if (department) {
+      bookingsQuery += ` AND d.department = $${curIdx}`;
+      filterParams.push(department);
+      curIdx++;
+    }
+    if (payment_mode) {
+      bookingsQuery += ` AND pb.payment_mode = $${curIdx}`;
+      filterParams.push(payment_mode);
+      curIdx++;
+    }
+
+    bookingsQuery += ` ORDER BY pb.created_at DESC`;
+    const bookingsRes = await pool.query(bookingsQuery, filterParams);
+    const allBookings = bookingsRes.rows;
+
+    // 4. Compute overall KPI metrics
+    const totalBookings = allBookings.length;
+    const completedBookings = allBookings.filter(b => b.status === 'Consulted' || b.status === 'Completed').length;
+    const cancelledBookings = allBookings.filter(b => b.status === 'Cancelled').length;
+    
+    const activeBookings = allBookings.filter(b => b.status !== 'Cancelled');
+    const totalRevenue = activeBookings.reduce((sum, b) => sum + parseFloat(b.fee || 0), 0);
+    const totalDoctorShare = activeBookings.reduce((sum, b) => sum + (parseFloat(b.fee || 0) * parseFloat(b.fee_percent || 0) / 100), 0);
+    const totalBMHShare = activeBookings.reduce((sum, b) => sum + (parseFloat(b.fee || 0) * (1 - parseFloat(b.fee_percent || 0) / 100)), 0);
+
+    const completedRate = totalBookings > 0 ? parseFloat((completedBookings / totalBookings * 100).toFixed(2)) : 0;
+
+    // 5. Financials split
+    let cashValue = 0, onlineValue = 0;
+    let cashDocShare = 0, onlineDocShare = 0;
+    activeBookings.forEach(b => {
+      const fee = parseFloat(b.fee || 0);
+      const share = fee * parseFloat(b.fee_percent || 0) / 100;
+      if (b.payment_mode === 'Cash') {
+        cashValue += fee;
+        cashDocShare += share;
+      } else {
+        onlineValue += fee;
+        onlineDocShare += share;
+      }
+    });
+
+    // 6. Area (Department) breakdown
+    const deptMap = {};
+    allBookings.forEach(b => {
+      const deptName = b.department || 'General';
+      if (!deptMap[deptName]) {
+        deptMap[deptName] = { area: deptName, totalOrders: 0, revenue: 0, pending: 0 };
+      }
+      deptMap[deptName].totalOrders++;
+      if (b.status !== 'Cancelled') {
+        deptMap[deptName].revenue += parseFloat(b.fee || 0);
+      }
+      if (b.status === 'Booked' || b.status === 'Checked In') {
+        deptMap[deptName].pending++;
+      }
+    });
+    const areaPerformance = Object.values(deptMap).map(d => ({
+      ...d,
+      revenue: parseFloat(d.revenue.toFixed(2))
+    }));
+
+    // 7. Doctors List Performance
+    const doctorsList = doctors.map(d => {
+      const docBookings = allBookings.filter(b => b.doctor_name === d.full_name);
+      const completed = docBookings.filter(b => b.status === 'Consulted' || b.status === 'Completed').length;
+      const cancelled = docBookings.filter(b => b.status === 'Cancelled').length;
+      const totalFee = docBookings.filter(b => b.status !== 'Cancelled').reduce((sum, b) => sum + parseFloat(b.fee || 0), 0);
+      const sharePercent = parseFloat(d.fee_percent || 0);
+      const docShare = totalFee * sharePercent / 100;
+      const bmhShare = totalFee * (1 - sharePercent / 100);
+
+      return {
+        id: d.id,
+        name: d.full_name,
+        department: d.department,
+        experience: d.experience,
+        feePercent: sharePercent,
+        totalBookings: docBookings.length,
+        completedConsultations: completed,
+        cancelledBookings: cancelled,
+        revenue: parseFloat(totalFee.toFixed(2)),
+        doctorShare: parseFloat(docShare.toFixed(2)),
+        bmhShare: parseFloat(bmhShare.toFixed(2))
+      };
+    });
+
+    // 8. Performance Trend
+    const trendMap = {};
+    allBookings.forEach(b => {
+      let key = '';
+      if (month) {
+        const d = new Date(b.slot_date || b.created_at);
+        key = `Day ${d.getDate()}`;
+      } else if (year) {
+        const d = new Date(b.slot_date || b.created_at);
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        key = monthNames[d.getMonth()];
+      } else {
+        const d = new Date(b.slot_date || b.created_at);
+        key = `${d.getDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()]}`;
+      }
+
+      if (!trendMap[key]) {
+        trendMap[key] = { label: key, orders: 0, revenue: 0 };
+      }
+      trendMap[key].orders++;
+      if (b.status !== 'Cancelled') {
+        trendMap[key].revenue += parseFloat(b.fee || 0);
+      }
+    });
+    const performanceTrend = Object.values(trendMap).map(t => ({
+      ...t,
+      revenue: parseFloat(t.revenue.toFixed(2))
+    }));
+
+    // 9. Peak Booking Hours
+    const hoursMap = Array.from({ length: 24 }, (_, i) => ({ hour: i, orders: 0 }));
+    allBookings.forEach(b => {
+      let hr = 12;
+      if (b.start_time) {
+        hr = parseInt(b.start_time.split(':')[0]);
+      } else if (b.created_at) {
+        hr = new Date(b.created_at).getHours();
+      }
+      if (hr >= 0 && hr < 24) {
+        hoursMap[hr].orders++;
+      }
+    });
+
+    // 10. Filtered Booking List
+    const bookingsList = allBookings.map(b => ({
+      id: b.id,
+      date: b.slot_date,
+      patientName: b.patient_name || `Token #${b.token_number}`,
+      patientPhone: b.patient_mobile || 'N/A',
+      status: b.status,
+      paymentMode: b.payment_mode,
+      fee: parseFloat(b.fee),
+      doctorShare: parseFloat((parseFloat(b.fee) * parseFloat(b.fee_percent || 0) / 100).toFixed(2)),
+      bmhShare: parseFloat((parseFloat(b.fee) * (1 - parseFloat(b.fee_percent || 0) / 100)).toFixed(2))
+    }));
+
+    // 11. Populate Unique Filters Lists
+    const uniqueDepts = [...new Set(doctors.map(d => d.department).filter(Boolean))];
+    const uniquePaymentModes = ['Cash', 'Online'];
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalBookings,
+          completedBookings,
+          cancelledBookings,
+          totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          totalDoctorShare: parseFloat(totalDoctorShare.toFixed(2)),
+          totalBMHShare: parseFloat(totalBMHShare.toFixed(2)),
+          completedRate
+        },
+        financials: {
+          totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          cashCollected: parseFloat(cashValue.toFixed(2)),
+          onlineCollected: parseFloat(onlineValue.toFixed(2)),
+          cashDoctorShare: parseFloat(cashDocShare.toFixed(2)),
+          onlineDoctorShare: parseFloat(onlineDocShare.toFixed(2))
+        },
+        doctorsList,
+        areaPerformance,
+        performanceTrend,
+        peakHours: hoursMap,
+        bookingsList,
+        filters: {
+          departments: uniqueDepts,
+          paymentModes: uniquePaymentModes
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching doctor performance stats:', error);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+}

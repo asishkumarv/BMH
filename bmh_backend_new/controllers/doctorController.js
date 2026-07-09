@@ -61,7 +61,7 @@ exports.loginDoctor = async (req, res) => {
 // Admin/Subadmin Create Doctor directly
 exports.createDoctor = async (req, res) => {
   try {
-    let { full_name, email, password, phone_number, department, experience, gender, description, profile_photo } = req.body;
+    let { full_name, email, password, phone_number, department, experience, gender, description, profile_photo, fee_percent } = req.body;
     if (email) email = email.toLowerCase();
     
     // Auto generate ID: e.g. CARDIOD101
@@ -73,9 +73,9 @@ exports.createDoctor = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     await pool.query(
-      `INSERT INTO doctors (id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Approved')`,
-      [newId, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo]
+      `INSERT INTO doctors (id, full_name, email, password, phone_number, department, experience, gender, description, profile_photo, status, fee_percent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Approved', $11)`,
+      [newId, full_name, email, hashedPassword, phone_number, department, experience, gender, description, profile_photo, parseFloat(fee_percent || 0)]
     );
 
     res.json({ success: true, message: 'Doctor created successfully', id: newId });
@@ -89,13 +89,13 @@ exports.createDoctor = async (req, res) => {
 exports.updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { full_name, email, phone_number, department, experience, gender, description } = req.body;
+    const { full_name, email, phone_number, department, experience, gender, description, fee_percent } = req.body;
     
     await pool.query(
       `UPDATE doctors 
-       SET full_name = $1, email = $2, phone_number = $3, department = $4, experience = $5, gender = $6, description = $7
-       WHERE id = $8`,
-      [full_name, email, phone_number, department, experience, gender, description, id]
+       SET full_name = $1, email = $2, phone_number = $3, department = $4, experience = $5, gender = $6, description = $7, fee_percent = $8
+       WHERE id = $9`,
+      [full_name, email, phone_number, department, experience, gender, description, parseFloat(fee_percent || 0), id]
     );
 
     res.json({ success: true, message: 'Doctor updated successfully' });
@@ -127,7 +127,7 @@ exports.updateDoctorStatus = async (req, res) => {
 exports.getDoctors = async (req, res) => {
   try {
     const { department, status } = req.query;
-    let query = 'SELECT id, full_name, email, phone_number, department, role, experience, gender, status, profile_photo FROM doctors WHERE 1=1';
+    let query = 'SELECT id, full_name, email, phone_number, department, role, experience, gender, status, profile_photo, fee_percent FROM doctors WHERE 1=1';
     let params = [];
     
     if (department) {
