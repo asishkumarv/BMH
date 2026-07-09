@@ -244,7 +244,18 @@ exports.getDeliveryFleet = async (req, res) => {
       boy.assigned_today_count = parseInt(a1.rows[0].count) + parseInt(a2.rows[0].count) + parseInt(a3.rows[0].count) + parseInt(a4.rows[0].count) + parseInt(a5.rows[0].count);
     }
 
-    res.json({ success: true, data: boys });
+    // Fetch delivery department ideal location coordinates
+    const deptRes = await pool.query(`
+      SELECT allowed_latitude, allowed_longitude 
+      FROM departments 
+      WHERE name = 'Delivery' LIMIT 1
+    `);
+    const departmentLocation = deptRes.rows[0] ? {
+      latitude: parseFloat(deptRes.rows[0].allowed_latitude),
+      longitude: parseFloat(deptRes.rows[0].allowed_longitude)
+    } : null;
+
+    res.json({ success: true, data: boys, departmentLocation });
   } catch (err) {
     console.error('Error fetching delivery fleet:', err);
     res.status(500).json({ success: false, message: 'Server error' });

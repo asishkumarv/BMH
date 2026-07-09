@@ -5,13 +5,15 @@ import { MapPin, User, Package, RefreshCw, X, Eye, CheckCircle, Navigation, Cloc
 import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 import 'leaflet/dist/leaflet.css';
 
-let MapContainer: any, TileLayer: any, Marker: any, Popup: any, L: any;
+let MapContainer: any, TileLayer: any, Marker: any, Popup: any, Tooltip: any, CircleMarker: any, L: any;
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   const RL = require('react-leaflet');
   MapContainer = RL.MapContainer;
   TileLayer = RL.TileLayer;
   Marker = RL.Marker;
   Popup = RL.Popup;
+  Tooltip = RL.Tooltip;
+  CircleMarker = RL.CircleMarker;
   var useMap = RL.useMap;
   L = require('leaflet');
 
@@ -39,6 +41,7 @@ function MapBoundsFitter({ fleet }: { fleet: any[] }) {
 
 export default function DeliveryFleetScreen() {
   const [fleet, setFleet] = useState<any[]>([]);
+  const [deptLocation, setDeptLocation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [ordersModalVisible, setOrdersModalVisible] = useState(false);
@@ -58,6 +61,9 @@ export default function DeliveryFleetScreen() {
       const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/delivery-fleet');
       if (res.data && res.data.success) {
         setFleet(res.data.data);
+        if (res.data.departmentLocation) {
+          setDeptLocation(res.data.departmentLocation);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -176,24 +182,45 @@ export default function DeliveryFleetScreen() {
                 </TouchableOpacity>
               </View>
               <View style={{flex: 1, backgroundColor:'#E2E8F0', overflow: 'hidden', borderRadius: 8}}>
-                 <MapContainer center={[16.5062, 80.6480]} zoom={11} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer
-                      attribution='&copy; OpenStreetMap contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <MapBoundsFitter fleet={fleet.filter((b: any) => b.is_active)} />
-                    {fleet.filter((b: any) => b.is_active).map((boy: any) => boy.location_lat ? (
-                      <Marker key={boy.id} position={[parseFloat(boy.location_lat), parseFloat(boy.location_lng)]}>
-                        <Popup>
-                          <Text style={{fontWeight:'bold'}}>{boy.full_name}</Text>
-                          <br />
-                          <Text>{boy.phone}</Text>
-                          <br />
-                          <Text>{boy.pending_orders_count} pending orders</Text>
-                        </Popup>
-                      </Marker>
-                    ) : null)}
-                  </MapContainer>
+                  <MapContainer center={deptLocation ? [deptLocation.latitude, deptLocation.longitude] : [21.9608, 86.7423]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                     <TileLayer
+                       attribution='&copy; OpenStreetMap contributors'
+                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                     />
+                     <MapBoundsFitter fleet={fleet.filter((b: any) => b.is_active)} />
+                     
+                     {/* Department Ideal Location (Blue Dot) */}
+                     {deptLocation && deptLocation.latitude && deptLocation.longitude && (
+                       <CircleMarker 
+                         center={[deptLocation.latitude, deptLocation.longitude]} 
+                         radius={10} 
+                         pathOptions={{ color: '#2563EB', fillColor: '#3B82F6', fillOpacity: 0.85, weight: 3 }}
+                       >
+                         <Tooltip permanent direction="top" offset={[0, -12]}>
+                           <span style={{ fontWeight: 'bold', fontSize: '11px', color: '#1e293b' }}>
+                             Delivery Department Store
+                           </span>
+                         </Tooltip>
+                       </CircleMarker>
+                     )}
+
+                     {fleet.filter((b: any) => b.is_active).map((boy: any) => boy.location_lat ? (
+                       <Marker key={boy.id} position={[parseFloat(boy.location_lat), parseFloat(boy.location_lng)]}>
+                         <Tooltip permanent direction="top" offset={[0, -20]}>
+                           <span style={{ fontWeight: '600', fontSize: '11px', color: '#1e293b' }}>
+                             {boy.full_name}
+                           </span>
+                         </Tooltip>
+                         <Popup>
+                           <Text style={{fontWeight:'bold'}}>{boy.full_name}</Text>
+                           <br />
+                           <Text>{boy.phone}</Text>
+                           <br />
+                           <Text>{boy.pending_orders_count} pending orders</Text>
+                         </Popup>
+                       </Marker>
+                     ) : null)}
+                   </MapContainer>
               </View>
             </View>
           </View>
