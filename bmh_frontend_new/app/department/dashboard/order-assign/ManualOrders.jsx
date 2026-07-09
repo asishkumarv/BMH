@@ -477,9 +477,9 @@ export default function ManualOrders({ deliveryBoys }) {
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
         {/* Status */}
         <View style={[styles.cell, { flex: 0.8, flexDirection: 'row', alignItems: 'center' }]}>
-          {item.mode_of_delivery === 'Bus' ? <Bus size={16} color="#64748b" style={{marginRight: 4}}/> : 
-           item.mode_of_delivery === 'Local' ? <MapPin size={16} color="#64748b" style={{marginRight: 4}}/> :
-           <Package size={16} color="#64748b" style={{marginRight: 4}}/>}
+          {item.mode_of_delivery === 'Bus' ? <Bus size={14} color="#64748b" style={{marginRight: 4}}/> : 
+           item.mode_of_delivery === 'Local' ? <MapPin size={14} color="#64748b" style={{marginRight: 4}}/> :
+           <Package size={14} color="#64748b" style={{marginRight: 4}}/>}
           <View style={[styles.badge, { backgroundColor: statusColor }]}>
             <Text style={styles.badgeText}>{item.status}</Text>
           </View>
@@ -501,12 +501,12 @@ export default function ManualOrders({ deliveryBoys }) {
         <View style={[styles.cell, { flex: 1.5 }]}>
           {(item.delivery_boy_id && item.status === 'Delivered') ? (
             <View style={{flexDirection: 'row', alignItems: 'center'}}>
-               {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={20} color="#94a3b8" style={{marginRight: 4}}/>}
+               {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
                <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name}</Text>
             </View>
           ) : (
             <TouchableOpacity 
-              style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 32, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
+              style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
               onPress={() => {
                 setAssignOrder(item);
                 setAssignSearchQuery('');
@@ -514,10 +514,10 @@ export default function ManualOrders({ deliveryBoys }) {
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 13, color: '#334155' }} numberOfLines={1}>
+                <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
                   {item.delivery_boy_name || 'Assign To'}
                 </Text>
-                <ChevronDown size={14} color="#64748b" style={{ marginLeft: 4 }} />
+                <ChevronDown size={12} color="#64748b" style={{ marginLeft: 4 }} />
               </View>
             </TouchableOpacity>
           )}
@@ -541,28 +541,28 @@ export default function ManualOrders({ deliveryBoys }) {
         {/* Created By */}
         <View style={[styles.cell, { flex: 1.2, justifyContent: 'center' }]}>
            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              {creatorImg ? <Image source={{uri: creatorImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
+              {creatorImg ? <Image source={{uri: creatorImg}} style={styles.avatar} /> : <User size={14} color="#94a3b8" style={{marginRight: 4}}/>}
               <Text style={styles.cellText} numberOfLines={1}>{item.admin_creator_name || item.creator_name}</Text>
            </View>
            {item.modified_by_name && (
-             <Text style={[styles.cellSubText, { color: '#6366f1', marginTop: 2 }]} numberOfLines={1}>
+             <Text style={[styles.cellSubText, { color: '#6366f1', marginTop: 1 }]} numberOfLines={1}>
                Mod: {item.modified_by_name}
              </Text>
            )}
         </View>
         
         {/* Actions */}
-        <View style={[styles.cell, { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center' }]}>
+        <View style={[styles.cell, { flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
           <TouchableOpacity onPress={() => { 
               setSelectedOrder(item); 
               setEditAddress(item.address || '');
               setNewNote('');
               setViewModalVisible(true); 
             }} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
-             <Eye size={16} color="#4338ca" />
+             <Eye size={14} color="#4338ca" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#dcfce7'}]}>
-             <Share2 size={16} color="#15803d" />
+             <Share2 size={14} color="#15803d" />
           </TouchableOpacity>
         </View>
       </View>
@@ -794,7 +794,7 @@ export default function ManualOrders({ deliveryBoys }) {
           </TouchableOpacity>
           
           <Text style={styles.pageInfoText}>
-            Page {pagination.page} of {pagination.totalPages || 1} ({pagination.total} total orders)
+            Page {pagination.page} of {pagination.totalPages || 1} (Showing {orders.length} of {pagination.total} total orders)
           </Text>
           
           <TouchableOpacity 
@@ -1482,30 +1482,30 @@ export default function ManualOrders({ deliveryBoys }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10, zIndex: 100, elevation: 10, position: 'relative' },
-  filters: { flexDirection: 'row', gap: 12, flex: 1, flexWrap: 'wrap', zIndex: 100, elevation: 10, position: 'relative' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 12, height: 40, width: 250 },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, height: '100%', outlineStyle: 'none' },
-  dropdownWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff', height: 40, justifyContent: 'center', minWidth: 160 },
-  picker: { height: 40, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 8, ...Platform.select({ web: { outlineStyle: 'none' } }) },
-  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  addBtnText: { color: '#fff', fontWeight: 'bold' },
-  tableContainer: { flex: 1, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
-  tableHeader: { flexDirection: 'row', padding: 16, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  headerText: { fontSize: 13, fontWeight: '700', color: '#475569' },
-  tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10, zIndex: 100, elevation: 10, position: 'relative' },
+  filters: { flexDirection: 'row', gap: 10, flex: 1, flexWrap: 'wrap', zIndex: 100, elevation: 10, position: 'relative' },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, height: 32, width: 210 },
+  searchIcon: { marginRight: 6 },
+  searchInput: { flex: 1, height: '100%', outlineStyle: 'none', fontSize: 13 },
+  dropdownWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140 },
+  picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  tableContainer: { height: 540, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
+  tableHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  headerText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  tableRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },
   cell: { paddingRight: 8 },
-  cellText: { fontSize: 14, color: '#334155' },
-  cellTextBold: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
-  cellSubText: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontSize: 11, fontWeight: '600', color: '#fff', textTransform: 'capitalize' },
-  avatar: { width: 24, height: 24, borderRadius: 12, marginRight: 6 },
-  pickerWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, backgroundColor: '#fff', height: 32, justifyContent: 'center' },
-  inlinePicker: { height: 32, fontSize: 13, borderWidth: 0, backgroundColor: 'transparent', ...Platform.select({ web: { outlineStyle: 'none' } }) },
-  actionBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  cellText: { fontSize: 13, color: '#334155' },
+  cellTextBold: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
+  cellSubText: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  badgeText: { fontSize: 10, fontWeight: '600', color: '#fff', textTransform: 'capitalize' },
+  avatar: { width: 20, height: 20, borderRadius: 10, marginRight: 6 },
+  pickerWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, backgroundColor: '#fff', height: 28, justifyContent: 'center' },
+  inlinePicker: { height: 28, fontSize: 12, borderWidth: 0, backgroundColor: 'transparent', ...Platform.select({ web: { outlineStyle: 'none' } }) },
+  actionBtn: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', borderRadius: 12, maxHeight: '95%', padding: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
