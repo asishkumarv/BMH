@@ -99,6 +99,63 @@ app.listen(PORT, () => {
   pool.query('ALTER TABLE wallet_transactions ADD COLUMN IF NOT EXISTS payment_txn_id VARCHAR(255)')
     .then(() => console.log('Successfully checked/patched payment_txn_id column in wallet_transactions table.'))
     .catch(err => console.error('Error patching wallet_transactions table (payment_txn_id):', err.message));
+
+  // Add order/customer metadata columns to wallet_transactions
+  const walletTxCols = [
+    'order_no VARCHAR(100)',
+    'invoice_no VARCHAR(100)',
+    'customer_name VARCHAR(255)',
+    'customer_phone VARCHAR(50)',
+    'delivery_method VARCHAR(100)',
+    'cash_amount NUMERIC(10, 2) DEFAULT 0',
+    'online_amount NUMERIC(10, 2) DEFAULT 0'
+  ];
+  walletTxCols.forEach(col => {
+    pool.query(`ALTER TABLE wallet_transactions ADD COLUMN IF NOT EXISTS ${col}`)
+      .catch(err => console.error(`Error adding column ${col} to wallet_transactions:`, err.message));
+  });
+
+  // Add order/customer metadata columns to cash_handovers
+  const handoverCols = [
+    'order_no VARCHAR(100)',
+    'invoice_no VARCHAR(100)',
+    'customer_name VARCHAR(255)',
+    'customer_phone VARCHAR(50)',
+    'delivery_method VARCHAR(100)',
+    'cash_amount NUMERIC(10, 2) DEFAULT 0',
+    'online_amount NUMERIC(10, 2) DEFAULT 0'
+  ];
+  handoverCols.forEach(col => {
+    pool.query(`ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS ${col}`)
+      .catch(err => console.error(`Error adding column ${col} to cash_handovers:`, err.message));
+  });
+
+  // Backfill existing records from manual_orders
+  setTimeout(async () => {
+    try {
+      console.log('Running backfill migration for wallet_transactions and cash_handovers...');
+      await pool.query(`
+        UPDATE wallet_transactions wt
+        SET 
+          order_no = COALESCE(mo.order_no, mo.id::text),
+          invoice_no = COALESCE(mo.invoice_no, ''),
+          customer_name = COALESCE(mo.customer_name, ''),
+          customer_phone = COALESCE(mo.customer_phone, ''),
+          delivery_method = COALESCE(mo.mode_of_delivery, ''),
+          cash_amount = CASE WHEN wt.payment_mode = 'Cash' THEN wt.amount ELSE 0 END,
+          online_amount = CASE WHEN wt.payment_mode = 'Online' THEN wt.amount ELSE 0 END
+        FROM manual_orders mo
+        WHERE (wt.order_no IS NULL OR wt.order_no = '')
+          AND (
+            wt.note LIKE '%' || mo.id::text || '%' 
+            OR wt.note LIKE '%' || mo.order_no || '%'
+          )
+      `);
+      console.log('Backfill migration completed successfully.');
+    } catch (e) {
+      console.error('Error backfilling transactions:', e.message);
+    }
+  }, 5000);
   
   // Initialize Pharmacy Background Sync
   try {

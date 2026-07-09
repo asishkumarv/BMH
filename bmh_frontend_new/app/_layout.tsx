@@ -8,17 +8,8 @@ import axios from 'axios';
 import * as Notifications from 'expo-notifications';
 
 if (Platform.OS === 'android') {
-  Notifications.setNotificationChannelAsync('alarm-channel-v3', {
-    name: 'Alarm Notifications',
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#FF231F7C',
-    sound: 'alarm',
-  });
-  
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
       shouldShowBanner: true,
@@ -62,6 +53,15 @@ export default function RootLayout() {
     if (Platform.OS !== 'web') {
       const initStorage = async () => {
         try {
+          // Register custom notification channel with high priority and alarm sound
+          await Notifications.setNotificationChannelAsync('alarm-channel-v3', {
+            name: 'Alarm Notifications',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+            sound: 'alarm',
+          });
+
           const keys = await AsyncStorage.getAllKeys();
           const pairs = await AsyncStorage.multiGet(keys);
           pairs.forEach(([key, value]) => {

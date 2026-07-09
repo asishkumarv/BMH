@@ -7,7 +7,6 @@ import Toast from 'react-native-toast-message';
 // Configure how notifications behave when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
@@ -244,7 +243,6 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
-          type: 'calendar',
           hour: reminderInHours,
           minute: reminderInMins,
           repeats: true,
@@ -272,7 +270,6 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
-          type: 'calendar',
           hour: reminderOutHours,
           minute: reminderOutMins,
           repeats: true,
@@ -300,7 +297,6 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
-          type: 'calendar',
           hour: reminderBreakInHours,
           minute: reminderBreakInMins,
           repeats: true,
@@ -328,7 +324,6 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
-          type: 'calendar',
           hour: reminderBreakOutHours,
           minute: reminderBreakOutMins,
           repeats: true,

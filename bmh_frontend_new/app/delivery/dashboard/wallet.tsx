@@ -10,8 +10,45 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; payment_mode?: string; payment_txn_id?: string; };
-type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; note?: string; };
+type Transaction = { 
+  id: string; 
+  type: string; 
+  amount: string; 
+  note: string; 
+  status: string; 
+  created_at: string; 
+  payment_mode?: string; 
+  payment_txn_id?: string;
+  order_no?: string;
+  invoice_no?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  delivery_method?: string;
+  cash_amount?: string;
+  online_amount?: string;
+};
+type Handover = { 
+  id: string; 
+  from_name: string; 
+  to_name: string; 
+  from_employee_id: string; 
+  to_employee_id: string; 
+  amount: string; 
+  status: string; 
+  created_at: string; 
+  from_role?: string; 
+  from_department?: string; 
+  to_role?: string; 
+  to_department?: string; 
+  note?: string;
+  order_no?: string;
+  invoice_no?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  delivery_method?: string;
+  cash_amount?: string;
+  online_amount?: string;
+};
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
 type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
 
@@ -56,6 +93,15 @@ export default function EmployeeWalletScreen() {
   const [selectedPeerId, setSelectedPeerId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Order Details Form states for handover metadata
+  const [orderNo, setOrderNo] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('');
+  const [cashAmount, setCashAmount] = useState('');
+  const [onlineAmount, setOnlineAmount] = useState('');
 
   useEffect(() => {
     const loadUser = async () => {
@@ -320,12 +366,20 @@ export default function EmployeeWalletScreen() {
         from_employee_id: employeeId,
         to_employee_id: selectedPeerId,
         amount: Number(amount),
-        note: note
+        note: note,
+        order_no: orderNo,
+        invoice_no: invoiceNo,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        delivery_method: deliveryMethod,
+        cash_amount: Number(cashAmount || 0),
+        online_amount: Number(onlineAmount || 0)
       });
       if (res.data.success) {
         Alert.alert('Success', 'Handover requested successfully');
         setHandoverModalVisible(false);
         setAmount(''); setSelectedPeerId(''); setNote('');
+        setOrderNo(''); setInvoiceNo(''); setCustomerName(''); setCustomerPhone(''); setDeliveryMethod(''); setCashAmount(''); setOnlineAmount('');
         fetchData(employeeId);
       }
     } catch (error: any) {
@@ -632,43 +686,113 @@ export default function EmployeeWalletScreen() {
                   {isBookingsExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
                 </Pressable>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(collectedTransactions, 'Order_Collections', ['Tx ID', 'Date', 'Amount', 'Payment Mode', 'Details'], (tx) => [
-                    tx.id,
-                    formatDateDMY(tx.created_at, true),
-                    `₹${tx.amount}`,
-                    tx.payment_mode || 'Cash',
-                    tx.note || ''
-                  ])}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(
+                    collectedTransactions, 
+                    'Order_Collections', 
+                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Total'], 
+                    (tx) => [
+                      formatDateDMY(tx.created_at, true),
+                      tx.invoice_no || '--',
+                      tx.order_no || '--',
+                      tx.customer_name || '--',
+                      tx.customer_phone || '--',
+                      tx.delivery_method || '--',
+                      tx.payment_mode === 'Cash' ? `₹${tx.amount}` : '₹0.00',
+                      tx.payment_mode === 'Online' ? `₹${tx.amount}` : '₹0.00',
+                      `₹${tx.amount}`
+                    ]
+                  )}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('My Order Collections', ['Tx ID', 'Date', 'Amount', 'Payment Mode', 'Details'], collectedTransactions, (tx) => [
-                    tx.id,
-                    formatDateDMY(tx.created_at, true),
-                    `₹${tx.amount}`,
-                    tx.payment_mode || 'Cash',
-                    tx.note || ''
-                  ])}>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint(
+                    'My Order Collections', 
+                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Total'], 
+                    collectedTransactions, 
+                    (tx) => [
+                      formatDateDMY(tx.created_at, true),
+                      tx.invoice_no || '--',
+                      tx.order_no || '--',
+                      tx.customer_name || '--',
+                      tx.customer_phone || '--',
+                      tx.delivery_method || '--',
+                      tx.payment_mode === 'Cash' ? `₹${tx.amount}` : '₹0.00',
+                      tx.payment_mode === 'Online' ? `₹${tx.amount}` : '₹0.00',
+                      `₹${tx.amount}`
+                    ]
+                  )}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
                 </View>
               </View>
               {isBookingsExpanded && collectedTransactions.map(tx => (
-                <View key={tx.id} style={styles.txCard}>
-                  <View style={[styles.txIconWrapper, { backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
-                    {(tx.payment_mode || 'Cash') === 'Cash' ? <Banknote size={20} color="#16a34a" /> : <RefreshCcw size={20} color={Colors.light.primary} />}
+                <View key={tx.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={[styles.txIconWrapper, { backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
+                        {(tx.payment_mode || 'Cash') === 'Cash' ? <Banknote size={20} color="#16a34a" /> : <RefreshCcw size={20} color={Colors.light.primary} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.txType, { fontWeight: '700' }]} numberOfLines={1}>{tx.note || 'Order Collection'}</Text>
+                        <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.txAmountSection}>
+                      <Text style={[styles.txAmount, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#16a34a' : Colors.light.primary }]}>
+                        +₹{tx.amount || 0}
+                      </Text>
+                      <Text style={[styles.txStatus, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#166534' : '#075985', backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
+                        {tx.payment_mode || 'Cash'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.txDetails}>
-                    <Text style={styles.txType}>{tx.note || 'Order Collection'}</Text>
-                    <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
+
+                  <View style={{ marginTop: 12, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Order No:</Text> {tx.order_no || '--'}</Text>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Invoice No:</Text> {tx.invoice_no || '--'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Customer:</Text> {tx.customer_name || '--'}</Text>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Phone:</Text> {tx.customer_phone || '--'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Method:</Text> {tx.delivery_method || '--'}</Text>
+                      <Text style={{ fontSize: 13, color: '#475569' }}>
+                        <Text style={{ fontWeight: '600' }}>Cash:</Text> {tx.payment_mode === 'Cash' ? `₹${tx.amount}` : '₹0.00'} | <Text style={{ fontWeight: '600' }}>Online:</Text> {tx.payment_mode === 'Online' ? `₹${tx.amount}` : '₹0.00'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.txAmountSection}>
-                    <Text style={[styles.txAmount, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#16a34a' : Colors.light.primary }]}>
-                      +₹{tx.amount || 0}
-                    </Text>
-                    <Text style={[styles.txStatus, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#166534' : '#075985', backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
-                      {tx.payment_mode || 'Cash'}
-                    </Text>
-                  </View>
+
+                  {tx.payment_mode === 'Cash' && (
+                    <Pressable 
+                      style={{ 
+                        marginTop: 12, 
+                        backgroundColor: '#16a34a', 
+                        paddingVertical: 8, 
+                        paddingHorizontal: 12, 
+                        borderRadius: 6, 
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                      onPress={() => {
+                        setAmount(tx.amount || '0');
+                        setOrderNo(tx.order_no || '');
+                        setInvoiceNo(tx.invoice_no || '');
+                        setCustomerName(tx.customer_name || '');
+                        setCustomerPhone(tx.customer_phone || '');
+                        setDeliveryMethod(tx.delivery_method || '');
+                        setCashAmount(tx.amount || '0');
+                        setOnlineAmount('0');
+                        setNote(`Handover for Order ${tx.order_no || tx.id}`);
+                        setHandoverModalVisible(true);
+                      }}
+                    >
+                      <HandCoins size={16} color="#FFF" />
+                      <Text style={{ fontSize: 13, color: '#FFF', fontWeight: '600' }}>Handover This Order's Cash</Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
               {!isBookingsExpanded && collectedTransactions.length > 0 && (
@@ -683,61 +807,102 @@ export default function EmployeeWalletScreen() {
                   {isHandoversExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
                 </Pressable>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredHandovers, 'Handover_History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Status', 'Note'], (h) => {
-                    const isOut = h.from_employee_id == employeeId;
-                    return [
-                      formatDateDMY(h.created_at, true),
-                      isOut ? 'Handed Over' : 'Received',
-                      isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
-                      isOut ? h.to_role || '' : h.from_role || '',
-                      isOut ? h.to_department || '' : h.from_department || '',
-                      `₹${h.amount}`,
-                      h.status,
-                      h.note || ''
-                    ];
-                  })}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(
+                    filteredHandovers, 
+                    'Handover_History', 
+                    ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Status', 'Note'], 
+                    (h) => {
+                      const isOut = h.from_employee_id == employeeId;
+                      return [
+                        formatDateDMY(h.created_at, true),
+                        isOut ? 'Handed Over' : 'Received',
+                        isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
+                        isOut ? h.to_role || '' : h.from_role || '',
+                        isOut ? h.to_department || '' : h.from_department || '',
+                        h.invoice_no || '--',
+                        h.order_no || '--',
+                        h.customer_name || '--',
+                        h.customer_phone || '--',
+                        h.delivery_method || '--',
+                        `₹${h.amount}`,
+                        `₹${h.online_amount || '0.00'}`,
+                        h.status,
+                        h.note || ''
+                      ];
+                    }
+                  )}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Handover History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Status', 'Note'], filteredHandovers, (h) => {
-                    const isOut = h.from_employee_id == employeeId;
-                    return [
-                      formatDateDMY(h.created_at, true),
-                      isOut ? 'Handed Over' : 'Received',
-                      isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
-                      isOut ? h.to_role || '' : h.from_role || '',
-                      isOut ? h.to_department || '' : h.from_department || '',
-                      `₹${h.amount}`,
-                      h.status,
-                      h.note || ''
-                    ];
-                  })}>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint(
+                    'Handover History', 
+                    ['Date', 'Type', 'Target Person', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Status', 'Note'], 
+                    filteredHandovers, 
+                    (h) => {
+                      const isOut = h.from_employee_id == employeeId;
+                      return [
+                        formatDateDMY(h.created_at, true),
+                        isOut ? 'Handed Over' : 'Received',
+                        isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
+                        h.invoice_no || '--',
+                        h.order_no || '--',
+                        h.customer_name || '--',
+                        h.customer_phone || '--',
+                        h.delivery_method || '--',
+                        `₹${h.amount}`,
+                        `₹${h.online_amount || '0.00'}`,
+                        h.status,
+                        h.note || ''
+                      ];
+                    }
+                  )}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
                 </View>
               </View>
               {isHandoversExpanded && filteredHandovers.map(h => (
-                <View key={h.id} style={styles.txCard}>
-                  <View style={styles.txDetails}>
-                    <Text style={styles.txType}>
-                      {h.from_employee_id == employeeId ? `Handed to ${h.to_name} (${h.to_employee_id})` : `Received from ${h.from_name} (${h.from_employee_id})`}
-                    </Text>
-                    <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>
-                      {h.from_employee_id == employeeId ? `${h.to_role} • ${h.to_department}` : `${h.from_role} • ${h.from_department}`}
-                    </Text>
-                    <Text style={styles.txDate}>{formatDateDMY(h.created_at, true)}</Text>
-                    {h.note ? <Text style={styles.txNote}>{h.note}</Text> : null}
+                <View key={h.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.txType, { fontWeight: '700' }]}>
+                        {h.from_employee_id == employeeId ? `Handed to ${h.to_name} (${h.to_employee_id})` : `Received from ${h.from_name} (${h.from_employee_id})`}
+                      </Text>
+                      <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>
+                        {h.from_employee_id == employeeId ? `${h.to_role} • ${h.to_department}` : `${h.from_role} • ${h.from_department}`}
+                      </Text>
+                      <Text style={styles.txDate}>{formatDateDMY(h.created_at, true)}</Text>
+                      {h.note ? <Text style={[styles.txNote, { marginTop: 4, fontStyle: 'italic' }]}>Note: {h.note}</Text> : null}
+                    </View>
+                    <View style={styles.txAmountSection}>
+                      <Text style={[styles.txAmount, { color: h.from_employee_id == employeeId ? '#ef4444' : '#16a34a' }]}>
+                        {h.from_employee_id == employeeId ? '-' : '+'}₹{h.amount}
+                      </Text>
+                      <Text style={[styles.txStatus, { 
+                        color: h.status === 'Accepted' ? '#22c55e' : h.status === 'Pending' ? '#eab308' : '#ef4444',
+                        backgroundColor: h.status === 'Accepted' ? '#dcfce7' : h.status === 'Pending' ? '#fef08a' : '#fee2e2'
+                      }]}>
+                        {h.status}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.txAmountSection}>
-                    <Text style={[styles.txAmount, { color: h.from_employee_id == employeeId ? '#ef4444' : '#16a34a' }]}>
-                      {h.from_employee_id == employeeId ? '-' : '+'}₹{h.amount}
-                    </Text>
-                    <Text style={[styles.txStatus, { 
-                      color: h.status === 'Accepted' ? '#22c55e' : h.status === 'Pending' ? '#eab308' : '#ef4444',
-                      backgroundColor: h.status === 'Accepted' ? '#dcfce7' : h.status === 'Pending' ? '#fef08a' : '#fee2e2'
-                    }]}>
-                      {h.status}
-                    </Text>
-                  </View>
+
+                  {(h.order_no || h.invoice_no) && (
+                    <View style={{ marginTop: 12, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Order No:</Text> {h.order_no || '--'}</Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Invoice No:</Text> {h.invoice_no || '--'}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Customer:</Text> {h.customer_name || '--'}</Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Phone:</Text> {h.customer_phone || '--'}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Method:</Text> {h.delivery_method || '--'}</Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}>
+                          <Text style={{ fontWeight: '600' }}>Cash Amount:</Text> ₹{h.amount} {h.online_amount && Number(h.online_amount) > 0 ? `| Online Amount: ₹${h.online_amount}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
               ))}
               {!isHandoversExpanded && filteredHandovers.length > 0 && (
@@ -791,7 +956,10 @@ export default function EmployeeWalletScreen() {
               placeholder="e.g. 500"
               keyboardType="numeric"
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(val) => {
+                setAmount(val);
+                setCashAmount(val);
+              }}
             />
 
             <Text style={styles.inputLabel}>Note (Optional)</Text>
@@ -802,8 +970,55 @@ export default function EmployeeWalletScreen() {
               onChangeText={setNote}
             />
 
+            <Text style={[styles.inputLabel, { marginTop: 16, color: '#1e3a8a', fontWeight: 'bold' }]}>Order Metadata (Optional)</Text>
+            
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Order Number</Text>
+                <TextInput style={styles.input} placeholder="e.g. ORD-101" value={orderNo} onChangeText={setOrderNo} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Invoice Number</Text>
+                <TextInput style={styles.input} placeholder="e.g. INV-101" value={invoiceNo} onChangeText={setInvoiceNo} />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Customer Name</Text>
+                <TextInput style={styles.input} placeholder="e.g. John" value={customerName} onChangeText={setCustomerName} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Customer Phone</Text>
+                <TextInput style={styles.input} placeholder="e.g. 987654321" value={customerPhone} onChangeText={setCustomerPhone} />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Delivery Method</Text>
+                <TextInput style={styles.input} placeholder="Bus / Local / Scheduled" value={deliveryMethod} onChangeText={setDeliveryMethod} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Online Amt (Optional)</Text>
+                <TextInput style={styles.input} placeholder="e.g. 0.00" keyboardType="numeric" value={onlineAmount} onChangeText={setOnlineAmount} />
+              </View>
+            </View>
+
             <View style={styles.modalButtons}>
-              <Pressable style={styles.modalCancelBtn} onPress={() => {setHandoverModalVisible(false); setSelectedPeerId(''); setNote(''); setAmount('');}}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => {
+                setHandoverModalVisible(false); 
+                setSelectedPeerId(''); 
+                setNote(''); 
+                setAmount('');
+                setOrderNo('');
+                setInvoiceNo('');
+                setCustomerName('');
+                setCustomerPhone('');
+                setDeliveryMethod('');
+                setCashAmount('');
+                setOnlineAmount('');
+              }}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
               <Pressable style={[styles.modalSubmitBtn, submitting && styles.btnDisabled]} onPress={handleRequestHandover} disabled={submitting}>

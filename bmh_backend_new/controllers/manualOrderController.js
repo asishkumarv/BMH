@@ -373,14 +373,54 @@ exports.updateOrder = async (req, res) => {
         await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [amt, updatedOrder.delivery_boy_id]);
         
         // Optionally add a transaction
-        await pool.query('INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode) VALUES ($1, $2, $3, $4, $5, $6)', 
-          [updatedOrder.delivery_boy_id, 'cash_collection', amt, `Order ${updatedOrder.order_no} Delivered (POD Cash)`, 'completed', 'Cash']);
+        await pool.query(
+          `INSERT INTO wallet_transactions (
+            employee_id, type, amount, note, status, payment_mode, 
+            order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+            cash_amount, online_amount
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, 
+          [
+            updatedOrder.delivery_boy_id, 
+            'cash_collection', 
+            amt, 
+            `Order ${updatedOrder.order_no || updatedOrder.id} Delivered (POD Cash)`, 
+            'completed', 
+            'Cash',
+            updatedOrder.order_no || updatedOrder.id,
+            updatedOrder.invoice_no || '',
+            updatedOrder.customer_name || '',
+            updatedOrder.customer_phone || '',
+            updatedOrder.mode_of_delivery || '',
+            amt,
+            0
+          ]
+        );
       } else if (updatedOrder.pod_payment_mode === 'Online') {
         const amt = updatedOrder.amount || 0;
         await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [amt, updatedOrder.delivery_boy_id]);
         
-        await pool.query('INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode) VALUES ($1, $2, $3, $4, $5, $6)', 
-          [updatedOrder.delivery_boy_id, 'online_collection', amt, `Order ${updatedOrder.order_no} Delivered (POD Online)`, 'completed', 'Online']);
+        await pool.query(
+          `INSERT INTO wallet_transactions (
+            employee_id, type, amount, note, status, payment_mode, 
+            order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+            cash_amount, online_amount
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, 
+          [
+            updatedOrder.delivery_boy_id, 
+            'online_collection', 
+            amt, 
+            `Order ${updatedOrder.order_no || updatedOrder.id} Delivered (POD Online)`, 
+            'completed', 
+            'Online',
+            updatedOrder.order_no || updatedOrder.id,
+            updatedOrder.invoice_no || '',
+            updatedOrder.customer_name || '',
+            updatedOrder.customer_phone || '',
+            updatedOrder.mode_of_delivery || '',
+            0,
+            amt
+          ]
+        );
       }
     }
     // Save new bus route on manual order update if mode_of_delivery is Bus
