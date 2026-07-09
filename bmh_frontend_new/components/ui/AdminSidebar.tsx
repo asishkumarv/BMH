@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { name: 'Doctors', icon: Users, route: '/admin/dashboard/doctors' },
   { name: 'Patient History', icon: Users, route: '/admin/dashboard/patient-history' },
   { name: 'Delivery Fleet', icon: Package, route: '/admin/dashboard/delivery-fleet' },
-  { name: 'Performance', icon: LayoutDashboard, route: '/admin/dashboard/performance' },
+  // { name: 'Performance', icon: LayoutDashboard, route: '/admin/dashboard/performance' },
   { name: 'Notifications', icon: Bell, route: '/admin/dashboard/notifications' },
   { name: 'Settings', icon: Settings, route: '/admin/dashboard/settings' },
   { name: 'Profile Requests', icon: Users, route: '/admin/dashboard/profile-requests' },

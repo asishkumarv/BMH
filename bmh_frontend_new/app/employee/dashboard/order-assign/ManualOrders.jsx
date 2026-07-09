@@ -405,10 +405,38 @@ export default function ManualOrders({ deliveryBoys }) {
 
   const handleShareOrder = async (item) => {
     try {
-      let msg = `Delivery Details:\nOrder No: ${item.order_no}\nCustomer: ${item.customer_name} (${item.customer_phone})\nAddress: ${item.address || 'N/A'}\nAmount: Rs ${item.amount}\nDelivery Boy: ${item.delivery_boy_name || 'Not assigned'} ( https://wa.me/91${item.delivery_boy_phone || ''} )\nOTP: ${item.delivery_otp || 'N/A'}`;
-        if (item.mode_of_delivery === 'Bus' || item.delivery_type === 'Bus') {
-            msg += `\n\nBus Details:\nBus No: ${item.bus_number || 'N/A'}\nTravels: ${item.bus_travels_name || 'N/A'}\nDriver: ${item.bus_driver_name || 'N/A'} (${item.bus_driver_number || 'N/A'})\nDate: ${item.bus_date ? item.bus_date.substring(0, 10) : 'N/A'}\nTime: ${item.est_reach_time || 'N/A'}`;
-        }
+      let header = '';
+      if (item.mode_of_delivery === 'Bus' || item.delivery_type === 'Bus') {
+        header = `${item.bus_travels_name || 'Bus Travels'} Bus Driver\nPhone: +91${item.bus_driver_number || item.bus_driver_phone || ''}`;
+      } else if (item.mode_of_delivery === 'Schedule Delivery' || item.is_scheduled) {
+        header = `Scheduled Delivery\nCustomer: ${item.customer_name || 'N/A'}\nPhone: ${item.customer_phone ? '+91' + item.customer_phone : 'N/A'}`;
+      } else {
+        header = `${item.customer_name || 'Customer'}\nPhone: ${item.customer_phone ? '+91' + item.customer_phone : 'N/A'}`;
+      }
+
+      let msg = `${header}\n\n` +
+                `Order Information:\n` +
+                `Order No: ${item.order_no || 'N/A'}\n` +
+                `Invoice No: ${item.invoice_no || 'N/A'}\n\n` +
+                `Amount: ${item.amount || '0.00'}\n` +
+                `OTP: ${item.delivery_otp || 'N/A'}\n\n` +
+                `Delivery Boy Information:\n` +
+                `Name: ${item.delivery_boy_name || 'Not assigned'}\n` +
+                `Phone: ${item.delivery_boy_phone ? '+91' + item.delivery_boy_phone : 'N/A'}`;
+
+      if (item.mode_of_delivery === 'Bus' || item.delivery_type === 'Bus') {
+        msg += `\n\nBus Information:\n` +
+               `Bus Name: ${item.bus_travels_name || '--'}\n` +
+               `Bus No: ${item.bus_number || '--'}\n` +
+               `Bus Contact Number: ${item.bus_driver_number || '--'}\n` +
+               `Time of Dispatch: ${item.bus_dispatch_time || '--'}\n` +
+               `Time of Arrival: ${item.est_reach_time || '--'}\n` +
+               `Handover To: ${item.bus_handover_to || '--'}`;
+      } else if (item.mode_of_delivery === 'Schedule Delivery' || item.is_scheduled) {
+        msg += `\n\nSchedule Information:\n` +
+               `Schedule Date: ${item.scheduled_date ? item.scheduled_date.substring(0, 10) : '--'}\n` +
+               `Schedule Time: ${item.scheduled_time || '--'}`;
+      }
       
       if (Platform.OS === 'web') {
         if (navigator.clipboard && navigator.clipboard.writeText) {
