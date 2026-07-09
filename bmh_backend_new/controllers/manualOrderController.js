@@ -135,7 +135,7 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-// Get All Manual Orders
+// Get All Manual Orders with Pagination & Global Search
 exports.getOrders = async (req, res) => {
   try {
     // Run schema migrations for timestamp tracking
@@ -146,8 +146,7 @@ exports.getOrders = async (req, res) => {
     await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS modified_by_type VARCHAR(50)`);
     await pool.query(`ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS modified_by_name VARCHAR(255)`);
 
-    // Optionally filter by customer_phone, delivery_boy_id, status
-    const { customer_phone, delivery_boy_id, status } = req.query;
+    const { customer_phone, delivery_boy_id, status, search, fromDate, toDate, page = 1, limit = 50 } = req.query;
     let query = `
       SELECT mo.*,
         emp.full_name as delivery_boy_name, emp.profile_data as delivery_boy_profile, emp.mobile as delivery_boy_phone,
@@ -173,11 +172,54 @@ exports.getOrders = async (req, res) => {
       params.push(status);
       query += ` AND mo.status = $${params.length}`;
     }
+    if (fromDate) {
+      params.push(fromDate);
+      query += ` AND mo.created_at::date >= $${params.length}`;
+    }
+    if (toDate) {
+      params.push(toDate);
+      query += ` AND mo.created_at::date <= $${params.length}`;
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      query += ` AND (
+        mo.customer_name ILIKE $${params.length} OR 
+        mo.customer_phone ILIKE $${params.length} OR 
+        mo.order_no ILIKE $${params.length} OR 
+        mo.invoice_no ILIKE $${params.length}
+      )`;
+    }
 
+    // Get total count for pagination metadata
+    const countParams = [...params];
+    const countQuery = `SELECT COUNT(*) FROM (${query}) AS temp`;
+    const countResult = await pool.query(countQuery, countParams);
+    const totalCount = parseInt(countResult.rows[0].count);
+
+    // Apply sorting & pagination
     query += ' ORDER BY mo.created_at DESC';
+    
+    const parsedPage = parseInt(page);
+    const parsedLimit = parseInt(limit);
+    const offset = (parsedPage - 1) * parsedLimit;
+    
+    params.push(parsedLimit);
+    query += ` LIMIT $${params.length}`;
+    
+    params.push(offset);
+    query += ` OFFSET $${params.length}`;
 
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total: totalCount,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(totalCount / parsedLimit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching manual orders:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch orders' });

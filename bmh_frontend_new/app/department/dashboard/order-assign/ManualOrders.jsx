@@ -96,18 +96,30 @@ export default function ManualOrders({ deliveryBoys }) {
     bus_number: '', bus_date: ''
   };
   const [formData, setFormData] = useState(initialFormData);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
 
-  const fetchManualOrders = async (silent = false) => {
+  const fetchManualOrders = async (silent = false, targetPage = page) => {
     try {
       if (!silent) setLoading(true);
       let url = 'https://napi.bharatmedicalhallplus.com/manual-orders';
-      const params = [];
+      const params = [`page=${targetPage}`, 'limit=50'];
       if (assignmentFilter !== 'All') params.push(`status=${assignmentFilter}`);
-      if (params.length > 0) url += `?${params.join('&')}`;
+      if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
+      if (startDate) params.push(`fromDate=${startDate}`);
+      if (endDate) params.push(`toDate=${endDate}`);
+      if (selectedBoyId !== 'All') {
+        params.push(`delivery_boy_id=${selectedBoyId}`);
+      }
+      
+      url += `?${params.join('&')}`;
       
       const res = await axios.get(url);
       if (res.data && res.data.success) {
         setOrders(res.data.data);
+        if (res.data.pagination) {
+          setPagination(res.data.pagination);
+        }
       }
     } catch (err) {
       console.error('Error fetching data:', err.message || err);
@@ -116,14 +128,34 @@ export default function ManualOrders({ deliveryBoys }) {
     }
   };
 
+  // Debounce search query changes
   useEffect(() => {
-    fetchManualOrders();
+    const delayDebounceFn = setTimeout(() => {
+      setPage(1);
+      fetchManualOrders(false, 1);
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // Fetch when filters change
+  useEffect(() => {
+    setPage(1);
+    fetchManualOrders(false, 1);
+  }, [startDate, endDate, selectedBoyId, assignmentFilter]);
+
+  // Fetch when page changes
+  useEffect(() => {
+    fetchManualOrders(false, page);
+  }, [page]);
+
+  // Initialize and run background updates
+  useEffect(() => {
     fetchBuses();
     const interval = setInterval(() => {
-      fetchManualOrders(true);
+      fetchManualOrders(true, page);
     }, 10000);
     return () => clearInterval(interval);
-  }, [assignmentFilter]);
+  }, [page, searchQuery, startDate, endDate, selectedBoyId, assignmentFilter]);
 
   const fetchBuses = async () => {
     try {
@@ -747,30 +779,32 @@ export default function ManualOrders({ deliveryBoys }) {
           <ActivityIndicator size="large" color="#4338ca" style={{marginTop: 50}} />
         ) : (
           <FlatList
-            data={orders.filter(o => {
-              const matchesSearch = o.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                    o.customer_phone?.includes(searchQuery) ||
-                                    o.order_no?.includes(searchQuery);
-                                    
-              const orderDateStr = o.order_date ? o.order_date.substring(0, 10) : '';
-              const matchesStartDate = !startDate || orderDateStr >= startDate;
-              const matchesEndDate = !endDate || orderDateStr <= endDate;
-              
-              let matchesBoy = true;
-              if (selectedBoyId !== 'All') {
-                if (selectedBoyId === 'unassigned') {
-                  matchesBoy = !o.delivery_boy_id || o.delivery_boy_id === 'null';
-                } else {
-                  matchesBoy = o.delivery_boy_id?.toString() === selectedBoyId.toString();
-                }
-              }
-              
-              return matchesSearch && matchesStartDate && matchesEndDate && matchesBoy;
-            })}
+            data={orders}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderOrderItem}
           />
         )}
+        <View style={styles.paginationContainer}>
+          <TouchableOpacity 
+            disabled={page <= 1} 
+            onPress={() => setPage(p => Math.max(1, p - 1))}
+            style={[styles.pageButton, page <= 1 && styles.pageButtonDisabled]}
+          >
+            <Text style={[styles.pageButtonText, page <= 1 && styles.pageButtonTextDisabled]}>Previous</Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.pageInfoText}>
+            Page {pagination.page} of {pagination.totalPages || 1} ({pagination.total} total orders)
+          </Text>
+          
+          <TouchableOpacity 
+            disabled={page >= (pagination.totalPages || 1)} 
+            onPress={() => setPage(p => Math.min(pagination.totalPages || 1, p + 1))}
+            style={[styles.pageButton, page >= (pagination.totalPages || 1) && styles.pageButtonDisabled]}
+          >
+            <Text style={[styles.pageButtonText, page >= (pagination.totalPages || 1) && styles.pageButtonTextDisabled]}>Next</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Create Order Modal */}
@@ -1483,5 +1517,40 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, backgroundColor: '#f8fafc' },
   modalFooter: { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 16, marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end' },
   saveBtn: { backgroundColor: '#1e293b', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  saveBtnText: { color: '#fff', fontWeight: 'bold' }
+  saveBtnText: { color: '#fff', fontWeight: 'bold' },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    marginTop: 8,
+    alignSelf: 'flex-end'
+  },
+  pageButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#4338ca',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#e2e8f0'
+  },
+  pageButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  pageButtonTextDisabled: {
+    color: '#94a3b8'
+  },
+  pageInfoText: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginHorizontal: 4
+  }
 });
