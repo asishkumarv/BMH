@@ -388,7 +388,7 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     // Simple lookup of employee details
     const riderRes = await pool.query(`
       SELECT id, full_name, mobile, email, schedule_in, schedule_out, created_at 
-      FROM employees WHERE id = $1 AND role = 'Hd delivery'
+      FROM employees WHERE id = $1 AND (department = 'Delivery' OR role = 'Hd delivery')
     `, [riderId]);
 
     if (riderRes.rows.length === 0) {
