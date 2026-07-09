@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable } from 'react-native';
 import axios from 'axios';
-import { ArrowUpDown, Calendar, Award, MapPin, TrendingUp, Clock, ShieldCheck, DollarSign, Star, AlertCircle, RefreshCw } from 'lucide-react-native';
+import { ArrowUpDown, Calendar, Award, MapPin, TrendingUp, Clock, ShieldCheck, DollarSign, Star, AlertCircle, RefreshCw, User } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
 
 const API_URL = 'https://napi.bharatmedicalhallplus.com';
@@ -33,6 +33,12 @@ export default function AdminPerformance() {
   const [filterRiderId, setFilterRiderId] = useState('');
   const [filterPeriod, setFilterPeriod] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
   const [filterValue, setFilterValue] = useState(''); // E.g., '2026-07'
+  const [filterArea, setFilterArea] = useState('');
+  const [filterShift, setFilterShift] = useState('');
+  const [filterPaymentMode, setFilterPaymentMode] = useState('');
+  const [areasList, setAreasList] = useState<string[]>([]);
+  const [shiftsList, setShiftsList] = useState<string[]>([]);
+  const [paymentModesList, setPaymentModesList] = useState<string[]>([]);
   
   useEffect(() => {
     // Set initial filter value based on current month/date
@@ -45,13 +51,16 @@ export default function AdminPerformance() {
     if (filterValue !== '') {
       fetchPerformanceData();
     }
-  }, [filterRiderId, filterPeriod, filterValue]);
+  }, [filterRiderId, filterPeriod, filterValue, filterArea, filterShift, filterPaymentMode]);
 
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
       let queryParams = [];
       if (filterRiderId) queryParams.push(`delivery_boy_id=${filterRiderId}`);
+      if (filterArea) queryParams.push(`area=${encodeURIComponent(filterArea)}`);
+      if (filterShift) queryParams.push(`shift=${encodeURIComponent(filterShift)}`);
+      if (filterPaymentMode) queryParams.push(`payment_mode=${encodeURIComponent(filterPaymentMode)}`);
       
       if (filterPeriod === 'daily') {
         queryParams.push(`date=${filterValue}`);
@@ -66,6 +75,11 @@ export default function AdminPerformance() {
       if (res.data && res.data.success) {
         setStats(res.data.executiveDashboard);
         setRiders(res.data.riders || []);
+        if (res.data.executiveDashboard) {
+          if (res.data.executiveDashboard.uniqueAreas) setAreasList(res.data.executiveDashboard.uniqueAreas);
+          if (res.data.executiveDashboard.uniqueShifts) setShiftsList(res.data.executiveDashboard.uniqueShifts);
+          if (res.data.executiveDashboard.uniquePaymentModes) setPaymentModesList(res.data.executiveDashboard.uniquePaymentModes);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -79,6 +93,9 @@ export default function AdminPerformance() {
     setFilterPeriod('monthly');
     const currentMonth = new Date().toISOString().substring(0, 7);
     setFilterValue(currentMonth);
+    setFilterArea('');
+    setFilterShift('');
+    setFilterPaymentMode('');
   };
 
   if (loading && !stats) {
@@ -170,6 +187,50 @@ export default function AdminPerformance() {
             />
           </View>
 
+          {Platform.OS === 'web' && (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterLabel}>Area</Text>
+              <select
+                value={filterArea}
+                onChange={(e) => setFilterArea(e.target.value)}
+                style={styles.webSelect}
+              >
+                <option value="">All Areas</option>
+                {areasList.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </View>
+          )}
+
+          {Platform.OS === 'web' && (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterLabel}>Shift</Text>
+              <select
+                value={filterShift}
+                onChange={(e) => setFilterShift(e.target.value)}
+                style={styles.webSelect}
+              >
+                <option value="">All Shifts</option>
+                <option value="Morning">Morning Shift (09:00)</option>
+                <option value="Evening">Evening Shift (18:00)</option>
+                {shiftsList.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </View>
+          )}
+
+          {Platform.OS === 'web' && (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterLabel}>Payment Mode</Text>
+              <select
+                value={filterPaymentMode}
+                onChange={(e) => setFilterPaymentMode(e.target.value)}
+                style={styles.webSelect}
+              >
+                <option value="">All Payments</option>
+                {paymentModesList.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+              </select>
+            </View>
+          )}
+
           <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
             <Text style={styles.resetBtnText}>Reset</Text>
           </TouchableOpacity>
@@ -192,13 +253,70 @@ export default function AdminPerformance() {
         </View>
 
         <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+            <Clock size={20} color="#0284C7" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>On-Time Delivery %</Text>
+            <Text style={[styles.kpiValue, { color: getStatusColor(executive.onTimeDeliveryRate || 0, 'on_time') }]}>
+              {executive.onTimeDeliveryRate || 0}%
+            </Text>
+            <Text style={styles.kpiSub}>Target: ≥95% On-Time</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#F1F5F9' }]}>
+            <TrendingUp size={20} color="#475569" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>Total Orders Assigned</Text>
+            <Text style={styles.kpiValue}>{executive.totalOrdersAssigned || 0}</Text>
+            <Text style={styles.kpiSub}>Total allocated load</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
           <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
             <ShieldCheck size={20} color="#10B981" />
           </View>
           <View>
             <Text style={styles.kpiLabel}>Total Orders Delivered</Text>
             <Text style={styles.kpiValue}>{executive.totalOrdersDelivered || 0}</Text>
-            <Text style={styles.kpiSub}>Assigned: {executive.totalOrdersAssigned || 0}</Text>
+            <Text style={styles.kpiSub}>Success count</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+            <Clock size={20} color="#D97706" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>Pending Deliveries</Text>
+            <Text style={styles.kpiValue}>{executive.pendingDeliveries || 0}</Text>
+            <Text style={styles.kpiSub}>Currently in transit</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+            <AlertCircle size={20} color="#EF4444" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>Failed & Returned</Text>
+            <Text style={styles.kpiValue}>{(executive.failedDeliveries || 0) + (executive.returnedOrders || 0)}</Text>
+            <Text style={styles.kpiSub}>Fail: {executive.failedDeliveries || 0} | Ret: {executive.returnedOrders || 0}</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#F3F4F6' }]}>
+            <AlertCircle size={20} color="#6B7280" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>Cancelled Orders</Text>
+            <Text style={styles.kpiValue}>{executive.cancelledOrders || 0}</Text>
+            <Text style={styles.kpiSub}>Void/Cancelled load</Text>
           </View>
         </View>
 
@@ -223,29 +341,172 @@ export default function AdminPerformance() {
             <Text style={styles.kpiSub}>Calculated via coordinates</Text>
           </View>
         </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+            <DollarSign size={20} color="#059669" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>Total Revenue</Text>
+            <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{((executive.totalCashCollected || 0) + (executive.totalOnlinePayments || 0))?.toLocaleString('en-IN')}</Text>
+            <Text style={styles.kpiSub}>From delivered orders</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+            <DollarSign size={20} color="#4F46E5" />
+          </View>
+          <View>
+            <Text style={styles.kpiLabel}>Total Delivery Charges</Text>
+            <Text style={styles.kpiValue}>₹{executive.totalDeliveryCharges?.toLocaleString('en-IN') || 0}</Text>
+            <Text style={styles.kpiSub}>Dynamic charges billed</Text>
+          </View>
+        </View>
       </View>
 
-      {/* Cash Collection Summary */}
+      {/* Financial Summary Card */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Total Cash & Payment Collection Accuracy</Text>
+        <Text style={styles.sectionTitle}>Financial Summary & Operations Breakdown</Text>
         <View style={styles.paymentsSummary}>
           <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>Cash Collected (COD)</Text>
+            <Text style={styles.paymentLabel}>Total Order Value</Text>
+            <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{executive.totalOrderValue?.toLocaleString('en-IN') || 0}</Text>
+          </View>
+          <View style={styles.paymentDivider} />
+          <View style={styles.paymentCol}>
+            <Text style={styles.paymentLabel}>COD Collected (Cash)</Text>
             <Text style={styles.paymentValue}>₹{executive.totalCashCollected?.toLocaleString('en-IN') || 0}</Text>
           </View>
           <View style={styles.paymentDivider} />
           <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>Online / UPI Received</Text>
+            <Text style={styles.paymentLabel}>Online Payments</Text>
             <Text style={styles.paymentValue}>₹{executive.totalOnlinePayments?.toLocaleString('en-IN') || 0}</Text>
           </View>
           <View style={styles.paymentDivider} />
           <View style={styles.paymentCol}>
-            <Text style={styles.paymentLabel}>Total Combined Collection</Text>
-            <Text style={[styles.paymentValue, { color: Colors.light.primary }]}>
-              ₹{((executive.totalCashCollected || 0) + (executive.totalOnlinePayments || 0)).toLocaleString('en-IN')}
-            </Text>
+            <Text style={styles.paymentLabel}>Pending Cash Collection</Text>
+            <Text style={[styles.paymentValue, { color: '#D97706' }]}>₹{executive.pendingCashCollection?.toLocaleString('en-IN') || 0}</Text>
           </View>
         </View>
+
+        {/* Bus and Scheduled orders subrow */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Bus Parcel Shipments</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
+              {executive.busOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
+            </Text>
+            <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.busOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+          </View>
+          
+          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Scheduled Deliveries</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
+              {executive.scheduledOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
+            </Text>
+            <Text style={{ fontSize: 13, color: '#0284C7', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.scheduledOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Delivery Executive Summary */}
+      <View style={[styles.card, { marginTop: 24 }]}>
+        <Text style={styles.sectionTitle}>Delivery Executive Summary</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F0F9FF', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ backgroundColor: '#0284C7', padding: 8, borderRadius: 6 }}>
+              <User size={18} color="#fff" />
+            </View>
+            <View>
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Total Delivery Boys</Text>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>{executive.totalRidersCount || 0}</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1, minWidth: 200, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ backgroundColor: '#10B981', padding: 8, borderRadius: 6 }}>
+              <ShieldCheck size={18} color="#fff" />
+            </View>
+            <View>
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Active Delivery Boys</Text>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a' }}>{executive.activeRidersCount || 0}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Area Performance */}
+      <View style={[styles.card, { marginTop: 24 }]}>
+        <Text style={styles.sectionTitle}>Area Performance Breakdown</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.th, { width: 180 }]}>Area Name</Text>
+              <Text style={[styles.th, { width: 100 }]}>Orders Billed</Text>
+              <Text style={[styles.th, { width: 120 }]}>Revenue Generated</Text>
+              <Text style={[styles.th, { width: 120 }]}>Pending Orders</Text>
+            </View>
+            {(executive.areaPerformance || []).length === 0 ? (
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <Text style={{ color: '#64748B', fontSize: 13 }}>No area data found for selected period.</Text>
+              </View>
+            ) : (
+              (executive.areaPerformance || []).map((area: any, index: number) => (
+                <View key={area.area || index} style={styles.tableRow}>
+                  <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{area.area}</Text>
+                  <Text style={[styles.td, { width: 100 }]}>{area.totalOrders}</Text>
+                  <Text style={[styles.td, { width: 120, color: '#10B981', fontWeight: '600' }]}>₹{area.revenue?.toLocaleString('en-IN')}</Text>
+                  <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>{area.pendingOrders}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* Performance Charts & Trends */}
+      <View style={[styles.card, { marginTop: 24 }]}>
+        <Text style={styles.sectionTitle}>Operations Trends & Peak Hours</Text>
+        
+        {/* Orders & Revenue Trend */}
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>Orders & Revenue Trend</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', height: 160, paddingBottom: 24, paddingHorizontal: 12 }}>
+            {(executive.performanceTrend || []).map((t: any, idx: number) => {
+              const maxVal = Math.max(...(executive.performanceTrend || []).map((x: any) => x.orders), 1);
+              const barHeight = Math.max((t.orders / maxVal) * 100, 10);
+              return (
+                <View key={t.label || idx} style={{ alignItems: 'center', width: 45 }}>
+                  <View style={{ height: 100, justifyContent: 'flex-end', width: 24, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
+                    <View style={{ height: `${barHeight}%`, backgroundColor: '#3B82F6', borderRadius: 4 }} />
+                  </View>
+                  <Text style={{ fontSize: 10, color: '#475569', fontWeight: '700', marginTop: 4 }}>{t.orders} Vol</Text>
+                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 2 }}>{t.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        {/* Peak Delivery Hours */}
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>Peak Delivery Hours (Distribution)</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', height: 150, paddingBottom: 20, paddingHorizontal: 12 }}>
+            {(executive.hourStats || []).filter((h: any) => h.orders > 0).map((h: any, idx: number) => {
+              const maxVal = Math.max(...(executive.hourStats || []).map((x: any) => x.orders), 1);
+              const barHeight = Math.max((h.orders / maxVal) * 100, 10);
+              return (
+                <View key={h.hour || idx} style={{ alignItems: 'center', width: 40 }}>
+                  <View style={{ height: 90, justifyContent: 'flex-end', width: 16, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ height: `${barHeight}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+                  </View>
+                  <Text style={{ fontSize: 9, color: '#475569', fontWeight: '700', marginTop: 4 }}>{h.orders}</Text>
+                  <Text style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{h.hour}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
 
       {/* Leaderboard/Ranking */}
@@ -323,6 +584,66 @@ export default function AdminPerformance() {
           </View>
         </ScrollView>
       </View>
+
+      {/* Rider's Detailed Assigned Orders list (when filtered) */}
+      {filterRiderId && (
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <Text style={styles.sectionTitle}>Executive's Deliveries Details ({riders.find(r => r.riderId === filterRiderId)?.name || 'Filtered Executive'})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.th, { width: 100 }]}>Order No</Text>
+                <Text style={[styles.th, { width: 100 }]}>Type</Text>
+                <Text style={[styles.th, { width: 150 }]}>Customer Name</Text>
+                <Text style={[styles.th, { width: 100 }]}>Status</Text>
+                <Text style={[styles.th, { width: 150 }]}>Assigned Time</Text>
+                <Text style={[styles.th, { width: 150 }]}>Picked Up Time</Text>
+                <Text style={[styles.th, { width: 150 }]}>Delivered Time</Text>
+                <Text style={[styles.th, { width: 140 }]}>Assigned to Deliv.</Text>
+                <Text style={[styles.th, { width: 140 }]}>Pickup to Deliv.</Text>
+                <Text style={[styles.th, { width: 100 }]}>Method</Text>
+              </View>
+
+              {(executive.ordersList || []).length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ color: '#64748B', fontSize: 13 }}>No matching deliveries found for the selected period.</Text>
+                </View>
+              ) : (
+                (executive.ordersList || []).map((order: any, idx: number) => {
+                  const formatTime = (ts: string) => {
+                    if (!ts) return 'N/A';
+                    return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+                  };
+                  const formatDuration = (mins: number) => {
+                    if (mins === null || mins === undefined) return 'N/A';
+                    if (mins < 60) return `${mins} mins`;
+                    const hrs = Math.floor(mins / 60);
+                    const rem = mins % 60;
+                    return `${hrs}h ${rem}m`;
+                  };
+                  return (
+                    <View key={order.id || idx} style={styles.tableRow}>
+                      <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>{order.orderNo}</Text>
+                      <Text style={[styles.td, { width: 100, textTransform: 'capitalize' }]}>{order.type}</Text>
+                      <View style={{ width: 150 }}>
+                        <Text style={{ fontWeight: '600', fontSize: 12, color: '#1e293b' }}>{order.customerName}</Text>
+                        <Text style={{ fontSize: 10, color: '#64748b' }}>{order.customerPhone}</Text>
+                      </View>
+                      <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{order.status}</Text>
+                      <Text style={[styles.td, { width: 150 }]}>{formatTime(order.assignedAt)}</Text>
+                      <Text style={[styles.td, { width: 150 }]}>{formatTime(order.pickedUpAt)}</Text>
+                      <Text style={[styles.td, { width: 150 }]}>{formatTime(order.deliveredAt)}</Text>
+                      <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#4F46E5' }]}>{formatDuration(order.assignedToDeliveryDuration)}</Text>
+                      <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#10B981' }]}>{formatDuration(order.pickupToDeliveryDuration)}</Text>
+                      <Text style={[styles.td, { width: 100 }]}>{order.modeOfDelivery}</Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      )}
 
       {/* Stats KPI Calculation Legend */}
       <View style={[styles.card, { marginTop: 24, backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]}>

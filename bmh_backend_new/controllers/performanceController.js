@@ -79,9 +79,35 @@ function parseCoordinates(link) {
   return null;
 }
 
+// Heuristic to get area name from address string
+function getAreaFromAddress(address) {
+  if (!address) return 'Unknown';
+  const addr = address.trim().toLowerCase();
+  if (addr.includes('bhanjpur')) return 'Bhanjpur';
+  if (addr.includes('murgabadi')) return 'Murgabadi';
+  if (addr.includes('lal bazar') || addr.includes('lalbazar')) return 'Lal Bazar';
+  if (addr.includes('station bazar') || addr.includes('station road') || addr.includes('stationroad')) return 'Station Bazar';
+  if (addr.includes('purnachandrapur')) return 'Purnachandrapur';
+  if (addr.includes('baghra')) return 'Baghra Road';
+  if (addr.includes('takipur')) return 'Takipur';
+  if (addr.includes('palbani')) return 'Palbani';
+  if (addr.includes('ward')) {
+    const match = address.match(/ward\s*#?\s*(\d+)/i);
+    if (match) return `Ward ${match[1]}`;
+  }
+  const parts = address.split(',');
+  if (parts.length > 0) {
+    const firstPart = parts[0].trim();
+    if (firstPart.length > 0 && firstPart.length < 25) {
+      return firstPart.replace(/\b\w/g, c => c.toUpperCase());
+    }
+  }
+  return 'Main City';
+}
+
 exports.getAdminPerformanceStats = async (req, res) => {
   try {
-    const { date, week, month, year, delivery_boy_id, shift, vehicle_type } = req.query;
+    const { date, week, month, year, delivery_boy_id, shift, area, payment_mode } = req.query;
 
     // 1. Fetch delivery boys (employees where department = 'Delivery' or role = 'Hd delivery')
     let riderQuery = `
@@ -95,7 +121,22 @@ exports.getAdminPerformanceStats = async (req, res) => {
       riderParams.push(delivery_boy_id);
     }
     const ridersRes = await pool.query(riderQuery, riderParams);
-    const riders = ridersRes.rows;
+    let riders = ridersRes.rows;
+
+    // Filter by shift (Morning / Evening / Exact match) in JS to be safe and robust
+    if (shift) {
+      const shiftLower = shift.toLowerCase();
+      riders = riders.filter(r => {
+        const fullShift = `${r.schedule_in || '09:00'} - ${r.schedule_out || '18:00'}`.toLowerCase();
+        if (shiftLower === 'morning') {
+          return (r.schedule_in && r.schedule_in.startsWith('09')) || fullShift.includes('morning') || fullShift.startsWith('09');
+        } else if (shiftLower === 'evening') {
+          return (r.schedule_in && (r.schedule_in.startsWith('17') || r.schedule_in.startsWith('18'))) || fullShift.includes('evening') || fullShift.startsWith('17') || fullShift.startsWith('18');
+        } else {
+          return fullShift === shiftLower;
+        }
+      });
+    }
 
     // 2. Fetch department default location coordinates (for distance calculation)
     const deptRes = await pool.query(`
@@ -116,6 +157,16 @@ exports.getAdminPerformanceStats = async (req, res) => {
     let totalAllDistance = 0;
     let totalAllCash = 0;
     let totalAllOnline = 0;
+
+    let totalAllOnTimeCount = 0;
+    let totalAllDeliveryCharges = 0;
+    let totalAllBusOrdersCount = 0;
+    let totalAllBusOrdersValue = 0;
+    let totalAllScheduledOrdersCount = 0;
+    let totalAllScheduledOrdersValue = 0;
+    let totalAllPendingCashCollection = 0;
+
+    const allFilteredOrders = [];
 
     for (const rider of riders) {
       const riderId = rider.id;
@@ -191,7 +242,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
       ` + dateFilter.replace(/created_at/g, 'si.created_at');
       const invoiceRes = await pool.query(invoiceQuery, filterParams);
 
-      // Unified order aggregation
+      // Unified order aggregation with unified fields
       const allOrders = [
         ...manualRes.rows.map(o => {
           let coords = parseCoordinates(o.location_link);
@@ -201,7 +252,24 @@ exports.getAdminPerformanceStats = async (req, res) => {
             lat = parseFloat(o.addr_lat);
             lng = parseFloat(o.addr_lng);
           }
-          return { status: o.status, type: 'manual', amount: parseFloat(o.amount || 0), paymentMode: o.payment_mode || o.pod_payment_mode || 'Cash', lat, lng, created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at };
+          return {
+            id: o.id,
+            order_no: o.order_no,
+            invoice_no: o.invoice_no,
+            status: o.status,
+            type: 'manual',
+            amount: parseFloat(o.amount || 0),
+            paymentMode: o.payment_mode || o.pod_payment_mode || 'Cash',
+            lat,
+            lng,
+            created: o.created_at,
+            delivered: o.delivered_at,
+            picked: o.picked_up_at,
+            deliveryCharge: parseFloat(o.delivery_charge || 0),
+            address: o.address,
+            modeOfDelivery: o.mode_of_delivery,
+            isScheduled: o.is_scheduled
+          };
         }),
         ...onlineRes.rows.map(o => {
           let lat = o.map_lat ? parseFloat(o.map_lat) : null;
@@ -210,22 +278,84 @@ exports.getAdminPerformanceStats = async (req, res) => {
             lat = parseFloat(o.addr_lat);
             lng = parseFloat(o.addr_lng);
           }
-          return { status: o.status, type: 'online', amount: parseFloat(o.total_amount || 0), paymentMode: o.pod_payment_mode || 'Online', lat, lng, created: o.created_at, delivered: o.updated_at, picked: o.created_at };
+          return {
+            id: o.id,
+            order_no: o.order_no || `ON-${o.id}`,
+            invoice_no: null,
+            status: o.status,
+            type: 'online',
+            amount: parseFloat(o.total_amount || 0),
+            paymentMode: o.pod_payment_mode || 'Online',
+            lat,
+            lng,
+            created: o.created_at,
+            delivered: o.updated_at,
+            picked: o.created_at,
+            deliveryCharge: 0,
+            address: o.delivery_address || o.address,
+            modeOfDelivery: 'Local',
+            isScheduled: false
+          };
         }),
         ...salesRes.rows.map(o => {
           let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
           let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
-          return { status: o.status, type: 'sales_order', amount: parseFloat(o.order_total || 0), paymentMode: 'Cash', lat, lng, created: o.created_at, delivered: o.created_at, picked: o.created_at };
+          return {
+            id: o.id,
+            order_no: o.order_no || `EG-${o.id}`,
+            invoice_no: null,
+            status: o.status,
+            type: 'sales_order',
+            amount: parseFloat(o.order_total || 0),
+            paymentMode: 'Cash',
+            lat,
+            lng,
+            created: o.created_at,
+            delivered: o.created_at,
+            picked: o.created_at,
+            deliveryCharge: 0,
+            address: o.address || o.delivery_address,
+            modeOfDelivery: 'Local',
+            isScheduled: false
+          };
         }),
         ...invoiceRes.rows.map(o => {
           let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
           let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
-          return { status: o.status, type: 'sales_invoice', amount: parseFloat(o.order_total || 0), paymentMode: 'Cash', lat, lng, created: o.created_at, delivered: o.created_at, picked: o.created_at };
+          return {
+            id: o.id,
+            order_no: o.invoice_no || `EGI-${o.id}`,
+            invoice_no: o.invoice_no,
+            status: o.status,
+            type: 'sales_invoice',
+            amount: parseFloat(o.order_total || 0),
+            paymentMode: 'Cash',
+            lat,
+            lng,
+            created: o.created_at,
+            delivered: o.created_at,
+            picked: o.created_at,
+            deliveryCharge: 0,
+            address: o.address || o.delivery_address,
+            modeOfDelivery: 'Local',
+            isScheduled: false
+          };
         })
       ];
 
+      // Apply Area and Payment Mode filters in JS
+      let filteredOrders = allOrders;
+      if (area) {
+        filteredOrders = filteredOrders.filter(o => getAreaFromAddress(o.address).toLowerCase() === area.toLowerCase());
+      }
+      if (payment_mode) {
+        filteredOrders = filteredOrders.filter(o => o.paymentMode?.toLowerCase() === payment_mode.toLowerCase());
+      }
+
+      allFilteredOrders.push(...filteredOrders);
+
       // Counters
-      const assigned = allOrders.length;
+      const assigned = filteredOrders.length;
       let delivered = 0;
       let failed = 0;
       let returned = 0;
@@ -237,25 +367,55 @@ exports.getAdminPerformanceStats = async (req, res) => {
       let durationCount = 0;
       let totalDistance = 0;
 
-      allOrders.forEach(o => {
+      let onTimeCount = 0;
+      let totalDeliveryCharges = 0;
+      let busOrdersCount = 0;
+      let busOrdersValue = 0;
+      let scheduledOrdersCount = 0;
+      let scheduledOrdersValue = 0;
+      let pendingCashCollection = 0;
+
+      filteredOrders.forEach(o => {
         const statusClean = o.status?.toLowerCase() || '';
         
+        // Sum Delivery Charges
+        totalDeliveryCharges += o.deliveryCharge || 0;
+
+        // Bus Orders
+        if (o.modeOfDelivery === 'Bus' || o.modeOfDelivery?.toLowerCase() === 'bus') {
+          busOrdersCount++;
+          busOrdersValue += o.amount;
+        }
+
+        // Scheduled Orders
+        if (o.isScheduled === true || o.isScheduled === 'true' || o.modeOfDelivery === 'Schedule Delivery') {
+          scheduledOrdersCount++;
+          scheduledOrdersValue += o.amount;
+        }
+
+        const pMode = o.paymentMode?.toLowerCase() || '';
+        const isPending = !statusClean.includes('delivered') && !statusClean.includes('completed') && 
+                          !statusClean.includes('cancel') && !statusClean.includes('return') && !statusClean.includes('fail');
+
         if (statusClean.includes('delivered') || statusClean.includes('completed')) {
           delivered++;
-          // Cash vs Online mapping
-          const pMode = o.paymentMode?.toLowerCase() || '';
           if (pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card')) {
             onlineCollected += o.amount;
           } else {
             cashCollected += o.amount;
           }
 
-          // Duration calculation (Delivered Time - Picked Up/Created Time)
           if (o.delivered && o.picked) {
             const diffMs = new Date(o.delivered) - new Date(o.picked);
             if (diffMs > 0) {
               totalDurationSec += Math.floor(diffMs / 1000);
               durationCount++;
+              
+              // On-time check (SLA ≤ 45 minutes)
+              const diffMin = Math.floor(diffMs / 60000);
+              if (diffMin <= 45) {
+                onTimeCount++;
+              }
             }
           }
 
@@ -274,6 +434,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
           failed++;
         } else {
           pending++;
+          if (!(pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card'))) {
+            pendingCashCollection += o.amount;
+          }
         }
       });
 
@@ -287,27 +450,25 @@ exports.getAdminPerformanceStats = async (req, res) => {
           const hours = (new Date(a.checkout_timestamp) - new Date(a.checkin_timestamp)) / (1000 * 60 * 60);
           if (hours > 0) workingHours += hours;
         } else if (a.checkin_timestamp) {
-          workingHours += 8; // Default shift duration if not checked out yet
+          workingHours += 8;
         }
       });
       if (workingHours === 0 && workingDaysCount > 0) {
-        workingHours = workingDaysCount * 9; // Fallback to standard shift duration
+        workingHours = workingDaysCount * 9;
       }
 
-      // Average Delivery duration in minutes (0 if no timestamps)
       const avgDeliveryTimeMin = durationCount > 0 ? Math.round((totalDurationSec / 60) / durationCount) : 0;
-
-      // Rate formulas
       const successRate = assigned > 0 ? Math.round((delivered / assigned) * 100) : 0;
+      const onTimeRate = delivered > 0 ? Math.round((onTimeCount / delivered) * 100) : 100;
       const cancellationRate = assigned > 0 ? Math.round((cancelled / assigned) * 100) : 0;
       const returnRate = assigned > 0 ? Math.round((returned / assigned) * 100) : 0;
 
-      // Rating: 5.0 base score minus deductions for failures and cancellations
       let ratingClean = 0.0;
       if (delivered > 0 || failed > 0 || cancelled > 0) {
         const ratingVal = 5.0 - (failed * 0.2) - (cancelled * 0.1);
         ratingClean = parseFloat(Math.min(5, Math.max(1, ratingVal)).toFixed(2));
       }
+
       compiledRidersStats.push({
         riderId,
         name: rider.full_name,
@@ -322,6 +483,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
         cancelled,
         pending,
         successRate,
+        onTimeRate,
         cancellationRate,
         returnRate,
         avgDeliveryTimeMin,
@@ -333,7 +495,6 @@ exports.getAdminPerformanceStats = async (req, res) => {
         rating: ratingClean
       });
 
-      // Sum all totals for executive metrics
       totalAllAssigned += assigned;
       totalAllDelivered += delivered;
       totalAllFailed += failed;
@@ -344,16 +505,123 @@ exports.getAdminPerformanceStats = async (req, res) => {
       totalAllDistance += totalDistance;
       totalAllCash += cashCollected;
       totalAllOnline += onlineCollected;
+
+      totalAllOnTimeCount += onTimeCount;
+      totalAllDeliveryCharges += totalDeliveryCharges;
+      totalAllBusOrdersCount += busOrdersCount;
+      totalAllBusOrdersValue += busOrdersValue;
+      totalAllScheduledOrdersCount += scheduledOrdersCount;
+      totalAllScheduledOrdersValue += scheduledOrdersValue;
+      totalAllPendingCashCollection += pendingCashCollection;
     }
 
     const totalRidersCount = riders.length;
     const overallAvgDeliveryTime = totalRidersCount > 0 ? Math.round(totalAllTime / totalRidersCount) : 0;
     const overallSuccessRate = totalAllAssigned > 0 ? Math.round((totalAllDelivered / totalAllAssigned) * 100) : 0;
-    
-    // Sort riders by success rate (or order volume)
+    const overallOnTimeRate = totalAllDelivered > 0 ? Math.round((totalAllOnTimeCount / totalAllDelivered) * 100) : 100;
+    const activeRidersCount = compiledRidersStats.filter(r => r.workingDays > 0).length;
+
     const sortedRiders = [...compiledRidersStats].sort((a, b) => b.delivered - a.delivered);
     const topExecutives = sortedRiders.slice(0, 5);
     const bottomExecutives = sortedRiders.slice(-5).reverse();
+
+    // Area breakdown
+    const areaStats = {};
+    allFilteredOrders.forEach(o => {
+      const areaName = getAreaFromAddress(o.address);
+      if (!areaStats[areaName]) {
+        areaStats[areaName] = { area: areaName, totalOrders: 0, revenue: 0, pendingOrders: 0 };
+      }
+      areaStats[areaName].totalOrders++;
+      const statusClean = o.status?.toLowerCase() || '';
+      if (statusClean.includes('delivered') || statusClean.includes('completed')) {
+        areaStats[areaName].revenue += o.amount;
+      } else if (!statusClean.includes('cancel') && !statusClean.includes('return') && !statusClean.includes('fail')) {
+        areaStats[areaName].pendingOrders++;
+      }
+    });
+    const areaPerformance = Object.values(areaStats).sort((a, b) => b.totalOrders - a.totalOrders);
+
+    // Group Performance Trends and Peak hours
+    const trendStats = {};
+    const hourStats = Array(24).fill(0).map((_, i) => ({ hour: `${i}:00`, orders: 0 }));
+    allFilteredOrders.forEach(o => {
+      let hourVal = 12;
+      if (o.created) {
+        hourVal = new Date(o.created).getHours();
+      }
+      if (hourVal >= 0 && hourVal < 24) {
+        hourStats[hourVal].orders++;
+      }
+
+      let trendKey = '';
+      if (date) {
+        trendKey = o.created ? new Date(o.created).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit' }) + ':00' : '12:00';
+      } else if (month) {
+        trendKey = o.created ? new Date(o.created).toISOString().substring(8, 10) : '01';
+      } else {
+        trendKey = o.created ? new Date(o.created).toISOString().substring(5, 7) : '01';
+      }
+
+      if (!trendStats[trendKey]) {
+        trendStats[trendKey] = { label: trendKey, orders: 0, revenue: 0, successCount: 0 };
+      }
+      trendStats[trendKey].orders++;
+      const statusClean = o.status?.toLowerCase() || '';
+      if (statusClean.includes('delivered') || statusClean.includes('completed')) {
+        trendStats[trendKey].revenue += o.amount;
+        trendStats[trendKey].successCount++;
+      }
+    });
+
+    const performanceTrend = Object.keys(trendStats).sort().map(key => {
+      const stat = trendStats[key];
+      return {
+        label: key,
+        orders: stat.orders,
+        revenue: stat.revenue,
+        successRate: stat.orders > 0 ? Math.round((stat.successCount / stat.orders) * 100) : 0
+      };
+    });
+
+    // Populate dynamic filter lists
+    const uniqueAreas = [...new Set(allFilteredOrders.map(o => getAreaFromAddress(o.address)))].filter(a => a !== 'Unknown').sort();
+    const uniqueShifts = [...new Set(riders.map(r => `${r.schedule_in || '09:00'} - ${r.schedule_out || '18:00'}`))].sort();
+    const uniquePaymentModes = [...new Set(allFilteredOrders.map(o => o.paymentMode))].filter(Boolean).sort();
+
+    // Compile detailed order details list when filtering by a single rider
+    let ordersList = [];
+    if (delivery_boy_id && allFilteredOrders.length > 0) {
+      ordersList = allFilteredOrders.map(o => {
+        let assignedToDelivery = null;
+        let pickupToDelivery = null;
+        if (o.delivered && o.created) {
+          const diff = new Date(o.delivered) - new Date(o.created);
+          if (diff > 0) assignedToDelivery = Math.round(diff / 60000);
+        }
+        if (o.delivered && o.picked) {
+          const diff = new Date(o.delivered) - new Date(o.picked);
+          if (diff > 0) pickupToDelivery = Math.round(diff / 60000);
+        }
+        return {
+          id: o.id,
+          orderNo: o.order_no || 'N/A',
+          invoiceNo: o.invoice_no || 'N/A',
+          type: o.type,
+          customerName: o.customer_name || 'N/A',
+          customerPhone: o.customer_phone || 'N/A',
+          amount: o.amount,
+          deliveryCharge: o.deliveryCharge,
+          status: o.status,
+          assignedAt: o.created,
+          pickedUpAt: o.picked,
+          deliveredAt: o.delivered,
+          assignedToDeliveryDuration: assignedToDelivery,
+          pickupToDeliveryDuration: pickupToDelivery,
+          modeOfDelivery: o.modeOfDelivery || 'Local'
+        };
+      });
+    }
 
     res.json({
       success: true,
@@ -369,8 +637,29 @@ exports.getAdminPerformanceStats = async (req, res) => {
         totalDistanceKM: parseFloat(totalAllDistance.toFixed(2)),
         totalCashCollected: totalAllCash,
         totalOnlinePayments: totalAllOnline,
+        
+        onTimeDeliveryRate: overallOnTimeRate,
+        totalDeliveryCharges: totalAllDeliveryCharges,
+        totalRidersCount,
+        activeRidersCount,
+        
+        totalOrderValue: totalAllCash + totalAllOnline + totalAllPendingCashCollection, 
+        pendingCashCollection: totalAllPendingCashCollection,
+        
+        busOrdersCount: totalAllBusOrdersCount,
+        busOrdersValue: totalAllBusOrdersValue,
+        scheduledOrdersCount: totalAllScheduledOrdersCount,
+        scheduledOrdersValue: totalAllScheduledOrdersValue,
+
         topExecutives,
-        bottomExecutives
+        bottomExecutives,
+        areaPerformance,
+        performanceTrend,
+        hourStats,
+        ordersList,
+        uniqueAreas,
+        uniqueShifts,
+        uniquePaymentModes
       },
       riders: compiledRidersStats
     });
