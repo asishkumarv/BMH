@@ -131,6 +131,28 @@ exports.updateEmployeeSettings = async (req, res) => {
       late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty
     ];
     const result = await pool.query(query, values);
+
+    // If employee_id is 0 (global settings), propagate the changes to existing individual settings of that user_type
+    if (parseInt(employee_id) === 0) {
+      const propagateQuery = `
+        UPDATE employee_leave_settings
+        SET leaves_per_month = $1,
+            extra_leave_penalty = $2,
+            late_checkin_limit = $3,
+            late_checkin_penalty = $4,
+            early_checkout_limit = $5,
+            early_checkout_penalty = $6,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_type = $7 AND employee_id != 0;
+      `;
+      await pool.query(propagateQuery, [
+        leaves_per_month, extra_leave_penalty,
+        late_checkin_limit, late_checkin_penalty,
+        early_checkout_limit, early_checkout_penalty,
+        finalUserType
+      ]);
+    }
+
     res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error('Error updating employee settings:', error);
