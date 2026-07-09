@@ -445,3 +445,35 @@ exports.updateOrder = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to update order' });
   }
 };
+
+exports.deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const orderCheck = await pool.query('SELECT status FROM manual_orders WHERE id = $1', [id]);
+    if (orderCheck.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const currentStatus = orderCheck.rows[0].status;
+    const restrictedStatuses = ['picked up', 'out for delivery', 'delivered', 'completed'];
+    if (restrictedStatuses.includes(currentStatus.toLowerCase())) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Orders with status '${currentStatus}' cannot be deleted.` 
+      });
+    }
+
+    const deleteResult = await pool.query('DELETE FROM manual_orders WHERE id = $1 RETURNING *', [id]);
+    
+    res.json({ 
+      success: true, 
+      message: 'Order deleted successfully', 
+      deletedOrder: deleteResult.rows[0] 
+    });
+
+  } catch (error) {
+    console.error('Error deleting manual order:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete order' });
+  }
+};

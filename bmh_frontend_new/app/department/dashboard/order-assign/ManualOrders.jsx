@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation, ChevronDown } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation, ChevronDown, Trash2, X } from 'lucide-react-native';
 import { Share } from 'react-native';
 
 export default function ManualOrders({ deliveryBoys }) {
@@ -58,6 +58,8 @@ export default function ManualOrders({ deliveryBoys }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [editAddress, setEditAddress] = useState('');
   const [newNote, setNewNote] = useState('');
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState(null);
   
   // Patient auto-fill state
   const [patients, setPatients] = useState([]);
@@ -423,6 +425,26 @@ export default function ManualOrders({ deliveryBoys }) {
     }
   };
 
+  const handleDeleteOrder = async () => {
+    if (!deleteOrderTarget) return;
+    try {
+      const API_URL = 'https://napi.bharatmedicalhallplus.com';
+      const res = await axios.delete(`${API_URL}/manual-orders/${deleteOrderTarget.id}`);
+      if (res.data && res.data.success) {
+        alert('Order deleted successfully');
+        setOrders(prev => prev.filter(o => o.id !== deleteOrderTarget.id));
+      } else {
+        alert(res.data.message || 'Failed to delete order');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Error deleting order');
+    } finally {
+      setDeleteModalVisible(false);
+      setDeleteOrderTarget(null);
+    }
+  };
+
   const renderOrderItem = ({ item, index }) => {
     // Determine the status badge color
     let statusColor = '#3b82f6';
@@ -552,7 +574,7 @@ export default function ManualOrders({ deliveryBoys }) {
         </View>
         
         {/* Actions */}
-        <View style={[styles.cell, { flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
+        <View style={[styles.cell, { flex: 1.2, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
           <TouchableOpacity onPress={() => { 
               setSelectedOrder(item); 
               setEditAddress(item.address || '');
@@ -564,6 +586,17 @@ export default function ManualOrders({ deliveryBoys }) {
           <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#dcfce7'}]}>
              <Share2 size={14} color="#15803d" />
           </TouchableOpacity>
+          {['pending', 'assigned'].includes(item.status?.toLowerCase()) && (
+            <TouchableOpacity 
+              onPress={() => {
+                setDeleteOrderTarget(item);
+                setDeleteModalVisible(true);
+              }}
+              style={[styles.actionBtn, {backgroundColor: '#fee2e2'}]}
+            >
+              <Trash2 size={14} color="#ef4444" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -806,6 +839,53 @@ export default function ManualOrders({ deliveryBoys }) {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalVisible && deleteOrderTarget && (
+        <Modal visible={deleteModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: '90%', maxWidth: 450, padding: 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Delete Order Permanently?</Text>
+                <TouchableOpacity onPress={() => { setDeleteModalVisible(false); setDeleteOrderTarget(null); }}>
+                  <X size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '600', marginBottom: 12 }}>
+                  Warning: This action cannot be undone. Are you sure you want to delete this order permanently?
+                </Text>
+                
+                <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, gap: 8 }}>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Order No:</Text> {deleteOrderTarget.order_no}</Text>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Invoice No:</Text> {deleteOrderTarget.invoice_no || 'N/A'}</Text>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Customer:</Text> {deleteOrderTarget.customer_name} ({deleteOrderTarget.customer_phone})</Text>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Amount:</Text> ₹{deleteOrderTarget.amount}</Text>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Delivery Charge:</Text> ₹{deleteOrderTarget.delivery_charge || 0}</Text>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Address:</Text> {deleteOrderTarget.address || 'N/A'}</Text>
+                  <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: 'bold' }}>Status:</Text> {deleteOrderTarget.status}</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                <TouchableOpacity 
+                  onPress={() => { setDeleteModalVisible(false); setDeleteOrderTarget(null); }}
+                  style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: '#E2E8F0' }}
+                >
+                  <Text style={{ color: '#475569', fontWeight: '600' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={handleDeleteOrder}
+                  style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: '#EF4444' }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Delete Permanently</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Create Order Modal */}
       <Modal visible={createModalVisible} transparent animationType="slide">
