@@ -273,7 +273,7 @@ export default function DeliveryDashboard() {
                   const timeStr = order.scheduled_time;
                   // Construct date string and parse
                   const scheduledDateTime = new Date(`${dateStr}T${timeStr.includes(':') && timeStr.split(':').length === 2 ? timeStr + ':00' : timeStr}`);
-                  const alarmTime = new Date(scheduledDateTime.getTime() - 15 * 60000); // 15 mins prior
+                  const alarmTime = new Date(scheduledDateTime.getTime() - 30 * 60000); // 30 mins prior
                   
                   if (alarmTime > new Date()) {
                     Notifications.scheduleNotificationAsync({

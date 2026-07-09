@@ -452,7 +452,7 @@ const fetchData = async () => {
   };
 
   const handleUpdateDoctor = async () => {
-    if (!editDoctor.full_name || !editDoctor.phone_number) return Alert.alert('Error', 'Name and Phone required');
+    if (!editDoctor.full_name) return Alert.alert('Error', 'Name is required');
     setUpdating(true);
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${editDoctor.id}`, editDoctor);
@@ -1283,22 +1283,22 @@ const fetchData = async () => {
               <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
                 <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                   <Text style={styles.label}>Full Name *</Text>
-                  <TextInput style={styles.input} value={editDoctor.full_name} onChangeText={(t) => setEditDoctor({...editDoctor, full_name: t})} />
+                  <TextInput style={styles.input} value={editDoctor.full_name || ''} onChangeText={(t) => setEditDoctor({...editDoctor, full_name: t})} />
                 </View>
                 <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
                   <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Email</Text>
-                    <TextInput style={styles.input} value={editDoctor.email} onChangeText={(t) => setEditDoctor({...editDoctor, email: t})} keyboardType="email-address" />
+                    <TextInput style={styles.input} value={editDoctor.email || ''} onChangeText={(t) => setEditDoctor({...editDoctor, email: t})} keyboardType="email-address" />
                   </View>
                   <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Phone *</Text>
-                    <TextInput style={styles.input} value={editDoctor.phone_number} onChangeText={(t) => setEditDoctor({...editDoctor, phone_number: t})} keyboardType="phone-pad" />
+                    <TextInput style={styles.input} value={editDoctor.phone_number || ''} onChangeText={(t) => setEditDoctor({...editDoctor, phone_number: t})} keyboardType="phone-pad" />
                   </View>
                 </View>
                 <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
                   <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Department</Text>
-                    <TextInput style={styles.input} value={editDoctor.department} onChangeText={(t) => setEditDoctor({...editDoctor, department: t})} />
+                    <TextInput style={styles.input} value={editDoctor.department || ''} onChangeText={(t) => setEditDoctor({...editDoctor, department: t})} />
                   </View>
                   <View style={[styles.formGroup, isMobile ? { flex: 0, width: '100%' } : { flex: 1 }]}>
                     <Text style={styles.label}>Experience (Years)</Text>

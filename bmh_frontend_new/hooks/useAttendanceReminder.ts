@@ -24,14 +24,27 @@ export function useAttendanceReminder(user: any) {
 
   useEffect(() => {
     if (!user) return;
-    const hasShift = user.schedule_in && user.schedule_out;
-    const hasBreak = user.break_in && user.break_out;
-    if (!hasShift && !hasBreak) return;
+
+    let pd: any = {};
+    if (user.profile_data) {
+      try {
+        pd = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+      } catch (e) {
+        console.log("Error parsing profile_data in hook:", e);
+      }
+    }
+
+    const scheduleIn = user.schedule_in || pd.shiftIn;
+    const scheduleOut = user.schedule_out || pd.shiftOut;
+    const breakIn = user.break_in || pd.breakStart;
+    const breakOut = user.break_out || pd.breakEnd;
+
+    if (!scheduleIn && !scheduleOut && !breakIn && !breakOut) return;
 
     if (Platform.OS === 'web') {
-      setupWebReminder(user.schedule_in, user.schedule_out, user.break_in, user.break_out);
+      setupWebReminder(scheduleIn, scheduleOut, breakIn, breakOut);
     } else {
-      setupMobileReminder(user.schedule_in, user.schedule_out, user.break_in, user.break_out);
+      setupMobileReminder(scheduleIn, scheduleOut, breakIn, breakOut);
     }
 
     return () => {

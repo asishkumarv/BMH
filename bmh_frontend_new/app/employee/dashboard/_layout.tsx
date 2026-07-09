@@ -57,6 +57,8 @@ export default function EmployeeLayout() {
     checkAuth();
   }, [rootNavigationState?.key]);
 
+  useAttendanceReminder(user);
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>

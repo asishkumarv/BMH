@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "271757090027",
+    "project_id": "bmh-new-82100",
+    "storage_bucket": "bmh-new-82100.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:271757090027:android:23ab061e597c80790bb2ae",
+        "android_client_info": {
+          "package_name": "com.asishkumarv.bmh_frontend_new"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhgSEV4SSYwkjPULWnF8XcOzFsEz9G21c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

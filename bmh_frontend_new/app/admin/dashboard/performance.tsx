@@ -27,6 +27,9 @@ const getStatusColor = (val: number, type: 'success' | 'on_time' | 'rating') => 
 };
 
 const getTrendLabel = (label: string, period: string) => {
+  if (!label) return '';
+  if (label.startsWith('Day ')) return label;
+  if (isNaN(Number(label))) return label;
   if (period === 'monthly') {
     return `Day ${parseInt(label)}`;
   } else if (period === 'yearly') {

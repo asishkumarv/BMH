@@ -148,21 +148,23 @@ exports.assignDelivery = async (req, res) => {
             const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
             if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
                 const { sendExpoPushNotification } = require('../utils/pushNotification');
-                
-                let shouldPushNow = true;
                 const ord = rows[0];
-                if (ord.is_scheduled && ord.scheduled_date && ord.scheduled_time) {
-                   const sDate = typeof ord.scheduled_date === 'string' ? ord.scheduled_date.split('T')[0] : ord.scheduled_date.toISOString().split('T')[0];
-                   const scheduledDateTime = new Date(`${sDate}T${ord.scheduled_time}`);
-                   const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
-                   if (alarmTime > new Date()) {
-                      shouldPushNow = false;
-                   }
+                
+                let title = 'New Order Assigned';
+                let body = `Order #${ord.id} has been assigned to you.`;
+                
+                const isBus = ord.delivery_type === 'Bus' || ord.mode_of_delivery === 'Bus';
+                if (isBus) {
+                  title = 'New Bus Delivery Assigned';
+                  const bDate = ord.bus_date ? (typeof ord.bus_date === 'string' ? ord.bus_date.split('T')[0] : ord.bus_date.toISOString().split('T')[0]) : '';
+                  body = `Bus order #${ord.id} has been assigned. Bus Date: ${bDate}, Time: ${ord.scheduled_time || ''}`;
+                } else if (ord.is_scheduled) {
+                  title = 'New Scheduled Order Assigned';
+                  const sDate = ord.scheduled_date ? (typeof ord.scheduled_date === 'string' ? ord.scheduled_date.split('T')[0] : ord.scheduled_date.toISOString().split('T')[0]) : '';
+                  body = `Scheduled order #${ord.id} has been assigned. Scheduled: ${sDate} ${ord.scheduled_time || ''}`;
                 }
                 
-                if (shouldPushNow) {
-                   sendExpoPushNotification(empRes.rows[0].push_token, 'New Online Order Assigned', `Order #${ord.id} has been assigned to you.`);
-                }
+                sendExpoPushNotification(empRes.rows[0].push_token, title, body);
             }
         } catch(e) { console.error('Push error:', e); }
 

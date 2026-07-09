@@ -342,26 +342,28 @@ exports.updateOrder = async (req, res) => {
     const updatedOrder = result.rows[0];
     
     if (delivery_boy_id && currentOrder.rows[0].delivery_boy_id != delivery_boy_id) {
-       try {
-           const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
-           if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
-              const { sendExpoPushNotification } = require('../utils/pushNotification');
-              
-              let shouldPushNow = true;
-              if (updatedOrder.is_scheduled && updatedOrder.scheduled_date && updatedOrder.scheduled_time) {
-                 const sDate = typeof updatedOrder.scheduled_date === 'string' ? updatedOrder.scheduled_date.split('T')[0] : updatedOrder.scheduled_date.toISOString().split('T')[0];
-                 const scheduledDateTime = new Date(`${sDate}T${updatedOrder.scheduled_time}`);
-                 const alarmTime = new Date(scheduledDateTime.getTime() - 20 * 60000);
-                 if (alarmTime > new Date()) {
-                    shouldPushNow = false;
-                 }
-              }
-              
-              if (shouldPushNow) {
-                 sendExpoPushNotification(empRes.rows[0].push_token, 'New Manual Order Assigned', `Order #${updatedOrder.order_no || updatedOrder.id} has been assigned to you.`);
-              }
-           }
-       } catch(e) { console.error('Push error:', e); }
+        try {
+            const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+            if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+               const { sendExpoPushNotification } = require('../utils/pushNotification');
+               
+               let title = 'New Order Assigned';
+               let body = `Order #${updatedOrder.order_no || updatedOrder.id} has been assigned to you.`;
+               
+               const isBus = updatedOrder.delivery_type === 'Bus' || updatedOrder.mode_of_delivery === 'Bus';
+               if (isBus) {
+                 title = 'New Bus Delivery Assigned';
+                 const bDate = updatedOrder.bus_date ? (typeof updatedOrder.bus_date === 'string' ? updatedOrder.bus_date.split('T')[0] : updatedOrder.bus_date.toISOString().split('T')[0]) : '';
+                 body = `Bus order #${updatedOrder.order_no || updatedOrder.id} has been assigned. Bus Date: ${bDate}, Time: ${updatedOrder.scheduled_time || ''}`;
+               } else if (updatedOrder.is_scheduled) {
+                 title = 'New Scheduled Order Assigned';
+                 const sDate = updatedOrder.scheduled_date ? (typeof updatedOrder.scheduled_date === 'string' ? updatedOrder.scheduled_date.split('T')[0] : updatedOrder.scheduled_date.toISOString().split('T')[0]) : '';
+                 body = `Scheduled order #${updatedOrder.order_no || updatedOrder.id} has been assigned. Scheduled: ${sDate} ${updatedOrder.scheduled_time || ''}`;
+               }
+               
+               sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+            }
+        } catch(e) { console.error('Push error:', e); }
     }
     
     // Wallet update logic for POD Cash Orders
