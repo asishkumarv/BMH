@@ -74,28 +74,95 @@ exports.getAdminPerformanceStats = async (req, res) => {
         paramIndex++;
       }
 
-      // Query manual orders
-      let manualQuery = `SELECT * FROM manual_orders WHERE delivery_boy_id = $1` + dateFilter;
+      // Query manual orders joining delivery addresses
+      let manualQuery = `
+        SELECT mo.*, da.latitude as addr_lat, da.longitude as addr_lng
+        FROM manual_orders mo
+        LEFT JOIN (
+          SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+          FROM delivery_addresses
+          GROUP BY mobile
+        ) da ON (da.mobile = mo.customer_phone OR da.mobile = mo.ship_to_phone)
+        WHERE mo.delivery_boy_id = $1
+      ` + dateFilter.replace(/created_at/g, 'mo.created_at');
       const manualRes = await pool.query(manualQuery, filterParams);
       
-      // Query online orders
-      let onlineQuery = `SELECT * FROM online_orders WHERE delivery_boy_id = $1` + dateFilter;
+      // Query online orders joining delivery addresses
+      let onlineQuery = `
+        SELECT oo.*, da.latitude as addr_lat, da.longitude as addr_lng
+        FROM online_orders oo
+        LEFT JOIN (
+          SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+          FROM delivery_addresses
+          GROUP BY mobile
+        ) da ON (da.mobile = oo.patient_mobile)
+        WHERE oo.delivery_boy_id = $1
+      ` + dateFilter.replace(/created_at/g, 'oo.created_at');
       const onlineRes = await pool.query(onlineQuery, filterParams);
 
-      // Query sales orders
-      let salesQuery = `SELECT * FROM ecogreen_sales_orders WHERE delivery_boy_id = $1` + dateFilter;
+      // Query sales orders joining delivery addresses
+      let salesQuery = `
+        SELECT so.*, da.latitude as addr_lat, da.longitude as addr_lng
+        FROM ecogreen_sales_orders so
+        LEFT JOIN (
+          SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+          FROM delivery_addresses
+          GROUP BY mobile
+        ) da ON (da.mobile = so.mobile_no)
+        WHERE so.delivery_boy_id = $1
+      ` + dateFilter.replace(/created_at/g, 'so.created_at');
       const salesRes = await pool.query(salesQuery, filterParams);
 
-      // Query sales invoices
-      let invoiceQuery = `SELECT * FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1` + dateFilter;
+      // Query sales invoices joining delivery addresses
+      let invoiceQuery = `
+        SELECT si.*, da.latitude as addr_lat, da.longitude as addr_lng
+        FROM ecogreen_sales_invoices si
+        LEFT JOIN (
+          SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+          FROM delivery_addresses
+          GROUP BY mobile
+        ) da ON (da.mobile = si.mobile_no)
+        WHERE si.delivery_boy_id = $1
+      ` + dateFilter.replace(/created_at/g, 'si.created_at');
       const invoiceRes = await pool.query(invoiceQuery, filterParams);
 
       // Unified order aggregation
       const allOrders = [
-        ...manualRes.rows.map(o => ({ status: o.status, type: 'manual', amount: parseFloat(o.amount || 0), paymentMode: o.payment_mode || o.pod_payment_mode || 'Cash', lat: null, lng: null, created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at })),
-        ...onlineRes.rows.map(o => ({ status: o.status, type: 'online', amount: parseFloat(o.total_amount || 0), paymentMode: o.pod_payment_mode || 'Online', lat: parseFloat(o.map_lat), lng: parseFloat(o.map_lng), created: o.created_at, delivered: o.updated_at, picked: o.created_at })),
-        ...salesRes.rows.map(o => ({ status: o.status, type: 'sales_order', amount: parseFloat(o.order_total || 0), paymentMode: 'Cash', lat: null, lng: null, created: o.created_at, delivered: o.created_at, picked: o.created_at })),
-        ...invoiceRes.rows.map(o => ({ status: o.status, type: 'sales_invoice', amount: parseFloat(o.order_total || 0), paymentMode: 'Cash', lat: null, lng: null, created: o.created_at, delivered: o.created_at, picked: o.created_at }))
+        ...manualRes.rows.map(o => {
+          let lat = null, lng = null;
+          if (o.location_link && o.location_link.includes('?q=')) {
+            const parts = o.location_link.split('?q=')[1];
+            if (parts) {
+              const coords = parts.split(',');
+              lat = parseFloat(coords[0]);
+              lng = parseFloat(coords[1]);
+            }
+          }
+          if ((lat == null || lng == null) && o.addr_lat != null && o.addr_lng != null) {
+            lat = parseFloat(o.addr_lat);
+            lng = parseFloat(o.addr_lng);
+          }
+          return { status: o.status, type: 'manual', amount: parseFloat(o.amount || 0), paymentMode: o.payment_mode || o.pod_payment_mode || 'Cash', lat, lng, created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at };
+        }),
+        ...onlineRes.rows.map(o => {
+          let lat = o.map_lat ? parseFloat(o.map_lat) : null;
+          let lng = o.map_lng ? parseFloat(o.map_lng) : null;
+          if ((lat == null || lng == null || lat === 0 || lng === 0) && o.addr_lat != null && o.addr_lng != null) {
+            lat = parseFloat(o.addr_lat);
+            lng = parseFloat(o.addr_lng);
+          }
+          return { status: o.status, type: 'online', amount: parseFloat(o.total_amount || 0), paymentMode: o.pod_payment_mode || 'Online', lat, lng, created: o.created_at, delivered: o.updated_at, picked: o.created_at };
+        }),
+        ...salesRes.rows.map(o => {
+          let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
+          let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
+          return { status: o.status, type: 'sales_order', amount: parseFloat(o.order_total || 0), paymentMode: 'Cash', lat, lng, created: o.created_at, delivered: o.created_at, picked: o.created_at };
+        }),
+        ...invoiceRes.rows.map(o => {
+          let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
+          let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
+          return { status: o.status, type: 'sales_invoice', amount: parseFloat(o.order_total || 0), paymentMode: 'Cash', lat, lng, created: o.created_at, delivered: o.created_at, picked: o.created_at };
+        })
       ];
 
       // Counters
@@ -135,12 +202,8 @@ exports.getAdminPerformanceStats = async (req, res) => {
 
           // Distance calculation
           let distance = 0;
-          if (o.lat != null && o.lng != null) {
+          if (o.lat != null && o.lng != null && o.lat !== 0 && o.lng !== 0) {
             distance = getHaversineDistance(deptLat, deptLng, o.lat, o.lng) || 0;
-          }
-          // If distance not captured, fallback to a realistic route distance
-          if (distance <= 0) {
-            distance = 3.5 + (o.amount % 5); // Realistic route variance based on amount
           }
           totalDistance += distance;
 
@@ -172,18 +235,20 @@ exports.getAdminPerformanceStats = async (req, res) => {
         workingHours = workingDaysCount * 9; // Fallback to standard shift duration
       }
 
-      // Average Delivery duration in minutes
-      const avgDeliveryTimeMin = durationCount > 0 ? Math.round((totalDurationSec / 60) / durationCount) : 25;
+      // Average Delivery duration in minutes (0 if no timestamps)
+      const avgDeliveryTimeMin = durationCount > 0 ? Math.round((totalDurationSec / 60) / durationCount) : 0;
 
       // Rate formulas
       const successRate = assigned > 0 ? Math.round((delivered / assigned) * 100) : 0;
       const cancellationRate = assigned > 0 ? Math.round((cancelled / assigned) * 100) : 0;
       const returnRate = assigned > 0 ? Math.round((returned / assigned) * 100) : 0;
-      const productivityRate = workingHours > 0 ? parseFloat((delivered / workingHours).toFixed(2)) : 0;
 
-      // Dynamic Rating & Incentives calculation
-      const rating = 4.8 - (failed * 0.1) - (cancelled * 0.05);
-      const ratingClean = parseFloat(Math.min(5, Math.max(3.5, rating)).toFixed(2));
+      // Rating: 5.0 base score minus deductions for failures and cancellations
+      let ratingClean = 0.0;
+      if (delivered > 0 || failed > 0 || cancelled > 0) {
+        const ratingVal = 5.0 - (failed * 0.2) - (cancelled * 0.1);
+        ratingClean = parseFloat(Math.min(5, Math.max(1, ratingVal)).toFixed(2));
+      }
       const incentive = delivered * 15; // ₹15 per delivery incentive
 
       compiledRidersStats.push({
@@ -226,7 +291,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
     }
 
     const totalRidersCount = riders.length;
-    const overallAvgDeliveryTime = totalRidersCount > 0 ? Math.round(totalAllTime / totalRidersCount) : 25;
+    const overallAvgDeliveryTime = totalRidersCount > 0 ? Math.round(totalAllTime / totalRidersCount) : 0;
     const overallSuccessRate = totalAllAssigned > 0 ? Math.round((totalAllDelivered / totalAllAssigned) * 100) : 0;
     
     // Sort riders by success rate (or order volume)
@@ -275,6 +340,14 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     }
     const rider = riderRes.rows[0];
 
+    // Fetch department default location coordinates (for distance calculation)
+    const deptRes = await pool.query(`
+      SELECT allowed_latitude, allowed_longitude FROM departments 
+      WHERE name = 'Delivery' LIMIT 1
+    `);
+    const deptLat = deptRes.rows[0]?.allowed_latitude ? parseFloat(deptRes.rows[0].allowed_latitude) : 17.3850;
+    const deptLng = deptRes.rows[0]?.allowed_longitude ? parseFloat(deptRes.rows[0].allowed_longitude) : 78.4867;
+
     // Filter construction helper
     let dateFilter = '';
     let filterParams = [riderId];
@@ -282,23 +355,92 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
       dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $2`;
       filterParams.push(month);
     } else {
-      // Default to current month
       const currentMonth = new Date().toISOString().substring(0, 7);
       dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $2`;
       filterParams.push(currentMonth);
     }
 
-    // Queries
-    const manualRes = await pool.query(`SELECT * FROM manual_orders WHERE delivery_boy_id = $1` + dateFilter, filterParams);
-    const onlineRes = await pool.query(`SELECT * FROM online_orders WHERE delivery_boy_id = $1` + dateFilter, filterParams);
-    const salesRes = await pool.query(`SELECT * FROM ecogreen_sales_orders WHERE delivery_boy_id = $1` + dateFilter, filterParams);
-    const invoiceRes = await pool.query(`SELECT * FROM ecogreen_sales_invoices WHERE delivery_boy_id = $1` + dateFilter, filterParams);
+    // Queries joining delivery addresses
+    const manualRes = await pool.query(`
+      SELECT mo.*, da.latitude as addr_lat, da.longitude as addr_lng
+      FROM manual_orders mo
+      LEFT JOIN (
+        SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+        FROM delivery_addresses
+        GROUP BY mobile
+      ) da ON (da.mobile = mo.customer_phone OR da.mobile = mo.ship_to_phone)
+      WHERE mo.delivery_boy_id = $1
+    ` + dateFilter.replace(/created_at/g, 'mo.created_at'), filterParams);
+
+    const onlineRes = await pool.query(`
+      SELECT oo.*, da.latitude as addr_lat, da.longitude as addr_lng
+      FROM online_orders oo
+      LEFT JOIN (
+        SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+        FROM delivery_addresses
+        GROUP BY mobile
+      ) da ON (da.mobile = oo.patient_mobile)
+      WHERE oo.delivery_boy_id = $1
+    ` + dateFilter.replace(/created_at/g, 'oo.created_at'), filterParams);
+
+    const salesRes = await pool.query(`
+      SELECT so.*, da.latitude as addr_lat, da.longitude as addr_lng
+      FROM ecogreen_sales_orders so
+      LEFT JOIN (
+        SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+        FROM delivery_addresses
+        GROUP BY mobile
+      ) da ON (da.mobile = so.mobile_no)
+      WHERE so.delivery_boy_id = $1
+    ` + dateFilter.replace(/created_at/g, 'so.created_at'), filterParams);
+
+    const invoiceRes = await pool.query(`
+      SELECT si.*, da.latitude as addr_lat, da.longitude as addr_lng
+      FROM ecogreen_sales_invoices si
+      LEFT JOIN (
+        SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+        FROM delivery_addresses
+        GROUP BY mobile
+      ) da ON (da.mobile = si.mobile_no)
+      WHERE si.delivery_boy_id = $1
+    ` + dateFilter.replace(/created_at/g, 'si.created_at'), filterParams);
 
     const allOrders = [
-      ...manualRes.rows.map(o => ({ status: o.status, amount: parseFloat(o.amount || 0), created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at })),
-      ...onlineRes.rows.map(o => ({ status: o.status, amount: parseFloat(o.total_amount || 0), created: o.created_at, delivered: o.updated_at, picked: o.created_at })),
-      ...salesRes.rows.map(o => ({ status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at })),
-      ...invoiceRes.rows.map(o => ({ status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at }))
+      ...manualRes.rows.map(o => {
+        let lat = null, lng = null;
+        if (o.location_link && o.location_link.includes('?q=')) {
+          const parts = o.location_link.split('?q=')[1];
+          if (parts) {
+            const coords = parts.split(',');
+            lat = parseFloat(coords[0]);
+            lng = parseFloat(coords[1]);
+          }
+        }
+        if ((lat == null || lng == null) && o.addr_lat != null && o.addr_lng != null) {
+          lat = parseFloat(o.addr_lat);
+          lng = parseFloat(o.addr_lng);
+        }
+        return { status: o.status, amount: parseFloat(o.amount || 0), created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at, lat, lng };
+      }),
+      ...onlineRes.rows.map(o => {
+        let lat = o.map_lat ? parseFloat(o.map_lat) : null;
+        let lng = o.map_lng ? parseFloat(o.map_lng) : null;
+        if ((lat == null || lng == null || lat === 0 || lng === 0) && o.addr_lat != null && o.addr_lng != null) {
+          lat = parseFloat(o.addr_lat);
+          lng = parseFloat(o.addr_lng);
+        }
+        return { status: o.status, amount: parseFloat(o.total_amount || 0), created: o.created_at, delivered: o.updated_at, picked: o.created_at, lat, lng };
+      }),
+      ...salesRes.rows.map(o => {
+        let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
+        let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
+        return { status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at, lat, lng };
+      }),
+      ...invoiceRes.rows.map(o => {
+        let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
+        let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
+        return { status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at, lat, lng };
+      })
     ];
 
     const assigned = allOrders.length;
@@ -310,6 +452,7 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     let totalDeliveryValue = 0;
     let totalDurationSec = 0;
     let durationCount = 0;
+    let totalDistance = 0;
 
     allOrders.forEach(o => {
       const statusClean = o.status?.toLowerCase() || '';
@@ -324,6 +467,14 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
             durationCount++;
           }
         }
+
+        // Distance calculation
+        let distance = 0;
+        if (o.lat != null && o.lng != null && o.lat !== 0 && o.lng !== 0) {
+          distance = getHaversineDistance(deptLat, deptLng, o.lat, o.lng) || 0;
+        }
+        totalDistance += distance;
+
       } else if (statusClean.includes('cancel')) {
         cancelled++;
       } else if (statusClean.includes('return')) {
@@ -352,10 +503,16 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
       workingHours = workingDays * 9;
     }
 
-    const avgDeliveryTimeMin = durationCount > 0 ? Math.round((totalDurationSec / 60) / durationCount) : 25;
+    const avgDeliveryTimeMin = durationCount > 0 ? Math.round((totalDurationSec / 60) / durationCount) : 0;
     const successRate = assigned > 0 ? Math.round((delivered / assigned) * 100) : 0;
-    const totalDistanceKM = parseFloat((delivered * 4.2).toFixed(2)); // realistic distance estimation
+    const totalDistanceKM = parseFloat(totalDistance.toFixed(2));
     const incentiveEarned = delivered * 15; // ₹15 incentive per delivery
+
+    let ratingClean = 0.0;
+    if (delivered > 0 || failed > 0 || cancelled > 0) {
+      const ratingVal = 5.0 - (failed * 0.2) - (cancelled * 0.1);
+      ratingClean = parseFloat(Math.min(5, Math.max(1, ratingVal)).toFixed(2));
+    }
 
     res.json({
       success: true,
@@ -382,7 +539,7 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
           workingHours: parseFloat(workingHours.toFixed(1)),
           avgDeliveryTimeMin,
           successRate,
-          rating: parseFloat(Math.min(5, Math.max(3.8, 4.8 - (failed * 0.1))).toFixed(2)),
+          rating: ratingClean,
           incentiveEarned,
           fuelReimbursement: parseFloat((totalDistanceKM * 3.5).toFixed(2)) // ₹3.5 per KM fuel rate
         }
