@@ -681,13 +681,33 @@ export default function AdminPerformance() {
       {/* Rider's Detailed Assigned Orders list (when filtered) */}
       {filterRiderId && (() => {
         const filteredOrders = (executive.ordersList || []).filter((order: any) => {
-          const matchesSearch = tableSearch === '' ||
-            order.orderNo?.toLowerCase().includes(tableSearch.toLowerCase()) ||
-            order.customerName?.toLowerCase().includes(tableSearch.toLowerCase()) ||
-            order.customerPhone?.toLowerCase().includes(tableSearch.toLowerCase());
-          const matchesType = tableType === '' || order.type?.toLowerCase() === tableType.toLowerCase();
-          const matchesStatus = tableStatus === '' || order.status?.toLowerCase() === tableStatus.toLowerCase();
+          const searchStr = tableSearch.toLowerCase().trim();
+          const matchesSearch = searchStr === '' ||
+            String(order.orderNo || '').toLowerCase().includes(searchStr) ||
+            String(order.invoiceNo || '').toLowerCase().includes(searchStr) ||
+            String(order.customerName || '').toLowerCase().includes(searchStr) ||
+            String(order.customerPhone || '').toLowerCase().includes(searchStr);
+          
+          // Use localized translation logic for table filter type matching to correspond to UI
+          let resolvedType = String(order.type || '').toLowerCase();
+          if (resolvedType === 'manual') {
+            resolvedType = String(order.modeOfDelivery || '').toLowerCase() === 'bus' ? 'bus' : String(order.modeOfDelivery || '').toLowerCase() === 'schedule delivery' ? 'scheduled' : 'local';
+          } else if (resolvedType === 'online') {
+            resolvedType = 'local';
+          } else if (resolvedType === 'sales_invoice' || resolvedType === 'sales_order') {
+            resolvedType = 'counter';
+          }
+          
+          const matchesType = tableType === '' || resolvedType === tableType.toLowerCase();
+          const matchesStatus = tableStatus === '' || String(order.status || '').toLowerCase() === tableStatus.toLowerCase();
+          
           return matchesSearch && matchesType && matchesStatus;
+        });
+
+        const sortedOrders = [...filteredOrders].sort((a: any, b: any) => {
+          const tA = a.assignedAt ? new Date(a.assignedAt).getTime() : 0;
+          const tB = b.assignedAt ? new Date(b.assignedAt).getTime() : 0;
+          return tB - tA;
         });
 
         return (
@@ -708,7 +728,7 @@ export default function AdminPerformance() {
                   <select
                     value={tableType}
                     onChange={(e) => setTableType(e.target.value)}
-                    style={StyleSheet.flatten([styles.webSelect, { height: 38, minWidth: 120 }]) as any}
+                    style={StyleSheet.flatten([styles.webSelect, { height: 38, width: 140, minWidth: 120 }]) as any}
                   >
                     <option value="">All Types</option>
                     <option value="Local">Local</option>
@@ -720,7 +740,7 @@ export default function AdminPerformance() {
                   <select
                     value={tableStatus}
                     onChange={(e) => setTableStatus(e.target.value)}
-                    style={StyleSheet.flatten([styles.webSelect, { height: 38, minWidth: 120 }]) as any}
+                    style={StyleSheet.flatten([styles.webSelect, { height: 38, width: 140, minWidth: 120 }]) as any}
                   >
                     <option value="">All Statuses</option>
                     <option value="assigned">Assigned</option>
@@ -750,12 +770,12 @@ export default function AdminPerformance() {
                   <Text style={[styles.th, { width: 140 }]}>Pickup to Deliv.</Text>
                 </View>
 
-                {filteredOrders.length === 0 ? (
+                {sortedOrders.length === 0 ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
                     <Text style={{ color: '#64748B', fontSize: 13 }}>No matching deliveries found for the selected filters.</Text>
                   </View>
                 ) : (
-                  filteredOrders.map((order: any, idx: number) => {
+                  sortedOrders.map((order: any, idx: number) => {
                     const formatTime = (ts: string) => {
                       if (!ts) return 'N/A';
                       return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
