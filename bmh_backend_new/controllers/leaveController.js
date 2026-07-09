@@ -492,10 +492,10 @@ exports.generatePayslip = async (req, res) => {
     const actual_leaves = approved_leaves_count + missingDays;
 
     // Determine free leaves limit (custom settings vs dynamic month days default)
-    const defaultFreeLeaves = Math.max(0, daysInMonth - 27);
-    const leaves_limit = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
+    const required_working_days = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
       ? settings.leaves_per_month 
-      : defaultFreeLeaves;
+      : 27;
+    const leaves_limit = Math.max(0, daysInMonth - required_working_days);
 
     // Calculate extra leaves and deductions (using 27 required working days divisor!)
     const extra_leaves = Math.max(0, actual_leaves - leaves_limit);
@@ -798,10 +798,10 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
 
     const actual_leaves = approved_leaves_count + missingDays;
 
-    const defaultFreeLeaves = Math.max(0, daysInMonth - 27);
-    const leaves_limit = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
+    const required_working_days = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
       ? settings.leaves_per_month 
-      : defaultFreeLeaves;
+      : 27;
+    const leaves_limit = Math.max(0, daysInMonth - required_working_days);
 
     res.status(200).json({
       limits: {
