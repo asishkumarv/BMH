@@ -64,6 +64,7 @@ app.use('/normal-sales', normalSalesOrderRoutes);
 app.use('/delivery-boy', deliveryBoyRoutes);
 app.use('/delivery-address', deliveryAddressRoutes);
 app.use('/profile', profileRoutes);
+app.use('/performance', require('./routes/performanceRoutes'));
 
 // Custom routes for EcoGreen-style sales orders
 app.use('/sales-order', ecogreenSalesOrderRoutes);

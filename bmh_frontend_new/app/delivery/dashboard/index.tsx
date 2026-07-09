@@ -104,6 +104,11 @@ export default function DeliveryDashboard() {
   const [cancelOtp, setCancelOtp] = useState('');
   const [updateOrder, setUpdateOrder] = useState<any>(null);
 
+  // GPS Location Update Modal State
+  const [gpsModalVisible, setGpsModalVisible] = useState(false);
+  const [gpsTargetOrder, setGpsTargetOrder] = useState<any>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+
   // New State
   const [filterState, setFilterState] = useState('All');
   const [summary, setSummary] = useState<any>(null);
@@ -425,6 +430,40 @@ export default function DeliveryDashboard() {
     }
   };
 
+  const handleUpdateGPSLocation = async () => {
+    try {
+      setGpsLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'GPS location permission is required.');
+        setGpsModalVisible(false);
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = loc.coords;
+      const response = await axios.post('https://napi.bharatmedicalhallplus.com/delivery-boy/order/update-patient-gps', {
+        orderId: gpsTargetOrder.id,
+        orderType: gpsTargetOrder.type,
+        latitude,
+        longitude
+      });
+      if (response.data && response.data.success) {
+        Alert.alert('Success', 'GPS coordinates successfully updated in patient master address!');
+        if (Platform.OS === 'web') window.alert('GPS coordinates successfully updated in patient master address!');
+      } else {
+        Alert.alert('Success', response.data.message || 'GPS coordinates updated.');
+        if (Platform.OS === 'web') window.alert(response.data.message || 'GPS coordinates updated.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to update GPS coordinates.');
+      if (Platform.OS === 'web') window.alert('Failed to update GPS coordinates.');
+    } finally {
+      setGpsLoading(false);
+      setGpsModalVisible(false);
+    }
+  };
+
   const processDelivery = async (orderId: string | number, type: string, otp?: string) => {
     try {
       if (type === 'online_order') {
@@ -451,9 +490,12 @@ export default function DeliveryDashboard() {
       } else {
         alert('Ecogreen Order Delivered (Status update pending backend implementation)');
       }
-      alert('Order Marked as Delivered!');
       setOtpModalVisible(false);
       if (user) fetchOrders(user.id);
+      
+      // Open patient GPS coordinates popup
+      setGpsTargetOrder({ id: orderId, type });
+      setGpsModalVisible(true);
     } catch (err: any) {
       alert("Error: " + (err.response?.data?.message || err.message));
     }
@@ -1034,6 +1076,46 @@ export default function DeliveryDashboard() {
                   <Text style={styles.saveBtnText}>Confirm Cancel</Text>
                 </TouchableOpacity>
               )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* GPS Location Update Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={gpsModalVisible}
+        onRequestClose={() => setGpsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 450 }]}>
+            <Text style={styles.modalTitle}>Confirm Patient Location</Text>
+            
+            <View style={{ marginVertical: 15 }}>
+              <Text style={[styles.infoText, { textAlign: 'center', fontSize: 15, lineHeight: 22, color: '#475569' }]}>
+                Would you like to capture your current Google Maps GPS coordinates and update the patient's master address profile?
+              </Text>
+              {gpsLoading && (
+                <ActivityIndicator size="small" color={Colors.light.primary} style={{ marginTop: 15 }} />
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={() => setGpsModalVisible(false)}
+                disabled={gpsLoading}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.saveBtn, { backgroundColor: '#10B981' }]} 
+                onPress={handleUpdateGPSLocation}
+                disabled={gpsLoading}
+              >
+                <Text style={styles.saveBtnText}>Update Location</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

@@ -1056,4 +1056,93 @@ router.patch('/:id/shift', async (req, res) => {
   }
 });
 
+router.post('/order/update-patient-gps', async (req, res) => {
+  const { orderId, orderType, latitude, longitude } = req.body;
+
+  if (!orderId || !orderType || latitude == null || longitude == null) {
+    return res.status(400).json({ success: false, error: 'Missing parameters' });
+  }
+
+  try {
+    let addressId = null;
+    let patientId = null;
+
+    // 1. Update order specific coordinates/link
+    if (orderType === 'manual_order') {
+      const locationLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      await pool.query(
+        'UPDATE manual_orders SET location_link = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [locationLink, orderId]
+      );
+      
+      const orderRes = await pool.query(
+        'SELECT customer_phone, ship_to_phone FROM manual_orders WHERE id = $1',
+        [orderId]
+      );
+      if (orderRes.rows.length > 0) {
+        const phone = orderRes.rows[0].customer_phone || orderRes.rows[0].ship_to_phone;
+        if (phone) {
+          const addrRes = await pool.query(
+            'SELECT id FROM delivery_addresses WHERE mobile = $1 ORDER BY created_at DESC LIMIT 1',
+            [phone]
+          );
+          if (addrRes.rows.length > 0) {
+            addressId = addrRes.rows[0].id;
+          }
+        }
+      }
+    } else if (orderType === 'online_order') {
+      await pool.query(
+        'UPDATE online_orders SET map_lat = $1, map_lng = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [latitude.toString(), longitude.toString(), orderId]
+      );
+      
+      const orderRes = await pool.query('SELECT patient_id FROM online_orders WHERE id = $1', [orderId]);
+      if (orderRes.rows.length > 0) {
+        patientId = orderRes.rows[0].patient_id;
+      }
+    } else if (orderType === 'sales_order') {
+      await pool.query(
+        'UPDATE ecogreen_sales_orders SET location_lat = $1, location_lng = $2 WHERE id = $3',
+        [latitude, longitude, orderId]
+      ).catch(() => {});
+      
+      const orderRes = await pool.query('SELECT patient_id FROM ecogreen_sales_orders WHERE id = $1', [orderId]);
+      if (orderRes.rows.length > 0) {
+        patientId = orderRes.rows[0].patient_id;
+      }
+    } else if (orderType === 'sales_invoice') {
+      const orderRes = await pool.query('SELECT patient_id FROM ecogreensales_invoices WHERE id = $1', [orderId]);
+      if (orderRes.rows.length > 0) {
+        patientId = orderRes.rows[0].patient_id;
+      }
+    }
+
+    // 2. Fallback lookup by patient_id
+    if (!addressId && patientId) {
+      const addrRes = await pool.query(
+        'SELECT id FROM delivery_addresses WHERE patient_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [patientId]
+      );
+      if (addrRes.rows.length > 0) {
+        addressId = addrRes.rows[0].id;
+      }
+    }
+
+    // 3. Update coordinates in delivery_addresses
+    if (addressId) {
+      await pool.query(
+        'UPDATE delivery_addresses SET latitude = $1, longitude = $2 WHERE id = $3',
+        [latitude, longitude, addressId]
+      );
+      return res.json({ success: true, message: 'GPS updated in order and patient master address' });
+    }
+
+    res.json({ success: true, message: 'GPS updated in order details, but patient master address record could not be mapped.' });
+  } catch (err) {
+    console.error('Error in /order/update-patient-gps:', err);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
