@@ -159,6 +159,29 @@ router.put('/:id/assign-delivery', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    const updatedOrder = result.rows[0];
+    if (delivery_boy_id) {
+      try {
+        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+          const { sendExpoPushNotification } = require('../utils/pushNotification');
+          let title = 'New Sales Order Assigned';
+          let body = `Sales Order #${updatedOrder.id} has been assigned to you.`;
+          
+          const isBus = updatedOrder.delivery_type === 'Bus';
+          if (isBus) {
+            title = 'New Bus Delivery Assigned';
+            const bDate = updatedOrder.bus_date ? (typeof updatedOrder.bus_date === 'string' ? updatedOrder.bus_date.split('T')[0] : updatedOrder.bus_date.toISOString().split('T')[0]) : '';
+            body = `Bus order #${updatedOrder.id} has been assigned. Bus Date: ${bDate}`;
+          }
+          
+          sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+        }
+      } catch (e) {
+        console.error('Push notification error:', e.message);
+      }
+    }
+
     res.json({ success: true, message: 'Delivery assigned successfully', delivery_otp });
   } catch (err) {
     console.error('Error assigning delivery:', err);

@@ -444,3 +444,17 @@ exports.bulkSavePurchaseOrders = async (req, res) => {
     client.release();
   }
 };
+
+exports.updatePushToken = async (req, res) => {
+  const { employee_id, pushToken } = req.body;
+  if (!employee_id) {
+    return res.status(400).json({ success: false, message: 'employee_id is required' });
+  }
+  try {
+    await pool.query('UPDATE employees SET push_token = $1 WHERE id = $2', [pushToken || null, employee_id]);
+    res.json({ success: true, message: 'Push token updated successfully' });
+  } catch (err) {
+    console.error('Update push token error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

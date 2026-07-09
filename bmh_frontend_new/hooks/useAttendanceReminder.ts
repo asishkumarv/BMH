@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 // Configure how notifications behave when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -43,7 +45,17 @@ export function useAttendanceReminder(user: any) {
     if (Platform.OS === 'web') {
       setupWebReminder(scheduleIn, scheduleOut, breakIn, breakOut);
     } else {
-      setupMobileReminder(scheduleIn, scheduleOut, breakIn, breakOut);
+      const timesKey = `${user.id || ''}_${scheduleIn || ''}_${scheduleOut || ''}_${breakIn || ''}_${breakOut || ''}`;
+      AsyncStorage.getItem('last_scheduled_reminder_times').then((val) => {
+        if (val === timesKey) {
+          console.log("Reminders already scheduled for these times. Skipping rescheduling.");
+          return;
+        }
+        setupMobileReminder(scheduleIn, scheduleOut, breakIn, breakOut, timesKey);
+      }).catch(err => {
+        console.error("Error reading last scheduled times:", err);
+        setupMobileReminder(scheduleIn, scheduleOut, breakIn, breakOut);
+      });
     }
 
     return () => {
@@ -190,7 +202,7 @@ export function useAttendanceReminder(user: any) {
     }
   };
 
-  const setupMobileReminder = async (scheduleIn?: string, scheduleOut?: string, breakIn?: string, breakOut?: string) => {
+  const setupMobileReminder = async (scheduleIn?: string, scheduleOut?: string, breakIn?: string, breakOut?: string, timesKey?: string) => {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {
@@ -244,6 +256,7 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
+          type: 'daily',
           hour: reminderInHours,
           minute: reminderInMins,
           repeats: true,
@@ -271,6 +284,7 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
+          type: 'daily',
           hour: reminderOutHours,
           minute: reminderOutMins,
           repeats: true,
@@ -298,6 +312,7 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
+          type: 'daily',
           hour: reminderBreakInHours,
           minute: reminderBreakInMins,
           repeats: true,
@@ -325,6 +340,7 @@ export function useAttendanceReminder(user: any) {
           sound: true,
         },
         trigger: {
+          type: 'daily',
           hour: reminderBreakOutHours,
           minute: reminderBreakOutMins,
           repeats: true,
@@ -332,6 +348,15 @@ export function useAttendanceReminder(user: any) {
         } as any,
       });
       console.log(`Scheduled Break-out alarm for ${reminderBreakOutHours}:${reminderBreakOutMins}`);
+    }
+
+    if (timesKey) {
+      try {
+        await AsyncStorage.setItem('last_scheduled_reminder_times', timesKey);
+        console.log("Successfully saved scheduled reminder times key:", timesKey);
+      } catch (e) {
+        console.log("Error saving times key to AsyncStorage:", e);
+      }
     }
   };
 }

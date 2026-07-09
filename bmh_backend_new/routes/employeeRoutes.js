@@ -14,6 +14,9 @@ router.post('/', employeeController.addEmployee);
 // POST /employees/login
 router.post('/login', employeeController.loginEmployee);
 
+// POST /employees/update-push-token
+router.post('/update-push-token', employeeController.updatePushToken);
+
 // GET /employees/by-department-id/:dept_id
 router.get('/by-department-id/:dept_id', employeeController.getEmployeesByDepartment);
 

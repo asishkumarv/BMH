@@ -2540,6 +2540,21 @@ router.put("/sales-orderstatus/assign-delivery-boy/:orderId", async (req, res) =
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
+    const updatedStatus = result.rows[0];
+    if (delivery_boy_id) {
+      try {
+        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+          const { sendExpoPushNotification } = require('../utils/pushNotification');
+          const title = 'New Order Assigned';
+          const body = `Order #${updatedStatus.order_id} has been assigned to you.`;
+          sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+        }
+      } catch (e) {
+        console.error('Push notification error:', e.message);
+      }
+    }
+
     res.json({ success: true, message: "Delivery boy assigned", order: result.rows[0] });
   } catch (err) {
     console.error("Assign Delivery Boy Error:", err);

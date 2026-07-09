@@ -67,6 +67,29 @@ router.post('/assign/:id', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Purchase order not found' });
         }
 
+        const updatedPO = result.rows[0];
+        if (delivery_boy_id) {
+            try {
+                const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+                if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+                    const { sendExpoPushNotification } = require('../utils/pushNotification');
+                    let title = 'New Purchase Order Assigned';
+                    let body = `Purchase Order #${updatedPO.id} has been assigned to you.`;
+                    
+                    const isBus = updatedPO.delivery_type === 'Bus';
+                    if (isBus) {
+                        title = 'New Bus Delivery Assigned';
+                        const bDate = updatedPO.bus_date ? (typeof updatedPO.bus_date === 'string' ? updatedPO.bus_date.split('T')[0] : updatedPO.bus_date.toISOString().split('T')[0]) : '';
+                        body = `Bus purchase order #${updatedPO.id} has been assigned. Bus Date: ${bDate}`;
+                    }
+                    
+                    sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+                }
+            } catch (e) {
+                console.error('Push notification error:', e.message);
+            }
+        }
+
         res.json({ success: true, data: result.rows[0] });
     } catch (err) {
         console.error("Error assigning delivery:", err.message);
