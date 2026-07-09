@@ -1424,15 +1424,18 @@ export default function ManualOrders({ deliveryBoys }) {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
-                      {boy.pending_count !== undefined && (
-                        <Text style={{ fontSize: 12, color: boy.pending_count > 0 ? '#d97706' : '#10b981', fontWeight: '500' }}>
-                          ({boy.pending_count} pending)
-                        </Text>
-                      )}
-                    </View>
-                    {assignOrder.delivery_boy_id?.toString() === boy.id.toString() && (
-                      <CheckCircle size={16} color="#4338ca" />
-                    )}
+                      {(() => {
+                        const pendingVal = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
+                        if (pendingVal !== undefined) {
+                          return (
+                            <Text style={{ fontSize: 12, color: pendingVal > 0 ? '#d97706' : '#10b981', fontWeight: '500' }}>
+                              ({pendingVal} pending)
+                            </Text>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </View>{assignOrder.delivery_boy_id?.toString() === boy.id.toString() && <CheckCircle size={16} color="#4338ca" />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
