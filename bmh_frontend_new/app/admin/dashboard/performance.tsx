@@ -298,7 +298,6 @@ export default function AdminPerformance() {
               <Text style={[styles.th, { width: 100 }]}>Distance</Text>
               <Text style={[styles.th, { width: 100 }]}>Attendance</Text>
               <Text style={[styles.th, { width: 80 }]}>Rating</Text>
-              <Text style={[styles.th, { width: 100 }]}>Incentive</Text>
             </View>
 
             {riders.map((r) => (
@@ -319,7 +318,6 @@ export default function AdminPerformance() {
                 <Text style={[styles.td, { width: 100 }]}>{r.totalDistanceKM} KM</Text>
                 <Text style={[styles.td, { width: 100 }]}>{r.workingDays} days</Text>
                 <Text style={[styles.td, { width: 80, fontWeight: '700', color: getStatusColor(r.rating, 'rating') }]}>{r.rating} ★</Text>
-                <Text style={[styles.td, { width: 100, fontWeight: '700', color: Colors.light.primary }]}>₹{r.incentiveEarned}</Text>
               </View>
             ))}
           </View>

@@ -249,8 +249,6 @@ exports.getAdminPerformanceStats = async (req, res) => {
         const ratingVal = 5.0 - (failed * 0.2) - (cancelled * 0.1);
         ratingClean = parseFloat(Math.min(5, Math.max(1, ratingVal)).toFixed(2));
       }
-      const incentive = delivered * 15; // ₹15 per delivery incentive
-
       compiledRidersStats.push({
         riderId,
         name: rider.full_name,
@@ -273,8 +271,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
         workingHours: parseFloat(workingHours.toFixed(1)),
         cashCollected,
         onlineCollected,
-        rating: ratingClean,
-        incentiveEarned: incentive
+        rating: ratingClean
       });
 
       // Sum all totals for executive metrics
@@ -506,8 +503,6 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     const avgDeliveryTimeMin = durationCount > 0 ? Math.round((totalDurationSec / 60) / durationCount) : 0;
     const successRate = assigned > 0 ? Math.round((delivered / assigned) * 100) : 0;
     const totalDistanceKM = parseFloat(totalDistance.toFixed(2));
-    const incentiveEarned = delivered * 15; // ₹15 incentive per delivery
-
     let ratingClean = 0.0;
     if (delivered > 0 || failed > 0 || cancelled > 0) {
       const ratingVal = 5.0 - (failed * 0.2) - (cancelled * 0.1);
@@ -539,9 +534,7 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
           workingHours: parseFloat(workingHours.toFixed(1)),
           avgDeliveryTimeMin,
           successRate,
-          rating: ratingClean,
-          incentiveEarned,
-          fuelReimbursement: parseFloat((totalDistanceKM * 3.5).toFixed(2)) // ₹3.5 per KM fuel rate
+          rating: ratingClean
         }
       }
     });

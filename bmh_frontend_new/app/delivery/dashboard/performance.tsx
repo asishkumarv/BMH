@@ -74,7 +74,7 @@ export default function RiderPerformance() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>My Performance & KPI</Text>
-          <Text style={styles.subtitle}>Track your delivery metrics, ratings, and incentives</Text>
+          <Text style={styles.subtitle}>Track your delivery metrics and ratings</Text>
         </View>
         
         <View style={styles.filterContainer}>
@@ -127,17 +127,6 @@ export default function RiderPerformance() {
         </View>
 
         <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
-            <DollarSign size={20} color="#10B981" />
-          </View>
-          <View>
-            <Text style={styles.kpiLabel}>Incentive Earned</Text>
-            <Text style={[styles.kpiValue, { color: '#10B981' }]}>₹{perf.incentiveEarned || 0}</Text>
-            <Text style={styles.kpiSub}>Rate: ₹15 per delivery</Text>
-          </View>
-        </View>
-
-        <View style={styles.kpiCard}>
           <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
             <Star size={20} color="#F59E0B" />
           </View>
@@ -156,10 +145,6 @@ export default function RiderPerformance() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Total Distance Traveled</Text>
             <Text style={styles.detailValue}>{perf.totalDistanceKM || 0} KM</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Fuel Reimbursement (₹3.5/KM)</Text>
-            <Text style={styles.detailValue}>₹{perf.fuelReimbursement || 0}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Average Delivery Cycle Duration</Text>
