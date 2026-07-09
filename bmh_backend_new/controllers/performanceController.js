@@ -14,6 +14,71 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// Robust coordinate parser supporting DMS, Decimal, and Google Map URLs
+function parseCoordinates(link) {
+  if (!link) return null;
+  link = link.trim();
+  
+  // Pattern 1: Decimal coordinates e.g. "21.96075,86.742305"
+  const decimalRegex = /^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/;
+  const decMatch = link.match(decimalRegex);
+  if (decMatch) {
+    return {
+      lat: parseFloat(decMatch[1]),
+      lng: parseFloat(decMatch[2])
+    };
+  }
+
+  // Pattern 2: DMS format e.g. "21°57'38.7\"N 86°44'32.3\"E"
+  const dmsRegex = /(\d+)°(\d+)'([\d.]+)"([NS])\s+(\d+)°(\d+)'([\d.]+)"([EW])/i;
+  const dmsMatch = link.match(dmsRegex);
+  if (dmsMatch) {
+    const convertDMS = (deg, min, sec, dir) => {
+      let dd = parseFloat(deg) + parseFloat(min)/60 + parseFloat(sec)/3600;
+      if (dir === 'S' || dir === 'W') dd = -dd;
+      return dd;
+    };
+    const lat = convertDMS(dmsMatch[1], dmsMatch[2], dmsMatch[3], dmsMatch[4]);
+    const lng = convertDMS(dmsMatch[5], dmsMatch[6], dmsMatch[7], dmsMatch[8]);
+    return { lat, lng };
+  }
+
+  // Pattern 3: Google Maps link with query parameter ?q=lat,lng
+  if (link.includes('?q=')) {
+    const parts = link.split('?q=')[1];
+    if (parts) {
+      const coords = parts.split('&')[0].split(',');
+      const lat = parseFloat(coords[0]);
+      const lng = parseFloat(coords[1]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+  }
+
+  // Pattern 4: Google Maps path link e.g. maps.google.com/maps/place/lat,lng
+  const placeRegex = /\/place\/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+  const placeMatch = link.match(placeRegex);
+  if (placeMatch) {
+    return {
+      lat: parseFloat(placeMatch[1]),
+      lng: parseFloat(placeMatch[2])
+    };
+  }
+
+  // Pattern 5: URL containing `@` coordinates e.g. @17.3850,78.4867
+  const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+  const atMatch = link.match(atRegex);
+  if (atMatch) {
+    return {
+      lat: parseFloat(atMatch[1]),
+      lng: parseFloat(atMatch[2])
+    };
+  }
+
+  return null;
+}
+
 exports.getAdminPerformanceStats = async (req, res) => {
   try {
     const { date, week, month, year, delivery_boy_id, shift, vehicle_type } = req.query;
@@ -129,15 +194,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
       // Unified order aggregation
       const allOrders = [
         ...manualRes.rows.map(o => {
-          let lat = null, lng = null;
-          if (o.location_link && o.location_link.includes('?q=')) {
-            const parts = o.location_link.split('?q=')[1];
-            if (parts) {
-              const coords = parts.split(',');
-              lat = parseFloat(coords[0]);
-              lng = parseFloat(coords[1]);
-            }
-          }
+          let coords = parseCoordinates(o.location_link);
+          let lat = coords ? coords.lat : null;
+          let lng = coords ? coords.lng : null;
           if ((lat == null || lng == null) && o.addr_lat != null && o.addr_lng != null) {
             lat = parseFloat(o.addr_lat);
             lng = parseFloat(o.addr_lng);
@@ -404,15 +463,9 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
 
     const allOrders = [
       ...manualRes.rows.map(o => {
-        let lat = null, lng = null;
-        if (o.location_link && o.location_link.includes('?q=')) {
-          const parts = o.location_link.split('?q=')[1];
-          if (parts) {
-            const coords = parts.split(',');
-            lat = parseFloat(coords[0]);
-            lng = parseFloat(coords[1]);
-          }
-        }
+        let coords = parseCoordinates(o.location_link);
+        let lat = coords ? coords.lat : null;
+        let lng = coords ? coords.lng : null;
         if ((lat == null || lng == null) && o.addr_lat != null && o.addr_lng != null) {
           lat = parseFloat(o.addr_lat);
           lng = parseFloat(o.addr_lng);

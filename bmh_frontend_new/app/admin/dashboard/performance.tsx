@@ -323,6 +323,33 @@ export default function AdminPerformance() {
           </View>
         </ScrollView>
       </View>
+
+      {/* Stats KPI Calculation Legend */}
+      <View style={[styles.card, { marginTop: 24, backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]}>
+        <Text style={[styles.sectionTitle, { color: '#1e293b', marginBottom: 8 }]}>How Statistics are Calculated</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Success %</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Calculated as (Delivered Orders / Assigned Orders) × 100.</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Avg Time</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Average duration in minutes from order "Picked Up" by the rider to "Delivered".</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Distance</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Straight-line aerial distance (Haversine formula) from department store to order destination.</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Attendance</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Total number of days the executive checked in / had attendance logs during the range.</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Rating ★</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Starts at 5.0. Deducts -0.2 for each Failed delivery and -0.1 for each Cancelled delivery (Clamped between 1.0 and 5.0).</Text>
+          </View>
+        </View>
+      </View>
     </ScrollView>
   );
 }
