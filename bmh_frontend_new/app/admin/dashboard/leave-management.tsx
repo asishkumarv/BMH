@@ -32,7 +32,7 @@ export default function AdminLeaveManagement() {
   const [hDesc, setHDesc] = useState('');
   
   const [rEmployeeId, setREmployeeId] = useState('');
-  const [rLeaves, setRLeaves] = useState('1');
+  const [rLeaves, setRLeaves] = useState('27');
   const [rExtraPen, setRExtraPen] = useState('0');
   const [rLateLim, setRLateLim] = useState('3');
   const [rLatePen, setRLatePen] = useState('0');
@@ -62,7 +62,10 @@ export default function AdminLeaveManagement() {
       }
       let allUser: any[] = [];
       if (empRes.data && empRes.data.success) {
-        const emps = (empRes.data.data || []).map((e: any) => ({ ...e, user_type: 'employee' }));
+        const emps = (empRes.data.data || []).map((e: any) => ({
+          ...e,
+          user_type: (e.role === 'Delivery Boy' || e.department === 'Delivery') ? 'delivery_boy' : 'employee'
+        }));
         allUser = [...allUser, ...emps];
       }
       if (adminRes.data && adminRes.data.data) {
@@ -147,8 +150,7 @@ export default function AdminLeaveManagement() {
         return;
       }
       const [uType, empIdStr] = rEmployeeId.split('-');
-      const employee = employees.find(e => e.id.toString() === empIdStr && e.user_type === uType);
-      const userType = employee ? employee.user_type : 'employee';
+      const userType = uType || 'employee';
       
       const res = await fetch(`${API_URL}/leave/settings/employee`, {
         method: 'POST',
@@ -264,7 +266,9 @@ export default function AdminLeaveManagement() {
                 </View>
                 <View style={styles.dateRow}>
                   <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
-                  <Text style={styles.reqDates}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</Text>
+                  <Text style={styles.reqDates}>
+                    {new Date(req.start_date).toLocaleDateString()} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : `- ${new Date(req.end_date).toLocaleDateString()}`}
+                  </Text>
                 </View>
                 <Text style={styles.reqReason}>"{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"</Text>
                 
@@ -362,12 +366,15 @@ export default function AdminLeaveManagement() {
                           setREarlyLim(existing.early_checkout_limit.toString());
                           setREarlyPen(existing.early_checkout_penalty.toString());
                         } else {
-                          setRLeaves('0'); setRExtraPen('0'); setRLateLim('0'); setRLatePen('0'); setREarlyLim('0'); setREarlyPen('0');
+                          setRLeaves('27'); setRExtraPen('0'); setRLateLim('3'); setRLatePen('0'); setREarlyLim('3'); setREarlyPen('0');
                         }
                       }} 
                       style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`}}
                     >
-                      <option value="">Select an Employee</option>
+                      <option value="">Select an Option</option>
+                      <option value="employee-0" style={{ fontWeight: 'bold', color: Colors.light.primary }}>[All Employees]</option>
+                      <option value="sub_admin-0" style={{ fontWeight: 'bold', color: Colors.light.primary }}>[All Sub Admins]</option>
+                      <option value="delivery_boy-0" style={{ fontWeight: 'bold', color: Colors.light.primary }}>[All Delivery Boys]</option>
                       {employees.map(emp => <option key={`${emp.user_type}-${emp.id}`} value={`${emp.user_type}-${emp.id}`}>{emp.full_name} ({emp.department} - {emp.role || 'Sub Admin'})</option>)}
                     </select>
                   ) : (
@@ -386,12 +393,15 @@ export default function AdminLeaveManagement() {
                             setREarlyLim(existing.early_checkout_limit.toString());
                             setREarlyPen(existing.early_checkout_penalty.toString());
                           } else {
-                            setRLeaves('0'); setRExtraPen('0'); setRLateLim('0'); setRLatePen('0'); setREarlyLim('0'); setREarlyPen('0');
+                            setRLeaves('27'); setRExtraPen('0'); setRLateLim('3'); setRLatePen('0'); setREarlyLim('3'); setREarlyPen('0');
                           }
                         }}
                         style={{ width: '100%', height: 50 }}
                       >
-                        <Picker.Item label="Select an Employee" value="" />
+                        <Picker.Item label="Select an Option" value="" />
+                        <Picker.Item label="[All Employees]" value="employee-0" color={Colors.light.primary} />
+                        <Picker.Item label="[All Sub Admins]" value="sub_admin-0" color={Colors.light.primary} />
+                        <Picker.Item label="[All Delivery Boys]" value="delivery_boy-0" color={Colors.light.primary} />
                         {employees.map(emp => <Picker.Item key={`${emp.user_type}-${emp.id}`} label={`${emp.full_name} (${emp.department})`} value={`${emp.user_type}-${emp.id}`} />)}
                       </Picker>
                     </View>
@@ -401,7 +411,7 @@ export default function AdminLeaveManagement() {
 
               <View style={[{ flexDirection: 'row', gap: 16, marginTop: 16 }, !isDesktop && { flexDirection: 'column' }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Free Leaves / Month</Text>
+                  <Text style={styles.label}>Required Working Days / Month</Text>
                   <TextInput style={styles.input} value={rLeaves} onChangeText={setRLeaves} keyboardType="numeric" />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -444,7 +454,7 @@ export default function AdminLeaveManagement() {
                     <View>
                       <Text style={styles.ruleName}>{es.employee_name} ({es.department} - {es.role})</Text>
                       <Text style={[styles.ruleVal, { fontSize: 13, marginTop: 4 }]}>
-                        {es.leaves_per_month} free | ₹{es.extra_leave_penalty} extra | {es.late_checkin_limit} late/₹{es.late_checkin_penalty} | {es.early_checkout_limit} early/₹{es.early_checkout_penalty}
+                        {es.leaves_per_month} req. working days | ₹{es.extra_leave_penalty} extra | {es.late_checkin_limit} late/₹{es.late_checkin_penalty} | {es.early_checkout_limit} early/₹{es.early_checkout_penalty}
                       </Text>
                     </View>
                   </View>

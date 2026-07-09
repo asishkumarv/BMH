@@ -33,6 +33,15 @@ export default function LeaveManagement() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDaySession, setHalfDaySession] = useState<'first_half' | 'second_half'>('first_half');
+
+  useEffect(() => {
+    if (isHalfDay && startDate) {
+      setEndDate(startDate);
+    }
+  }, [isHalfDay, startDate]);
+
   // Cache for monthly summaries
   const [monthlySummaries, setMonthlySummaries] = useState<{[key: string]: any}>({});
   const loadedMonthsRef = React.useRef<Set<string>>(new Set());
@@ -77,7 +86,7 @@ export default function LeaveManagement() {
       }
       if (empReqRes.ok) {
         const data = await empReqRes.json();
-        setEmpRequests(data.filter((r: any) => r.user_type === 'employee'));
+        setEmpRequests(data.filter((r: any) => r.user_type === 'employee' || r.user_type === 'delivery_boy'));
       }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
@@ -131,8 +140,14 @@ export default function LeaveManagement() {
       
       // Group requested working days by month
       const daysByMonth: { [key: string]: number } = {};
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0) { // Not Sunday
+      if (isHalfDay) {
+        const dStr = start.toISOString().split('T')[0];
+        if (!holidayDates.has(dStr)) {
+          const monthStr = dStr.substring(0, 7);
+          daysByMonth[monthStr] = (daysByMonth[monthStr] || 0) + 0.5;
+        }
+      } else {
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
           const dStr = d.toISOString().split('T')[0];
           if (!holidayDates.has(dStr)) {
             const monthStr = dStr.substring(0, 7);
@@ -162,7 +177,7 @@ export default function LeaveManagement() {
           baseSalary = parseFloat(pd.salary);
         }
       } catch (e) {}
-      const salaryPerDay = baseSalary / 30;
+      const salaryPerDay = baseSalary / 27;
 
       for (const m of monthsInvolved) {
         const mSummary = getSummaryForMonth(m);
@@ -194,7 +209,7 @@ export default function LeaveManagement() {
     } else {
       setProjection(null);
     }
-  }, [startDate, endDate, summary, monthlySummaries, holidays, employee]);
+  }, [startDate, endDate, isHalfDay, summary, monthlySummaries, holidays, employee]);
 
   const submitRequest = async () => {
     if (!startDate || !endDate || !reason) {
@@ -225,6 +240,8 @@ export default function LeaveManagement() {
           start_date: startDate,
           end_date: endDate,
           reason,
+          is_half_day: isHalfDay,
+          half_day_session: isHalfDay ? halfDaySession : null,
         }),
       });
       const data = await res.json();
@@ -374,24 +391,25 @@ export default function LeaveManagement() {
                   <input
                     type="date"
                     min={startDate || minDateStr}
-                    value={endDate}
+                    value={isHalfDay ? startDate : endDate}
+                    disabled={isHalfDay}
                     onChange={(e: any) => setEndDate(e.target.value)}
-                    style={{...styles.input, backgroundColor: Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
+                    style={{...styles.input, backgroundColor: isHalfDay ? '#F1F5F9' : Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
                   />
                 ) : (
                   <>
-                    <Pressable onPress={() => setShowEndPicker(true)}>
+                    <Pressable onPress={() => { if (!isHalfDay) setShowEndPicker(true); }}>
                       <View pointerEvents="none">
                         <TextInput
-                          style={styles.input}
-                          value={endDate}
+                          style={[styles.input, isHalfDay && { backgroundColor: '#F1F5F9' }]}
+                          value={isHalfDay ? startDate : endDate}
                           editable={false}
                           placeholder="YYYY-MM-DD"
                           placeholderTextColor={Colors.light.icon}
                         />
                       </View>
                     </Pressable>
-                    {showEndPicker && (
+                    {showEndPicker && !isHalfDay && (
                       <DateTimePicker
                         value={endDate ? new Date(endDate) : new Date()}
                         mode="date"
@@ -408,6 +426,64 @@ export default function LeaveManagement() {
                   </>
                 )}
               </View>
+            </View>
+
+            {/* Half Day Selection */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+              <Pressable 
+                onPress={() => {
+                  setIsHalfDay(!isHalfDay);
+                }} 
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderWidth: 2,
+                  borderColor: Colors.light.primary,
+                  borderRadius: 4,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 8,
+                  backgroundColor: isHalfDay ? Colors.light.primary : 'transparent'
+                }}>
+                  {isHalfDay && <View style={{ width: 10, height: 10, backgroundColor: 'white', borderRadius: 2 }} />}
+                </View>
+                <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '500' }}>Apply for Half Day</Text>
+              </Pressable>
+
+              {isHalfDay && (
+                <View style={{ flex: 1, flexDirection: 'row', gap: 8, minWidth: 200 }}>
+                  <Pressable 
+                    onPress={() => setHalfDaySession('first_half')}
+                    style={{
+                      flex: 1,
+                      padding: 10,
+                      borderWidth: 1,
+                      borderColor: halfDaySession === 'first_half' ? Colors.light.primary : Colors.light.border,
+                      borderRadius: 8,
+                      backgroundColor: halfDaySession === 'first_half' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: halfDaySession === 'first_half' ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>First Half</Text>
+                  </Pressable>
+                  <Pressable 
+                    onPress={() => setHalfDaySession('second_half')}
+                    style={{
+                      flex: 1,
+                      padding: 10,
+                      borderWidth: 1,
+                      borderColor: halfDaySession === 'second_half' ? Colors.light.primary : Colors.light.border,
+                      borderRadius: 8,
+                      backgroundColor: halfDaySession === 'second_half' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: halfDaySession === 'second_half' ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>Second Half</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
             <View style={styles.formGroup}>
               <Text style={styles.label}>Reason for Leave</Text>
@@ -480,7 +556,7 @@ export default function LeaveManagement() {
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
                     <Text style={styles.reqDates}>
-                      {new Date(req.start_date).toLocaleDateString()} to {new Date(req.end_date).toLocaleDateString()}
+                      {new Date(req.start_date).toLocaleDateString()} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : `to ${new Date(req.end_date).toLocaleDateString()}`}
                     </Text>
                   </View>
                   <View style={[
@@ -532,7 +608,9 @@ export default function LeaveManagement() {
                 </View>
                 <View style={styles.dateRow}>
                   <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
-                  <Text style={styles.reqDates}>{new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()}</Text>
+                  <Text style={styles.reqDates}>
+                    {new Date(req.start_date).toLocaleDateString()} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : `- ${new Date(req.end_date).toLocaleDateString()}`}
+                  </Text>
                 </View>
                 <Text style={styles.reqReason}>
                   "{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"

@@ -16,27 +16,50 @@ exports.getSettings = async (req, res) => {
     }
     const depRes = await pool.query(depQuery, depValues);
 
-    // Employee settings
+    // Employee and Global settings
     let empQuery = `
-      SELECT els.*, e.full_name as employee_name, e.department, e.role
+      SELECT els.*,
+             (CASE 
+               WHEN els.employee_id = 0 THEN 
+                 (CASE 
+                   WHEN els.user_type = 'employee' THEN 'All Employees'
+                   WHEN els.user_type = 'sub_admin' THEN 'All Sub Admins'
+                   WHEN els.user_type = 'delivery_boy' THEN 'All Delivery Boys'
+                   ELSE 'All Users'
+                 END)
+               ELSE COALESCE(u.full_name, 'N/A')
+              END) as employee_name,
+             (CASE 
+               WHEN els.employee_id = 0 THEN 'All'
+               ELSE COALESCE(u.department, 'All')
+              END) as department,
+             (CASE 
+               WHEN els.employee_id = 0 THEN 
+                 (CASE 
+                   WHEN els.user_type = 'employee' THEN 'Employee'
+                   WHEN els.user_type = 'sub_admin' THEN 'Sub Admin'
+                   WHEN els.user_type = 'delivery_boy' THEN 'Delivery Boy'
+                   ELSE 'User'
+                 END)
+               ELSE COALESCE(u.role, 'N/A')
+             END) as role
       FROM employee_leave_settings els
-      JOIN employees e ON els.employee_id = e.id AND els.user_type = 'employee'
+      LEFT JOIN (
+        SELECT id, full_name, department, role, 
+               (CASE WHEN role = 'Delivery Boy' OR department = 'Delivery' THEN 'delivery_boy' ELSE 'employee' END) as user_type 
+        FROM employees
+        UNION ALL
+        SELECT id, full_name, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'Sub Admin' as role, 'sub_admin' as user_type 
+        FROM department_admins
+      ) u ON els.employee_id = u.id AND els.user_type = u.user_type
     `;
     let empValues = [];
     if (department && department !== 'All') {
-      empQuery += ' WHERE e.department = $1';
+      empQuery += ' WHERE (u.department = $1 OR els.employee_id = 0)';
       empValues.push(department);
     }
     
-    empQuery += `
-      UNION ALL
-      SELECT els.*, da.full_name as employee_name, (SELECT name FROM departments WHERE id = da.department_id) as department, 'Sub Admin' as role
-      FROM employee_leave_settings els
-      JOIN department_admins da ON els.employee_id = da.id AND els.user_type = 'sub_admin'
-    `;
-    if (department && department !== 'All') {
-      empQuery += ' WHERE (SELECT name FROM departments WHERE id = da.department_id) = $1';
-    }
+    empQuery += ' ORDER BY els.employee_id ASC, els.id DESC';
     const empRes = await pool.query(empQuery, empValues);
 
     res.status(200).json({
@@ -78,6 +101,17 @@ exports.updateEmployeeSettings = async (req, res) => {
       early_checkout_limit, early_checkout_penalty
     } = req.body;
 
+    let finalUserType = user_type;
+    if (user_type === 'employee') {
+      const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
+      if (roleCheck.rows.length > 0) {
+        const emp = roleCheck.rows[0];
+        if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
+          finalUserType = 'delivery_boy';
+        }
+      }
+    }
+
     const query = `
       INSERT INTO employee_leave_settings 
       (employee_id, user_type, leaves_per_month, extra_leave_penalty, late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty)
@@ -93,7 +127,7 @@ exports.updateEmployeeSettings = async (req, res) => {
       RETURNING *;
     `;
     const values = [
-      employee_id, user_type, leaves_per_month, extra_leave_penalty,
+      employee_id, finalUserType, leaves_per_month, extra_leave_penalty,
       late_checkin_limit, late_checkin_penalty, early_checkout_limit, early_checkout_penalty
     ];
     const result = await pool.query(query, values);
@@ -109,11 +143,22 @@ exports.updateEmployeeSettings = async (req, res) => {
 // Apply for leave (Employee)
 exports.applyLeave = async (req, res) => {
   try {
-    const { employee_id, user_type = 'employee', start_date, end_date, reason } = req.body;
+    const { employee_id, user_type = 'employee', start_date, end_date, reason, is_half_day = false, half_day_session = null } = req.body;
+
+    let finalUserType = user_type;
+    if (user_type === 'employee') {
+      const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
+      if (roleCheck.rows.length > 0) {
+        const emp = roleCheck.rows[0];
+        if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
+          finalUserType = 'delivery_boy';
+        }
+      }
+    }
 
     // Get employee department
-    const tableName = user_type === 'sub_admin' ? 'department_admins' : 'employees';
-    const deptCol = user_type === 'sub_admin' 
+    const tableName = finalUserType === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = finalUserType === 'sub_admin' 
       ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
       : 'department';
     const empRes = await pool.query(`SELECT ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
@@ -121,7 +166,6 @@ exports.applyLeave = async (req, res) => {
     const department = empRes.rows[0].department;
 
     // Check max employees limit for the requested dates
-    // For simplicity, we check if ANY of the days in the range exceed the limit.
     const depSetRes = await pool.query('SELECT max_employees_leave_per_day FROM department_leave_settings WHERE department = $1', [department]);
     const maxLeaves = depSetRes.rows.length > 0 ? depSetRes.rows[0].max_employees_leave_per_day : 9999; // Default large if not set
 
@@ -130,7 +174,9 @@ exports.applyLeave = async (req, res) => {
       SELECT lr.*, u.department
       FROM leave_requests lr
       JOIN (
-        SELECT id, department, 'employee' as user_type FROM employees
+        SELECT id, department, 
+               (CASE WHEN role = 'Delivery Boy' OR department = 'Delivery' THEN 'delivery_boy' ELSE 'employee' END) as user_type 
+        FROM employees
         UNION ALL
         SELECT id, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'sub_admin' as user_type FROM department_admins
       ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
@@ -138,15 +184,24 @@ exports.applyLeave = async (req, res) => {
         AND (lr.start_date <= $3 AND lr.end_date >= $2)
     `, [department, start_date, end_date]);
 
-    if (overlapRes.rows.length >= maxLeaves) {
+    let overlapCount = 0;
+    overlapRes.rows.forEach(r => {
+      if (r.is_half_day) {
+        overlapCount += 0.5;
+      } else {
+        overlapCount += 1.0;
+      }
+    });
+
+    if (overlapCount >= maxLeaves) {
       return res.status(400).json({ message: 'Leave limit for that date exceeded' });
     }
 
     const query = `
-      INSERT INTO leave_requests (employee_id, user_type, start_date, end_date, reason)
-      VALUES ($1, $2, $3, $4, $5) RETURNING *;
+      INSERT INTO leave_requests (employee_id, user_type, start_date, end_date, reason, is_half_day, half_day_session)
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
     `;
-    const result = await pool.query(query, [employee_id, user_type, start_date, end_date, reason]);
+    const result = await pool.query(query, [employee_id, finalUserType, start_date, end_date, reason, is_half_day, half_day_session]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error applying for leave:', error);
@@ -160,30 +215,34 @@ exports.getRequests = async (req, res) => {
     const { employee_id, user_type, department, month } = req.query; // If employee_id is passed, get for that employee. If department, for department.
     
     let query = `
-      SELECT lr.*, e.full_name, e.department, e.role 
+      SELECT lr.*, u.full_name, u.department, u.role
       FROM leave_requests lr
-      JOIN employees e ON lr.employee_id = e.id AND lr.user_type = 'employee'
+      JOIN (
+        SELECT id, full_name, department, role, 
+               (CASE WHEN role = 'Delivery Boy' OR department = 'Delivery' THEN 'delivery_boy' ELSE 'employee' END) as user_type 
+        FROM employees
+        UNION ALL
+        SELECT id, full_name, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'Sub Admin' as role, 'sub_admin' as user_type 
+        FROM department_admins
+      ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
       WHERE 1=1
     `;
     let values = [];
     let idx = 1;
 
-    // We can also union with sub_admins if needed, for simplicity let's just use union all if not specific
-    // Actually, to fully support it:
-    query = `
-      SELECT lr.*, u.full_name, u.department, u.role
-      FROM leave_requests lr
-      JOIN (
-        SELECT id, full_name, department, role, 'employee' as user_type FROM employees
-        UNION ALL
-        SELECT id, full_name, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'Sub Admin' as role, 'sub_admin' as user_type FROM department_admins
-      ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
-      WHERE 1=1
-    `;
-
     if (employee_id && user_type) {
+      let finalUserType = user_type;
+      if (user_type === 'employee') {
+        const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
+        if (roleCheck.rows.length > 0) {
+          const emp = roleCheck.rows[0];
+          if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
+            finalUserType = 'delivery_boy';
+          }
+        }
+      }
       query += ` AND lr.employee_id = $${idx++} AND lr.user_type = $${idx++}`;
-      values.push(employee_id, user_type);
+      values.push(employee_id, finalUserType);
     } else if (employee_id) {
       query += ` AND lr.employee_id = $${idx++}`;
       values.push(employee_id);
@@ -231,9 +290,20 @@ exports.generatePayslip = async (req, res) => {
   try {
     const { employee_id, user_type = 'employee', month, appreciation_amount = 0, extra_working_amount = 0 } = req.body; // Month format 'YYYY-MM'
     
+    let finalUserType = user_type;
+    if (user_type === 'employee') {
+      const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
+      if (roleCheck.rows.length > 0) {
+        const emp = roleCheck.rows[0];
+        if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
+          finalUserType = 'delivery_boy';
+        }
+      }
+    }
+
     // 1. Get employee data
-    const tableName = user_type === 'sub_admin' ? 'department_admins' : 'employees';
-    const deptCol = user_type === 'sub_admin' 
+    const tableName = finalUserType === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = finalUserType === 'sub_admin' 
       ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
       : 'department';
     const empRes = await pool.query(`SELECT *, ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
@@ -251,14 +321,28 @@ exports.generatePayslip = async (req, res) => {
 
     // 2. Get employee settings
     let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1 AND user_type = $2`;
-    const empSetRes = await pool.query(empSetQuery, [employee_id, user_type]);
+    const empSetRes = await pool.query(empSetQuery, [employee_id, finalUserType]);
     
     let settings = {
-      leaves_per_month: 0, extra_leave_penalty: 0,
+      leaves_per_month: null, extra_leave_penalty: 0,
       late_checkin_limit: 0, late_checkin_penalty: 0,
       early_checkout_limit: 0, early_checkout_penalty: 0
     };
-    if (empSetRes.rows.length > 0) settings = empSetRes.rows[0];
+    if (empSetRes.rows.length > 0) {
+      settings = {
+        ...empSetRes.rows[0],
+        leaves_per_month: empSetRes.rows[0].leaves_per_month !== null ? parseInt(empSetRes.rows[0].leaves_per_month) : null
+      };
+    } else {
+      // Fallback to global setting (where employee_id = 0)
+      const globalSetRes = await pool.query(`SELECT * FROM employee_leave_settings WHERE employee_id = 0 AND user_type = $1`, [finalUserType]);
+      if (globalSetRes.rows.length > 0) {
+        settings = {
+          ...globalSetRes.rows[0],
+          leaves_per_month: globalSetRes.rows[0].leaves_per_month !== null ? parseInt(globalSetRes.rows[0].leaves_per_month) : null
+        };
+      }
+    }
 
     const [yearStr, monthStr] = month.split('-');
     const year = parseInt(yearStr);
@@ -277,7 +361,7 @@ exports.generatePayslip = async (req, res) => {
       SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
       FROM attendance 
       WHERE employee_id = $1 AND user_type = $3 AND TO_CHAR(date, 'YYYY-MM') = $2
-    `, [employee_id, month, user_type]);
+    `, [employee_id, month, finalUserType]);
 
     const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
 
@@ -329,25 +413,33 @@ exports.generatePayslip = async (req, res) => {
 
     // Fetch approved leaves
     const leavesListRes = await pool.query(`
-      SELECT start_date, end_date FROM leave_requests
+      SELECT start_date, end_date, is_half_day FROM leave_requests
       WHERE employee_id = $1 AND user_type = $3 AND status = 'approved'
       AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
-    `, [employee_id, month, user_type]);
+    `, [employee_id, month, finalUserType]);
 
-    const approvedLeaveDays = new Set();
+    // Map leave fractions per day of month (including Sundays!)
+    const approvedLeavesMap = new Map();
+    let approved_leaves_count = 0;
     leavesListRes.rows.forEach(lr => {
         const start = new Date(lr.start_date);
         const end = new Date(lr.end_date);
-        for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            if (d.getMonth() === m && d.getFullYear() === year) {
-                if (d.getDay() !== 0) { // Exclude Sundays from approved leaves
-                    approvedLeaveDays.add(d.getDate());
+        if (lr.is_half_day) {
+            if (start.getMonth() === m && start.getFullYear() === year) {
+                approvedLeavesMap.set(start.getDate(), 0.5);
+                approved_leaves_count += 0.5;
+            }
+        } else {
+            for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                if (d.getMonth() === m && d.getFullYear() === year) {
+                    approvedLeavesMap.set(d.getDate(), 1.0);
+                    approved_leaves_count += 1.0;
                 }
             }
         }
     });
 
-    // Calculate missing days (absents)
+    // Calculate missing days (absents) - including Sundays!
     let missingDays = 0;
     
     // If it is the current month, only calculate missing days up to yesterday (to avoid premature absent flags)
@@ -359,19 +451,33 @@ exports.generatePayslip = async (req, res) => {
 
     for (let day = 1; day < limitDay; day++) {
         const dateObj = new Date(year, m, day);
-        const isSunday = dateObj.getDay() === 0;
-        if (!isSunday && !holidaySet.has(day)) {
-            if (!attendedDays.has(day) && !approvedLeaveDays.has(day)) {
-                missingDays++;
+        if (!holidaySet.has(day)) {
+            const leaveFraction = approvedLeavesMap.get(day) || 0;
+            if (leaveFraction === 1.0) {
+                // Full day approved leave, no absent counted
+            } else if (leaveFraction === 0.5) {
+                if (!attendedDays.has(day)) {
+                    missingDays += 0.5; // Missed the other half of the day
+                }
+            } else {
+                if (!attendedDays.has(day)) {
+                    missingDays += 1.0; // Missed the whole day
+                }
             }
         }
     }
 
-    const actual_leaves = approvedLeaveDays.size + missingDays;
+    const actual_leaves = approved_leaves_count + missingDays;
 
-    // 4. Calculate extra leaves
-    const extra_leaves = Math.max(0, actual_leaves - settings.leaves_per_month);
-    const salary_per_day = base_salary / 30; // Approximating month as 30 days
+    // Determine free leaves limit (custom settings vs dynamic month days default)
+    const defaultFreeLeaves = Math.max(0, daysInMonth - 27);
+    const leaves_limit = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
+      ? settings.leaves_per_month 
+      : defaultFreeLeaves;
+
+    // Calculate extra leaves and deductions (using 27 required working days divisor!)
+    const extra_leaves = Math.max(0, actual_leaves - leaves_limit);
+    const salary_per_day = base_salary / 27; 
     const extra_leave_deduction = extra_leaves * (salary_per_day + parseFloat(settings.extra_leave_penalty || 0));
 
     const extra_late = Math.max(0, late_count - settings.late_checkin_limit);
@@ -383,13 +489,27 @@ exports.generatePayslip = async (req, res) => {
     let net_salary = base_salary - (extra_leave_deduction + late_checkin_deduction + early_checkout_deduction) + parseFloat(appreciation_amount) + parseFloat(extra_working_amount);
     if (net_salary < 0) net_salary = 0;
 
+    // Compute total hours worked
+    let totalWorkedSeconds = 0;
+    attendanceRes.rows.forEach(att => {
+        if (att.timestamp && att.checkout_timestamp) {
+            const diffMs = new Date(att.checkout_timestamp) - new Date(att.timestamp);
+            if (diffMs > 0) {
+                totalWorkedSeconds += Math.floor(diffMs / 1000);
+            }
+        }
+    });
+    const totalWorkedHours = parseFloat((totalWorkedSeconds / 3600).toFixed(1));
+
     // Detailed breakdown
     const details = {
       base_salary,
       per_day_salary: salary_per_day.toFixed(2),
+      total_worked_hours: totalWorkedHours,
+      required_working_hours: 270,
       leaves: {
         total_taken: actual_leaves,
-        free_limit: settings.leaves_per_month,
+        free_limit: leaves_limit,
         penalized: extra_leaves,
         penalty_per_day: settings.extra_leave_penalty,
         total_deduction: extra_leave_deduction
@@ -425,7 +545,7 @@ exports.generatePayslip = async (req, res) => {
           details = EXCLUDED.details
       RETURNING *;
     `;
-    const psResult = await pool.query(psQuery, [employee_id, user_type, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, appreciation_amount, extra_working_amount, net_salary, JSON.stringify(details)]);
+    const psResult = await pool.query(psQuery, [employee_id, finalUserType, month, base_salary, extra_leave_deduction, late_checkin_deduction, early_checkout_deduction, appreciation_amount, extra_working_amount, net_salary, JSON.stringify(details)]);
     
     res.status(200).json(psResult.rows[0]);
   } catch (error) {
@@ -480,6 +600,17 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
     const { month: queryMonth, user_type = 'employee' } = req.query;
     const now = new Date();
     
+    let finalUserType = user_type;
+    if (user_type === 'employee') {
+      const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
+      if (roleCheck.rows.length > 0) {
+        const emp = roleCheck.rows[0];
+        if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
+          finalUserType = 'delivery_boy';
+        }
+      }
+    }
+
     // Calculate current month using Indian timezone (GMT+5:30)
     const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
     const [tDay, tMonth, tYear] = todayStr.split('/').map(Number);
@@ -492,8 +623,8 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
     const daysInMonth = new Date(year, m + 1, 0).getDate();
 
     // 1. Get employee data
-    const tableName = user_type === 'sub_admin' ? 'department_admins' : 'employees';
-    const deptCol = user_type === 'sub_admin' 
+    const tableName = finalUserType === 'sub_admin' ? 'department_admins' : 'employees';
+    const deptCol = finalUserType === 'sub_admin' 
       ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
       : 'department';
     const empRes = await pool.query(`SELECT *, ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
@@ -502,38 +633,59 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
 
     // 2. Get employee settings
     let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1 AND user_type = $2`;
-    const empSetRes = await pool.query(empSetQuery, [employee_id, user_type]);
+    const empSetRes = await pool.query(empSetQuery, [employee_id, finalUserType]);
     
     let settings = {
-      leaves_per_month: 0,
+      leaves_per_month: null,
       late_checkin_limit: 0,
       early_checkout_limit: 0,
       extra_leave_penalty: 0,
       late_checkin_penalty: 0,
       early_checkout_penalty: 0,
     };
-    if (empSetRes.rows.length > 0) settings = empSetRes.rows[0];
+    if (empSetRes.rows.length > 0) {
+      settings = {
+        ...empSetRes.rows[0],
+        leaves_per_month: empSetRes.rows[0].leaves_per_month !== null ? parseInt(empSetRes.rows[0].leaves_per_month) : null
+      };
+    } else {
+      // Fallback to global setting (where employee_id = 0)
+      const globalSetRes = await pool.query(`SELECT * FROM employee_leave_settings WHERE employee_id = 0 AND user_type = $1`, [finalUserType]);
+      if (globalSetRes.rows.length > 0) {
+        settings = {
+          ...globalSetRes.rows[0],
+          leaves_per_month: globalSetRes.rows[0].leaves_per_month !== null ? parseInt(globalSetRes.rows[0].leaves_per_month) : null
+        };
+      }
+    }
 
     // 3. Fetch approved leaves for this month
     const leavesListRes = await pool.query(`
-      SELECT start_date, end_date FROM leave_requests
+      SELECT start_date, end_date, is_half_day FROM leave_requests
       WHERE employee_id = $1 AND user_type = $3 AND status = 'approved'
       AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
-    `, [employee_id, month, user_type]);
+    `, [employee_id, month, finalUserType]);
 
-    const approvedLeaveDays = new Set();
+    // Map leave fractions per day of month (including Sundays!)
+    const approvedLeavesMap = new Map();
+    let approved_leaves_count = 0;
     leavesListRes.rows.forEach(lr => {
         const start = new Date(lr.start_date);
         const end = new Date(lr.end_date);
-        for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            if (d.getMonth() === m && d.getFullYear() === year) {
-                if (d.getDay() !== 0) { // Exclude Sundays from approved leaves
-                    approvedLeaveDays.add(d.getDate());
+        if (lr.is_half_day) {
+            if (start.getMonth() === m && start.getFullYear() === year) {
+                approvedLeavesMap.set(start.getDate(), 0.5);
+                approved_leaves_count += 0.5;
+            }
+        } else {
+            for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                if (d.getMonth() === m && d.getFullYear() === year) {
+                    approvedLeavesMap.set(d.getDate(), 1.0);
+                    approved_leaves_count += 1.0;
                 }
             }
         }
     });
-    const approved_leaves_count = approvedLeaveDays.size;
 
     // 4. Calculate attendance and missing days (absents)
     let late_count = 0;
@@ -553,7 +705,7 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
         SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
         FROM attendance 
         WHERE employee_id = $1 AND user_type = $3 AND TO_CHAR(date, 'YYYY-MM') = $2
-      `, [employee_id, month, user_type]);
+      `, [employee_id, month, finalUserType]);
 
       const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
 
@@ -601,15 +753,22 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
         if (isEarly) early_count++;
       });
 
-      // Calculate missing days (absents)
-      // If it is the current month, only calculate up to yesterday
+      // Calculate missing days (absents) - including Sundays!
       const limitDay = (month === currentMonthStr) ? tDay : daysInMonth + 1;
       for (let day = 1; day < limitDay; day++) {
           const dateObj = new Date(year, m, day);
-          const isSunday = dateObj.getDay() === 0;
-          if (!isSunday && !holidaySet.has(day)) {
-              if (!attendedDays.has(day) && !approvedLeaveDays.has(day)) {
-                  missingDays++;
+          if (!holidaySet.has(day)) {
+              const leaveFraction = approvedLeavesMap.get(day) || 0;
+              if (leaveFraction === 1.0) {
+                  // Full day approved leave
+              } else if (leaveFraction === 0.5) {
+                  if (!attendedDays.has(day)) {
+                      missingDays += 0.5; // Missed the other half of the day
+                  }
+              } else {
+                  if (!attendedDays.has(day)) {
+                      missingDays += 1.0; // Missed the whole day
+                  }
               }
           }
       }
@@ -617,9 +776,14 @@ exports.getEmployeeLeaveSummary = async (req, res) => {
 
     const actual_leaves = approved_leaves_count + missingDays;
 
+    const defaultFreeLeaves = Math.max(0, daysInMonth - 27);
+    const leaves_limit = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
+      ? settings.leaves_per_month 
+      : defaultFreeLeaves;
+
     res.status(200).json({
       limits: {
-        leaves: settings.leaves_per_month,
+        leaves: leaves_limit,
         late_checkins: settings.late_checkin_limit,
         early_checkouts: settings.early_checkout_limit
       },

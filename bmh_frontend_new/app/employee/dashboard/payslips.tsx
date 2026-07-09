@@ -138,6 +138,10 @@ export default function Payslips() {
               <td><strong>Extra Working Amount</strong></td>
               <td class="amount" style="color: #10B981">+ ${payslip.extra_working_amount || 0}</td>
             </tr>
+            <tr>
+              <td><strong>Total Worked Hours</strong></td>
+              <td class="amount">${d?.total_worked_hours !== undefined ? `${d.total_worked_hours} / 270h` : 'N/A'}</td>
+            </tr>
             ${d ? `
             <tr>
               <td>
@@ -329,7 +333,14 @@ export default function Payslips() {
                                  </Text>
                                </View>
                              </View>
-                             <View style={styles.psRow}>
+                              <View style={styles.psRow}>
+                                <Text style={styles.psLabel}>Total Worked Hours:</Text>
+                                <View style={styles.psValueContainer}>
+                                  <Text style={styles.psValue}>{d.total_worked_hours !== undefined ? `${d.total_worked_hours}h / 270h` : 'N/A'}</Text>
+                                </View>
+                              </View>
+
+                              <View style={styles.psRow}>
                                <Text style={styles.psLabel}>Appreciation / Extra Work:</Text>
                                <View style={styles.psValueContainer}>
                                  <Text style={[styles.psValue, { color: '#10B981' }]}>+ ₹{parseFloat(ps.appreciation_amount || 0) + parseFloat(ps.extra_working_amount || 0)}</Text>
