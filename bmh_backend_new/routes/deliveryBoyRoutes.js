@@ -329,7 +329,13 @@ router.get("/available", async (req, res) => {
         e.mobile,
         e.available,
         a.status AS attendance_status,
-        b.status AS break_status
+        b.status AS break_status,
+        (
+          COALESCE((SELECT COUNT(*)::integer FROM online_orders WHERE delivery_boy_id = e.id AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available')), 0) +
+          COALESCE((SELECT COUNT(*)::integer FROM manual_orders WHERE delivery_boy_id = e.id::varchar AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
+          COALESCE((SELECT COUNT(*)::integer FROM ecogreen_sales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
+          COALESCE((SELECT COUNT(*)::integer FROM ecogreen_sales_invoices WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0)
+        ) AS pending_count
       FROM employees e
       LEFT JOIN attendance a ON a.employee_id = e.id
       LEFT JOIN break_logs b ON b.employee_id = e.id

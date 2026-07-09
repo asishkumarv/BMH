@@ -1422,7 +1422,14 @@ export default function ManualOrders({ deliveryBoys }) {
                       setAssignOrder(null);
                     }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                      {boy.pending_count !== undefined && (
+                        <Text style={{ fontSize: 12, color: boy.pending_count > 0 ? '#d97706' : '#10b981', fontWeight: '500' }}>
+                          ({boy.pending_count} pending)
+                        </Text>
+                      )}
+                    </View>
                     {assignOrder.delivery_boy_id?.toString() === boy.id.toString() && (
                       <CheckCircle size={16} color="#4338ca" />
                     )}
