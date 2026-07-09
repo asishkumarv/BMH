@@ -8,12 +8,12 @@ import axios from 'axios';
 import * as Notifications from 'expo-notifications';
 
 if (Platform.OS === 'android') {
-  Notifications.setNotificationChannelAsync('alarm-channel-v2', {
+  Notifications.setNotificationChannelAsync('alarm-channel-v3', {
     name: 'Alarm Notifications',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#FF231F7C',
-    sound: 'alarm.wav',
+    sound: 'alarm',
   });
   
   Notifications.setNotificationHandler({

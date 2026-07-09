@@ -20,7 +20,7 @@ async function sendExpoPushNotification(pushToken, title, body, data = {}) {
     body: body,
     data: data,
     priority: 'high',
-    channelId: 'alarm-channel-v2',
+    channelId: 'alarm-channel-v3',
   };
 
   try {

@@ -205,12 +205,12 @@ export function useAttendanceReminder(user: any) {
 
     if (Platform.OS === 'android') {
       try {
-        await Notifications.setNotificationChannelAsync('alarm-channel-v2', {
+        await Notifications.setNotificationChannelAsync('alarm-channel-v3', {
           name: 'Alarm Notifications',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
-          sound: 'alarm.wav',
+          sound: 'alarm',
         });
       } catch (e) {
         console.log("Error creating channel inside hook:", e);
@@ -248,7 +248,7 @@ export function useAttendanceReminder(user: any) {
           hour: reminderInHours,
           minute: reminderInMins,
           repeats: true,
-          channelId: 'alarm-channel-v2'
+          channelId: 'alarm-channel-v3'
         } as any,
       });
       console.log(`Scheduled Check-in alarm for ${reminderInHours}:${reminderInMins}`);
@@ -276,7 +276,7 @@ export function useAttendanceReminder(user: any) {
           hour: reminderOutHours,
           minute: reminderOutMins,
           repeats: true,
-          channelId: 'alarm-channel-v2'
+          channelId: 'alarm-channel-v3'
         } as any,
       });
       console.log(`Scheduled Check-out alarm for ${reminderOutHours}:${reminderOutMins}`);
@@ -304,7 +304,7 @@ export function useAttendanceReminder(user: any) {
           hour: reminderBreakInHours,
           minute: reminderBreakInMins,
           repeats: true,
-          channelId: 'alarm-channel-v2'
+          channelId: 'alarm-channel-v3'
         } as any,
       });
       console.log(`Scheduled Break-in alarm for ${reminderBreakInHours}:${reminderBreakInMins}`);
@@ -332,7 +332,7 @@ export function useAttendanceReminder(user: any) {
           hour: reminderBreakOutHours,
           minute: reminderBreakOutMins,
           repeats: true,
-          channelId: 'alarm-channel-v2'
+          channelId: 'alarm-channel-v3'
         } as any,
       });
       console.log(`Scheduled Break-out alarm for ${reminderBreakOutHours}:${reminderBreakOutMins}`);
