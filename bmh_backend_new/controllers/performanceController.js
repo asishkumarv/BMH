@@ -252,12 +252,23 @@ exports.getAdminPerformanceStats = async (req, res) => {
             lat = parseFloat(o.addr_lat);
             lng = parseFloat(o.addr_lng);
           }
+          let displayType = 'Local';
+          if (o.mode_of_delivery === 'Bus' || o.mode_of_delivery?.toLowerCase() === 'bus') {
+            displayType = 'Bus';
+          } else if (o.is_scheduled === true || o.is_scheduled === 'true' || o.mode_of_delivery === 'Schedule Delivery') {
+            displayType = 'Scheduled';
+          } else if (o.mode_of_delivery === 'Counter') {
+            displayType = 'Counter';
+          }
           return {
             id: o.id,
             order_no: o.order_no,
             invoice_no: o.invoice_no,
             status: o.status,
             type: 'manual',
+            displayType,
+            customer_name: o.customer_name || 'N/A',
+            customer_phone: o.customer_phone || o.ship_to_phone || 'N/A',
             amount: parseFloat(o.amount || 0),
             paymentMode: o.payment_mode || o.pod_payment_mode || 'Cash',
             lat,
@@ -284,6 +295,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
             invoice_no: null,
             status: o.status,
             type: 'online',
+            displayType: 'Local',
+            customer_name: o.patient_name || 'Online Patient',
+            customer_phone: o.patient_mobile || 'N/A',
             amount: parseFloat(o.total_amount || 0),
             paymentMode: o.pod_payment_mode || 'Online',
             lat,
@@ -306,6 +320,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
             invoice_no: null,
             status: o.status,
             type: 'sales_order',
+            displayType: 'Counter',
+            customer_name: o.customer_name || 'Counter Customer',
+            customer_phone: o.mobile_no || 'N/A',
             amount: parseFloat(o.order_total || 0),
             paymentMode: 'Cash',
             lat,
@@ -328,6 +345,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
             invoice_no: o.invoice_no,
             status: o.status,
             type: 'sales_invoice',
+            displayType: 'Counter',
+            customer_name: o.customer_name || 'Counter Customer',
+            customer_phone: o.mobile_no || 'N/A',
             amount: parseFloat(o.order_total || 0),
             paymentMode: 'Cash',
             lat,
@@ -605,9 +625,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
         }
         return {
           id: o.id,
-          orderNo: o.order_no || 'N/A',
+          orderNo: o.order_no || o.invoice_no || 'N/A',
           invoiceNo: o.invoice_no || 'N/A',
-          type: o.type,
+          type: o.displayType || 'Local',
           customerName: o.customer_name || 'N/A',
           customerPhone: o.customer_phone || 'N/A',
           amount: o.amount,

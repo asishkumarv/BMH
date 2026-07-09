@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable, Alert, Modal } from 'react-native';
 import axios from 'axios';
-import { ArrowUpDown, Calendar, Award, MapPin, TrendingUp, Clock, ShieldCheck, DollarSign, Star, AlertCircle, RefreshCw, User } from 'lucide-react-native';
+import { ArrowUpDown, Calendar, Award, MapPin, TrendingUp, Clock, ShieldCheck, DollarSign, Star, AlertCircle, RefreshCw, User, Info } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
 
 const API_URL = 'https://napi.bharatmedicalhallplus.com';
@@ -26,6 +26,18 @@ const getStatusColor = (val: number, type: 'success' | 'on_time' | 'rating') => 
   return '#6B7280';
 };
 
+const getTrendLabel = (label: string, period: string) => {
+  if (period === 'monthly') {
+    return `Day ${parseInt(label)}`;
+  } else if (period === 'yearly') {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const idx = parseInt(label) - 1;
+    return months[idx] || label;
+  } else {
+    return label;
+  }
+};
+
 export default function AdminPerformance() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -39,6 +51,13 @@ export default function AdminPerformance() {
   const [areasList, setAreasList] = useState<string[]>([]);
   const [shiftsList, setShiftsList] = useState<string[]>([]);
   const [paymentModesList, setPaymentModesList] = useState<string[]>([]);
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableType, setTableType] = useState('');
+  const [tableStatus, setTableStatus] = useState('');
+  const [areaExpanded, setAreaExpanded] = useState(false);
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [infoModalTitle, setInfoModalTitle] = useState('');
+  const [infoModalMessage, setInfoModalMessage] = useState('');
   
   useEffect(() => {
     // Set initial filter value based on current month/date
@@ -96,6 +115,46 @@ export default function AdminPerformance() {
     setFilterArea('');
     setFilterShift('');
     setFilterPaymentMode('');
+    setTableSearch('');
+    setTableType('');
+    setTableStatus('');
+  };
+
+  const showInfoAlert = (type: string) => {
+    let title = '';
+    let message = '';
+    
+    if (type === 'kpis') {
+      title = 'Overview KPIs Calculation';
+      message = '• Deliveries Success %:\nCalculated as (Delivered Orders / Total Assigned Orders) × 100\n\n' +
+                '• On-Time Delivery %:\nCalculated as (Delivered orders completed ≤ 45 mins / Total Delivered Orders) × 100\n\n' +
+                '• Average Delivery Cycle:\nAverage duration in minutes from rider "Picked Up" to "Delivered" timestamp\n\n' +
+                '• Distance Covered:\nTotal Haversine straight-line aerial distance from the department store coordinates to customer destinations\n\n' +
+                '• Total Revenue:\nTotal payments collected (COD Cash + Online payments combined) from successfully delivered orders\n\n' +
+                '• Total Delivery Charges:\nBilled delivery charges for manual/custom deliveries';
+    } else if (type === 'financial') {
+      title = 'Financial Breakdown Definitions';
+      message = '• Total Order Value:\nSum of all assigned orders (COD + Online + Pending Collection)\n\n' +
+                '• COD Collected:\nCash payment collections brought back by delivery boys\n\n' +
+                '• Online Payments:\nPre-paid or digital payments received for orders\n\n' +
+                '• Pending Cash:\nCash collections expected for orders currently in transit (not yet delivered)\n\n' +
+                '• Bus Parcel Shipments:\nCount and value of parcels dispatched via third-party Bus carriers\n\n' +
+                '• Scheduled Deliveries:\nScheduled local orders set to be processed later';
+    } else if (type === 'area') {
+      title = 'Area Performance Breakdown';
+      message = '• Area Names:\nNeighborhood parsing heuristics from customer delivery addresses\n\n' +
+                '• Orders Billed:\nTotal orders dispatched to each neighborhood area\n\n' +
+                '• Revenue Generated:\nSum of completed/delivered sales in the area\n\n' +
+                '• Pending Orders:\nActive transit orders in the area';
+    } else if (type === 'trends') {
+      title = 'Operations Trends & Peak Hours';
+      message = '• Orders & Revenue Trend:\nShows chronological transaction volume distribution (daily, monthly, or yearly) and revenue to evaluate system throughput\n\n' +
+                '• Peak Delivery Hours:\nHour of day distribution (0-23) based on order assignment times. Helps identify high-traffic intervals and adjust shift timings';
+    }
+    
+    setInfoModalTitle(title);
+    setInfoModalMessage(message);
+    setInfoModalVisible(true);
   };
 
   if (loading && !stats) {
@@ -237,6 +296,14 @@ export default function AdminPerformance() {
         </View>
       </View>
 
+      {/* Overview KPIs Section Title */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 12 }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b' }}>Overview KPIs</Text>
+        <TouchableOpacity onPress={() => showInfoAlert('kpis')} style={{ padding: 4 }}>
+          <Info size={15} color="#4F46E5" />
+        </TouchableOpacity>
+      </View>
+
       {/* KPI Cards Grid */}
       <View style={styles.grid}>
         <View style={styles.kpiCard}>
@@ -367,7 +434,12 @@ export default function AdminPerformance() {
 
       {/* Financial Summary Card */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Financial Summary & Operations Breakdown</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Financial Summary & Operations Breakdown</Text>
+          <TouchableOpacity onPress={() => showInfoAlert('financial')} style={{ padding: 4 }}>
+            <Info size={15} color="#4F46E5" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.paymentsSummary}>
           <View style={styles.paymentCol}>
             <Text style={styles.paymentLabel}>Total Order Value</Text>
@@ -437,36 +509,56 @@ export default function AdminPerformance() {
 
       {/* Area Performance */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Area Performance Breakdown</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.th, { width: 180 }]}>Area Name</Text>
-              <Text style={[styles.th, { width: 100 }]}>Orders Billed</Text>
-              <Text style={[styles.th, { width: 120 }]}>Revenue Generated</Text>
-              <Text style={[styles.th, { width: 120 }]}>Pending Orders</Text>
-            </View>
-            {(executive.areaPerformance || []).length === 0 ? (
-              <View style={{ padding: 16, alignItems: 'center' }}>
-                <Text style={{ color: '#64748B', fontSize: 13 }}>No area data found for selected period.</Text>
-              </View>
-            ) : (
-              (executive.areaPerformance || []).map((area: any, index: number) => (
-                <View key={area.area || index} style={styles.tableRow}>
-                  <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{area.area}</Text>
-                  <Text style={[styles.td, { width: 100 }]}>{area.totalOrders}</Text>
-                  <Text style={[styles.td, { width: 120, color: '#10B981', fontWeight: '600' }]}>₹{area.revenue?.toLocaleString('en-IN')}</Text>
-                  <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>{area.pendingOrders}</Text>
-                </View>
-              ))
-            )}
+        <TouchableOpacity
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+          onPress={() => setAreaExpanded(!areaExpanded)}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Area Performance Breakdown</Text>
+            <TouchableOpacity onPress={() => showInfoAlert('area')} style={{ padding: 4 }}>
+              <Info size={15} color="#4F46E5" />
+            </TouchableOpacity>
           </View>
-        </ScrollView>
+          <Text style={{ color: '#4F46E5', fontSize: 13, fontWeight: '600' }}>{areaExpanded ? 'Collapse' : 'Expand'}</Text>
+        </TouchableOpacity>
+
+        {areaExpanded && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginTop: 12 }}>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.th, { width: 180 }]}>Area Name</Text>
+                <Text style={[styles.th, { width: 100 }]}>Orders Billed</Text>
+                <Text style={[styles.th, { width: 120 }]}>Revenue Generated</Text>
+                <Text style={[styles.th, { width: 120 }]}>Pending Orders</Text>
+              </View>
+              {(executive.areaPerformance || []).length === 0 ? (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ color: '#64748B', fontSize: 13 }}>No area data found for selected period.</Text>
+                </View>
+              ) : (
+                (executive.areaPerformance || []).map((area: any, index: number) => (
+                  <View key={area.area || index} style={styles.tableRow}>
+                    <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{area.area}</Text>
+                    <Text style={[styles.td, { width: 100 }]}>{area.totalOrders}</Text>
+                    <Text style={[styles.td, { width: 120, color: '#10B981', fontWeight: '600' }]}>₹{area.revenue?.toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>{area.pendingOrders}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        )}
       </View>
 
       {/* Performance Charts & Trends */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Operations Trends & Peak Hours</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Operations Trends & Peak Hours</Text>
+          <TouchableOpacity onPress={() => showInfoAlert('trends')} style={{ padding: 4 }}>
+            <Info size={15} color="#4F46E5" />
+          </TouchableOpacity>
+        </View>
         
         {/* Orders & Revenue Trend */}
         <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>Orders & Revenue Trend</Text>
@@ -476,12 +568,13 @@ export default function AdminPerformance() {
               const maxVal = Math.max(...(executive.performanceTrend || []).map((x: any) => x.orders), 1);
               const barHeight = Math.max((t.orders / maxVal) * 100, 10);
               return (
-                <View key={t.label || idx} style={{ alignItems: 'center', width: 45 }}>
-                  <View style={{ height: 100, justifyContent: 'flex-end', width: 24, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
+                <View key={t.label || idx} style={{ alignItems: 'center', width: 65 }}>
+                  <View style={{ height: 100, justifyContent: 'flex-end', width: 28, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
                     <View style={{ height: `${barHeight}%`, backgroundColor: '#3B82F6', borderRadius: 4 }} />
                   </View>
-                  <Text style={{ fontSize: 10, color: '#475569', fontWeight: '700', marginTop: 4 }}>{t.orders} Vol</Text>
-                  <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 2 }}>{t.label}</Text>
+                  <Text style={{ fontSize: 10, color: '#1e293b', fontWeight: '700', marginTop: 6 }}>{t.orders} Vol</Text>
+                  <Text style={{ fontSize: 9, color: '#059669', fontWeight: '600', marginTop: 2 }}>₹{t.revenue >= 1000 ? `${(t.revenue / 1000).toFixed(1)}k` : t.revenue}</Text>
+                  <Text style={{ fontSize: 9, color: '#64748B', marginTop: 4 }}>{getTrendLabel(t.label, filterPeriod)}</Text>
                 </View>
               );
             })}
@@ -586,64 +679,126 @@ export default function AdminPerformance() {
       </View>
 
       {/* Rider's Detailed Assigned Orders list (when filtered) */}
-      {filterRiderId && (
-        <View style={[styles.card, { marginTop: 24 }]}>
-          <Text style={styles.sectionTitle}>Executive's Deliveries Details ({riders.find(r => r.riderId === filterRiderId)?.name || 'Filtered Executive'})</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View style={styles.table}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.th, { width: 100 }]}>Order No</Text>
-                <Text style={[styles.th, { width: 100 }]}>Type</Text>
-                <Text style={[styles.th, { width: 150 }]}>Customer Name</Text>
-                <Text style={[styles.th, { width: 100 }]}>Status</Text>
-                <Text style={[styles.th, { width: 150 }]}>Assigned Time</Text>
-                <Text style={[styles.th, { width: 150 }]}>Picked Up Time</Text>
-                <Text style={[styles.th, { width: 150 }]}>Delivered Time</Text>
-                <Text style={[styles.th, { width: 140 }]}>Assigned to Deliv.</Text>
-                <Text style={[styles.th, { width: 140 }]}>Pickup to Deliv.</Text>
-                <Text style={[styles.th, { width: 100 }]}>Method</Text>
-              </View>
+      {filterRiderId && (() => {
+        const filteredOrders = (executive.ordersList || []).filter((order: any) => {
+          const matchesSearch = tableSearch === '' ||
+            order.orderNo?.toLowerCase().includes(tableSearch.toLowerCase()) ||
+            order.customerName?.toLowerCase().includes(tableSearch.toLowerCase()) ||
+            order.customerPhone?.toLowerCase().includes(tableSearch.toLowerCase());
+          const matchesType = tableType === '' || order.type?.toLowerCase() === tableType.toLowerCase();
+          const matchesStatus = tableStatus === '' || order.status?.toLowerCase() === tableStatus.toLowerCase();
+          return matchesSearch && matchesType && matchesStatus;
+        });
 
-              {(executive.ordersList || []).length === 0 ? (
-                <View style={{ padding: 24, alignItems: 'center' }}>
-                  <Text style={{ color: '#64748B', fontSize: 13 }}>No matching deliveries found for the selected period.</Text>
+        return (
+          <View style={[styles.card, { marginTop: 24 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
+              <Text style={styles.sectionTitle}>Executive's Deliveries Details ({riders.find(r => r.riderId === filterRiderId)?.name || 'Filtered Executive'})</Text>
+              
+              {/* Table Filter Controls */}
+              {Platform.OS === 'web' && (
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <TextInput
+                    style={[styles.input, { width: 220, height: 38, paddingVertical: 0 }]}
+                    placeholder="Search by Order, Name, Phone..."
+                    value={tableSearch}
+                    onChangeText={setTableSearch}
+                  />
+                  
+                  <select
+                    value={tableType}
+                    onChange={(e) => setTableType(e.target.value)}
+                    style={StyleSheet.flatten([styles.webSelect, { height: 38, minWidth: 120 }]) as any}
+                  >
+                    <option value="">All Types</option>
+                    <option value="Local">Local</option>
+                    <option value="Bus">Bus</option>
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="Counter">Counter</option>
+                  </select>
+
+                  <select
+                    value={tableStatus}
+                    onChange={(e) => setTableStatus(e.target.value)}
+                    style={StyleSheet.flatten([styles.webSelect, { height: 38, minWidth: 120 }]) as any}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="picked up">Picked Up</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="returned">Returned</option>
+                    <option value="failed">Failed</option>
+                  </select>
                 </View>
-              ) : (
-                (executive.ordersList || []).map((order: any, idx: number) => {
-                  const formatTime = (ts: string) => {
-                    if (!ts) return 'N/A';
-                    return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
-                  };
-                  const formatDuration = (mins: number) => {
-                    if (mins === null || mins === undefined) return 'N/A';
-                    if (mins < 60) return `${mins} mins`;
-                    const hrs = Math.floor(mins / 60);
-                    const rem = mins % 60;
-                    return `${hrs}h ${rem}m`;
-                  };
-                  return (
-                    <View key={order.id || idx} style={styles.tableRow}>
-                      <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>{order.orderNo}</Text>
-                      <Text style={[styles.td, { width: 100, textTransform: 'capitalize' }]}>{order.type}</Text>
-                      <View style={{ width: 150 }}>
-                        <Text style={{ fontWeight: '600', fontSize: 12, color: '#1e293b' }}>{order.customerName}</Text>
-                        <Text style={{ fontSize: 10, color: '#64748b' }}>{order.customerPhone}</Text>
-                      </View>
-                      <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{order.status}</Text>
-                      <Text style={[styles.td, { width: 150 }]}>{formatTime(order.assignedAt)}</Text>
-                      <Text style={[styles.td, { width: 150 }]}>{formatTime(order.pickedUpAt)}</Text>
-                      <Text style={[styles.td, { width: 150 }]}>{formatTime(order.deliveredAt)}</Text>
-                      <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#4F46E5' }]}>{formatDuration(order.assignedToDeliveryDuration)}</Text>
-                      <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#10B981' }]}>{formatDuration(order.pickupToDeliveryDuration)}</Text>
-                      <Text style={[styles.td, { width: 100 }]}>{order.modeOfDelivery}</Text>
-                    </View>
-                  );
-                })
               )}
             </View>
-          </ScrollView>
-        </View>
-      )}
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <View style={styles.table}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { width: 100 }]}>Order No</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Invoice No</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Method</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Customer Name</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Status</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Assigned Time</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Picked Up Time</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Delivered Time</Text>
+                  <Text style={[styles.th, { width: 140 }]}>Assigned to Deliv.</Text>
+                  <Text style={[styles.th, { width: 140 }]}>Pickup to Deliv.</Text>
+                </View>
+
+                {filteredOrders.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: '#64748B', fontSize: 13 }}>No matching deliveries found for the selected filters.</Text>
+                  </View>
+                ) : (
+                  filteredOrders.map((order: any, idx: number) => {
+                    const formatTime = (ts: string) => {
+                      if (!ts) return 'N/A';
+                      return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+                    };
+                    const formatDuration = (mins: number) => {
+                      if (mins === null || mins === undefined) return 'N/A';
+                      if (mins < 60) return `${mins} mins`;
+                      const hrs = Math.floor(mins / 60);
+                      const rem = mins % 60;
+                      return `${hrs}h ${rem}m`;
+                    };
+                    return (
+                      <View key={order.id || idx} style={styles.tableRow}>
+                        <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>{order.orderNo}</Text>
+                        <Text style={[styles.td, { width: 100 }]}>{order.invoiceNo || 'N/A'}</Text>
+                        <Text style={[styles.td, { width: 100, textTransform: 'capitalize' }]}>
+                          {String(order.type).toLowerCase() === 'manual'
+                            ? (String(order.modeOfDelivery).toLowerCase() === 'bus' ? 'Bus' : String(order.modeOfDelivery).toLowerCase() === 'schedule delivery' ? 'Scheduled' : 'Local')
+                            : String(order.type).toLowerCase() === 'online'
+                            ? 'Local'
+                            : (String(order.type).toLowerCase() === 'sales_invoice' || String(order.type).toLowerCase() === 'sales_order')
+                            ? 'Counter'
+                            : order.type}
+                        </Text>
+                        <View style={{ width: 150, paddingVertical: 6 }}>
+                          <Text style={{ fontWeight: '600', fontSize: 12, color: '#1e293b' }}>{order.customerName}</Text>
+                          <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{order.customerPhone}</Text>
+                        </View>
+                        <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{order.status}</Text>
+                        <Text style={[styles.td, { width: 150 }]}>{formatTime(order.assignedAt)}</Text>
+                        <Text style={[styles.td, { width: 150 }]}>{formatTime(order.pickedUpAt)}</Text>
+                        <Text style={[styles.td, { width: 150 }]}>{formatTime(order.deliveredAt)}</Text>
+                        <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#4F46E5' }]}>{formatDuration(order.assignedToDeliveryDuration)}</Text>
+                        <Text style={[styles.td, { width: 140, fontWeight: '600', color: '#10B981' }]}>{formatDuration(order.pickupToDeliveryDuration)}</Text>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        );
+      })()}
 
       {/* Stats KPI Calculation Legend */}
       <View style={[styles.card, { marginTop: 24, backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]}>
@@ -671,6 +826,35 @@ export default function AdminPerformance() {
           </View>
         </View>
       </View>
+
+      {/* Custom Customized Info Popup Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={infoModalVisible}
+        onRequestClose={() => setInfoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{infoModalTitle}</Text>
+              <TouchableOpacity onPress={() => setInfoModalVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={true}>
+              <Text style={styles.modalMessage}>{infoModalMessage}</Text>
+            </ScrollView>
+            <TouchableOpacity 
+              style={styles.modalGotItBtn} 
+              onPress={() => setInfoModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalGotItText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -960,4 +1144,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '80%',
+    padding: 24,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    paddingBottom: 12,
+    marginBottom: 16
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a'
+  },
+  modalCloseBtn: {
+    padding: 4
+  },
+  modalCloseBtnText: {
+    fontSize: 16,
+    color: '#94a3b8',
+    fontWeight: '700'
+  },
+  modalBody: {
+    marginBottom: 20,
+    maxHeight: 300
+  },
+  modalMessage: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 20
+  },
+  modalGotItBtn: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  modalGotItText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 13
+  }
 });
