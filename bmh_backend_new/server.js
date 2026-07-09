@@ -152,8 +152,14 @@ app.listen(PORT, () => {
           )
       `);
       console.log('Backfill migration completed successfully.');
+      
+      console.log('Cleaning up invalid push tokens from database tables...');
+      await pool.query("UPDATE employees SET push_token = NULL WHERE push_token IS NOT NULL AND push_token NOT LIKE 'ExponentPushToken%'");
+      await pool.query("UPDATE delivery_boys SET push_token = NULL WHERE push_token IS NOT NULL AND push_token NOT LIKE 'ExponentPushToken%'");
+      await pool.query("UPDATE department_admins SET push_token = NULL WHERE push_token IS NOT NULL AND push_token NOT LIKE 'ExponentPushToken%'");
+      console.log('Invalid push tokens cleanup completed.');
     } catch (e) {
-      console.error('Error backfilling transactions:', e.message);
+      console.error('Error during startup database migrations/cleanup:', e.message);
     }
   }, 5000);
   

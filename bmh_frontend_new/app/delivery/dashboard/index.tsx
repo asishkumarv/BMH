@@ -286,7 +286,7 @@ export default function DeliveryDashboard() {
                       },
                       trigger: {
                         seconds: Math.max(1, Math.floor((alarmTime.getTime() - Date.now()) / 1000)),
-                        channelId: 'alarm-channel-v3'
+                        channelId: 'alarm-channel-v4'
                       } as any,
                     });
                   }

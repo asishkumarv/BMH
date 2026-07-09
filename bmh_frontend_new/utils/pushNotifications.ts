@@ -15,6 +15,10 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
+  if (Platform.OS === 'web') {
+    return undefined;
+  }
+
   let token;
 
   if (Platform.OS === 'android') {
@@ -50,7 +54,8 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
       ).data;
       console.log('Expo Push Token:', token);
     } catch (e) {
-      token = `${e}`;
+      console.error('Error fetching push token:', e);
+      token = undefined;
     }
   } else {
     console.log('Must use physical device for Push Notifications');

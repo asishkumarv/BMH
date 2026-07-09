@@ -54,12 +54,13 @@ export default function RootLayout() {
       const initStorage = async () => {
         try {
           // Register custom notification channel with high priority and alarm sound
-          await Notifications.setNotificationChannelAsync('alarm-channel-v3', {
+          await Notifications.setNotificationChannelAsync('alarm-channel-v4', {
             name: 'Alarm Notifications',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#FF231F7C',
             sound: 'alarm',
+            bypassDnd: true,
           });
 
           const keys = await AsyncStorage.getAllKeys();
