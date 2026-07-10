@@ -106,8 +106,13 @@ exports.createOrder = async (req, res) => {
             try { currentAddresses = JSON.parse(currentAddresses); } catch(e) { currentAddresses = []; }
           }
           
-          const addressExists = currentAddresses.some(a => a.address === address);
-          if (!addressExists) {
+          let addressObj = currentAddresses.find(a => a && a.address === address);
+          if (addressObj) {
+            if (location_link && (!addressObj.location_link || addressObj.location_link !== location_link)) {
+              addressObj.location_link = location_link;
+              await pool.query('UPDATE patients SET addresses = $1 WHERE id = $2', [JSON.stringify(currentAddresses), patientId]);
+            }
+          } else {
             currentAddresses.push({ address, location_link: location_link || '' });
             await pool.query('UPDATE patients SET addresses = $1 WHERE id = $2', [JSON.stringify(currentAddresses), patientId]);
           }
@@ -460,8 +465,13 @@ exports.updateOrder = async (req, res) => {
           if (typeof currentAddresses === 'string') {
             try { currentAddresses = JSON.parse(currentAddresses); } catch(e) { currentAddresses = []; }
           }
-          const addressExists = currentAddresses.some(a => a.address === finalAddress);
-          if (!addressExists) {
+          let addressObj = currentAddresses.find(a => a && a.address === finalAddress);
+          if (addressObj) {
+            if (finalLink && (!addressObj.location_link || addressObj.location_link !== finalLink)) {
+              addressObj.location_link = finalLink;
+              await pool.query('UPDATE patients SET addresses = $1, name = COALESCE($2, name) WHERE id = $3', [JSON.stringify(currentAddresses), finalName || null, patientId]);
+            }
+          } else {
             currentAddresses.push({ address: finalAddress, location_link: finalLink || '' });
             await pool.query('UPDATE patients SET addresses = $1, name = COALESCE($2, name) WHERE id = $3', [JSON.stringify(currentAddresses), finalName || null, patientId]);
           }

@@ -1082,12 +1082,52 @@ router.post('/order/update-patient-gps', async (req, res) => {
       );
       
       const orderRes = await pool.query(
-        'SELECT customer_phone, ship_to_phone FROM manual_orders WHERE id = $1',
+        'SELECT customer_phone, ship_to_phone, address FROM manual_orders WHERE id = $1',
         [orderId]
       );
       if (orderRes.rows.length > 0) {
         const phone = orderRes.rows[0].customer_phone || orderRes.rows[0].ship_to_phone;
+        const orderAddress = orderRes.rows[0].address;
         if (phone) {
+          if (orderAddress) {
+            try {
+              const patientRes = await pool.query(
+                'SELECT id, addresses FROM patients WHERE mobile = $1',
+                [phone]
+              );
+              if (patientRes.rows.length > 0) {
+                const patientId = patientRes.rows[0].id;
+                let currentAddresses = patientRes.rows[0].addresses || [];
+                if (typeof currentAddresses === 'string') {
+                  try {
+                    currentAddresses = JSON.parse(currentAddresses);
+                  } catch (e) {
+                    currentAddresses = [];
+                  }
+                }
+                if (Array.isArray(currentAddresses)) {
+                  const targetAddress = orderAddress.trim().toLowerCase();
+                  let updated = false;
+                  currentAddresses = currentAddresses.map(addrObj => {
+                    if (addrObj && addrObj.address && addrObj.address.trim().toLowerCase() === targetAddress) {
+                      addrObj.location_link = locationLink;
+                      updated = true;
+                    }
+                    return addrObj;
+                  });
+                  if (updated) {
+                    await pool.query(
+                      'UPDATE patients SET addresses = $1 WHERE id = $2',
+                      [JSON.stringify(currentAddresses), patientId]
+                    );
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Error updating patient address location link:', err);
+            }
+          }
+
           const addrRes = await pool.query(
             'SELECT id FROM delivery_addresses WHERE mobile = $1 ORDER BY created_at DESC LIMIT 1',
             [phone]
