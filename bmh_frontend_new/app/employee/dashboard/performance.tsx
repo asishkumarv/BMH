@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable, Alert } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Award, Clock, Calendar, CheckCircle2, User, DollarSign, CalendarDays, ClipboardList, ShieldAlert, ArrowLeft } from 'lucide-react-native';
+import { Award, Clock, Calendar, CheckCircle2, User, DollarSign, CalendarDays, ClipboardList, ShieldAlert, ArrowLeft, Info } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
 import { useRouter } from 'expo-router';
 
@@ -78,6 +78,28 @@ export default function EmployeePerformance() {
     }
   };
 
+  const showCalculationFormulaAlert = () => {
+    const title = 'Employee Performance Calculation Formula';
+    const message = '• Task Completion %:\n(Completed Tasks / Total Assigned Tasks) × 100\n\n' +
+              '• Overall KPI Score:\nWeighted composite score from key metrics:\n' +
+              '  - Task Completion Rate: 30% weight\n' +
+              '  - On-Time SLA Rate: 20% weight\n' +
+              '  - Attendance Adherence: 20% weight\n' +
+              '  - Shift Punctuality: 10% weight\n' +
+              '  - Quality Score: 20% weight\n\n' +
+              '• Performance Levels:\n' +
+              '  - Excellent: 90 - 100 pts\n' +
+              '  - Good: 75 - 89 pts\n' +
+              '  - Average: 60 - 74 pts\n' +
+              '  - Needs Improvement: Below 60 pts\n\n' +
+              '• Manager Rating:\nRating provided by reporting manager (1.0 to 5.0 ★)';
+    if (Platform.OS === 'web') {
+      alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message, [{ text: 'OK' }]);
+    }
+  };
+
   if (loading && !stats) {
     return (
       <View style={styles.loadingContainer}>
@@ -95,9 +117,14 @@ export default function EmployeePerformance() {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={{ flex: 1, minWidth: 200 }}>
-          <Text style={styles.title}>My Performance Report</Text>
-          <Text style={styles.subtitle}>{basic.name} • {basic.role} ({basic.department})</Text>
+        <View style={{ flex: 1, minWidth: 200, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>My Performance Report</Text>
+            <Text style={styles.subtitle}>{basic.name} • {basic.role} ({basic.department})</Text>
+          </View>
+          <TouchableOpacity onPress={showCalculationFormulaAlert} style={{ padding: 4, marginTop: 4 }}>
+            <Info size={16} color="#4F46E5" />
+          </TouchableOpacity>
         </View>
         
         {/* Date Filter Selection Tabs */}

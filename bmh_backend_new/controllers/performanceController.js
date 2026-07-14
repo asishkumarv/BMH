@@ -1171,15 +1171,19 @@ function getExpectedDays(date, month, year) {
     const y = parseInt(targetMonth.split('-')[0], 10);
     const m = parseInt(targetMonth.split('-')[1], 10);
     if (isNaN(y) || isNaN(m)) return 26;
-    const days = new Date(y, m, 0).getDate();
+    
+    const now = new Date();
+    const isCurrentMonth = (y === now.getFullYear() && m === (now.getMonth() + 1));
+    const maxDay = isCurrentMonth ? now.getDate() : new Date(y, m, 0).getDate();
+    
     let workingDays = 0;
-    for (let d = 1; d <= days; d++) {
+    for (let d = 1; d <= maxDay; d++) {
       const dayOfWeek = new Date(y, m - 1, d).getDay();
       if (dayOfWeek !== 0) { // Exclude Sunday
         workingDays++;
       }
     }
-    return workingDays;
+    return workingDays || 1;
   }
   
   if (year) {
@@ -1245,7 +1249,14 @@ async function getEmployeePerformanceStats(req, res) {
     let totalAllBookingRevenue = 0;
     let totalAllPendingTasks = 0;
     let totalAllOverdueTasks = 0;
-    let presentEmployeesCount = 0;
+    
+    const targetPresenceDate = date || new Date().toLocaleDateString('en-CA');
+    const presenceRes = await pool.query(`
+      SELECT DISTINCT employee_id 
+      FROM attendance 
+      WHERE date = $1 AND user_type = 'employee' AND timestamp IS NOT NULL
+    `, [targetPresenceDate]);
+    const presentEmpIds = new Set(presenceRes.rows.map(r => r.employee_id));
 
     let tasksList = [];
     let attendanceList = [];
@@ -1365,7 +1376,6 @@ async function getEmployeePerformanceStats(req, res) {
       }
 
       const presentDays = attendance.filter(a => a.timestamp).length;
-      if (presentDays > 0) presentEmployeesCount++;
 
       let hoursWorked = 0;
       attendance.forEach(a => {
@@ -1527,6 +1537,13 @@ async function getEmployeePerformanceStats(req, res) {
     }));
 
     const overallTaskCompletionRate = totalAllTasksAssigned > 0 ? Math.round((totalAllTasksCompleted / totalAllTasksAssigned) * 100) : 0;
+    
+    let presentEmployeesCount = 0;
+    employees.forEach(emp => {
+      if (presentEmpIds.has(emp.id)) {
+        presentEmployeesCount++;
+      }
+    });
     const absentEmployeesCount = Math.max(0, employees.length - presentEmployeesCount);
 
     res.json({

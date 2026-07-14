@@ -279,6 +279,21 @@ export default function AdminPerformance() {
         title = 'Patient Bookings Financial Summary';
         message = '• Total Bookings Made:\nNumber of patient slot tokens created by employee(s)\n\n' +
                   '• Total Booking Revenue:\nSum of consultation fees collected for those active bookings';
+      } else if (type === 'employee_scores') {
+        title = 'Employee Performance Calculation Formula';
+        message = '• Task Completion %:\n(Completed Tasks / Total Assigned Tasks) × 100\n\n' +
+                  '• Overall KPI Score:\nWeighted composite score from key metrics:\n' +
+                  '  - Task Completion Rate: 30% weight\n' +
+                  '  - On-Time SLA Rate: 20% weight\n' +
+                  '  - Attendance Adherence: 20% weight\n' +
+                  '  - Shift Punctuality: 10% weight\n' +
+                  '  - Quality Score: 20% weight\n\n' +
+                  '• Performance Levels:\n' +
+                  '  - Excellent: 90 - 100 pts\n' +
+                  '  - Good: 75 - 89 pts\n' +
+                  '  - Average: 60 - 74 pts\n' +
+                  '  - Needs Improvement: Below 60 pts\n\n' +
+                  '• Manager Rating:\nRating provided by reporting manager (1.0 to 5.0 ★)';
       }
     } else {
       if (type === 'kpis') {
@@ -328,12 +343,10 @@ export default function AdminPerformance() {
 
   const isDoctorMode = dashboardType === 'doctor';
 
-  const topEmployees = (riders || [])
-    .filter((e: any) => (e.appraisal?.overallKpiScore || 0) >= 75)
+  const topEmployees = [...(riders || [])]
     .sort((a: any, b: any) => (b.appraisal?.overallKpiScore || 0) - (a.appraisal?.overallKpiScore || 0));
 
-  const bottomEmployees = (riders || [])
-    .filter((e: any) => (e.appraisal?.overallKpiScore || 0) < 60)
+  const bottomEmployees = [...(riders || [])]
     .sort((a: any, b: any) => (a.appraisal?.overallKpiScore || 0) - (b.appraisal?.overallKpiScore || 0));
 
   return (
@@ -1140,10 +1153,17 @@ export default function AdminPerformance() {
 
       {/* Detail Table */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>
-          {dashboardType === 'doctor' ? 'Doctor Bookings & Share Performance' :
-           dashboardType === 'employee' ? 'Employee KPI & Attendance Statistics' : 'Rider Breakdown Statistics'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+            {dashboardType === 'doctor' ? 'Doctor Bookings & Share Performance' :
+             dashboardType === 'employee' ? 'Employee KPI & Attendance Statistics' : 'Rider Breakdown Statistics'}
+          </Text>
+          {dashboardType === 'employee' && (
+            <TouchableOpacity onPress={() => showInfoAlert('employee_scores')} style={{ padding: 4 }}>
+              <Info size={15} color="#4F46E5" />
+            </TouchableOpacity>
+          )}
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={true}>
           <View style={styles.table}>
             {dashboardType === 'doctor' ? (
