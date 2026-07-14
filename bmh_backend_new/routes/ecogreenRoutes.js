@@ -1799,7 +1799,7 @@ router.get("/sales-orders", async (req, res) => {
       paramIdx++;
     }
     
-    query += ` ORDER BY created_at DESC, id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    query += ` ORDER BY created_at DESC, order_no DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
     
     const totalRes = await pool.query(countQuery, queryParams.slice(0, paramIdx - 1));
     const totalCount = parseInt(totalRes.rows[0].count, 10);
@@ -2978,19 +2978,23 @@ router.put('/sales-orders/otp/:id', async (req, res) => {
 router.put('/sales-orders/details/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { patient_address, patient_name, patient_contact_no } = req.body;
+    const { patient_address, patient_name, patient_contact_no, delivery_type, bus_details } = req.body;
     
     const result = await pool.query(`
       UPDATE ecogreensales_orders
       SET patient_address = $1,
           patient_name = $2,
-          patient_contact_no = $3
-      WHERE id = $4
+          patient_contact_no = $3,
+          delivery_type = $4,
+          bus_details = $5
+      WHERE id = $6
       RETURNING *
     `, [
       typeof patient_address === 'string' ? patient_address : JSON.stringify(patient_address),
       patient_name,
       patient_contact_no,
+      delivery_type || 'Local',
+      typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details || null),
       id
     ]);
     

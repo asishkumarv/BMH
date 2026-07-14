@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, TextInput, useWindowDimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, TextInput, useWindowDimensions, ScrollView, Image } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
-import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Eye, Share2, Trash2, Phone, Navigation, ChevronDown, X } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Eye, Share2, Trash2, Plus, Phone, Navigation, ChevronDown, X } from 'lucide-react-native';
 
 export default function SalesOrders({ deliveryBoys }) {
   const { width } = useWindowDimensions();
@@ -32,6 +32,27 @@ export default function SalesOrders({ deliveryBoys }) {
   const [newNote, setNewNote] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [otpVerifying, setOtpVerifying] = useState(false);
+
+  // Buses list and manage states
+  const [buses, setBuses] = useState([]);
+  const [busesModalVisible, setBusesModalVisible] = useState(false);
+  const [editingBus, setEditingBus] = useState(null);
+  const [isAddingBus, setIsAddingBus] = useState(false);
+  const [busForm, setBusForm] = useState({
+    bus_name: '', operator_name: '', bus_number: '', route_code: '',
+    source: '', destination: '', departure_time: '',
+    parcel_contact_person: '', mobile_no: '', remarks: ''
+  });
+
+  // Current order's bus details
+  const [busDetails, setBusDetails] = useState({
+    bus_travels_name: '',
+    bus_driver_name: '',
+    bus_driver_number: '',
+    bus_number: '',
+    bus_date: '',
+    scheduled_time: ''
+  });
 
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
@@ -64,6 +85,21 @@ export default function SalesOrders({ deliveryBoys }) {
       if (!silent) setLoading(false);
     }
   };
+
+  const fetchBuses = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/buses');
+      if (res.data && res.data.success) {
+        setBuses(res.data.data);
+      }
+    } catch (err) {
+      console.log('Error fetching buses', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBuses();
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -99,10 +135,12 @@ export default function SalesOrders({ deliveryBoys }) {
         }
       }
 
+      const targetOrder = assignOrder || orders.find(o => o.id === orderId);
+
       const payload = {
         delivery_boy_id: boyId === 'null' ? null : boyId,
-        delivery_type: 'Local',
-        bus_details: null,
+        delivery_type: targetOrder?.delivery_type || 'Local',
+        bus_details: targetOrder?.bus_details || null,
         assigned_by: assignedBy
       };
 
@@ -170,12 +208,39 @@ export default function SalesOrders({ deliveryBoys }) {
     }
   };
 
+  const handleSelectOrderForView = (order) => {
+    setSelectedOrder(order);
+    setEditAddress(typeof order.patient_address === 'object' ? order.patient_address?.address || order.patient_address?.locality || '' : order.patient_address || '');
+    
+    // Parse bus details
+    let bDetails = {
+      bus_travels_name: '',
+      bus_driver_name: '',
+      bus_driver_number: '',
+      bus_number: '',
+      bus_date: '',
+      scheduled_time: ''
+    };
+    if (order.bus_details) {
+      try {
+        const parsed = typeof order.bus_details === 'string' ? JSON.parse(order.bus_details) : order.bus_details;
+        if (parsed) bDetails = { ...bDetails, ...parsed };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setBusDetails(bDetails);
+    setViewModalVisible(true);
+  };
+
   const handleUpdateOrderDetails = async () => {
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen/sales-orders/details/${selectedOrder.id}`, {
         patient_address: editAddress,
         patient_name: selectedOrder.patient_name,
-        patient_contact_no: selectedOrder.patient_contact_no
+        patient_contact_no: selectedOrder.patient_contact_no,
+        delivery_type: selectedOrder.delivery_type || 'Local',
+        bus_details: busDetails
       });
       if (res.data.success) {
         alert('Order details updated successfully!');
@@ -203,8 +268,35 @@ export default function SalesOrders({ deliveryBoys }) {
 
   const handleShareOrder = async (item) => {
     try {
+      let header = '';
+      const bDetails = typeof item.bus_details === 'string' ? JSON.parse(item.bus_details || '{}') : item.bus_details || {};
+      
+      if (item.delivery_type === 'Bus') {
+        header = `${bDetails.bus_travels_name || 'Bus Travels'} Bus Driver\nPhone: +91${bDetails.bus_driver_number || ''}`;
+      } else if (item.delivery_type === 'Schedule Delivery') {
+        header = `Scheduled Delivery\nCustomer: ${item.patient_name || 'N/A'}\nPhone: ${item.patient_contact_no ? '+91' + item.patient_contact_no : 'N/A'}`;
+      } else {
+        header = `${item.patient_name || 'Customer'}\nPhone: ${item.patient_contact_no ? '+91' + item.patient_contact_no : 'N/A'}`;
+      }
+
       const addr = typeof item.patient_address === 'object' ? item.patient_address?.address || item.patient_address?.locality || 'N/A' : item.patient_address || 'N/A';
-      const msg = `Sales Order No: ${item.order_no}\nCustomer: ${item.patient_name}\nPhone: ${item.patient_contact_no}\nAddress: ${addr}\nAmount: ₹${item.total_price}\nStatus: ${item.status}`;
+      let msg = `${header}\n\n` +
+                `Order Information:\n` +
+                `Order No: ${item.order_no || 'N/A'}\n` +
+                `Invoice No: ${item.invoice_id || 'N/A'}\n\n` +
+                `Amount: ₹${item.total_price || '0.00'}\n` +
+                `OTP: ${item.delivery_otp || 'N/A'}\n\n` +
+                `Delivery Boy Information:\n` +
+                `Name: ${deliveryBoys.find(b => b.id.toString() === String(item.delivery_boy_id))?.full_name || 'Not assigned'}`;
+
+      if (item.delivery_type === 'Bus') {
+        msg += `\n\nBus Information:\n` +
+               `Bus Name: ${bDetails.bus_travels_name || '--'}\n` +
+               `Bus No: ${bDetails.bus_number || '--'}\n` +
+               `Bus Contact Number: ${bDetails.bus_driver_number || '--'}\n` +
+               `Bus Date: ${bDetails.bus_date || '--'}\n` +
+               `Bus Time: ${bDetails.scheduled_time || '--'}`;
+      }
       
       if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(msg);
@@ -215,6 +307,67 @@ export default function SalesOrders({ deliveryBoys }) {
       }
     } catch (error) {
       console.error('Error sharing:', error.message || error);
+    }
+  };
+
+  const handleSaveBus = async () => {
+    try {
+      if (editingBus) {
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/buses/${editingBus.id}`, busForm);
+        if (res.data.success) {
+          alert('Bus updated successfully!');
+          fetchBuses();
+          setEditingBus(null);
+        }
+      } else {
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/buses', busForm);
+        if (res.data.success) {
+          alert('Bus added successfully!');
+          fetchBuses();
+          setIsAddingBus(false);
+        }
+      }
+    } catch (err) {
+      alert('Failed to save bus details');
+    }
+  };
+
+  const startEditBus = (bus) => {
+    setEditingBus(bus);
+    setBusForm({
+      bus_name: bus.bus_name || '',
+      operator_name: bus.operator_name || '',
+      bus_number: bus.bus_number || '',
+      route_code: bus.route_code || '',
+      source: bus.source || '',
+      destination: bus.destination || '',
+      departure_time: bus.departure_time || '',
+      parcel_contact_person: bus.parcel_contact_person || '',
+      mobile_no: bus.mobile_no || '',
+      remarks: bus.remarks || ''
+    });
+  };
+
+  const startAddBus = () => {
+    setIsAddingBus(true);
+    setEditingBus(null);
+    setBusForm({
+      bus_name: '', operator_name: '', bus_number: '', route_code: '',
+      source: '', destination: '', departure_time: '',
+      parcel_contact_person: '', mobile_no: '', remarks: ''
+    });
+  };
+
+  const handleDeleteBus = async (busId) => {
+    if (!confirm('Are you sure you want to delete this bus?')) return;
+    try {
+      const res = await axios.delete(`https://napi.bharatmedicalhallplus.com/buses/${busId}`);
+      if (res.data.success) {
+        alert('Bus deleted successfully!');
+        fetchBuses();
+      }
+    } catch (err) {
+      alert('Failed to delete bus');
     }
   };
 
@@ -297,11 +450,7 @@ export default function SalesOrders({ deliveryBoys }) {
 
         {/* Actions */}
         <View style={[styles.cell, { flex: 1.2, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
-          <TouchableOpacity onPress={() => { 
-              setSelectedOrder(item); 
-              setEditAddress(typeof item.patient_address === 'object' ? item.patient_address?.address || item.patient_address?.locality || '' : item.patient_address || '');
-              setViewModalVisible(true); 
-            }} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
+          <TouchableOpacity onPress={() => handleSelectOrderForView(item)} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
              <Eye size={14} color="#4338ca" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#dcfce7'}]}>
@@ -433,6 +582,14 @@ export default function SalesOrders({ deliveryBoys }) {
               </TouchableOpacity>
             )}
           </View>
+        </View>
+        
+        {/* Buses Button next to filters */}
+        <View style={{flexDirection: 'row', gap: 10}}>
+          <TouchableOpacity style={[styles.addBtn, {backgroundColor: '#4f46e5'}]} onPress={() => setBusesModalVisible(true)}>
+            <Bus size={18} color="#fff" style={{marginRight: 6}} />
+            <Text style={styles.addBtnText}>Buses</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -573,6 +730,101 @@ export default function SalesOrders({ deliveryBoys }) {
                   />
                 </View>
 
+                {/* Delivery Mode & Location Link */}
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>Delivery & Location</Text>
+                  <View style={styles.formRow}>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Delivery Mode</Text>
+                      <View style={styles.dropdownWrapper}>
+                        <Picker
+                          selectedValue={selectedOrder.delivery_type || 'Local'}
+                          onValueChange={(val) => setSelectedOrder({...selectedOrder, delivery_type: val})}
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="Counter / Store Pickup" value="Counter" />
+                          <Picker.Item label="Schedule Delivery" value="Schedule Delivery" />
+                          <Picker.Item label="Local" value="Local" />
+                          <Picker.Item label="Bus" value="Bus" />
+                        </Picker>
+                      </View>
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Location Link</Text>
+                      <TextInput 
+                        style={styles.input} 
+                        value={selectedOrder.location_link || ''} 
+                        onChangeText={t => setSelectedOrder({...selectedOrder, location_link: t})} 
+                        placeholder="Google Maps Location Link" 
+                      />
+                    </View>
+                  </View>
+
+                  {/* Bus Delivery Form Details */}
+                  {selectedOrder.delivery_type === 'Bus' && (
+                    <View style={{ marginTop: 15, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#334155', marginBottom: 8 }}>Bus Details Setup</Text>
+                      
+                      <Text style={styles.label}>Select Saved Bus</Text>
+                      <View style={[styles.dropdownWrapper, { width: '100%', marginBottom: 10 }]}>
+                        <Picker
+                          selectedValue=""
+                          onValueChange={(val) => {
+                            if (val) {
+                              const b = buses.find(x => x.id.toString() === val.toString());
+                              if (b) {
+                                setBusDetails({
+                                  bus_travels_name: b.operator_name || b.bus_name || '',
+                                  bus_driver_name: b.parcel_contact_person || '',
+                                  bus_driver_number: b.mobile_no || '',
+                                  bus_number: b.bus_number || '',
+                                  bus_date: new Date().toISOString().split('T')[0],
+                                  scheduled_time: b.departure_time || ''
+                                });
+                              }
+                            }
+                          }}
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="-- Choose Bus --" value="" />
+                          {buses.map(b => (
+                            <Picker.Item key={b.id} label={`${b.operator_name || b.bus_name} (${b.departure_time || ''})`} value={b.id.toString()} />
+                          ))}
+                        </Picker>
+                      </View>
+
+                      <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Travels Name" value={busDetails.bus_travels_name} onChangeText={t => setBusDetails({...busDetails, bus_travels_name: t})} />
+                      <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Driver Name" value={busDetails.bus_driver_name} onChangeText={t => setBusDetails({...busDetails, bus_driver_name: t})} />
+                      <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Driver Number" value={busDetails.bus_driver_number} onChangeText={t => setBusDetails({...busDetails, bus_driver_number: t})} />
+                      <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Bus No" value={busDetails.bus_number} onChangeText={t => setBusDetails({...busDetails, bus_number: t})} />
+                      
+                      <Text style={styles.label}>Bus Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="date" 
+                          value={busDetails.bus_date || ''} 
+                          onChange={(e) => setBusDetails({...busDetails, bus_date: e.target.value})}
+                          style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 6, height: 32 }}
+                        />
+                      ) : (
+                        <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Bus Date (YYYY-MM-DD)" value={busDetails.bus_date} onChangeText={t => setBusDetails({...busDetails, bus_date: t})} />
+                      )}
+
+                      <Text style={styles.label}>Departure Time</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="time" 
+                          value={busDetails.scheduled_time || ''} 
+                          onChange={(e) => setBusDetails({...busDetails, scheduled_time: e.target.value})}
+                          style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 6, height: 32 }}
+                        />
+                      ) : (
+                        <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Departure Time (HH:MM)" value={busDetails.scheduled_time} onChangeText={t => setBusDetails({...busDetails, scheduled_time: t})} />
+                      )}
+                    </View>
+                  )}
+                </View>
+
                 <View style={styles.detailsGroup}>
                   <Text style={styles.detailsTitle}>Financial Details</Text>
                   <Text style={styles.detailsText}>Total Price: ₹{selectedOrder.total_price}</Text>
@@ -650,6 +902,146 @@ export default function SalesOrders({ deliveryBoys }) {
           </View>
         </Modal>
       )}
+
+      {/* Manage Buses Modal */}
+      <Modal visible={busesModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: isDesktop ? 900 : '95%', height: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingBus ? 'Edit Bus Details' : isAddingBus ? 'Add New Bus' : 'Manage Buses'}
+              </Text>
+              <TouchableOpacity onPress={() => {
+                if (editingBus || isAddingBus) {
+                  setEditingBus(null);
+                  setIsAddingBus(false);
+                } else {
+                  setBusesModalVisible(false);
+                }
+              }}>
+                <X size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {(editingBus || isAddingBus) ? (
+              <ScrollView style={{ flex: 1 }}>
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Name</Text>
+                    <TextInput style={styles.input} value={busForm.bus_name} onChangeText={t => setBusForm({...busForm, bus_name: t})} placeholder="e.g. Biswakarma" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Travels / Operator Name</Text>
+                    <TextInput style={styles.input} value={busForm.operator_name} onChangeText={t => setBusForm({...busForm, operator_name: t})} placeholder="e.g. Travels Co" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Bus Number</Text>
+                    <TextInput style={styles.input} value={busForm.bus_number} onChangeText={t => setBusForm({...busForm, bus_number: t})} placeholder="e.g. OD-11G-6920" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Route Code</Text>
+                    <TextInput style={styles.input} value={busForm.route_code} onChangeText={t => setBusForm({...busForm, route_code: t})} placeholder="e.g. R001" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Source Stop</Text>
+                    <TextInput style={styles.input} value={busForm.source} onChangeText={t => setBusForm({...busForm, source: t})} placeholder="e.g. Golei Stop" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Destination Stop</Text>
+                    <TextInput style={styles.input} value={busForm.destination} onChangeText={t => setBusForm({...busForm, destination: t})} placeholder="e.g. Udla" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Departure Time</Text>
+                    <TextInput style={styles.input} value={busForm.departure_time} onChangeText={t => setBusForm({...busForm, departure_time: t})} placeholder="e.g. 18:00" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Parcel Contact Person</Text>
+                    <TextInput style={styles.input} value={busForm.parcel_contact_person} onChangeText={t => setBusForm({...busForm, parcel_contact_person: t})} placeholder="Driver Name" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Driver Mobile Number</Text>
+                    <TextInput style={styles.input} value={busForm.mobile_no} onChangeText={t => setBusForm({...busForm, mobile_no: t})} placeholder="Driver Phone" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Remarks</Text>
+                    <TextInput style={styles.input} value={busForm.remarks} onChangeText={t => setBusForm({...busForm, remarks: t})} placeholder="Any special notes..." />
+                  </View>
+                </View>
+
+                <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20, gap: 10}}>
+                  <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#ef4444'}]} onPress={() => { setEditingBus(null); setIsAddingBus(false); }}>
+                    <Text style={styles.saveBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBus}>
+                    <Text style={styles.saveBtnText}>Save Bus</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            ) : (
+              <View style={{flex: 1}}>
+                <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10}}>
+                  <TouchableOpacity style={[styles.addBtn, {backgroundColor: '#10b981'}]} onPress={startAddBus}>
+                    <Plus size={16} color="#fff" style={{marginRight: 6}} />
+                    <Text style={styles.addBtnText}>Add New Bus</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={{flex: 1}}>
+                  <View style={{borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden'}}>
+                    <View style={{flexDirection: 'row', backgroundColor: '#f8fafc', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0'}}>
+                      <Text style={{flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569'}}>Bus Details</Text>
+                      <Text style={{flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569'}}>Route Stop</Text>
+                      <Text style={{flex: 1, fontWeight: '700', fontSize: 13, color: '#475569'}}>Timing</Text>
+                      <Text style={{flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569'}}>Contact</Text>
+                      <Text style={{flex: 0.8, fontWeight: '700', fontSize: 13, color: '#475569', textAlign: 'center'}}>Actions</Text>
+                    </View>
+
+                    {buses.length === 0 ? (
+                      <View style={{padding: 20, alignItems: 'center'}}><Text>No buses registered.</Text></View>
+                    ) : buses.map(bus => (
+                      <View key={bus.id} style={{flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', alignItems: 'center'}}>
+                        <View style={{flex: 1.5}}>
+                          <Text style={{fontWeight: '600', fontSize: 13}}>{bus.operator_name || bus.bus_name}</Text>
+                          <Text style={{fontSize: 11, color: '#64748b'}}>{bus.bus_number}</Text>
+                        </View>
+                        <View style={{flex: 1.2}}>
+                          <Text style={{fontSize: 13}}>{bus.source} - {bus.destination}</Text>
+                          <Text style={{fontSize: 11, color: '#64748b'}}>Code: {bus.route_code}</Text>
+                        </View>
+                        <Text style={{flex: 1, fontSize: 13}}>{bus.departure_time}</Text>
+                        <View style={{flex: 1.2}}>
+                          <Text style={{fontSize: 13}}>{bus.parcel_contact_person}</Text>
+                          <Text style={{fontSize: 11, color: '#64748b'}}>{bus.mobile_no}</Text>
+                        </View>
+                        <View style={{flex: 0.8, flexDirection: 'row', gap: 6, justifyContent: 'center'}}>
+                          <TouchableOpacity onPress={() => startEditBus(bus)} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
+                            <Eye size={12} color="#4338ca" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteBus(bus.id)} style={[styles.actionBtn, {backgroundColor: '#fee2e2'}]}>
+                            <Trash2 size={12} color="#ef4444" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -663,6 +1055,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, height: '100%', outlineStyle: 'none', fontSize: 13 },
   dropdownWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140 },
   picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
   tableContainer: { height: 540, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerText: { fontSize: 12, fontWeight: '700', color: '#475569' },
@@ -695,6 +1089,8 @@ const styles = StyleSheet.create({
   noteAuthor: { fontSize: 11, fontWeight: '700', color: '#64748b' },
   noteText: { fontSize: 12, color: '#334155', marginTop: 2 },
   noteBtn: { backgroundColor: '#4338CA', paddingHorizontal: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  formRow: { flexDirection: 'row', gap: 8, marginBottom: 6, flexWrap: 'wrap' },
+  formCol: { flex: 1, minWidth: 200 },
   popoverMenu: {
     position: 'absolute',
     top: 45,
