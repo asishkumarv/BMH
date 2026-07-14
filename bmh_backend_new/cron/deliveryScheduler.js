@@ -33,7 +33,7 @@ const startDeliveryCron = () => {
       const manualQuery = `
         SELECT m.*, d.push_token 
         FROM manual_orders m
-        LEFT JOIN delivery_boys d ON m.delivery_boy_id = d.id::varchar
+        LEFT JOIN employees d ON m.delivery_boy_id = d.id::text
         WHERE m.status != 'Delivered' 
           AND m.delivery_boy_id IS NOT NULL
           AND (m.scheduled_notified = false OR m.bus_notified = false)
@@ -73,7 +73,7 @@ const startDeliveryCron = () => {
       const onlineQuery = `
         SELECT o.*, d.push_token 
         FROM online_orders o
-        LEFT JOIN delivery_boys d ON o.delivery_boy_id = d.id
+        LEFT JOIN employees d ON o.delivery_boy_id = d.id
         WHERE o.is_scheduled = true 
           AND o.status != 'Delivered' 
           AND o.delivery_boy_id IS NOT NULL
@@ -98,7 +98,7 @@ const startDeliveryCron = () => {
       const ecoSalesOrdersQuery = `
         SELECT e.*, d.push_token 
         FROM ecogreen_sales_orders e
-        LEFT JOIN delivery_boys d ON e.delivery_boy_id = d.id
+        LEFT JOIN employees d ON e.delivery_boy_id = d.id
         WHERE e.delivery_type = 'Bus'
           AND e.status != 'Delivered'
           AND e.delivery_boy_id IS NOT NULL
@@ -126,7 +126,7 @@ const startDeliveryCron = () => {
       const ecoSalesInvoicesQuery = `
         SELECT e.*, d.push_token 
         FROM ecogreen_sales_invoices e
-        LEFT JOIN delivery_boys d ON e.delivery_boy_id = d.id
+        LEFT JOIN employees d ON e.delivery_boy_id = d.id
         WHERE e.delivery_type = 'Bus'
           AND e.status != 'Delivered'
           AND e.delivery_boy_id IS NOT NULL

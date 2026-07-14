@@ -2136,6 +2136,21 @@ router.post("/sales-invoice/assign-delivery", async (req, res) => {
 
     await client.query("COMMIT");
 
+    // Send push notification to the assigned rider
+    if (selectedBoy && selectedBoy.id) {
+      try {
+        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [selectedBoy.id]);
+        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+          const { sendExpoPushNotification } = require('../utils/pushNotification');
+          const title = 'New Sales Invoice Assigned';
+          const body = `Invoice #${invoice_id} (Order #${orderNoStr}) has been auto-assigned to you.`;
+          sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+        }
+      } catch (e) {
+        console.error('Push notification error on auto-assignment:', e.message);
+      }
+    }
+
     res.json({
       success: true,
       assigned_to: selectedBoy,

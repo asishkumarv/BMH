@@ -705,7 +705,7 @@ export default function DeliveryDashboard() {
             </View>
             <Text style={styles.orderId}>Order #{item.id}</Text>
           </View>
-        <View style={[styles.statusBadge, item.status === 'DELIVERED' ? styles.statusDelivered : styles.statusPending]}>
+        <View style={[styles.statusBadge, ['delivered', 'completed', 'received'].includes(item.status?.toLowerCase()) ? styles.statusDelivered : styles.statusPending]}>
           <Text style={styles.statusText}>{item.status}</Text>
         </View>
       </View>
@@ -852,13 +852,13 @@ export default function DeliveryDashboard() {
                   </Text>
                 </TouchableOpacity>
               )}
-              {(item.status === 'Starts to Wholesaler' || item.status === 'Starts to Bus Stand' || item.status === 'Starts to Store') && (
+              {['starts to wholesaler', 'starts to bus stand', 'starts to store'].includes(item.status?.toLowerCase()) && (
                 <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#3B82F6'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
                   <Package color="#fff" size={14} style={{marginRight: 4}} />
                   <Text style={[styles.footerBtnText, {color: '#fff'}]}>Pickup</Text>
                 </TouchableOpacity>
               )}
-              {item.status === 'Picked Up' && (
+              {item.status?.toLowerCase() === 'picked up' && (
                 <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#10B981'}]} onPress={() => openSubmissionModal(item)}>
                   <CheckCircle color="#fff" size={14} style={{marginRight: 4}} />
                   <Text style={[styles.footerBtnText, {color: '#fff'}]}>Submitted To</Text>
@@ -867,7 +867,7 @@ export default function DeliveryDashboard() {
             </>
           )}
 
-          {item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && item.status?.toLowerCase() !== 'received' && (
+          {!['delivered', 'completed', 'cancelled', 'received'].includes(item.status?.toLowerCase()) && (
               <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#6366F1'}]} onPress={() => openUpdateModal(item)}>
                 <Text style={[styles.footerBtnText, {color: '#fff'}]}>Update</Text>
               </TouchableOpacity>
@@ -963,11 +963,11 @@ export default function DeliveryDashboard() {
           <Text style={{ fontSize: 12, color: filterState === 'All' ? '#fff' : '#1e40af' }}>Total</Text>
         </TouchableOpacity>
         <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'Pending' ? '#f59e0b' : '#fef3c7', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Pending')}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => o.status !== 'Delivered').length}</Text>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => !['delivered', 'completed', 'received'].includes(o.status?.toLowerCase())).length}</Text>
           <Text style={{ fontSize: 12, color: filterState === 'Pending' ? '#fff' : '#b45309' }}>Pending</Text>
         </TouchableOpacity>
         <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'Completed' ? '#10b981' : '#d1fae5', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Completed')}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Completed' ? '#fff' : '#047857' }}>{orders.filter(o => o.status === 'Delivered').length}</Text>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Completed' ? '#fff' : '#047857' }}>{orders.filter(o => ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase())).length}</Text>
           <Text style={{ fontSize: 12, color: filterState === 'Completed' ? '#fff' : '#047857' }}>Completed</Text>
         </TouchableOpacity>
       </View>
@@ -987,7 +987,12 @@ export default function DeliveryDashboard() {
         <ActivityIndicator size="large" color="#3B82F6" style={{ marginTop: 50 }} />
       ) : (
         <FlatList
-          data={orders.filter(o => { if (filterState === 'Completed') return o.status === 'Delivered'; if (filterState === 'Pending') return o.status !== 'Delivered'; return true; })}
+          data={orders.filter(o => { 
+            const isCompleted = ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase());
+            if (filterState === 'Completed') return isCompleted; 
+            if (filterState === 'Pending') return !isCompleted; 
+            return true; 
+          })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}
           contentContainerStyle={[styles.listContainer, orders.length === 0 && {flex: 1, justifyContent: 'center'}]}

@@ -335,7 +335,16 @@ export default function ManualOrders({ deliveryBoys }) {
         }
       }
 
-      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
+      let url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`;
+      if (selectedOrder.order_source_type === 'purchase_order') {
+        url = `https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/update/${selectedOrder.id}`;
+      } else if (selectedOrder.order_source_type === 'online_order') {
+        url = `https://napi.bharatmedicalhallplus.com/online-orders/${selectedOrder.id}/update`;
+      } else if (selectedOrder.order_source_type === 'sales_order') {
+        url = `https://napi.bharatmedicalhallplus.com/sales-order/${selectedOrder.id}/update`;
+      }
+
+      await axios.put(url, {
         ...selectedOrder,
         address: editAddress,
         new_note: newNote,
@@ -353,7 +362,7 @@ export default function ManualOrders({ deliveryBoys }) {
     }
   };
 
-  const handleAssignBoy = async (orderId, boyId) => {
+  const handleAssignBoy = async (order, boyId) => {
     try {
       const isUnassign = boyId === 'null' || !boyId;
       
@@ -377,25 +386,92 @@ export default function ManualOrders({ deliveryBoys }) {
         }
       }
 
-      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, {
+      let url = `https://napi.bharatmedicalhallplus.com/manual-orders/${order.id}`;
+      let method = 'PUT';
+      let payload = {
         delivery_boy_id: isUnassign ? null : boyId,
         status: isUnassign ? 'Pending' : 'Assigned',
         modified_by_id: modifiedById,
         modified_by_type: modifiedByType,
         modified_by_name: authName
-      });
+      };
+
+      if (order.type === 'online_order') {
+        url = `https://napi.bharatmedicalhallplus.com/online-orders/${order.id}/assign-delivery`;
+        payload = {
+          delivery_boy_id: isUnassign ? null : boyId,
+          assigned_by: modifiedById
+        };
+      } else if (order.type === 'sales_order') {
+        url = `https://napi.bharatmedicalhallplus.com/sales-order/${order.id}/assign-delivery`;
+        payload = {
+          delivery_type: 'Local',
+          delivery_boy_id: isUnassign ? null : boyId,
+          assigned_by: modifiedById
+        };
+      } else if (order.type === 'sales_invoice') {
+        url = `https://napi.bharatmedicalhallplus.com/sales-invoice-list/${order.id}/assign-delivery`;
+        payload = {
+          delivery_type: 'Local',
+          delivery_boy_id: isUnassign ? null : boyId,
+          assigned_by: modifiedById
+        };
+      } else if (order.type === 'purchase_order') {
+        url = `https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/assign/${order.id}`;
+        method = 'POST';
+        payload = {
+          delivery_type: 'Local',
+          delivery_boy_id: isUnassign ? null : boyId,
+          assigned_by: modifiedById
+        };
+      }
+
+      if (method === 'POST') {
+        await axios.post(url, payload);
+      } else {
+        await axios.put(url, payload);
+      }
+      
       fetchManualOrders();
     } catch (err) {
+      console.error(err);
       alert('Failed to assign boy');
     }
   };
 
   const handleResetStatus = async () => {
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
+      let url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`;
+      let method = 'PUT';
+      let payload = {
         status: 'Pending',
         delivery_boy_id: null
-      });
+      };
+
+      if (selectedOrder.order_source_type === 'purchase_order') {
+        url = `https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/status/${selectedOrder.id}`;
+        method = 'POST';
+        payload = {
+          status: 'Pending'
+        };
+      } else if (selectedOrder.order_source_type === 'online_order') {
+        url = `https://napi.bharatmedicalhallplus.com/online-orders/${selectedOrder.id}/status`;
+        payload = {
+          status: 'Pending'
+        };
+      } else if (selectedOrder.order_source_type === 'sales_order') {
+        url = `https://napi.bharatmedicalhallplus.com/sales-order/${selectedOrder.id}/status`;
+        payload = {
+          status: 'Pending'
+        };
+      }
+
+      if (method === 'POST') {
+        await axios.post(url, payload);
+      } else {
+        await axios.put(url, payload);
+      }
+
       alert('Order reset to Pending');
       fetchManualOrders();
       setViewModalVisible(false);
@@ -448,8 +524,9 @@ export default function ManualOrders({ deliveryBoys }) {
   const renderOrderItem = ({ item, index }) => {
     // Determine the status badge color
     let statusColor = '#3b82f6';
-    if (item.status === 'Assigned') statusColor = '#f59e0b';
-    else if (item.status === 'Completed' || item.status === 'Delivered') statusColor = '#10b981';
+    const lowerStatus = item.status?.toLowerCase();
+    if (lowerStatus === 'assigned') statusColor = '#f59e0b';
+    else if (['completed', 'delivered', 'received'].includes(lowerStatus)) statusColor = '#10b981';
     
     // Created By parsing
     let creatorImg = null;
@@ -521,7 +598,7 @@ export default function ManualOrders({ deliveryBoys }) {
         
         {/* Delivery Boy */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {(item.delivery_boy_id && item.status === 'Delivered') ? (
+          {(item.delivery_boy_id && ['completed', 'delivered', 'received'].includes(item.status?.toLowerCase())) ? (
             <View style={{flexDirection: 'row', alignItems: 'center'}}>
                {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
                <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name}</Text>
@@ -1508,7 +1585,7 @@ export default function ManualOrders({ deliveryBoys }) {
                 <TouchableOpacity 
                   style={{ padding: 12, borderRadius: 8, backgroundColor: '#fee2e2', marginBottom: 10 }}
                   onPress={() => {
-                    handleAssignBoy(assignOrder.id, 'null');
+                    handleAssignBoy(assignOrder, 'null');
                     setAssignModalVisible(false);
                     setAssignOrder(null);
                   }}
@@ -1531,7 +1608,7 @@ export default function ManualOrders({ deliveryBoys }) {
                       justifyContent: 'space-between'
                     }}
                     onPress={() => {
-                      handleAssignBoy(assignOrder.id, boy.id);
+                      handleAssignBoy(assignOrder, boy.id);
                       setAssignModalVisible(false);
                       setAssignOrder(null);
                     }}

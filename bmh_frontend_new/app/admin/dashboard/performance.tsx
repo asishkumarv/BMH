@@ -42,7 +42,7 @@ const getTrendLabel = (label: string, period: string) => {
 };
 
 export default function AdminPerformance() {
-  const [dashboardType, setDashboardType] = useState<'delivery' | 'doctor'>('delivery');
+  const [dashboardType, setDashboardType] = useState<'delivery' | 'doctor' | 'employee'>('delivery');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [riders, setRiders] = useState<any[]>([]);
@@ -70,7 +70,7 @@ export default function AdminPerformance() {
     setFilterValue(currentMonth);
   }, []);
 
-  const handleDashboardTypeChange = (type: 'delivery' | 'doctor') => {
+  const handleDashboardTypeChange = (type: 'delivery' | 'doctor' | 'employee') => {
     setDashboardType(type);
     setFilterRiderId('');
     setFilterArea('');
@@ -92,6 +92,10 @@ export default function AdminPerformance() {
       if (dashboardType === 'doctor') {
         queryParams.push('type=doctor');
         if (filterRiderId) queryParams.push(`doctor_id=${filterRiderId}`);
+        if (filterArea) queryParams.push(`department=${encodeURIComponent(filterArea)}`);
+      } else if (dashboardType === 'employee') {
+        queryParams.push('type=employee');
+        if (filterRiderId) queryParams.push(`employee_id=${filterRiderId}`);
         if (filterArea) queryParams.push(`department=${encodeURIComponent(filterArea)}`);
       } else {
         if (filterRiderId) queryParams.push(`delivery_boy_id=${filterRiderId}`);
@@ -119,6 +123,15 @@ export default function AdminPerformance() {
             setShiftsList([]);
             if (res.data.data.filters.paymentModes) setPaymentModesList(res.data.data.filters.paymentModes);
           }
+        } else if (dashboardType === 'employee') {
+          setStats(res.data);
+          setRiders(res.data.employees || []);
+          if (res.data.employees) {
+            const depts = [...new Set(res.data.employees.map((e: any) => e.department).filter(Boolean))] as string[];
+            setAreasList(depts);
+          }
+          setShiftsList([]);
+          setPaymentModesList([]);
         } else {
           setStats(res.data.executiveDashboard);
           setRiders(res.data.riders || []);
@@ -152,9 +165,8 @@ export default function AdminPerformance() {
   const showInfoAlert = (type: string) => {
     let title = '';
     let message = '';
-    const isDoc = dashboardType === 'doctor';
     
-    if (isDoc) {
+    if (dashboardType === 'doctor') {
       if (type === 'kpis') {
         title = 'Doctor KPIs Calculation';
         message = '• Consultations Completed %:\nCalculated as (Completed Consultations / Total Bookings) × 100\n\n' +
@@ -179,6 +191,16 @@ export default function AdminPerformance() {
         title = 'Doctor Trends & Peak Hours';
         message = '• Bookings & Revenue Trend:\nShows daily, monthly, or yearly distribution of token bookings and consultation revenue\n\n' +
                   '• Peak Booking Hours:\nHour of day distribution (0-23) based on slot start times. Helps track peak consulting hours';
+      }
+    } else if (dashboardType === 'employee') {
+      if (type === 'kpis') {
+        title = 'Employee KPIs Calculation';
+        message = '• Task Completion Rate:\nCalculated as (Completed Tasks / Total Assigned Tasks) × 100\n\n' +
+                  '• Total Tasks:\nTotal normal and recurring tasks assigned to the employee\n\n' +
+                  '• Completed Tasks:\nTasks successfully completed by the employee\n\n' +
+                  '• Hours Worked:\nAccumulated check-in to check-out session hours from attendance logs\n\n' +
+                  '• Patient Bookings:\nTokens booked by the employee (if they perform booking operations)\n\n' +
+                  '• Booking Revenue:\nTotal booking fee payments collected by the employee';
       }
     } else {
       if (type === 'kpis') {
@@ -248,18 +270,27 @@ export default function AdminPerformance() {
             Doctors
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleTabButton, dashboardType === 'employee' && styles.toggleTabButtonActive]}
+          onPress={() => handleDashboardTypeChange('employee')}
+        >
+          <Text style={[styles.toggleTabButtonText, dashboardType === 'employee' && styles.toggleTabButtonActiveText]}>
+            Employees
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Page Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>
-            {isDoctorMode ? 'Doctors Performance KPI & KRI Dashboard' : 'Delivery Performance KPI & KRI  Dashboard'}
+            {dashboardType === 'doctor' ? 'Doctors Performance KPI & KRI Dashboard' :
+             dashboardType === 'employee' ? 'Employees Performance KPI & KRI Dashboard' : 'Delivery Performance KPI & KRI  Dashboard'}
           </Text>
           <Text style={styles.subtitle}>
-            {isDoctorMode
-              ? 'Measure booking loads, consultant payouts, and department statistics'
-              : 'Measure productivity, quality, and service levels of delivery executives'}
+            {dashboardType === 'doctor' ? 'Measure booking loads, consultant payouts, and department statistics' :
+             dashboardType === 'employee' ? 'Measure task completion times, attendance hours, and patient bookings' :
+             'Measure productivity, quality, and service levels of delivery executives'}
           </Text>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchPerformanceData}>
@@ -273,16 +304,24 @@ export default function AdminPerformance() {
         <Text style={styles.sectionTitle}>Reporting Filters</Text>
         <View style={styles.filtersRow}>
           <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
-            <Text style={styles.filterLabel}>{isDoctorMode ? 'Doctor ID (Optional)' : 'Rider ID (Optional)'}</Text>
+            <Text style={styles.filterLabel}>
+              {dashboardType === 'doctor' ? 'Doctor ID (Optional)' :
+               dashboardType === 'employee' ? 'Employee ID (Optional)' : 'Rider ID (Optional)'}
+            </Text>
             {Platform.OS === 'web' ? (
               <select
                 value={filterRiderId}
                 onChange={(e) => setFilterRiderId(e.target.value)}
                 style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
-                {isDoctorMode ? (
+                {dashboardType === 'doctor' ? (
                   <>
                     <option value="">All Doctors</option>
+                    {riders.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </>
+                ) : dashboardType === 'employee' ? (
+                  <>
+                    <option value="">All Employees</option>
                     {riders.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </>
                 ) : (
@@ -295,7 +334,10 @@ export default function AdminPerformance() {
             ) : (
               <TextInput
                 style={[styles.input, { height: 36, fontSize: 13 }]}
-                placeholder={isDoctorMode ? 'Doctor ID' : 'Rider ID'}
+                placeholder={
+                  dashboardType === 'doctor' ? 'Doctor ID' :
+                  dashboardType === 'employee' ? 'Employee ID' : 'Rider ID'
+                }
                 value={filterRiderId}
                 onChangeText={setFilterRiderId}
               />
@@ -342,19 +384,25 @@ export default function AdminPerformance() {
 
           {Platform.OS === 'web' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
-              <Text style={styles.filterLabel}>{isDoctorMode ? 'Department' : 'Area'}</Text>
+              <Text style={styles.filterLabel}>
+                {dashboardType === 'doctor' ? 'Department' :
+                 dashboardType === 'employee' ? 'Department' : 'Area'}
+              </Text>
               <select
                 value={filterArea}
                 onChange={(e) => setFilterArea(e.target.value)}
                 style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
               >
-                <option value="">{isDoctorMode ? 'All Specializations' : 'All Areas'}</option>
+                <option value="">
+                  {dashboardType === 'doctor' ? 'All Specializations' :
+                   dashboardType === 'employee' ? 'All Departments' : 'All Areas'}
+                </option>
                 {areasList.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </View>
           )}
 
-          {!isDoctorMode && Platform.OS === 'web' && (
+          {dashboardType === 'delivery' && Platform.OS === 'web' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Shift</Text>
               <select
@@ -370,7 +418,7 @@ export default function AdminPerformance() {
             </View>
           )}
 
-          {Platform.OS === 'web' && (
+          {dashboardType !== 'employee' && Platform.OS === 'web' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Payment Mode</Text>
               <select
@@ -399,7 +447,7 @@ export default function AdminPerformance() {
       </View>
 
       {/* KPI Cards Grid */}
-      {isDoctorMode ? (
+      {dashboardType === 'doctor' ? (
         <View style={styles.grid}>
           <View style={styles.kpiCard}>
             <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
@@ -477,6 +525,76 @@ export default function AdminPerformance() {
               <Text style={styles.kpiLabel}>BMH Net Share</Text>
               <Text style={[styles.kpiValue, { color: '#4F46E5' }]}>₹{(executive.overview?.totalBMHShare || 0).toLocaleString('en-IN')}</Text>
               <Text style={styles.kpiSub}>Hospital revenue share</Text>
+            </View>
+          </View>
+        </View>
+      ) : dashboardType === 'employee' ? (
+        <View style={styles.grid}>
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <Award size={20} color="#4F46E5" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Task Completion Rate</Text>
+              <Text style={[styles.kpiValue, { color: getStatusColor(executive.overview?.overallTaskCompletionRate || 0, 'success') }]}>
+                {executive.overview?.overallTaskCompletionRate || 0}%
+              </Text>
+              <Text style={styles.kpiSub}>Target: High completion rate</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <Clock size={20} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Total Tasks Assigned</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.totalTasksAssigned || 0}</Text>
+              <Text style={styles.kpiSub}>Normal & recurring tasks</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <ShieldCheck size={20} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Completed Tasks</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.totalTasksCompleted || 0}</Text>
+              <Text style={styles.kpiSub}>Tasks finished successfully</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <Clock size={20} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Hours Worked</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.totalHoursWorked || 0} hrs</Text>
+              <Text style={styles.kpiSub}>Attendance shift hours</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <User size={20} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Patient Bookings</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.totalBookingsMade || 0}</Text>
+              <Text style={styles.kpiSub}>Tokens booked by staff</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <DollarSign size={20} color="#059669" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Booking Revenue</Text>
+              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{(executive.overview?.totalBookingRevenue || 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.kpiSub}>Fees collected by staff</Text>
             </View>
           </View>
         </View>
@@ -766,65 +884,67 @@ export default function AdminPerformance() {
       </View>
 
       {/* Performance Charts & Trends */}
-      <View style={[styles.card, { marginTop: 24 }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Operations Trends & Peak Hours</Text>
-          <TouchableOpacity onPress={() => showInfoAlert('trends')} style={{ padding: 4 }}>
-            <Info size={15} color="#4F46E5" />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Bookings / Orders & Revenue Trend */}
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>
-          {isDoctorMode ? 'Bookings & Revenue Trend' : 'Orders & Revenue Trend'}
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', height: 160, paddingBottom: 24, paddingHorizontal: 12 }}>
-            {(executive.performanceTrend || []).map((t: any, idx: number) => {
-              const maxVal = Math.max(...(executive.performanceTrend || []).map((x: any) => x.orders), 1);
-              const barHeight = Math.max((t.orders / maxVal) * 100, 10);
-              return (
-                <View key={t.label || idx} style={{ alignItems: 'center', width: 65 }}>
-                  <View style={{ height: 100, justifyContent: 'flex-end', width: 28, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
-                    <View style={{ height: `${barHeight}%`, backgroundColor: '#3B82F6', borderRadius: 4 }} />
-                  </View>
-                  <Text style={{ fontSize: 10, color: '#1e293b', fontWeight: '700', marginTop: 6 }}>{t.orders} Vol</Text>
-                  <Text style={{ fontSize: 9, color: '#059669', fontWeight: '600', marginTop: 2 }}>₹{t.revenue >= 1000 ? `${(t.revenue / 1000).toFixed(1)}k` : t.revenue}</Text>
-                  <Text style={{ fontSize: 9, color: '#64748B', marginTop: 4 }}>{getTrendLabel(t.label, filterPeriod)}</Text>
-                </View>
-              );
-            })}
+      {dashboardType !== 'employee' && (
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Operations Trends & Peak Hours</Text>
+            <TouchableOpacity onPress={() => showInfoAlert('trends')} style={{ padding: 4 }}>
+              <Info size={15} color="#4F46E5" />
+            </TouchableOpacity>
           </View>
-        </ScrollView>
-
-        {/* Peak Hours distribution */}
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>
-          {isDoctorMode ? 'Peak Booking Hours (Distribution)' : 'Peak Delivery Hours (Distribution)'}
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', height: 150, paddingBottom: 20, paddingHorizontal: 12 }}>
-            {(() => {
-              const peakHoursArray = isDoctorMode ? executive.peakHours : executive.hourStats;
-              return (peakHoursArray || []).filter((h: any) => h.orders > 0).map((h: any, idx: number) => {
-                const maxVal = Math.max(...(peakHoursArray || []).map((x: any) => x.orders), 1);
-                const barHeight = Math.max((h.orders / maxVal) * 100, 10);
+          
+          {/* Bookings / Orders & Revenue Trend */}
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>
+            {isDoctorMode ? 'Bookings & Revenue Trend' : 'Orders & Revenue Trend'}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', height: 160, paddingBottom: 24, paddingHorizontal: 12 }}>
+              {(executive.performanceTrend || []).map((t: any, idx: number) => {
+                const maxVal = Math.max(...(executive.performanceTrend || []).map((x: any) => x.orders), 1);
+                const barHeight = Math.max((t.orders / maxVal) * 100, 10);
                 return (
-                  <View key={h.hour || idx} style={{ alignItems: 'center', width: 40 }}>
-                    <View style={{ height: 90, justifyContent: 'flex-end', width: 16, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
-                      <View style={{ height: `${barHeight}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+                  <View key={t.label || idx} style={{ alignItems: 'center', width: 65 }}>
+                    <View style={{ height: 100, justifyContent: 'flex-end', width: 28, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
+                      <View style={{ height: `${barHeight}%`, backgroundColor: '#3B82F6', borderRadius: 4 }} />
                     </View>
-                    <Text style={{ fontSize: 9, color: '#475569', fontWeight: '700', marginTop: 4 }}>{h.orders}</Text>
-                    <Text style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{h.hour}</Text>
+                    <Text style={{ fontSize: 10, color: '#1e293b', fontWeight: '700', marginTop: 6 }}>{t.orders} Vol</Text>
+                    <Text style={{ fontSize: 9, color: '#059669', fontWeight: '600', marginTop: 2 }}>₹{t.revenue >= 1000 ? `${(t.revenue / 1000).toFixed(1)}k` : t.revenue}</Text>
+                    <Text style={{ fontSize: 9, color: '#64748B', marginTop: 4 }}>{getTrendLabel(t.label, filterPeriod)}</Text>
                   </View>
                 );
-              });
-            })()}
-          </View>
-        </ScrollView>
-      </View>
+              })}
+            </View>
+          </ScrollView>
+
+          {/* Peak Hours distribution */}
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 12 }}>
+            {isDoctorMode ? 'Peak Booking Hours (Distribution)' : 'Peak Delivery Hours (Distribution)'}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end', height: 150, paddingBottom: 20, paddingHorizontal: 12 }}>
+              {(() => {
+                const peakHoursArray = isDoctorMode ? executive.peakHours : executive.hourStats;
+                return (peakHoursArray || []).filter((h: any) => h.orders > 0).map((h: any, idx: number) => {
+                  const maxVal = Math.max(...(peakHoursArray || []).map((x: any) => x.orders), 1);
+                  const barHeight = Math.max((h.orders / maxVal) * 100, 10);
+                  return (
+                    <View key={h.hour || idx} style={{ alignItems: 'center', width: 40 }}>
+                      <View style={{ height: 90, justifyContent: 'flex-end', width: 16, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                        <View style={{ height: `${barHeight}%`, backgroundColor: '#10B981', borderRadius: 3 }} />
+                      </View>
+                      <Text style={{ fontSize: 9, color: '#475569', fontWeight: '700', marginTop: 4 }}>{h.orders}</Text>
+                      <Text style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{h.hour}</Text>
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+          </ScrollView>
+        </View>
+      )}
 
       {/* Leaderboard/Ranking */}
-      {!isDoctorMode && (
+      {dashboardType === 'delivery' && (
         <View style={styles.rankingsRow}>
           <View style={[styles.card, { flex: 1 }]}>
             <Text style={styles.sectionTitle}>Top Performing Executives</Text>
@@ -862,10 +982,13 @@ export default function AdminPerformance() {
 
       {/* Detail Table */}
       <View style={[styles.card, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>{isDoctorMode ? 'Doctor Bookings & Share Performance' : 'Rider Breakdown Statistics'}</Text>
+        <Text style={styles.sectionTitle}>
+          {dashboardType === 'doctor' ? 'Doctor Bookings & Share Performance' :
+           dashboardType === 'employee' ? 'Employee KPI & Attendance Statistics' : 'Rider Breakdown Statistics'}
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={true}>
           <View style={styles.table}>
-            {isDoctorMode ? (
+            {dashboardType === 'doctor' ? (
               <>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.th, { width: 60 }]}>ID</Text>
@@ -890,6 +1013,40 @@ export default function AdminPerformance() {
                     <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{d.revenue?.toLocaleString('en-IN')}</Text>
                     <Text style={[styles.td, { width: 100, color: '#0284C7', fontWeight: '600' }]}>₹{d.doctorShare?.toLocaleString('en-IN')}</Text>
                     <Text style={[styles.td, { width: 100, color: '#4F46E5', fontWeight: '600' }]}>₹{d.bmhShare?.toLocaleString('en-IN')}</Text>
+                  </View>
+                ))}
+              </>
+            ) : dashboardType === 'employee' ? (
+              <>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { width: 60 }]}>ID</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Employee Name</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Department</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Role</Text>
+                  <Text style={[styles.th, { width: 150 }]}>Tasks (Assigned / Completed)</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Task Comp. %</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Hours Worked</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Bookings Made</Text>
+                  <Text style={[styles.th, { width: 100 }]}>Booking Rev.</Text>
+                </View>
+
+                {riders.map((e: any, index: number) => (
+                  <View key={e.id || index} style={styles.tableRow}>
+                    <Text style={[styles.td, { width: 60, fontWeight: 'bold' }]}>#{e.id}</Text>
+                    <Text style={[styles.td, { width: 150, fontWeight: '600' }]}>{e.name}</Text>
+                    <Text style={[styles.td, { width: 120 }]}>{e.department}</Text>
+                    <Text style={[styles.td, { width: 120 }]}>{e.role}</Text>
+                    <Text style={[styles.td, { width: 150 }]}>
+                      {e.tasks?.assigned} / {e.tasks?.completed}
+                    </Text>
+                    <View style={[styles.td, { width: 100 }]}>
+                      <Text style={[styles.badge, { backgroundColor: getStatusColor(e.tasks?.completionRate, 'success') + '15', color: getStatusColor(e.tasks?.completionRate, 'success') }]}>
+                        {e.tasks?.completionRate}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.td, { width: 100 }]}>{e.attendance?.hoursWorked} hrs</Text>
+                    <Text style={[styles.td, { width: 100 }]}>{e.bookings?.total > 0 ? e.bookings.total : 'N/A'}</Text>
+                    <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{e.bookings?.total > 0 ? `₹${e.bookings.revenue}` : 'N/A'}</Text>
                   </View>
                 ))}
               </>
@@ -935,7 +1092,7 @@ export default function AdminPerformance() {
 
       {/* Filtered Rider's deliveries OR Filtered Doctor's Patient Bookings */}
       {filterRiderId && (() => {
-        if (isDoctorMode) {
+        if (dashboardType === 'doctor') {
           const filteredBookings = (executive.bookingsList || []).filter((b: any) => {
             const searchStr = tableSearch.toLowerCase().trim();
             return searchStr === '' ||
@@ -1001,6 +1158,159 @@ export default function AdminPerformance() {
                   )}
                 </View>
               </ScrollView>
+            </View>
+          );
+        } else if (dashboardType === 'employee') {
+          const filteredTasks = (stats.tasksList || []).filter((t: any) => {
+            const searchStr = tableSearch.toLowerCase().trim();
+            return searchStr === '' ||
+              String(t.id || '').toLowerCase().includes(searchStr) ||
+              String(t.title || '').toLowerCase().includes(searchStr);
+          });
+
+          const filteredAtt = (stats.attendanceList || []).filter((a: any) => {
+            const searchStr = tableSearch.toLowerCase().trim();
+            return searchStr === '' ||
+              String(a.date || '').toLowerCase().includes(searchStr) ||
+              String(a.status || '').toLowerCase().includes(searchStr);
+          });
+
+          const filteredBookings = (stats.bookingsList || []).filter((b: any) => {
+            const searchStr = tableSearch.toLowerCase().trim();
+            return searchStr === '' ||
+              String(b.id || '').toLowerCase().includes(searchStr) ||
+              String(b.patientName || '').toLowerCase().includes(searchStr);
+          });
+
+          const selectedEmp = riders.find(r => String(r.id) === String(filterRiderId));
+
+          return (
+            <View style={{ gap: 24, marginTop: 24 }}>
+              {/* Tasks list */}
+              <View style={styles.card}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={styles.sectionTitle}>Employee Tasks List ({selectedEmp?.name})</Text>
+                  {Platform.OS === 'web' && (
+                    <TextInput
+                      style={[styles.input, { width: 220, height: 38, paddingVertical: 0 }]}
+                      placeholder="Search tasks..."
+                      value={tableSearch}
+                      onChangeText={setTableSearch}
+                    />
+                  )}
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <View style={styles.table}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.th, { width: 80 }]}>Task ID</Text>
+                      <Text style={[styles.th, { width: 200 }]}>Title</Text>
+                      <Text style={[styles.th, { width: 100 }]}>Priority</Text>
+                      <Text style={[styles.th, { width: 120 }]}>Status</Text>
+                      <Text style={[styles.th, { width: 120 }]}>Due Date</Text>
+                      <Text style={[styles.th, { width: 120 }]}>Completed At</Text>
+                      <Text style={[styles.th, { width: 100 }]}>Duration</Text>
+                    </View>
+                    {filteredTasks.length === 0 ? (
+                      <View style={{ padding: 24, alignItems: 'center' }}>
+                        <Text style={{ color: '#64748B', fontSize: 13 }}>No tasks found.</Text>
+                      </View>
+                    ) : (
+                      filteredTasks.map((t: any) => (
+                        <View key={t.id} style={styles.tableRow}>
+                          <Text style={[styles.td, { width: 80, fontWeight: '700' }]}>#{t.id}</Text>
+                          <Text style={[styles.td, { width: 200, fontWeight: '600' }]}>{t.title}</Text>
+                          <Text style={[styles.td, { width: 100 }]}>{t.priority}</Text>
+                          <View style={[styles.td, { width: 120 }]}>
+                            <Text style={[styles.badge, { 
+                              backgroundColor: t.status?.toLowerCase() === 'completed' ? '#dcfce7' : '#fee2e2',
+                              color: t.status?.toLowerCase() === 'completed' ? '#10b981' : '#ef4444'
+                            }]}>
+                              {t.status}
+                            </Text>
+                          </View>
+                          <Text style={[styles.td, { width: 120 }]}>{t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 120 }]}>{t.completedAt ? new Date(t.completedAt).toLocaleDateString('en-IN') : 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 100 }]}>{t.durationHours != null ? `${t.durationHours} hrs` : 'N/A'}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
+
+              {/* Attendance list */}
+              <View style={styles.card}>
+                <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Attendance History ({selectedEmp?.name})</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <View style={styles.table}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.th, { width: 120 }]}>Date</Text>
+                      <Text style={[styles.th, { width: 150 }]}>Check In</Text>
+                      <Text style={[styles.th, { width: 150 }]}>Check Out</Text>
+                      <Text style={[styles.th, { width: 120 }]}>Working Hours</Text>
+                      <Text style={[styles.th, { width: 100 }]}>Status</Text>
+                    </View>
+                    {filteredAtt.length === 0 ? (
+                      <View style={{ padding: 24, alignItems: 'center' }}>
+                        <Text style={{ color: '#64748B', fontSize: 13 }}>No attendance logs found.</Text>
+                      </View>
+                    ) : (
+                      filteredAtt.map((a: any) => (
+                        <View key={a.id} style={styles.tableRow}>
+                          <Text style={[styles.td, { width: 120, fontWeight: '600' }]}>{new Date(a.date).toLocaleDateString('en-IN')}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{a.checkin ? new Date(a.checkin).toLocaleTimeString('en-US', { hour12: true }) : 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{a.checkout ? new Date(a.checkout).toLocaleTimeString('en-US', { hour12: true }) : 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 120 }]}>{a.sessionHours || 'N/A'}</Text>
+                          <View style={[styles.td, { width: 100 }]}>
+                            <Text style={[styles.badge, { 
+                              backgroundColor: a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'regular' ? '#dcfce7' : '#fee2e2',
+                              color: a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'regular' ? '#10b981' : '#ef4444'
+                            }]}>
+                              {a.status || 'Present'}
+                            </Text>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
+
+              {/* Patient Bookings list (Conditional) */}
+              {(stats.bookingsList || []).length > 0 && (
+                <View style={styles.card}>
+                  <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Patient Bookings Log ({selectedEmp?.name})</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                    <View style={styles.table}>
+                      <View style={styles.tableHeader}>
+                        <Text style={[styles.th, { width: 100 }]}>Booking ID</Text>
+                        <Text style={[styles.th, { width: 120 }]}>Date</Text>
+                        <Text style={[styles.th, { width: 180 }]}>Patient Name</Text>
+                        <Text style={[styles.th, { width: 150 }]}>Doctor</Text>
+                        <Text style={[styles.th, { width: 100 }]}>Fee</Text>
+                        <Text style={[styles.th, { width: 120 }]}>Status</Text>
+                      </View>
+                      {filteredBookings.map((b: any) => (
+                        <View key={b.id} style={styles.tableRow}>
+                          <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>#{b.id}</Text>
+                          <Text style={[styles.td, { width: 120 }]}>{new Date(b.createdAt).toLocaleDateString('en-IN')}</Text>
+                          <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{b.patientName}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{b.doctorName}</Text>
+                          <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{b.fee}</Text>
+                          <View style={[styles.td, { width: 120 }]}>
+                            <Text style={[styles.badge, { 
+                              backgroundColor: b.status === 'Cancelled' ? '#fee2e2' : (b.status === 'Consulted' || b.status === 'Completed' ? '#dcfce7' : '#fef3c7'),
+                              color: b.status === 'Cancelled' ? '#ef4444' : (b.status === 'Consulted' || b.status === 'Completed' ? '#10b981' : '#d97706')
+                            }]}>
+                              {b.status}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
             </View>
           );
         } else {
@@ -1146,7 +1456,7 @@ export default function AdminPerformance() {
       {/* Stats KPI Calculation Legend */}
       <View style={[styles.card, { marginTop: 24, backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]}>
         <Text style={[styles.sectionTitle, { color: '#1e293b', marginBottom: 8 }]}>How Statistics are Calculated</Text>
-        {isDoctorMode ? (
+        {dashboardType === 'doctor' ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
             <View style={{ flex: 1, minWidth: 200 }}>
               <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Completion Rate</Text>
@@ -1163,6 +1473,21 @@ export default function AdminPerformance() {
             <View style={{ flex: 1, minWidth: 200 }}>
               <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>BMH Net Share</Text>
               <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Net revenue kept by BMH (Booking Fee × (1 - Fee Share %)).</Text>
+            </View>
+          </View>
+        ) : dashboardType === 'employee' ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Task Completion Rate</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Calculated as (Completed Tasks / Assigned Tasks) × 100.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Hours Worked</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Accumulated session check-in to check-out hours parsed from attendance logs.</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <Text style={{ fontWeight: '700', fontSize: 13, color: '#475569', marginBottom: 2 }}>Bookings & Revenue</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', lineHeight: 16 }}>Sum of patient bookings created by this employee and corresponding consultation fees collected (excludes Cancelled bookings).</Text>
             </View>
           </View>
         ) : (

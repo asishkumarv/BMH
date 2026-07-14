@@ -112,6 +112,9 @@ exports.getAdminPerformanceStats = async (req, res) => {
     if (type === 'doctor') {
       return await getDoctorPerformanceStats(req, res);
     }
+    if (type === 'employee') {
+      return await getEmployeePerformanceStats(req, res);
+    }
 
     // 1. Fetch delivery boys (employees where department = 'Delivery' or role = 'Hd delivery')
     let riderQuery = `
@@ -470,10 +473,11 @@ exports.getAdminPerformanceStats = async (req, res) => {
       const workingDaysCount = attRes.rowCount;
       let workingHours = 0;
       attRes.rows.forEach(a => {
-        if (a.checkin_timestamp && a.checkout_timestamp) {
-          const hours = (new Date(a.checkout_timestamp) - new Date(a.checkin_timestamp)) / (1000 * 60 * 60);
+        const checkin = a.timestamp || a.checkin_timestamp;
+        if (checkin && a.checkout_timestamp) {
+          const hours = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
           if (hours > 0) workingHours += hours;
-        } else if (a.checkin_timestamp) {
+        } else if (checkin) {
           workingHours += 8;
         }
       });
@@ -855,10 +859,11 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     const workingDays = attRes.rowCount;
     let workingHours = 0;
     attRes.rows.forEach(a => {
-      if (a.checkin_timestamp && a.checkout_timestamp) {
-        const hours = (new Date(a.checkout_timestamp) - new Date(a.checkin_timestamp)) / (1000 * 60 * 60);
+      const checkin = a.timestamp || a.checkin_timestamp;
+      if (checkin && a.checkout_timestamp) {
+        const hours = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
         if (hours > 0) workingHours += hours;
-      } else if (a.checkin_timestamp) {
+      } else if (checkin) {
         workingHours += 8;
       }
     });
@@ -1147,3 +1152,453 @@ async function getDoctorPerformanceStats(req, res) {
     res.status(500).json({ success: false, error: 'Internal Server Error' });
   }
 }
+
+async function getEmployeePerformanceStats(req, res) {
+  try {
+    const { date, month, year, employee_id, department } = req.query;
+
+    let dateFilter = '';
+    let queryParams = [];
+    let paramIdx = 1;
+
+    if (date) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM-DD') = $${paramIdx}`;
+      queryParams.push(date);
+      paramIdx++;
+    } else if (month) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $${paramIdx}`;
+      queryParams.push(month);
+      paramIdx++;
+    } else if (year) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY') = $${paramIdx}`;
+      queryParams.push(year);
+      paramIdx++;
+    }
+
+    let empQuery = `
+      SELECT id, full_name, email, mobile, department, role, created_at 
+      FROM employees 
+      WHERE (department != 'Delivery' AND role != 'Hd delivery' AND role != 'Hd delivery boy')
+        AND status = 'approved'
+    `;
+    let empParams = [];
+    let empParamIdx = 1;
+
+    if (employee_id) {
+      empQuery += ` AND id = $${empParamIdx}`;
+      empParams.push(employee_id);
+      empParamIdx++;
+    }
+    if (department) {
+      empQuery += ` AND department = $${empParamIdx}`;
+      empParams.push(department);
+      empParamIdx++;
+    }
+
+    empQuery += ` ORDER BY full_name ASC`;
+    const empRes = await pool.query(empQuery, empParams);
+    const employees = empRes.rows;
+
+    let totalAllTasksAssigned = 0;
+    let totalAllTasksCompleted = 0;
+    let totalAllHoursWorked = 0;
+    let totalAllBookingsMade = 0;
+    let totalAllBookingRevenue = 0;
+
+    let tasksList = [];
+    let attendanceList = [];
+    let bookingsList = [];
+
+    const compiledEmployeesStats = await Promise.all(employees.map(async (emp) => {
+      const empId = emp.id;
+      const taskFilterParams = [empId, ...queryParams];
+      const taskDateFilter = dateFilter.replace(/created_at/g, 'created_at').replace(/\$1/g, '$2');
+
+      const tasksRes = await pool.query(`
+        SELECT id, title, description, status, due_date, accepted_at, completed_at, priority, notes
+        FROM tasks
+        WHERE assignee_id = $1 AND assignee_type = 'employee'
+          ${taskDateFilter}
+        ORDER BY created_at DESC
+      `, taskFilterParams);
+      const tasks = tasksRes.rows;
+
+      const attDateFilter = dateFilter.replace(/created_at/g, 'date').replace(/\$1/g, '$2');
+      const attRes = await pool.query(`
+        SELECT id, date, timestamp, checkout_timestamp, status, session_hours, late_duration, early_checkout_duration
+        FROM attendance
+        WHERE employee_id = $1
+          ${attDateFilter}
+        ORDER BY date DESC
+      `, taskFilterParams);
+      const attendance = attRes.rows;
+
+      const pbDateFilter = dateFilter.replace(/created_at/g, 'pb.created_at').replace(/\$1/g, '$2');
+      const bookingsRes = await pool.query(`
+        SELECT pb.id, pb.status, pb.created_at, pb.payment_mode, ds.fee, d.full_name as doctor_name,
+               p.name as patient_name, p.mobile as patient_mobile
+        FROM patient_bookings pb
+        JOIN doctor_slots ds ON pb.slot_id = ds.id
+        JOIN doctors d ON ds.doctor_id = d.id
+        LEFT JOIN patients p ON pb.patient_id = p.id
+        WHERE pb.booked_by = $1
+          ${pbDateFilter}
+        ORDER BY pb.created_at DESC
+      `, taskFilterParams);
+      const bookings = bookingsRes.rows;
+
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(t => t.status?.toLowerCase() === 'completed').length;
+      const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      const onTimeTasks = tasks.filter(t => {
+        if (t.status?.toLowerCase() !== 'completed') return false;
+        if (!t.due_date || !t.completed_at) return true;
+        return new Date(t.completed_at) <= new Date(t.due_date);
+      }).length;
+      const onTimeRate = completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 100;
+
+      let totalTaskDurationHrs = 0;
+      let taskDurationCount = 0;
+      tasks.forEach(t => {
+        if (t.status?.toLowerCase() === 'completed' && t.completed_at) {
+          const start = t.accepted_at || t.created_at;
+          if (start) {
+            const diffMs = new Date(t.completed_at) - new Date(start);
+            if (diffMs > 0) {
+              totalTaskDurationHrs += diffMs / (1000 * 60 * 60);
+              taskDurationCount++;
+            }
+          }
+        }
+      });
+      const avgTaskCompletionTimeHrs = taskDurationCount > 0 ? parseFloat((totalTaskDurationHrs / taskDurationCount).toFixed(1)) : 0;
+
+      const presentDays = attendance.filter(a => a.timestamp).length;
+      let hoursWorked = 0;
+      attendance.forEach(a => {
+        const checkin = a.timestamp || a.checkin_timestamp;
+        if (checkin && a.checkout_timestamp) {
+          const hrs = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
+          if (hrs > 0) hoursWorked += hrs;
+        } else if (checkin) {
+          hoursWorked += 8;
+        }
+      });
+
+      const avgHoursPerDay = presentDays > 0 ? parseFloat((hoursWorked / presentDays).toFixed(1)) : 0;
+
+      const totalBookings = bookings.length;
+      const consultedBookings = bookings.filter(b => b.status === 'Consulted' || b.status === 'Completed').length;
+      const bookingCompletionRate = totalBookings > 0 ? Math.round((consultedBookings / totalBookings) * 100) : 0;
+      const bookingRevenue = bookings.filter(b => b.status !== 'Cancelled').reduce((sum, b) => sum + parseFloat(b.fee || 0), 0);
+
+      totalAllTasksAssigned += totalTasks;
+      totalAllTasksCompleted += completedTasks;
+      totalAllHoursWorked += hoursWorked;
+      totalAllBookingsMade += totalBookings;
+      totalAllBookingRevenue += bookingRevenue;
+
+      if (employee_id && String(employee_id) === String(empId)) {
+        tasksList = tasks.map(t => {
+          let duration = null;
+          if (t.completed_at) {
+            const start = t.accepted_at || t.created_at;
+            const diff = new Date(t.completed_at) - new Date(start);
+            if (diff > 0) duration = parseFloat((diff / (1000 * 60 * 60)).toFixed(1));
+          }
+          return {
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            status: t.status,
+            dueDate: t.due_date,
+            completedAt: t.completed_at,
+            priority: t.priority,
+            notes: t.notes,
+            durationHours: duration
+          };
+        });
+
+        attendanceList = attendance.map(a => {
+          let duration = null;
+          const checkin = a.timestamp || a.checkin_timestamp;
+          if (checkin && a.checkout_timestamp) {
+            const diff = new Date(a.checkout_timestamp) - new Date(checkin);
+            if (diff > 0) duration = parseFloat((diff / (1000 * 60 * 60)).toFixed(1));
+          } else if (checkin) {
+            duration = 8.0;
+          }
+          return {
+            id: a.id,
+            date: a.date,
+            checkin: checkin,
+            checkout: a.checkout_timestamp,
+            status: a.status,
+            sessionHours: a.session_hours || (duration ? `${duration} hrs` : null),
+            lateDuration: a.late_duration,
+            earlyCheckoutDuration: a.early_checkout_duration,
+            durationHours: duration
+          };
+        });
+
+        bookingsList = bookings.map(b => ({
+          id: b.id,
+          createdAt: b.created_at,
+          patientName: b.patient_name || 'N/A',
+          patientPhone: b.patient_mobile || 'N/A',
+          doctorName: b.doctor_name,
+          status: b.status,
+          paymentMode: b.payment_mode,
+          fee: parseFloat(b.fee)
+        }));
+      }
+
+      return {
+        id: empId,
+        name: emp.full_name,
+        email: emp.email,
+        mobile: emp.mobile,
+        department: emp.department,
+        role: emp.role,
+        joiningDate: emp.created_at,
+        tasks: {
+          assigned: totalTasks,
+          completed: completedTasks,
+          completionRate: taskCompletionRate,
+          onTimeRate,
+          avgCompletionTimeHrs: avgTaskCompletionTimeHrs
+        },
+        attendance: {
+          presentDays,
+          hoursWorked: parseFloat(hoursWorked.toFixed(1)),
+          avgHoursPerDay
+        },
+        bookings: {
+          total: totalBookings,
+          completed: consultedBookings,
+          completionRate: bookingCompletionRate,
+          revenue: parseFloat(bookingRevenue.toFixed(2))
+        }
+      };
+    }));
+
+    const overallTaskCompletionRate = totalAllTasksAssigned > 0 ? Math.round((totalAllTasksCompleted / totalAllTasksAssigned) * 100) : 0;
+
+    res.json({
+      success: true,
+      overview: {
+        totalEmployees: employees.length,
+        totalTasksAssigned: totalAllTasksAssigned,
+        totalTasksCompleted: totalAllTasksCompleted,
+        overallTaskCompletionRate,
+        totalHoursWorked: parseFloat(totalAllHoursWorked.toFixed(1)),
+        totalBookingsMade: totalAllBookingsMade,
+        totalBookingRevenue: parseFloat(totalAllBookingRevenue.toFixed(2))
+      },
+      employees: compiledEmployeesStats,
+      tasksList,
+      attendanceList,
+      bookingsList
+    });
+  } catch (error) {
+    console.error('Error fetching employee performance statistics:', error);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+}
+
+exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { month } = req.query; 
+    
+    let dateFilter = '';
+    let filterParams = [parseInt(employeeId, 10)];
+    let paramIdx = 2;
+
+    if (month) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $${paramIdx}`;
+      filterParams.push(month);
+      paramIdx++;
+    } else {
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $${paramIdx}`;
+      filterParams.push(currentMonth);
+      paramIdx++;
+    }
+
+    const empRes = await pool.query('SELECT id, full_name, email, mobile, department, role, created_at FROM employees WHERE id = $1', [parseInt(employeeId, 10)]);
+    if (empRes.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
+    const emp = empRes.rows[0];
+
+    const taskDateFilter = dateFilter.replace(/created_at/g, 'created_at');
+    const tasksRes = await pool.query(`
+      SELECT id, title, description, status, due_date, accepted_at, completed_at, priority, notes
+      FROM tasks
+      WHERE assignee_id = $1 AND assignee_type = 'employee'
+        ${taskDateFilter}
+      ORDER BY created_at DESC
+    `, filterParams);
+    const tasks = tasksRes.rows;
+
+    const attDateFilter = dateFilter.replace(/created_at/g, 'date');
+    const attRes = await pool.query(`
+      SELECT id, date, timestamp, checkout_timestamp, status, session_hours, late_duration, early_checkout_duration
+      FROM attendance
+      WHERE employee_id = $1
+        ${attDateFilter}
+      ORDER BY date DESC
+    `, filterParams);
+    const attendance = attRes.rows;
+
+    const pbDateFilter = dateFilter.replace(/created_at/g, 'pb.created_at');
+    const bookingsRes = await pool.query(`
+      SELECT pb.id, pb.status, pb.created_at, pb.payment_mode, ds.fee, d.full_name as doctor_name,
+             p.name as patient_name, p.mobile as patient_mobile
+      FROM patient_bookings pb
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
+      LEFT JOIN patients p ON pb.patient_id = p.id
+      WHERE pb.booked_by = $1
+        ${pbDateFilter}
+      ORDER BY pb.created_at DESC
+    `, filterParams);
+    const bookings = bookingsRes.rows;
+
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status?.toLowerCase() === 'completed').length;
+    const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    const onTimeTasks = tasks.filter(t => {
+      if (t.status?.toLowerCase() !== 'completed') return false;
+      if (!t.due_date || !t.completed_at) return true;
+      return new Date(t.completed_at) <= new Date(t.due_date);
+    }).length;
+    const onTimeRate = completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 100;
+
+    let totalTaskDurationHrs = 0;
+    let taskDurationCount = 0;
+    tasks.forEach(t => {
+      if (t.status?.toLowerCase() === 'completed' && t.completed_at) {
+        const start = t.accepted_at || t.created_at;
+        if (start) {
+          const diffMs = new Date(t.completed_at) - new Date(start);
+          if (diffMs > 0) {
+            totalTaskDurationHrs += diffMs / (1000 * 60 * 60);
+            taskDurationCount++;
+          }
+        }
+      }
+    });
+    const avgTaskCompletionTimeHrs = taskDurationCount > 0 ? parseFloat((totalTaskDurationHrs / taskDurationCount).toFixed(1)) : 0;
+
+    const presentDays = attendance.filter(a => a.timestamp).length;
+    let hoursWorked = 0;
+    attendance.forEach(a => {
+      const checkin = a.timestamp || a.checkin_timestamp;
+      if (checkin && a.checkout_timestamp) {
+        const hrs = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
+        if (hrs > 0) hoursWorked += hrs;
+      } else if (checkin) {
+        hoursWorked += 8;
+      }
+    });
+    const avgHoursPerDay = presentDays > 0 ? parseFloat((hoursWorked / presentDays).toFixed(1)) : 0;
+
+    const totalBookings = bookings.length;
+    const consultedBookings = bookings.filter(b => b.status === 'Consulted' || b.status === 'Completed').length;
+    const bookingCompletionRate = totalBookings > 0 ? Math.round((consultedBookings / totalBookings) * 100) : 0;
+    const bookingRevenue = bookings.filter(b => b.status !== 'Cancelled').reduce((sum, b) => sum + parseFloat(b.fee || 0), 0);
+
+    const tasksList = tasks.map(t => {
+      let duration = null;
+      if (t.completed_at) {
+        const start = t.accepted_at || t.created_at;
+        const diff = new Date(t.completed_at) - new Date(start);
+        if (diff > 0) duration = parseFloat((diff / (1000 * 60 * 60)).toFixed(1));
+      }
+      return {
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        dueDate: t.due_date,
+        completedAt: t.completed_at,
+        priority: t.priority,
+        notes: t.notes,
+        durationHours: duration
+      };
+    });
+
+    const attendanceList = attendance.map(a => {
+      let duration = null;
+      const checkin = a.timestamp || a.checkin_timestamp;
+      if (checkin && a.checkout_timestamp) {
+        const diff = new Date(a.checkout_timestamp) - new Date(checkin);
+        if (diff > 0) duration = parseFloat((diff / (1000 * 60 * 60)).toFixed(1));
+      } else if (checkin) {
+        duration = 8.0;
+      }
+      return {
+        id: a.id,
+        date: a.date,
+        checkin: checkin,
+        checkout: a.checkout_timestamp,
+        status: a.status,
+        sessionHours: a.session_hours || (duration ? `${duration} hrs` : null),
+        lateDuration: a.late_duration,
+        earlyCheckoutDuration: a.early_checkout_duration,
+        durationHours: duration
+      };
+    });
+
+    const bookingsList = bookings.map(b => ({
+      id: b.id,
+      createdAt: b.created_at,
+      patientName: b.patient_name || 'N/A',
+      patientPhone: b.patient_mobile || 'N/A',
+      doctorName: b.doctor_name,
+      status: b.status,
+      paymentMode: b.payment_mode,
+      fee: parseFloat(b.fee)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        basicDetails: {
+          employeeId: emp.id,
+          name: emp.full_name,
+          mobile: emp.mobile,
+          email: emp.email,
+          department: emp.department,
+          role: emp.role,
+          joiningDate: emp.created_at,
+          supervisor: 'Super Admin'
+        },
+        performance: {
+          tasksAssigned: totalTasks,
+          tasksCompleted: completedTasks,
+          taskCompletionRate,
+          onTimeRate,
+          avgTaskCompletionTimeHrs,
+          workingDays: presentDays,
+          workingHours: parseFloat(hoursWorked.toFixed(1)),
+          avgHoursPerDay,
+          bookingsMade: totalBookings,
+          bookingsCompleted: consultedBookings,
+          bookingCompletionRate,
+          bookingRevenue: parseFloat(bookingRevenue.toFixed(2))
+        },
+        tasksList,
+        attendanceList,
+        bookingsList
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching individual employee stats:', error);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+};
