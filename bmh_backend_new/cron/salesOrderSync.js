@@ -87,10 +87,13 @@ async function syncSalesOrders() {
                 const valueRows = [];
                 const queryParams = [];
                 let paramCount = 1;
+                const processedInThisBatch = new Set();
                 
                 for (const order of orders) {
                     if (!order.order_no) continue;
                     if (existingOrderNos.has(order.order_no)) continue;
+                    if (processedInThisBatch.has(order.order_no)) continue;
+                    processedInThisBatch.add(order.order_no);
                     
                     const rowParams = [
                         order.order_id || null,
