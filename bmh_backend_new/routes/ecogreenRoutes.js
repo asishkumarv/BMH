@@ -2978,7 +2978,7 @@ router.put('/sales-orders/otp/:id', async (req, res) => {
 router.put('/sales-orders/details/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { patient_address, patient_name, patient_contact_no, delivery_type, bus_details } = req.body;
+    const { patient_address, patient_name, patient_contact_no, delivery_type, bus_details, order_no, invoice_id } = req.body;
     
     const result = await pool.query(`
       UPDATE ecogreensales_orders
@@ -2986,8 +2986,10 @@ router.put('/sales-orders/details/:id', async (req, res) => {
           patient_name = $2,
           patient_contact_no = $3,
           delivery_type = $4,
-          bus_details = $5
-      WHERE id = $6
+          bus_details = $5,
+          order_no = $6,
+          invoice_id = $7
+      WHERE id = $8
       RETURNING *
     `, [
       typeof patient_address === 'string' ? patient_address : JSON.stringify(patient_address),
@@ -2995,6 +2997,8 @@ router.put('/sales-orders/details/:id', async (req, res) => {
       patient_contact_no,
       delivery_type || 'Local',
       typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details || null),
+      order_no,
+      invoice_id,
       id
     ]);
     

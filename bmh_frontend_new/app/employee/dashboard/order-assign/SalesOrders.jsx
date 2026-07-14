@@ -121,7 +121,7 @@ export default function SalesOrders({ deliveryBoys }) {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchSalesOrders(true, page);
-    }, 15000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [page, searchQuery, startDate, endDate, selectedBoyId, assignmentFilter]);
 
@@ -240,7 +240,9 @@ export default function SalesOrders({ deliveryBoys }) {
         patient_name: selectedOrder.patient_name,
         patient_contact_no: selectedOrder.patient_contact_no,
         delivery_type: selectedOrder.delivery_type || 'Local',
-        bus_details: busDetails
+        bus_details: busDetails,
+        order_no: selectedOrder.order_no,
+        invoice_id: selectedOrder.invoice_id
       });
       if (res.data.success) {
         alert('Order details updated successfully!');
@@ -719,8 +721,23 @@ export default function SalesOrders({ deliveryBoys }) {
               <ScrollView style={{ flex: 1, paddingRight: 4 }}>
                 <View style={styles.detailsGroup}>
                   <Text style={styles.detailsTitle}>Patient Profile</Text>
-                  <Text style={styles.detailsText}>Name: {selectedOrder.patient_name || 'N/A'}</Text>
-                  <Text style={styles.detailsText}>Contact: {selectedOrder.patient_contact_no || 'N/A'}</Text>
+                  <Text style={styles.label}>Patient Name</Text>
+                  <TextInput 
+                    style={[styles.input, { marginBottom: 8 }]} 
+                    value={selectedOrder.patient_name || ''} 
+                    onChangeText={t => setSelectedOrder({...selectedOrder, patient_name: t})}
+                    placeholder="Patient Name"
+                  />
+                  
+                  <Text style={styles.label}>Contact Number</Text>
+                  <TextInput 
+                    style={[styles.input, { marginBottom: 8 }]} 
+                    value={selectedOrder.patient_contact_no || ''} 
+                    onChangeText={t => setSelectedOrder({...selectedOrder, patient_contact_no: t})}
+                    placeholder="Contact Number"
+                    keyboardType="phone-pad"
+                  />
+
                   <Text style={styles.label}>Address Info</Text>
                   <TextInput 
                     style={styles.input} 
@@ -823,6 +840,55 @@ export default function SalesOrders({ deliveryBoys }) {
                       )}
                     </View>
                   )}
+
+                  {/* Schedule Delivery Form Details */}
+                  {selectedOrder.delivery_type === 'Schedule Delivery' && (
+                    <View style={{ marginTop: 15, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#334155', marginBottom: 8 }}>Schedule Delivery Setup</Text>
+                      
+                      <Text style={styles.label}>Scheduled Date</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="date" 
+                          value={busDetails.bus_date || ''} 
+                          onChange={(e) => setBusDetails({...busDetails, bus_date: e.target.value})}
+                          style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 6, height: 32 }}
+                        />
+                      ) : (
+                        <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Date (YYYY-MM-DD)" value={busDetails.bus_date} onChangeText={t => setBusDetails({...busDetails, bus_date: t})} />
+                      )}
+
+                      <Text style={styles.label}>Scheduled Time</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="time" 
+                          value={busDetails.scheduled_time || ''} 
+                          onChange={(e) => setBusDetails({...busDetails, scheduled_time: e.target.value})}
+                          style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 6, height: 32 }}
+                        />
+                      ) : (
+                        <TextInput style={[styles.input, { marginBottom: 6, height: 32 }]} placeholder="Time (HH:MM)" value={busDetails.scheduled_time} onChangeText={t => setBusDetails({...busDetails, scheduled_time: t})} />
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>Order Identification</Text>
+                  <Text style={styles.label}>Order Number</Text>
+                  <TextInput 
+                    style={[styles.input, { marginBottom: 8 }]} 
+                    value={selectedOrder.order_no || ''} 
+                    onChangeText={t => setSelectedOrder({...selectedOrder, order_no: t})}
+                    placeholder="Order Number"
+                  />
+                  <Text style={styles.label}>Invoice Number</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={selectedOrder.invoice_id || ''} 
+                    onChangeText={t => setSelectedOrder({...selectedOrder, invoice_id: t})}
+                    placeholder="Invoice Number"
+                  />
                 </View>
 
                 <View style={styles.detailsGroup}>
