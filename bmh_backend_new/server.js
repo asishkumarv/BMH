@@ -108,6 +108,10 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched submitted_at in ecogreenpurchase_orders.'))
     .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_at):', err.message));
 
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP')
+    .then(() => console.log('Successfully checked/patched delivered_at in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (delivered_at):', err.message));
+
   pool.query('ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS note TEXT')
     .then(() => console.log('Successfully checked/patched note column in cash_handovers table.'))
     .catch(err => console.error('Error patching cash_handovers table:', err.message));
