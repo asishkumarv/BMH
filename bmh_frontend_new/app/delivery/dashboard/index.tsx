@@ -837,7 +837,7 @@ export default function DeliveryDashboard() {
                   }}
                 >
                   <Navigation color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>
+                  <Text style={[styles.footerBtnText, {color: '#fff', fontSize: 10, textAlign: 'center', flexShrink: 1}]}>
                     {item.delivery_type === 'Bus' ? 'Start to Bus Stand' : 
                      item.delivery_type === 'Store' ? 'Start to Store' : 
                      'Start to Wholesaler'}

@@ -109,13 +109,13 @@ router.post('/status/:id', async (req, res) => {
         if (submitted_to_id) {
             query = `
                 UPDATE ecogreenpurchase_orders 
-                SET status = $1, 
+                SET status = $1::varchar, 
                     submitted_to_id = $2, 
                     submitted_to_name = $3, 
                     submitted_to_role = $4, 
                     submitted_to_dept = $5,
                     submitted_at = NOW(),
-                    delivered_at = CASE WHEN $1 = 'Delivered' THEN NOW() ELSE delivered_at END
+                    delivered_at = CASE WHEN $1::varchar = 'Delivered' THEN NOW() ELSE delivered_at END
                 WHERE id = $6 
                 RETURNING *
             `;
@@ -123,8 +123,8 @@ router.post('/status/:id', async (req, res) => {
         } else {
             query = `
                 UPDATE ecogreenpurchase_orders 
-                SET status = $1,
-                    delivered_at = CASE WHEN $1 = 'Delivered' THEN NOW() ELSE delivered_at END
+                SET status = $1::varchar,
+                    delivered_at = CASE WHEN $1::varchar = 'Delivered' THEN NOW() ELSE delivered_at END
                 WHERE id = $2 
                 RETURNING *
             `;
