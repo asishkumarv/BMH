@@ -224,7 +224,7 @@ export default function AdminTasksScreen() {
         updater_type: 'super_admin',
         updater_id: adminUser.id || 1
       });
-      fetchInitData();
+      fetchTasks();
       Alert.alert('Success', 'Task accepted successfully');
     } catch (e) {
       console.error(e);
@@ -244,7 +244,7 @@ export default function AdminTasksScreen() {
       });
       setShowDirectRejectModal(false);
       setDirectRejectTask(null);
-      fetchInitData();
+      fetchTasks();
       Alert.alert('Success', 'Task rejected successfully');
     } catch (e) {
       console.error(e);
@@ -401,7 +401,7 @@ export default function AdminTasksScreen() {
       ) : null}
 
       <View style={[styles.taskActions, { gap: 8, flexDirection: 'row', flexWrap: 'wrap' }]}>
-                    {task.status === 'assigned' && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id) && (
+                    {(task.status === 'assigned' || task.status === 'pending') && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id) && (
                       <>
                         <Pressable 
                           style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
@@ -777,7 +777,7 @@ export default function AdminTasksScreen() {
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
 
-              {selectedTask?.assignee_type === 'super_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
+              {selectedTask?.assignee_type === 'super_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (selectedTask?.status === 'pending' || selectedTask?.status === 'assigned' || selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
                 <>
                   <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus('in_progress')}>
                     <Text style={styles.saveBtnText}>Mark In Progress</Text>
@@ -935,6 +935,7 @@ const styles = StyleSheet.create({
   actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 14 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   modalContent: { backgroundColor: Colors.light.card, borderRadius: 24, padding: 16, width: '100%', maxHeight: '95%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.light.text, marginBottom: 10 },
   label: { fontSize: 13, fontWeight: '600', color: Colors.light.text, marginBottom: 2, marginTop: 6 },
   input: { backgroundColor: Colors.light.background, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 8, fontSize: 14, color: Colors.light.text },

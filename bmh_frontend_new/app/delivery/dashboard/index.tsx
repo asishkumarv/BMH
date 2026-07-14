@@ -139,17 +139,25 @@ export default function DeliveryDashboard() {
     setSelectedPO(order);
     setSubmissionSearchQuery('');
     setSubmissionModalVisible(true);
+    setSubmissionLoading(true);
     
-    if (usersList.length === 0) {
-      try {
-        const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
-        if (res.data && res.data.success) {
-          const filtered = res.data.data.filter((u: any) => u.type === 'employee' || u.role?.toLowerCase() === 'subadmin' || u.role?.toLowerCase() === 'sub_admin');
-          setUsersList(filtered);
-        }
-      } catch (err) {
-        console.error("Error fetching users:", err);
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
+      if (res.data && res.data.success) {
+        const filtered = res.data.data.filter((u: any) => 
+          u.type === 'employee' || 
+          u.role?.toLowerCase() === 'subadmin' || 
+          u.role?.toLowerCase() === 'sub_admin'
+        );
+        setUsersList(filtered);
+      } else {
+        alert("Failed to load employee list");
       }
+    } catch (err: any) {
+      console.error("Error fetching users:", err);
+      alert("Error loading employee list: " + err.message);
+    } finally {
+      setSubmissionLoading(false);
     }
   };
 
@@ -1252,7 +1260,7 @@ export default function DeliveryDashboard() {
       {submissionModalVisible && (
         <Modal transparent animationType="slide" visible={submissionModalVisible} onRequestClose={() => setSubmissionModalVisible(false)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { width: '90%', maxWidth: 500, maxHeight: '80%' }]}>
+            <View style={[styles.modalContent, { width: '90%', maxWidth: 500, height: 450 }]}>
               <Text style={styles.modalTitle}>Submit Purchase Order #{selectedPO?.id}</Text>
               
               <View style={{ marginBottom: 15 }}>
@@ -1275,19 +1283,9 @@ export default function DeliveryDashboard() {
               {submissionLoading ? (
                 <ActivityIndicator size="large" color="#10B981" style={{ marginVertical: 20 }} />
               ) : (
-                <ScrollView style={{ flex: 1, maxHeight: 400 }}>
-                  {usersList.filter(u => {
-                    if (!submissionSearchQuery) return true;
-                    const q = submissionSearchQuery.toLowerCase();
-                    return (
-                      u.full_name?.toLowerCase().includes(q) ||
-                      u.role?.toLowerCase().includes(q) ||
-                      u.department?.toLowerCase().includes(q)
-                    );
-                  }).length === 0 ? (
-                    <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No employees found</Text>
-                  ) : (
-                    usersList.filter(u => {
+                <View style={{ height: 260, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                  <ScrollView style={{ flex: 1 }}>
+                    {usersList.filter(u => {
                       if (!submissionSearchQuery) return true;
                       const q = submissionSearchQuery.toLowerCase();
                       return (
@@ -1295,32 +1293,44 @@ export default function DeliveryDashboard() {
                         u.role?.toLowerCase().includes(q) ||
                         u.department?.toLowerCase().includes(q)
                       );
-                    }).map((emp: any) => (
-                      <TouchableOpacity
-                        key={emp.id}
-                        onPress={() => handleSelectEmployee(emp)}
-                        style={{
-                          padding: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: '#f1f5f9',
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontWeight: '600', fontSize: 14, color: '#0f172a' }}>{emp.full_name}</Text>
-                          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                            {emp.role} • {emp.department}
-                          </Text>
-                        </View>
-                        <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-                          <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: 'bold' }}>Select</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </ScrollView>
+                    }).length === 0 ? (
+                      <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No employees found</Text>
+                    ) : (
+                      usersList.filter(u => {
+                        if (!submissionSearchQuery) return true;
+                        const q = submissionSearchQuery.toLowerCase();
+                        return (
+                          u.full_name?.toLowerCase().includes(q) ||
+                          u.role?.toLowerCase().includes(q) ||
+                          u.department?.toLowerCase().includes(q)
+                        );
+                      }).map((emp: any) => (
+                        <TouchableOpacity
+                          key={emp.id}
+                          onPress={() => handleSelectEmployee(emp)}
+                          style={{
+                            padding: 12,
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#f1f5f9',
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontWeight: '600', fontSize: 14, color: '#0f172a' }}>{emp.full_name}</Text>
+                            <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                              {emp.role} • {emp.department}
+                            </Text>
+                          </View>
+                          <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: 'bold' }}>Select</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
+                </View>
               )}
 
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 15 }}>
