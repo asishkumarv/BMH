@@ -186,6 +186,25 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched payment_txn_id column in wallet_transactions table.'))
     .catch(err => console.error('Error patching wallet_transactions table (payment_txn_id):', err.message));
 
+  // ecogreensales_orders modifications
+  pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN pharmacy TYPE TEXT').catch(e => console.error(e.message));
+  pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN patient_address TYPE TEXT').catch(e => console.error(e.message));
+  pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN order_items TYPE TEXT').catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending'").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS delivery_boy_id INTEGER").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS delivery_type VARCHAR(50) DEFAULT 'Local'").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS bus_details JSONB").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS delivery_otp VARCHAR(20)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS assigned_by INTEGER").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS modified_by_id VARCHAR(50)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS modified_by_name VARCHAR(255)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS modified_by_type VARCHAR(50)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT '[]'::jsonb").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS location_lat VARCHAR(50)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS location_lng VARCHAR(50)").catch(e => console.error(e.message));
+
   // Add appraisal columns to employees
   const empAppraisalCols = [
     'quality_score INTEGER DEFAULT 85',
@@ -303,5 +322,13 @@ app.listen(PORT, () => {
     }
   } catch (err) {
     console.error("Failed to initialize buses db:", err.message);
+  }
+
+  // Initialize Sales Orders Background Sync
+  try {
+    const { startSalesOrderCron } = require('./cron/salesOrderSync');
+    startSalesOrderCron();
+  } catch (err) {
+    console.error("Failed to start sales order sync cron:", err.message);
   }
 });

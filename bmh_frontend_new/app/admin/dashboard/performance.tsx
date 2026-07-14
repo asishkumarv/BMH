@@ -202,12 +202,12 @@ export default function AdminPerformance() {
     let headers = [];
     let rows = [];
     if (dashboardType === 'employee') {
-      headers = ['ID', 'Name', 'Department', 'Role', 'Tasks Assigned', 'Tasks Completed', 'Completion Rate %', 'Hours Worked', 'Break Hours', 'Rating', 'KPI Score', 'Level'];
+      headers = ['ID', 'Name', 'Department', 'Role', 'Tasks Assigned', 'Tasks Completed', 'Completion Rate %', 'Hours Worked', 'Break Hours', 'Manager Rating', 'Quality Score', 'KPI Score', 'Level'];
       rows = riders.map(e => [
         e.id, e.name, e.department, e.role, 
         e.tasks?.assigned, e.tasks?.completed, e.tasks?.completionRate,
         e.attendance?.hoursWorked, e.attendance?.breakTimeHours, 
-        e.appraisal?.managerRating, e.appraisal?.overallKpiScore, e.appraisal?.performanceLevel
+        e.appraisal?.managerRating, e.appraisal?.qualityScore, e.appraisal?.overallKpiScore, e.appraisal?.performanceLevel
       ]);
     } else if (dashboardType === 'doctor') {
       headers = ['ID', 'Name', 'Department', 'Total Bookings', 'Consultations Completed', 'Revenue', 'Doctor Share', 'BMH Share'];
@@ -1205,7 +1205,8 @@ export default function AdminPerformance() {
                   <Text style={[styles.th, { width: 100 }]}>Task Comp. %</Text>
                   <Text style={[styles.th, { width: 100 }]}>Hours Worked</Text>
                   <Text style={[styles.th, { width: 90 }]}>Break Time</Text>
-                  <Text style={[styles.th, { width: 80 }]}>Rating</Text>
+                  <Text style={[styles.th, { width: 110 }]}>Manager Rating</Text>
+                  <Text style={[styles.th, { width: 110 }]}>Quality Score</Text>
                   <Text style={[styles.th, { width: 90 }]}>KPI Score</Text>
                   <Text style={[styles.th, { width: 120 }]}>Performance Level</Text>
                   <Text style={[styles.th, { width: 100 }]}>Bookings Made</Text>
@@ -1228,7 +1229,8 @@ export default function AdminPerformance() {
                     </View>
                     <Text style={[styles.td, { width: 100 }]}>{e.attendance?.hoursWorked} hrs</Text>
                     <Text style={[styles.td, { width: 90 }]}>{e.attendance?.breakTimeHours} hrs</Text>
-                    <Text style={[styles.td, { width: 80, fontWeight: '700', color: '#D97706' }]}>{e.appraisal?.managerRating || '4.0'} ★</Text>
+                    <Text style={[styles.td, { width: 110, fontWeight: '700', color: '#D97706' }]}>{e.appraisal?.managerRating || '4.0'} ★</Text>
+                    <Text style={[styles.td, { width: 110, fontWeight: '700', color: '#0284C7' }]}>{e.appraisal?.qualityScore || 85} / 100</Text>
                     <Text style={[styles.td, { width: 90, fontWeight: '700', color: '#4F46E5' }]}>{e.appraisal?.overallKpiScore || 0} / 100</Text>
                     <View style={[styles.td, { width: 120 }]}>
                       <Text style={[styles.badge, { 

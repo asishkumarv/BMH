@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Filter, Calendar, List, Plus } from 'lucide-react-native';
 import ManualOrders from './ManualOrders';
+import SalesOrders from './SalesOrders';
 
 export default function OrderAssignScreen() {
   const { width } = useWindowDimensions();
@@ -251,10 +252,15 @@ export default function OrderAssignScreen() {
         <TouchableOpacity onPress={() => setActiveTab('Manual Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Manual Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
           <Text style={{fontWeight: activeTab === 'Manual Orders' ? 'bold' : 'normal', color: activeTab === 'Manual Orders' ? '#4338ca' : '#64748b'}}>Manual Orders</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setActiveTab('Sales Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Sales Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+          <Text style={{fontWeight: activeTab === 'Sales Orders' ? 'bold' : 'normal', color: activeTab === 'Sales Orders' ? '#4338ca' : '#64748b'}}>Sales Orders</Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'Manual Orders' ? (
         <ManualOrders deliveryBoys={deliveryBoys} />
+      ) : activeTab === 'Sales Orders' ? (
+        <SalesOrders deliveryBoys={deliveryBoys} />
       ) : (
       <>
         {/* Header */}

@@ -1752,10 +1752,61 @@ router.post("/sales-order", async (req, res) => {
 // });
 router.get("/sales-orders", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM ecogreensales_orders "
-    );
-
+    const { status, delivery_boy_id, search, fromDate, toDate, page = 1, limit = 50 } = req.query;
+    
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 50;
+    const offset = (parsedPage - 1) * parsedLimit;
+    
+    let query = `SELECT * FROM ecogreensales_orders WHERE 1=1`;
+    let countQuery = `SELECT COUNT(*) FROM ecogreensales_orders WHERE 1=1`;
+    let queryParams = [];
+    let paramIdx = 1;
+    
+    if (status && status !== 'All') {
+      query += ` AND status = $${paramIdx}`;
+      countQuery += ` AND status = $${paramIdx}`;
+      queryParams.push(status);
+      paramIdx++;
+    }
+    
+    if (delivery_boy_id && delivery_boy_id !== 'All') {
+      query += ` AND delivery_boy_id = $${paramIdx}`;
+      countQuery += ` AND delivery_boy_id = $${paramIdx}`;
+      queryParams.push(parseInt(delivery_boy_id, 10));
+      paramIdx++;
+    }
+    
+    if (fromDate) {
+      query += ` AND created_at >= $${paramIdx}::timestamp`;
+      countQuery += ` AND created_at >= $${paramIdx}::timestamp`;
+      queryParams.push(`${fromDate} 00:00:00`);
+      paramIdx++;
+    }
+    
+    if (toDate) {
+      query += ` AND created_at <= $${paramIdx}::timestamp`;
+      countQuery += ` AND created_at <= $${paramIdx}::timestamp`;
+      queryParams.push(`${toDate} 23:59:59`);
+      paramIdx++;
+    }
+    
+    if (search) {
+      const searchWild = `%${search}%`;
+      query += ` AND (order_no LIKE $${paramIdx} OR patient_name LIKE $${paramIdx} OR patient_contact_no LIKE $${paramIdx} OR invoice_id LIKE $${paramIdx})`;
+      countQuery += ` AND (order_no LIKE $${paramIdx} OR patient_name LIKE $${paramIdx} OR patient_contact_no LIKE $${paramIdx} OR invoice_id LIKE $${paramIdx})`;
+      queryParams.push(searchWild);
+      paramIdx++;
+    }
+    
+    query += ` ORDER BY id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    
+    const totalRes = await pool.query(countQuery, queryParams.slice(0, paramIdx - 1));
+    const totalCount = parseInt(totalRes.rows[0].count, 10);
+    
+    const pageParams = [...queryParams, parsedLimit, offset];
+    const result = await pool.query(query, pageParams);
+    
     const orders = result.rows.map((order) => ({
       ...order,
       patient_address:
@@ -1771,11 +1822,19 @@ router.get("/sales-orders", async (req, res) => {
           ? JSON.parse(order.order_items || "[]")
           : order.order_items || [],
     }));
-
-    res.status(200).json(orders);
+    
+    res.status(200).json({
+      success: true,
+      data: orders,
+      pagination: {
+        page: parsedPage,
+        totalPages: Math.ceil(totalCount / parsedLimit) || 1,
+        total: totalCount
+      }
+    });
   } catch (err) {
     console.error("Error fetching orders:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 });
 
@@ -2764,6 +2823,152 @@ router.get("/orders/:id", async (req, res) => {
   } catch (err) {
     console.error("Fetch Order Error:", err.message);
     res.status(500).json({ error: "Failed to fetch order" });
+  }
+});
+
+/* =========================================================
+   ✅ Assign Delivery Boy to Sales Order
+========================================================= */
+router.put('/sales-orders/assign/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { delivery_boy_id, delivery_type, bus_details, assigned_by } = req.body;
+    
+    // Generate 6 digit OTP (matching ecogreenSalesOrderRoutes.js)
+    const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    const checkRes = await pool.query('SELECT * FROM ecogreensales_orders WHERE id = $1', [id]);
+    if (checkRes.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
+    
+    const result = await pool.query(`
+      UPDATE ecogreensales_orders
+      SET delivery_boy_id = $1,
+          delivery_type = $2,
+          bus_details = $3,
+          delivery_otp = $4,
+          assigned_by = COALESCE($5::integer, assigned_by),
+          status = 'Assigned'
+      WHERE id = $6
+      RETURNING *
+    `, [
+      delivery_boy_id,
+      delivery_type || 'Local',
+      bus_details ? (typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details)) : null,
+      delivery_otp,
+      assigned_by || null,
+      id
+    ]);
+    
+    // Trigger push notification to delivery boy for closed-app alarm ring
+    if (delivery_boy_id) {
+      try {
+        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+          const { sendExpoPushNotification } = require('../utils/pushNotification');
+          const title = 'New Sales Order Assigned';
+          const body = `Sales Order #${result.rows[0].id} has been assigned to you.`;
+          sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+        }
+      } catch (e) {
+        console.error('Push notification error:', e.message);
+      }
+    }
+    
+    res.json({ success: true, message: 'Sales order assigned successfully', delivery_otp, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to assign order' });
+  }
+});
+
+/* =========================================================
+   ✅ Update Sales Order Status
+========================================================= */
+router.put('/sales-orders/status/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    const result = await pool.query(`
+      UPDATE ecogreensales_orders
+      SET status = $1
+      WHERE id = $2
+      RETURNING *
+    `, [status, id]);
+    
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+/* =========================================================
+   ✅ Update Sales Order Notes
+========================================================= */
+router.put('/sales-orders/notes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note, author } = req.body;
+    
+    const checkRes = await pool.query('SELECT notes FROM ecogreensales_orders WHERE id = $1', [id]);
+    if (checkRes.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
+    
+    let currentNotes = [];
+    if (checkRes.rows[0].notes) {
+      currentNotes = typeof checkRes.rows[0].notes === 'string'
+        ? JSON.parse(checkRes.rows[0].notes)
+        : checkRes.rows[0].notes;
+    }
+    
+    currentNotes.push({
+      text: note,
+      author: author || 'System',
+      timestamp: new Date().toISOString()
+    });
+    
+    const result = await pool.query(`
+      UPDATE ecogreensales_orders
+      SET notes = $1
+      WHERE id = $2
+      RETURNING *
+    `, [JSON.stringify(currentNotes), id]);
+    
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update notes' });
+  }
+});
+
+/* =========================================================
+   ✅ Verify Delivery OTP for Sales Order
+========================================================= */
+router.put('/sales-orders/otp/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { otp } = req.body;
+    
+    const checkRes = await pool.query('SELECT delivery_otp FROM ecogreensales_orders WHERE id = $1', [id]);
+    if (checkRes.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
+    
+    if (checkRes.rows[0].delivery_otp !== otp) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP' });
+    }
+    
+    const result = await pool.query(`
+      UPDATE ecogreensales_orders
+      SET status = 'Delivered',
+          delivered_at = CURRENT_TIMESTAMP,
+          payment_status = 'Success'
+      WHERE id = $1
+      RETURNING *
+    `, [id]);
+    
+    res.json({ success: true, message: 'Order delivered successfully', data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to verify OTP' });
   }
 });
 
