@@ -186,6 +186,17 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched payment_txn_id column in wallet_transactions table.'))
     .catch(err => console.error('Error patching wallet_transactions table (payment_txn_id):', err.message));
 
+  // Add appraisal columns to employees
+  const empAppraisalCols = [
+    'quality_score INTEGER DEFAULT 85',
+    'manager_rating NUMERIC(3,1) DEFAULT 4.0',
+    'manager_feedback TEXT DEFAULT \'\''
+  ];
+  empAppraisalCols.forEach(col => {
+    pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS ${col}`)
+      .catch(err => console.error(`Error adding column ${col} to employees:`, err.message));
+  });
+
   // Add order/customer metadata columns to wallet_transactions
   const walletTxCols = [
     'order_no VARCHAR(100)',

@@ -700,7 +700,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
 exports.getDeliveryBoyPerformanceStats = async (req, res) => {
   try {
     const { riderId } = req.params;
-    const { month } = req.query; // format: 'YYYY-MM'
+    const { date, month, year } = req.query;
 
     // Simple lookup of employee details
     const riderRes = await pool.query(`
@@ -724,9 +724,15 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     // Filter construction helper
     let dateFilter = '';
     let filterParams = [riderId];
-    if (month) {
+    if (date) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM-DD') = $2`;
+      filterParams.push(date);
+    } else if (month) {
       dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $2`;
       filterParams.push(month);
+    } else if (year) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY') = $2`;
+      filterParams.push(year);
     } else {
       const currentMonth = new Date().toISOString().substring(0, 7);
       dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $2`;
@@ -1153,6 +1159,36 @@ async function getDoctorPerformanceStats(req, res) {
   }
 }
 
+function getExpectedDays(date, month, year) {
+  if (date) return 1;
+  
+  let targetMonth = month;
+  if (!targetMonth && !year) {
+    targetMonth = new Date().toISOString().substring(0, 7);
+  }
+  
+  if (targetMonth) {
+    const y = parseInt(targetMonth.split('-')[0], 10);
+    const m = parseInt(targetMonth.split('-')[1], 10);
+    if (isNaN(y) || isNaN(m)) return 26;
+    const days = new Date(y, m, 0).getDate();
+    let workingDays = 0;
+    for (let d = 1; d <= days; d++) {
+      const dayOfWeek = new Date(y, m - 1, d).getDay();
+      if (dayOfWeek !== 0) { // Exclude Sunday
+        workingDays++;
+      }
+    }
+    return workingDays;
+  }
+  
+  if (year) {
+    return 312; // 52 weeks * 6 days
+  }
+  
+  return 26;
+}
+
 async function getEmployeePerformanceStats(req, res) {
   try {
     const { date, month, year, employee_id, department } = req.query;
@@ -1175,8 +1211,11 @@ async function getEmployeePerformanceStats(req, res) {
       paramIdx++;
     }
 
+    const expectedDays = getExpectedDays(date, month, year);
+
     let empQuery = `
-      SELECT id, full_name, email, mobile, department, role, created_at 
+      SELECT id, full_name, email, mobile, department, role, created_at,
+             quality_score, manager_rating, manager_feedback
       FROM employees 
       WHERE (department != 'Delivery' AND role != 'Hd delivery' AND role != 'Hd delivery boy')
         AND status = 'approved'
@@ -1204,6 +1243,9 @@ async function getEmployeePerformanceStats(req, res) {
     let totalAllHoursWorked = 0;
     let totalAllBookingsMade = 0;
     let totalAllBookingRevenue = 0;
+    let totalAllPendingTasks = 0;
+    let totalAllOverdueTasks = 0;
+    let presentEmployeesCount = 0;
 
     let tasksList = [];
     let attendanceList = [];
@@ -1258,6 +1300,12 @@ async function getEmployeePerformanceStats(req, res) {
       }).length;
       const onTimeRate = completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 100;
 
+      const overdueTasks = tasks.filter(t => 
+        t.status?.toLowerCase() !== 'completed' && 
+        t.due_date && 
+        new Date(t.due_date) < new Date()
+      ).length;
+
       let totalTaskDurationHrs = 0;
       let taskDurationCount = 0;
       tasks.forEach(t => {
@@ -1273,20 +1321,92 @@ async function getEmployeePerformanceStats(req, res) {
         }
       });
       const avgTaskCompletionTimeHrs = taskDurationCount > 0 ? parseFloat((totalTaskDurationHrs / taskDurationCount).toFixed(1)) : 0;
+      
+      const breakDateFilter = dateFilter.replace(/created_at/g, 'timestamp').replace(/\$1/g, '$2');
+      const breaksRes = await pool.query(`
+        SELECT timestamp, break_type
+        FROM break_logs
+        WHERE employee_id = $1 AND user_type = 'employee'
+          ${breakDateFilter}
+        ORDER BY timestamp ASC
+      `, taskFilterParams);
+      const breaks = breaksRes.rows;
+
+      const breakMinutesByDate = {};
+      let totalBreakMinutes = 0;
+
+      const breaksByDate = {};
+      breaks.forEach(b => {
+        if (b.timestamp) {
+          const dateStr = new Date(b.timestamp).toISOString().substring(0, 10);
+          if (!breaksByDate[dateStr]) breaksByDate[dateStr] = [];
+          breaksByDate[dateStr].push(b);
+        }
+      });
+
+      for (const dateStr in breaksByDate) {
+        const dayBreaks = breaksByDate[dateStr];
+        dayBreaks.sort((x, y) => new Date(x.timestamp).getTime() - new Date(y.timestamp).getTime());
+        let currentBreakIn = null;
+        let dayBreakMins = 0;
+        dayBreaks.forEach(b => {
+          if (b.break_type === 'Break In') {
+            currentBreakIn = new Date(b.timestamp);
+          } else if (b.break_type === 'Break Out' && currentBreakIn) {
+            const diff = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+            if (diff > 0) {
+              dayBreakMins += diff / 60000;
+            }
+            currentBreakIn = null;
+          }
+        });
+        breakMinutesByDate[dateStr] = dayBreakMins;
+        totalBreakMinutes += dayBreakMins;
+      }
 
       const presentDays = attendance.filter(a => a.timestamp).length;
+      if (presentDays > 0) presentEmployeesCount++;
+
       let hoursWorked = 0;
       attendance.forEach(a => {
         const checkin = a.timestamp || a.checkin_timestamp;
+        const dateStr = new Date(a.date).toISOString().substring(0, 10);
+        const dayBreakMins = breakMinutesByDate[dateStr] || 0;
+        const dayBreakHrs = dayBreakMins / 60;
+
         if (checkin && a.checkout_timestamp) {
-          const hrs = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
+          let hrs = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
+          hrs = Math.max(0, hrs - dayBreakHrs);
           if (hrs > 0) hoursWorked += hrs;
         } else if (checkin) {
-          hoursWorked += 8;
+          const hrs = Math.max(0, 8 - dayBreakHrs);
+          hoursWorked += hrs;
         }
       });
 
       const avgHoursPerDay = presentDays > 0 ? parseFloat((hoursWorked / presentDays).toFixed(1)) : 0;
+      const attRating = presentDays > 0 ? Math.max(1.0, Math.min(5.0, parseFloat(((avgHoursPerDay / 8) * 5).toFixed(1)))) : 5.0;
+
+      const attendancePercentage = expectedDays > 0 ? Math.min(100, Math.max(0, Math.round((presentDays / expectedDays) * 100))) : 100;
+      const lateCheckinCount = attendance.filter(a => a.late_duration && a.late_duration !== '0h 0m' && a.late_duration !== '').length;
+      const punctuality = presentDays > 0 ? Math.min(100, Math.max(0, Math.round(((presentDays - lateCheckinCount) / presentDays) * 100))) : 100;
+
+      const qualityScore = parseInt(emp.quality_score || 85, 10);
+      const managerRating = parseFloat(emp.manager_rating || 4.0);
+      const managerFeedback = emp.manager_feedback || '';
+
+      const overallKpiScore = Math.round(
+        (taskCompletionRate * 0.3) + 
+        (onTimeRate * 0.2) + 
+        (attendancePercentage * 0.2) + 
+        (punctuality * 0.1) + 
+        ((qualityScore / 100) * 100 * 0.2)
+      );
+
+      let performanceLevel = 'Needs Improvement';
+      if (overallKpiScore >= 90) performanceLevel = 'Excellent';
+      else if (overallKpiScore >= 75) performanceLevel = 'Good';
+      else if (overallKpiScore >= 60) performanceLevel = 'Average';
 
       const totalBookings = bookings.length;
       const consultedBookings = bookings.filter(b => b.status === 'Consulted' || b.status === 'Completed').length;
@@ -1298,6 +1418,8 @@ async function getEmployeePerformanceStats(req, res) {
       totalAllHoursWorked += hoursWorked;
       totalAllBookingsMade += totalBookings;
       totalAllBookingRevenue += bookingRevenue;
+      totalAllPendingTasks += tasks.filter(t => t.status?.toLowerCase() !== 'completed').length;
+      totalAllOverdueTasks += overdueTasks;
 
       if (employee_id && String(employee_id) === String(empId)) {
         tasksList = tasks.map(t => {
@@ -1321,6 +1443,10 @@ async function getEmployeePerformanceStats(req, res) {
         });
 
         attendanceList = attendance.map(a => {
+          const dateStr = new Date(a.date).toISOString().substring(0, 10);
+          const dayBreakMins = breakMinutesByDate[dateStr] || 0;
+          const dayBreakHrs = dayBreakMins / 60;
+
           let duration = null;
           const checkin = a.timestamp || a.checkin_timestamp;
           if (checkin && a.checkout_timestamp) {
@@ -1329,13 +1455,18 @@ async function getEmployeePerformanceStats(req, res) {
           } else if (checkin) {
             duration = 8.0;
           }
+          if (duration !== null) {
+            duration = Math.max(0, duration - dayBreakHrs);
+          }
+
           return {
             id: a.id,
             date: a.date,
             checkin: checkin,
             checkout: a.checkout_timestamp,
-            status: a.status,
-            sessionHours: a.session_hours || (duration ? `${duration} hrs` : null),
+            status: a.checkout_timestamp ? 'Checked Out' : (a.status || 'On Duty'),
+            sessionHours: duration !== null ? `${duration.toFixed(1)} hrs` : 'N/A',
+            breakTime: dayBreakMins > 0 ? `${Math.round(dayBreakMins)} mins` : '0 mins',
             lateDuration: a.late_duration,
             earlyCheckoutDuration: a.early_checkout_duration,
             durationHours: duration
@@ -1367,12 +1498,24 @@ async function getEmployeePerformanceStats(req, res) {
           completed: completedTasks,
           completionRate: taskCompletionRate,
           onTimeRate,
+          overdue: overdueTasks,
           avgCompletionTimeHrs: avgTaskCompletionTimeHrs
         },
         attendance: {
           presentDays,
           hoursWorked: parseFloat(hoursWorked.toFixed(1)),
-          avgHoursPerDay
+          breakTimeHours: parseFloat((totalBreakMinutes / 60).toFixed(1)),
+          avgHoursPerDay,
+          attendancePercentage,
+          punctuality,
+          rating: attRating
+        },
+        appraisal: {
+          qualityScore,
+          managerRating,
+          managerFeedback,
+          overallKpiScore,
+          performanceLevel
         },
         bookings: {
           total: totalBookings,
@@ -1384,13 +1527,18 @@ async function getEmployeePerformanceStats(req, res) {
     }));
 
     const overallTaskCompletionRate = totalAllTasksAssigned > 0 ? Math.round((totalAllTasksCompleted / totalAllTasksAssigned) * 100) : 0;
+    const absentEmployeesCount = Math.max(0, employees.length - presentEmployeesCount);
 
     res.json({
       success: true,
       overview: {
         totalEmployees: employees.length,
-        totalTasksAssigned: totalAllTasksAssigned,
-        totalTasksCompleted: totalAllTasksCompleted,
+        presentEmployees: presentEmployeesCount,
+        absentEmployees: absentEmployeesCount,
+        tasksAssignedToday: totalAllTasksAssigned,
+        tasksCompletedToday: totalAllTasksCompleted,
+        pendingTasks: totalAllPendingTasks,
+        overdueTasks: totalAllOverdueTasks,
         overallTaskCompletionRate,
         totalHoursWorked: parseFloat(totalAllHoursWorked.toFixed(1)),
         totalBookingsMade: totalAllBookingsMade,
@@ -1410,15 +1558,23 @@ async function getEmployeePerformanceStats(req, res) {
 exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const { month } = req.query; 
+    const { date, month, year } = req.query; 
     
     let dateFilter = '';
     let filterParams = [parseInt(employeeId, 10)];
     let paramIdx = 2;
 
-    if (month) {
+    if (date) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM-DD') = $${paramIdx}`;
+      filterParams.push(date);
+      paramIdx++;
+    } else if (month) {
       dateFilter = ` AND TO_CHAR(created_at, 'YYYY-MM') = $${paramIdx}`;
       filterParams.push(month);
+      paramIdx++;
+    } else if (year) {
+      dateFilter = ` AND TO_CHAR(created_at, 'YYYY') = $${paramIdx}`;
+      filterParams.push(year);
       paramIdx++;
     } else {
       const currentMonth = new Date().toISOString().substring(0, 7);
@@ -1427,7 +1583,14 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
       paramIdx++;
     }
 
-    const empRes = await pool.query('SELECT id, full_name, email, mobile, department, role, created_at FROM employees WHERE id = $1', [parseInt(employeeId, 10)]);
+    const expectedDays = getExpectedDays(date, month, year);
+
+    const empRes = await pool.query(`
+      SELECT id, full_name, email, mobile, department, role, created_at,
+             quality_score, manager_rating, manager_feedback
+      FROM employees 
+      WHERE id = $1
+    `, [parseInt(employeeId, 10)]);
     if (empRes.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Employee not found' });
     }
@@ -1478,6 +1641,12 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
     }).length;
     const onTimeRate = completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 100;
 
+    const overdueTasks = tasks.filter(t => 
+      t.status?.toLowerCase() !== 'completed' && 
+      t.due_date && 
+      new Date(t.due_date) < new Date()
+    ).length;
+
     let totalTaskDurationHrs = 0;
     let taskDurationCount = 0;
     tasks.forEach(t => {
@@ -1494,18 +1663,91 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
     });
     const avgTaskCompletionTimeHrs = taskDurationCount > 0 ? parseFloat((totalTaskDurationHrs / taskDurationCount).toFixed(1)) : 0;
 
+    // Fetch break logs for this employee in the month
+    const breakDateFilter = dateFilter.replace(/created_at/g, 'timestamp');
+    const breaksRes = await pool.query(`
+      SELECT timestamp, break_type
+      FROM break_logs
+      WHERE employee_id = $1 AND user_type = 'employee'
+        ${breakDateFilter}
+      ORDER BY timestamp ASC
+    `, filterParams);
+    const breaks = breaksRes.rows;
+
+    const breakMinutesByDate = {};
+    let totalBreakMinutes = 0;
+
+    // Group break logs by date
+    const breaksByDate = {};
+    breaks.forEach(b => {
+      if (b.timestamp) {
+        const dateStr = new Date(b.timestamp).toISOString().substring(0, 10);
+        if (!breaksByDate[dateStr]) breaksByDate[dateStr] = [];
+        breaksByDate[dateStr].push(b);
+      }
+    });
+
+    // Calculate total break minutes per date
+    for (const dateStr in breaksByDate) {
+      const dayBreaks = breaksByDate[dateStr];
+      dayBreaks.sort((x, y) => new Date(x.timestamp).getTime() - new Date(y.timestamp).getTime());
+      let currentBreakIn = null;
+      let dayBreakMins = 0;
+      dayBreaks.forEach(b => {
+        if (b.break_type === 'Break In') {
+          currentBreakIn = new Date(b.timestamp);
+        } else if (b.break_type === 'Break Out' && currentBreakIn) {
+          const diff = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+          if (diff > 0) {
+            dayBreakMins += diff / 60000;
+          }
+          currentBreakIn = null;
+        }
+      });
+      breakMinutesByDate[dateStr] = dayBreakMins;
+      totalBreakMinutes += dayBreakMins;
+    }
+
     const presentDays = attendance.filter(a => a.timestamp).length;
     let hoursWorked = 0;
     attendance.forEach(a => {
       const checkin = a.timestamp || a.checkin_timestamp;
+      const dateStr = new Date(a.date).toISOString().substring(0, 10);
+      const dayBreakMins = breakMinutesByDate[dateStr] || 0;
+      const dayBreakHrs = dayBreakMins / 60;
+
       if (checkin && a.checkout_timestamp) {
-        const hrs = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
+        let hrs = (new Date(a.checkout_timestamp) - new Date(checkin)) / (1000 * 60 * 60);
+        hrs = Math.max(0, hrs - dayBreakHrs);
         if (hrs > 0) hoursWorked += hrs;
       } else if (checkin) {
-        hoursWorked += 8;
+        const hrs = Math.max(0, 8 - dayBreakHrs);
+        hoursWorked += hrs;
       }
     });
     const avgHoursPerDay = presentDays > 0 ? parseFloat((hoursWorked / presentDays).toFixed(1)) : 0;
+    const attRating = presentDays > 0 ? Math.max(1.0, Math.min(5.0, parseFloat(((avgHoursPerDay / 8) * 5).toFixed(1)))) : 5.0;
+
+    const attendancePercentage = expectedDays > 0 ? Math.min(100, Math.max(0, Math.round((presentDays / expectedDays) * 100))) : 100;
+    const lateCheckinCount = attendance.filter(a => a.late_duration && a.late_duration !== '0h 0m' && a.late_duration !== '').length;
+    const punctuality = presentDays > 0 ? Math.min(100, Math.max(0, Math.round(((presentDays - lateCheckinCount) / presentDays) * 100))) : 100;
+
+    const qualityScore = parseInt(emp.quality_score || 85, 10);
+    const managerRating = parseFloat(emp.manager_rating || 4.0);
+    const managerFeedback = emp.manager_feedback || '';
+
+    const overallKpiScore = Math.round(
+      (taskCompletionRate * 0.3) + 
+      (onTimeRate * 0.2) + 
+      (attendancePercentage * 0.2) + 
+      (punctuality * 0.1) + 
+      ((qualityScore / 100) * 100 * 0.2)
+    );
+
+    let performanceLevel = 'Needs Improvement';
+    if (overallKpiScore >= 90) performanceLevel = 'Excellent';
+    else if (overallKpiScore >= 75) performanceLevel = 'Good';
+    else if (overallKpiScore >= 60) performanceLevel = 'Average';
 
     const totalBookings = bookings.length;
     const consultedBookings = bookings.filter(b => b.status === 'Consulted' || b.status === 'Completed').length;
@@ -1533,6 +1775,10 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
     });
 
     const attendanceList = attendance.map(a => {
+      const dateStr = new Date(a.date).toISOString().substring(0, 10);
+      const dayBreakMins = breakMinutesByDate[dateStr] || 0;
+      const dayBreakHrs = dayBreakMins / 60;
+
       let duration = null;
       const checkin = a.timestamp || a.checkin_timestamp;
       if (checkin && a.checkout_timestamp) {
@@ -1541,13 +1787,18 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
       } else if (checkin) {
         duration = 8.0;
       }
+      if (duration !== null) {
+        duration = Math.max(0, duration - dayBreakHrs);
+      }
+
       return {
         id: a.id,
         date: a.date,
         checkin: checkin,
         checkout: a.checkout_timestamp,
-        status: a.status,
-        sessionHours: a.session_hours || (duration ? `${duration} hrs` : null),
+        status: a.checkout_timestamp ? 'Checked Out' : (a.status || 'On Duty'),
+        sessionHours: duration !== null ? `${duration.toFixed(1)} hrs` : 'N/A',
+        breakTime: dayBreakMins > 0 ? `${Math.round(dayBreakMins)} mins` : '0 mins',
         lateDuration: a.late_duration,
         earlyCheckoutDuration: a.early_checkout_duration,
         durationHours: duration
@@ -1583,14 +1834,26 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
           tasksCompleted: completedTasks,
           taskCompletionRate,
           onTimeRate,
+          overdueTasks,
           avgTaskCompletionTimeHrs,
           workingDays: presentDays,
           workingHours: parseFloat(hoursWorked.toFixed(1)),
+          breakTimeHours: parseFloat((totalBreakMinutes / 60).toFixed(1)),
           avgHoursPerDay,
+          attendancePercentage,
+          punctuality,
+          rating: attRating,
           bookingsMade: totalBookings,
           bookingsCompleted: consultedBookings,
           bookingCompletionRate,
           bookingRevenue: parseFloat(bookingRevenue.toFixed(2))
+        },
+        appraisal: {
+          qualityScore,
+          managerRating,
+          managerFeedback,
+          overallKpiScore,
+          performanceLevel
         },
         tasksList,
         attendanceList,
@@ -1599,6 +1862,29 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching individual employee stats:', error);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+};
+
+exports.saveEmployeeAppraisal = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { manager_rating, quality_score, manager_feedback } = req.body;
+
+    const resUpdate = await pool.query(`
+      UPDATE employees
+      SET manager_rating = $1, quality_score = $2, manager_feedback = $3
+      WHERE id = $4
+      RETURNING id
+    `, [manager_rating, quality_score, manager_feedback, parseInt(employeeId, 10)]);
+
+    if (resUpdate.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
+
+    res.json({ success: true, message: 'Appraisal saved successfully' });
+  } catch (error) {
+    console.error('Error saving employee appraisal:', error);
     res.status(500).json({ success: false, error: 'Internal Server Error' });
   }
 };

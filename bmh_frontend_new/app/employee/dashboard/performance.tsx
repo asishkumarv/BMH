@@ -10,8 +10,9 @@ const API_URL = 'https://napi.bharatmedicalhallplus.com';
 
 const getStatusBadgeColor = (status: string) => {
   const s = status?.toLowerCase() || '';
-  if (['completed', 'consulted', 'present', 'regular'].includes(s)) return { bg: '#dcfce7', text: '#10b981' };
+  if (['completed', 'consulted', 'present', 'regular', 'on duty'].includes(s)) return { bg: '#dcfce7', text: '#10b981' };
   if (['pending', 'in progress', 'booked', 'checked in'].includes(s)) return { bg: '#fef3c7', text: '#d97706' };
+  if (['checked out'].includes(s)) return { bg: '#e2e8f0', text: '#475569' };
   return { bg: '#fee2e2', text: '#ef4444' };
 };
 
@@ -20,14 +21,14 @@ export default function EmployeePerformance() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
-  const [month, setMonth] = useState(''); // YYYY-MM
+  const [filterPeriod, setFilterPeriod] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
+  const [filterValue, setFilterValue] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'tasks' | 'attendance' | 'bookings'>('tasks');
 
   useEffect(() => {
-    // Set initial filter value based on current month
     const today = new Date();
     const currentMonth = today.toISOString().substring(0, 7); // 'YYYY-MM'
-    setMonth(currentMonth);
+    setFilterValue(currentMonth);
 
     const loadUser = async () => {
       try {
@@ -50,15 +51,23 @@ export default function EmployeePerformance() {
   }, []);
 
   useEffect(() => {
-    if (user?.id && month) {
+    if (user?.id && filterValue) {
       fetchPerformanceData();
     }
-  }, [user, month]);
+  }, [user, filterPeriod, filterValue]);
 
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/performance/employee-stats/${user.id}?month=${month}`);
+      let queryParam = '';
+      if (filterPeriod === 'daily') {
+        queryParam = `date=${filterValue}`;
+      } else if (filterPeriod === 'monthly') {
+        queryParam = `month=${filterValue}`;
+      } else if (filterPeriod === 'yearly') {
+        queryParam = `year=${filterValue}`;
+      }
+      const res = await axios.get(`${API_URL}/performance/employee-stats/${user.id}?${queryParam}`);
       if (res.data && res.data.success) {
         setStats(res.data.data);
       }
@@ -79,31 +88,120 @@ export default function EmployeePerformance() {
   }
 
   const perf = stats?.performance || {};
+  const appraisal = stats?.appraisal || {};
   const basic = stats?.basicDetails || {};
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1, minWidth: 200 }}>
           <Text style={styles.title}>My Performance Report</Text>
           <Text style={styles.subtitle}>{basic.name} • {basic.role} ({basic.department})</Text>
         </View>
         
-        {/* Date Filter */}
-        <View style={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Select Month</Text>
-          <TextInput
-            style={styles.dateInput}
-            value={month}
-            onChangeText={setMonth}
-            placeholder="YYYY-MM"
-          />
+        {/* Date Filter Selection Tabs */}
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+          <View style={styles.filterContainer}>
+            <Text style={styles.filterLabel}>Period</Text>
+            <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 2 }}>
+              {(['daily', 'monthly', 'yearly'] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }, filterPeriod === tab && { backgroundColor: '#fff' }]}
+                  onPress={() => {
+                    setFilterPeriod(tab);
+                    const todayStr = new Date().toISOString();
+                    setFilterValue(
+                      tab === 'daily' ? todayStr.substring(0, 10) :
+                      tab === 'monthly' ? todayStr.substring(0, 7) :
+                      todayStr.substring(0, 4)
+                    );
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: filterPeriod === tab ? Colors.light.primary : '#64748b' }}>
+                    {tab.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.filterContainer}>
+            <Text style={styles.filterLabel}>
+              {filterPeriod === 'daily' ? 'Date' : filterPeriod === 'monthly' ? 'Month' : 'Year'}
+            </Text>
+            <TextInput
+              style={[styles.dateInput, { width: 130 }]}
+              value={filterValue}
+              onChangeText={setFilterValue}
+              placeholder={filterPeriod === 'daily' ? 'YYYY-MM-DD' : 'YYYY-MM'}
+            />
+          </View>
         </View>
       </View>
 
       {/* KPI Cards Grid */}
       <View style={styles.grid}>
+        <View style={[styles.kpiCard, { backgroundColor: '#EEF2FF', borderColor: '#4F46E530' }]}>
+          <View style={[styles.iconContainer, { backgroundColor: '#4F46E5' }]}>
+            <Award size={20} color="#fff" />
+          </View>
+          <View style={styles.kpiInfo}>
+            <Text style={[styles.kpiLabel, { color: '#4F46E5' }]}>Overall KPI Score</Text>
+            <Text style={[styles.kpiValue, { color: '#4F46E5', fontSize: 22 }]}>
+              {appraisal.overallKpiScore || 0} / 100
+            </Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: appraisal.overallKpiScore >= 90 ? '#10B981' : appraisal.overallKpiScore >= 75 ? '#0284C7' : appraisal.overallKpiScore >= 60 ? '#D97706' : '#EF4444', marginTop: 2 }}>
+              Level: {appraisal.performanceLevel || 'Needs Improvement'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#F0F9FF' }]}>
+            <User size={20} color="#0284C7" />
+          </View>
+          <View style={styles.kpiInfo}>
+            <Text style={styles.kpiLabel}>Quality Score</Text>
+            <Text style={[styles.kpiValue, { color: '#0284C7' }]}>{appraisal.qualityScore || 85} / 100</Text>
+            <Text style={styles.kpiSub}>Based on accuracy & feedback</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+            <Award size={20} color="#D97706" />
+          </View>
+          <View style={styles.kpiInfo}>
+            <Text style={styles.kpiLabel}>Manager Rating</Text>
+            <Text style={[styles.kpiValue, { color: '#D97706' }]}>{appraisal.managerRating || '4.0'} ★</Text>
+            <Text style={styles.kpiSub}>Appraisal score</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+            <Calendar size={20} color="#10B981" />
+          </View>
+          <View style={styles.kpiInfo}>
+            <Text style={styles.kpiLabel}>Attendance Adherence</Text>
+            <Text style={styles.kpiValue}>{perf.attendancePercentage || 0}%</Text>
+            <Text style={styles.kpiSub}>Present: {perf.workingDays || 0} days</Text>
+          </View>
+        </View>
+
+        <View style={styles.kpiCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#F0F9FF' }]}>
+            <Clock size={20} color="#0284C7" />
+          </View>
+          <View style={styles.kpiInfo}>
+            <Text style={styles.kpiLabel}>Shift Punctuality</Text>
+            <Text style={styles.kpiValue}>{perf.punctuality || 0}%</Text>
+            <Text style={styles.kpiSub}>Timely shift logins</Text>
+          </View>
+        </View>
+
         <View style={styles.kpiCard}>
           <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
             <Award size={20} color="#4F46E5" />
@@ -116,24 +214,24 @@ export default function EmployeePerformance() {
         </View>
 
         <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-            <Clock size={20} color="#0284C7" />
+          <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+            <ShieldAlert size={20} color="#EF4444" />
           </View>
           <View style={styles.kpiInfo}>
-            <Text style={styles.kpiLabel}>Hours Worked</Text>
-            <Text style={styles.kpiValue}>{perf.workingHours || 0} hrs</Text>
-            <Text style={styles.kpiSub}>{perf.workingDays || 0} present days</Text>
+            <Text style={styles.kpiLabel}>Overdue Tasks</Text>
+            <Text style={[styles.kpiValue, { color: '#EF4444' }]}>{perf.overdueTasks || 0}</Text>
+            <Text style={styles.kpiSub}>Tasks past deadline</Text>
           </View>
         </View>
 
         <View style={styles.kpiCard}>
-          <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
-            <CheckCircle2 size={20} color="#10B981" />
+          <View style={[styles.iconContainer, { backgroundColor: '#F3F4F6' }]}>
+            <Clock size={20} color="#4B5563" />
           </View>
           <View style={styles.kpiInfo}>
-            <Text style={styles.kpiLabel}>On-Time Tasks</Text>
-            <Text style={styles.kpiValue}>{perf.onTimeRate || 0}%</Text>
-            <Text style={styles.kpiSub}>SLA compliance</Text>
+            <Text style={styles.kpiLabel}>Hours Worked</Text>
+            <Text style={styles.kpiValue}>{perf.workingHours || 0} hrs</Text>
+            <Text style={styles.kpiSub}>Excludes break times</Text>
           </View>
         </View>
 
@@ -149,6 +247,13 @@ export default function EmployeePerformance() {
             </View>
           </View>
         )}
+
+        {appraisal.managerFeedback ? (
+          <View style={[styles.kpiCard, { minWidth: '100%', flexDirection: 'column', alignItems: 'flex-start', padding: 16, backgroundColor: '#FAF9F6' }]}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>Reporting Manager Reviews & Feedback</Text>
+            <Text style={{ fontSize: 13, color: '#4b5563', fontStyle: 'italic', marginTop: 6 }}>"{appraisal.managerFeedback}"</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Tabs Switcher for details lists */}
@@ -228,6 +333,7 @@ export default function EmployeePerformance() {
                         <Text style={styles.metaText}>In: {checkInTime}</Text>
                         <Text style={styles.metaText}>Out: {checkOutTime}</Text>
                         {a.sessionHours && <Text style={styles.metaText}>Duration: {a.sessionHours}</Text>}
+                        {a.breakTime && <Text style={styles.metaText}>Break: {a.breakTime}</Text>}
                       </View>
                     </View>
                     <View style={[styles.badgeContainer, { backgroundColor: badge.bg }]}>

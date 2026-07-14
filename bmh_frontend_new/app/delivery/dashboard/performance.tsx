@@ -11,12 +11,13 @@ export default function RiderPerformance() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
-  const [filterMonth, setFilterMonth] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
+  const [filterValue, setFilterValue] = useState('');
 
   useEffect(() => {
     const today = new Date();
     const currentMonth = today.toISOString().substring(0, 7); // 'YYYY-MM'
-    setFilterMonth(currentMonth);
+    setFilterValue(currentMonth);
     loadUser();
   }, []);
 
@@ -37,15 +38,23 @@ export default function RiderPerformance() {
   };
 
   useEffect(() => {
-    if (user && filterMonth) {
+    if (user && filterValue) {
       fetchPerformance();
     }
-  }, [user, filterMonth]);
+  }, [user, filterPeriod, filterValue]);
 
   const fetchPerformance = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/performance/rider-stats/${user.id}?month=${filterMonth}`);
+      let queryParam = '';
+      if (filterPeriod === 'daily') {
+        queryParam = `date=${filterValue}`;
+      } else if (filterPeriod === 'monthly') {
+        queryParam = `month=${filterValue}`;
+      } else if (filterPeriod === 'yearly') {
+        queryParam = `year=${filterValue}`;
+      }
+      const res = await axios.get(`${API_URL}/performance/rider-stats/${user.id}?${queryParam}`);
       if (res.data && res.data.success) {
         setData(res.data.data);
       }
@@ -72,19 +81,49 @@ export default function RiderPerformance() {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
       {/* Date Filter */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1, minWidth: 200 }}>
           <Text style={styles.title}>My Performance & KPI</Text>
           <Text style={styles.subtitle}>Track your delivery metrics and ratings</Text>
         </View>
         
-        <View style={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Month:</Text>
-          <TextInput
-            style={styles.filterInput}
-            value={filterMonth}
-            onChangeText={setFilterMonth}
-            placeholder="YYYY-MM"
-          />
+        {/* Date Filter Selection Tabs */}
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+          <View style={styles.filterContainer}>
+            <Text style={styles.filterLabel}>Period</Text>
+            <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 2 }}>
+              {(['daily', 'monthly', 'yearly'] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }, filterPeriod === tab && { backgroundColor: '#fff' }]}
+                  onPress={() => {
+                    setFilterPeriod(tab);
+                    const todayStr = new Date().toISOString();
+                    setFilterValue(
+                      tab === 'daily' ? todayStr.substring(0, 10) :
+                      tab === 'monthly' ? todayStr.substring(0, 7) :
+                      todayStr.substring(0, 4)
+                    );
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: filterPeriod === tab ? Colors.light.primary : '#64748b' }}>
+                    {tab.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.filterContainer}>
+            <Text style={styles.filterLabel}>
+              {filterPeriod === 'daily' ? 'Date' : filterPeriod === 'monthly' ? 'Month' : 'Year'}
+            </Text>
+            <TextInput
+              style={[styles.filterInput, { width: 130 }]}
+              value={filterValue}
+              onChangeText={setFilterValue}
+              placeholder={filterPeriod === 'daily' ? 'YYYY-MM-DD' : 'YYYY-MM'}
+            />
+          </View>
         </View>
       </View>
 

@@ -62,6 +62,9 @@ export default function AdminPerformance() {
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [infoModalTitle, setInfoModalTitle] = useState('');
   const [infoModalMessage, setInfoModalMessage] = useState('');
+  const [appraisalQuality, setAppraisalQuality] = useState('');
+  const [appraisalRating, setAppraisalRating] = useState('');
+  const [appraisalFeedback, setAppraisalFeedback] = useState('');
   
   useEffect(() => {
     // Set initial filter value based on current month/date
@@ -162,6 +165,77 @@ export default function AdminPerformance() {
     setTableStatus('');
   };
 
+  useEffect(() => {
+    if (dashboardType === 'employee' && filterRiderId) {
+      const selectedEmp = riders.find(r => String(r.id) === String(filterRiderId));
+      if (selectedEmp) {
+        setAppraisalQuality(String(selectedEmp.appraisal?.qualityScore || ''));
+        setAppraisalRating(String(selectedEmp.appraisal?.managerRating || ''));
+        setAppraisalFeedback(selectedEmp.appraisal?.managerFeedback || '');
+      }
+    } else {
+      setAppraisalQuality('');
+      setAppraisalRating('');
+      setAppraisalFeedback('');
+    }
+  }, [filterRiderId, riders, dashboardType]);
+
+  const saveAppraisal = async () => {
+    try {
+      if (!filterRiderId) return;
+      const res = await axios.post(`${API_URL}/performance/appraisal/${filterRiderId}`, {
+        manager_rating: parseFloat(appraisalRating) || 4.0,
+        quality_score: parseInt(appraisalQuality, 10) || 85,
+        manager_feedback: appraisalFeedback
+      });
+      if (res.data && res.data.success) {
+        alert('Appraisal saved successfully');
+        fetchPerformanceData();
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save appraisal');
+    }
+  };
+
+  const downloadCSVReport = () => {
+    let headers = [];
+    let rows = [];
+    if (dashboardType === 'employee') {
+      headers = ['ID', 'Name', 'Department', 'Role', 'Tasks Assigned', 'Tasks Completed', 'Completion Rate %', 'Hours Worked', 'Break Hours', 'Rating', 'KPI Score', 'Level'];
+      rows = riders.map(e => [
+        e.id, e.name, e.department, e.role, 
+        e.tasks?.assigned, e.tasks?.completed, e.tasks?.completionRate,
+        e.attendance?.hoursWorked, e.attendance?.breakTimeHours, 
+        e.appraisal?.managerRating, e.appraisal?.overallKpiScore, e.appraisal?.performanceLevel
+      ]);
+    } else if (dashboardType === 'doctor') {
+      headers = ['ID', 'Name', 'Department', 'Total Bookings', 'Consultations Completed', 'Revenue', 'Doctor Share', 'BMH Share'];
+      rows = riders.map(d => [
+        d.id, d.name, d.department, d.totalBookings, d.completedConsultations, d.revenue, d.doctorShare, d.bmhShare
+      ]);
+    } else {
+      headers = ['ID', 'Name', 'Shift', 'Assigned', 'Delivered', 'Success Rate %', 'Avg Time (m)', 'Distance (KM)', 'Rating'];
+      rows = riders.map(r => [
+        r.id, r.name, r.shift, r.assigned, r.delivered, r.successRate, r.avgTime, r.distance, r.rating
+      ]);
+    }
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', `Performance_Report_${dashboardType}_${filterValue || 'all'}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert('Report download: \n\n' + csvContent.substring(0, 300) + '...');
+    }
+  };
+
   const showInfoAlert = (type: string) => {
     let title = '';
     let message = '';
@@ -201,6 +275,10 @@ export default function AdminPerformance() {
                   '• Hours Worked:\nAccumulated check-in to check-out session hours from attendance logs\n\n' +
                   '• Patient Bookings:\nTokens booked by the employee (if they perform booking operations)\n\n' +
                   '• Booking Revenue:\nTotal booking fee payments collected by the employee';
+      } else if (type === 'financial_booking') {
+        title = 'Patient Bookings Financial Summary';
+        message = '• Total Bookings Made:\nNumber of patient slot tokens created by employee(s)\n\n' +
+                  '• Total Booking Revenue:\nSum of consultation fees collected for those active bookings';
       }
     } else {
       if (type === 'kpis') {
@@ -250,6 +328,14 @@ export default function AdminPerformance() {
 
   const isDoctorMode = dashboardType === 'doctor';
 
+  const topEmployees = (riders || [])
+    .filter((e: any) => (e.appraisal?.overallKpiScore || 0) >= 75)
+    .sort((a: any, b: any) => (b.appraisal?.overallKpiScore || 0) - (a.appraisal?.overallKpiScore || 0));
+
+  const bottomEmployees = (riders || [])
+    .filter((e: any) => (e.appraisal?.overallKpiScore || 0) < 60)
+    .sort((a: any, b: any) => (a.appraisal?.overallKpiScore || 0) - (b.appraisal?.overallKpiScore || 0));
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
       {/* Dashboard Toggle Segment */}
@@ -293,10 +379,15 @@ export default function AdminPerformance() {
              'Measure productivity, quality, and service levels of delivery executives'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchPerformanceData}>
-          <RefreshCw size={18} color="#fff" />
-          <Text style={styles.refreshText}>Refresh</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.refreshBtn, { backgroundColor: '#10B981' }]} onPress={downloadCSVReport}>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Download Report</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.refreshBtn} onPress={fetchPerformanceData}>
+            <RefreshCw size={16} color="#fff" />
+            <Text style={styles.refreshText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Filter Section */}
@@ -532,14 +623,14 @@ export default function AdminPerformance() {
         <View style={styles.grid}>
           <View style={styles.kpiCard}>
             <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
-              <Award size={20} color="#4F46E5" />
+              <User size={20} color="#4F46E5" />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>Task Completion Rate</Text>
-              <Text style={[styles.kpiValue, { color: getStatusColor(executive.overview?.overallTaskCompletionRate || 0, 'success') }]}>
-                {executive.overview?.overallTaskCompletionRate || 0}%
+              <Text style={styles.kpiLabel}>Total Employees</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.totalEmployees || 0}</Text>
+              <Text style={styles.kpiSub}>
+                Present: {executive.overview?.presentEmployees || 0} | Absent: {executive.overview?.absentEmployees || 0}
               </Text>
-              <Text style={styles.kpiSub}>Target: High completion rate</Text>
             </View>
           </View>
 
@@ -548,9 +639,9 @@ export default function AdminPerformance() {
               <Clock size={20} color="#0284C7" />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>Total Tasks Assigned</Text>
-              <Text style={styles.kpiValue}>{executive.overview?.totalTasksAssigned || 0}</Text>
-              <Text style={styles.kpiSub}>Normal & recurring tasks</Text>
+              <Text style={styles.kpiLabel}>Tasks Assigned</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.tasksAssignedToday || 0}</Text>
+              <Text style={styles.kpiSub}>Pending: {executive.overview?.pendingTasks || 0}</Text>
             </View>
           </View>
 
@@ -560,8 +651,19 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>Completed Tasks</Text>
-              <Text style={styles.kpiValue}>{executive.overview?.totalTasksCompleted || 0}</Text>
-              <Text style={styles.kpiSub}>Tasks finished successfully</Text>
+              <Text style={styles.kpiValue}>{executive.overview?.tasksCompletedToday || 0}</Text>
+              <Text style={styles.kpiSub}>SLA: {executive.overview?.overallTaskCompletionRate || 0}% rate</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+              <AlertCircle size={20} color="#EF4444" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Overdue Tasks</Text>
+              <Text style={[styles.kpiValue, { color: '#EF4444' }]}>{executive.overview?.overdueTasks || 0}</Text>
+              <Text style={styles.kpiSub}>Urgent completion needed</Text>
             </View>
           </View>
 
@@ -572,29 +674,18 @@ export default function AdminPerformance() {
             <View>
               <Text style={styles.kpiLabel}>Hours Worked</Text>
               <Text style={styles.kpiValue}>{executive.overview?.totalHoursWorked || 0} hrs</Text>
-              <Text style={styles.kpiSub}>Attendance shift hours</Text>
+              <Text style={styles.kpiSub}>Net shift duration</Text>
             </View>
           </View>
 
           <View style={styles.kpiCard}>
             <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-              <User size={20} color="#0284C7" />
-            </View>
-            <View>
-              <Text style={styles.kpiLabel}>Patient Bookings</Text>
-              <Text style={styles.kpiValue}>{executive.overview?.totalBookingsMade || 0}</Text>
-              <Text style={styles.kpiSub}>Tokens booked by staff</Text>
-            </View>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
-              <DollarSign size={20} color="#059669" />
+              <DollarSign size={20} color="#0284C7" />
             </View>
             <View>
               <Text style={styles.kpiLabel}>Booking Revenue</Text>
               <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{(executive.overview?.totalBookingRevenue || 0).toLocaleString('en-IN')}</Text>
-              <Text style={styles.kpiSub}>Fees collected by staff</Text>
+              <Text style={styles.kpiSub}>Staff Bookings: {executive.overview?.totalBookingsMade || 0}</Text>
             </View>
           </View>
         </View>
@@ -728,7 +819,7 @@ export default function AdminPerformance() {
       )}
 
       {/* Financial Summary Card */}
-      {isDoctorMode ? (
+      {dashboardType === 'doctor' ? (
         <View style={[styles.card, { marginTop: 24 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Financial Summary & Payout Breakdown</Text>
@@ -755,6 +846,28 @@ export default function AdminPerformance() {
             </View>
           </View>
         </View>
+      ) : dashboardType === 'employee' ? (
+        (executive.overview?.totalBookingsMade || 0) > 0 ? (
+          <View style={[styles.card, { marginTop: 24 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Financial Summary & Bookings Breakdown</Text>
+              <TouchableOpacity onPress={() => showInfoAlert('financial_booking')} style={{ padding: 4 }}>
+                <Info size={15} color="#4F46E5" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.paymentsSummary}>
+              <View style={styles.paymentCol}>
+                <Text style={styles.paymentLabel}>Total Bookings Made</Text>
+                <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>{executive.overview?.totalBookingsMade || 0}</Text>
+              </View>
+              <View style={styles.paymentDivider} />
+              <View style={styles.paymentCol}>
+                <Text style={styles.paymentLabel}>Total Booking Revenue</Text>
+                <Text style={[styles.paymentValue, { color: '#059669' }]}>₹{(executive.overview?.totalBookingRevenue || 0).toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null
       ) : (
         <View style={[styles.card, { marginTop: 24 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -807,7 +920,7 @@ export default function AdminPerformance() {
       )}
 
       {/* Delivery Executive Summary */}
-      {!isDoctorMode && (
+      {dashboardType === 'delivery' && (
         <View style={[styles.card, { marginTop: 24 }]}>
           <Text style={styles.sectionTitle}>Delivery Executive Summary</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
@@ -834,54 +947,56 @@ export default function AdminPerformance() {
       )}
 
       {/* Area / Department Performance */}
-      <View style={[styles.card, { marginTop: 24 }]}>
-        <TouchableOpacity
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-          onPress={() => setAreaExpanded(!areaExpanded)}
-          activeOpacity={0.7}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
-              {isDoctorMode ? 'Specialization Department Breakdown' : 'Area Performance Breakdown'}
-            </Text>
-            <TouchableOpacity onPress={() => showInfoAlert(isDoctorMode ? 'dept' : 'area')} style={{ padding: 4 }}>
-              <Info size={15} color="#4F46E5" />
-            </TouchableOpacity>
-          </View>
-          <Text style={{ color: '#4F46E5', fontSize: 13, fontWeight: '600' }}>{areaExpanded ? 'Collapse' : 'Expand'}</Text>
-        </TouchableOpacity>
+      {dashboardType !== 'employee' && (
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            onPress={() => setAreaExpanded(!areaExpanded)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+                {isDoctorMode ? 'Specialization Department Breakdown' : 'Area Performance Breakdown'}
+              </Text>
+              <TouchableOpacity onPress={() => showInfoAlert(isDoctorMode ? 'dept' : 'area')} style={{ padding: 4 }}>
+                <Info size={15} color="#4F46E5" />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ color: '#4F46E5', fontSize: 13, fontWeight: '600' }}>{areaExpanded ? 'Collapse' : 'Expand'}</Text>
+          </TouchableOpacity>
 
-        {areaExpanded && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginTop: 12 }}>
-            <View style={styles.table}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.th, { width: 180 }]}>{isDoctorMode ? 'Department Name' : 'Area Name'}</Text>
-                <Text style={[styles.th, { width: 100 }]}>{isDoctorMode ? 'Total Bookings' : 'Total Orders'}</Text>
-                <Text style={[styles.th, { width: 120 }]}>Revenue Generated</Text>
-                <Text style={[styles.th, { width: 120 }]}>{isDoctorMode ? 'Pending Tokens' : 'Pending Orders'}</Text>
-              </View>
-              {(executive.areaPerformance || []).length === 0 ? (
-                <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ color: '#64748B', fontSize: 13 }}>
-                    {isDoctorMode ? 'No department data found.' : 'No area data found for selected period.'}
-                  </Text>
+          {areaExpanded && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginTop: 12 }}>
+              <View style={styles.table}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { width: 180 }]}>{isDoctorMode ? 'Department Name' : 'Area Name'}</Text>
+                  <Text style={[styles.th, { width: 100 }]}>{isDoctorMode ? 'Total Bookings' : 'Total Orders'}</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Revenue Generated</Text>
+                  <Text style={[styles.th, { width: 120 }]}>{isDoctorMode ? 'Pending Tokens' : 'Pending Orders'}</Text>
                 </View>
-              ) : (
-                (executive.areaPerformance || []).map((area: any, index: number) => (
-                  <View key={area.area || index} style={styles.tableRow}>
-                    <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{area.area}</Text>
-                    <Text style={[styles.td, { width: 100 }]}>{area.totalOrders}</Text>
-                    <Text style={[styles.td, { width: 120, color: '#10B981', fontWeight: '600' }]}>₹{area.revenue?.toLocaleString('en-IN')}</Text>
-                    <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>
-                      {isDoctorMode ? area.pending : area.pendingOrders}
+                {(executive.areaPerformance || []).length === 0 ? (
+                  <View style={{ padding: 16, alignItems: 'center' }}>
+                    <Text style={{ color: '#64748B', fontSize: 13 }}>
+                      {isDoctorMode ? 'No department data found.' : 'No area data found for selected period.'}
                     </Text>
                   </View>
-                ))
-              )}
-            </View>
-          </ScrollView>
-        )}
-      </View>
+                ) : (
+                  (executive.areaPerformance || []).map((area: any, index: number) => (
+                    <View key={area.area || index} style={styles.tableRow}>
+                      <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{area.area}</Text>
+                      <Text style={[styles.td, { width: 100 }]}>{area.totalOrders}</Text>
+                      <Text style={[styles.td, { width: 120, color: '#10B981', fontWeight: '600' }]}>₹{area.revenue?.toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.td, { width: 120, color: '#F59E0B', fontWeight: '600' }]}>
+                        {isDoctorMode ? area.pending : area.pendingOrders}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            </ScrollView>
+          )}
+        </View>
+      )}
 
       {/* Performance Charts & Trends */}
       {dashboardType !== 'employee' && (
@@ -980,6 +1095,49 @@ export default function AdminPerformance() {
         </View>
       )}
 
+      {/* Leaderboard/Ranking for Employees */}
+      {dashboardType === 'employee' && (
+        <View style={styles.rankingsRow}>
+          <View style={[styles.card, { flex: 1 }]}>
+            <Text style={styles.sectionTitle}>Top Performers</Text>
+            {topEmployees.slice(0, 5).map((e: any, index: number) => (
+              <View key={e.id} style={styles.rankItem}>
+                <View style={[styles.rankBadge, { backgroundColor: '#ECFDF5' }]}>
+                  <Text style={[styles.rankText, { color: '#10B981' }]}>#{index + 1}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName}>{e.name}</Text>
+                  <Text style={styles.rankDetails}>{e.role} ({e.department}) | Rating: {e.appraisal?.managerRating} ★</Text>
+                </View>
+                <Text style={[styles.rankScore, { color: '#10B981' }]}>{e.appraisal?.overallKpiScore || 0} pts</Text>
+              </View>
+            ))}
+            {topEmployees.length === 0 && (
+              <Text style={{ color: '#64748B', fontSize: 13, padding: 12 }}>No employees currently rank as Top Performers.</Text>
+            )}
+          </View>
+
+          <View style={[styles.card, { flex: 1 }]}>
+            <Text style={styles.sectionTitle}>Employees Requiring Improvement</Text>
+            {bottomEmployees.slice(0, 5).map((e: any, index: number) => (
+              <View key={e.id} style={styles.rankItem}>
+                <View style={[styles.rankBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <Text style={[styles.rankText, { color: '#EF4444' }]}>!</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rankName}>{e.name}</Text>
+                  <Text style={styles.rankDetails}>{e.role} ({e.department}) | Rating: {e.appraisal?.managerRating} ★</Text>
+                </View>
+                <Text style={[styles.rankScore, { color: '#EF4444' }]}>{e.appraisal?.overallKpiScore || 0} pts</Text>
+              </View>
+            ))}
+            {bottomEmployees.length === 0 && (
+              <Text style={{ color: '#64748B', fontSize: 13, padding: 12 }}>No employees require urgent improvement.</Text>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Detail Table */}
       <View style={[styles.card, { marginTop: 24 }]}>
         <Text style={styles.sectionTitle}>
@@ -1026,6 +1184,10 @@ export default function AdminPerformance() {
                   <Text style={[styles.th, { width: 150 }]}>Tasks (Assigned / Completed)</Text>
                   <Text style={[styles.th, { width: 100 }]}>Task Comp. %</Text>
                   <Text style={[styles.th, { width: 100 }]}>Hours Worked</Text>
+                  <Text style={[styles.th, { width: 90 }]}>Break Time</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Rating</Text>
+                  <Text style={[styles.th, { width: 90 }]}>KPI Score</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Performance Level</Text>
                   <Text style={[styles.th, { width: 100 }]}>Bookings Made</Text>
                   <Text style={[styles.th, { width: 100 }]}>Booking Rev.</Text>
                 </View>
@@ -1045,6 +1207,17 @@ export default function AdminPerformance() {
                       </Text>
                     </View>
                     <Text style={[styles.td, { width: 100 }]}>{e.attendance?.hoursWorked} hrs</Text>
+                    <Text style={[styles.td, { width: 90 }]}>{e.attendance?.breakTimeHours} hrs</Text>
+                    <Text style={[styles.td, { width: 80, fontWeight: '700', color: '#D97706' }]}>{e.appraisal?.managerRating || '4.0'} ★</Text>
+                    <Text style={[styles.td, { width: 90, fontWeight: '700', color: '#4F46E5' }]}>{e.appraisal?.overallKpiScore || 0} / 100</Text>
+                    <View style={[styles.td, { width: 120 }]}>
+                      <Text style={[styles.badge, { 
+                        backgroundColor: (e.appraisal?.performanceLevel === 'Excellent' ? '#ECFDF5' : e.appraisal?.performanceLevel === 'Good' ? '#F0F9FF' : e.appraisal?.performanceLevel === 'Average' ? '#FEF3C7' : '#FEE2E2'),
+                        color: (e.appraisal?.performanceLevel === 'Excellent' ? '#10B981' : e.appraisal?.performanceLevel === 'Good' ? '#0284C7' : e.appraisal?.performanceLevel === 'Average' ? '#D97706' : '#EF4444')
+                      }]}>
+                        {e.appraisal?.performanceLevel || 'N/A'}
+                      </Text>
+                    </View>
                     <Text style={[styles.td, { width: 100 }]}>{e.bookings?.total > 0 ? e.bookings.total : 'N/A'}</Text>
                     <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{e.bookings?.total > 0 ? `₹${e.bookings.revenue}` : 'N/A'}</Text>
                   </View>
@@ -1186,6 +1359,91 @@ export default function AdminPerformance() {
 
           return (
             <View style={{ gap: 24, marginTop: 24 }}>
+              {/* Reporting Manager Appraisal Inputs */}
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Employee Appraisal & Performance Ratings ({selectedEmp?.name})</Text>
+                
+                {/* Score Summary Metrics */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+                  <View style={{ flex: 1, minWidth: 150, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Overall KPI Score</Text>
+                    <Text style={{ fontSize: 24, fontWeight: '700', color: '#4F46E5', marginTop: 4 }}>
+                      {selectedEmp?.appraisal?.overallKpiScore || 0} / 100
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: (selectedEmp?.appraisal?.overallKpiScore >= 90 ? '#10B981' : selectedEmp?.appraisal?.overallKpiScore >= 75 ? '#0284C7' : selectedEmp?.appraisal?.overallKpiScore >= 60 ? '#D97706' : '#EF4444'), marginTop: 2 }}>
+                      Level: {selectedEmp?.appraisal?.performanceLevel || 'Needs Improvement'}
+                    </Text>
+                  </View>
+                  
+                  <View style={{ flex: 1, minWidth: 150, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Attendance Adherence</Text>
+                    <Text style={{ fontSize: 20, fontWeight: '700', color: '#0f172a', marginTop: 4 }}>
+                      {selectedEmp?.attendance?.attendancePercentage || 0}%
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      Punctuality: {selectedEmp?.attendance?.punctuality || 0}%
+                    </Text>
+                  </View>
+                  
+                  <View style={{ flex: 1, minWidth: 150, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Overdue Tasks</Text>
+                    <Text style={{ fontSize: 20, fontWeight: '700', color: '#EF4444', marginTop: 4 }}>
+                      {selectedEmp?.tasks?.overdue || 0} tasks
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      Task SLA: {selectedEmp?.tasks?.onTimeRate || 0}%
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Edit Form */}
+                <View style={{ gap: 16 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569' }}>Reporting Manager Appraisal Inputs</Text>
+                  
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                    <View style={{ flex: 1, minWidth: 200 }}>
+                      <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>Quality Score (0 - 100)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        placeholder="e.g. 85"
+                        value={appraisalQuality}
+                        onChangeText={setAppraisalQuality}
+                      />
+                    </View>
+                    
+                    <View style={{ flex: 1, minWidth: 200 }}>
+                      <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>Manager Rating (1.0 - 5.0)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        placeholder="e.g. 4.5"
+                        value={appraisalRating}
+                        onChangeText={setAppraisalRating}
+                      />
+                    </View>
+                  </View>
+                  
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>Manager Feedback & Comments</Text>
+                    <TextInput
+                      style={[styles.input, { height: 60, textAlignVertical: 'top', paddingTop: 8 }]}
+                      multiline={true}
+                      placeholder="Enter performance review, feedback, or coaching actions..."
+                      value={appraisalFeedback}
+                      onChangeText={setAppraisalFeedback}
+                    />
+                  </View>
+
+                  <TouchableOpacity 
+                    style={[styles.refreshBtn, { backgroundColor: '#4F46E5', alignSelf: 'flex-start', paddingHorizontal: 16, height: 38, marginTop: 8 }]}
+                    onPress={saveAppraisal}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Save Performance Appraisal</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {/* Tasks list */}
               <View style={styles.card}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1248,6 +1506,7 @@ export default function AdminPerformance() {
                       <Text style={[styles.th, { width: 150 }]}>Check In</Text>
                       <Text style={[styles.th, { width: 150 }]}>Check Out</Text>
                       <Text style={[styles.th, { width: 120 }]}>Working Hours</Text>
+                      <Text style={[styles.th, { width: 100 }]}>Break Time</Text>
                       <Text style={[styles.th, { width: 100 }]}>Status</Text>
                     </View>
                     {filteredAtt.length === 0 ? (
@@ -1261,10 +1520,13 @@ export default function AdminPerformance() {
                           <Text style={[styles.td, { width: 150 }]}>{a.checkin ? new Date(a.checkin).toLocaleTimeString('en-US', { hour12: true }) : 'N/A'}</Text>
                           <Text style={[styles.td, { width: 150 }]}>{a.checkout ? new Date(a.checkout).toLocaleTimeString('en-US', { hour12: true }) : 'N/A'}</Text>
                           <Text style={[styles.td, { width: 120 }]}>{a.sessionHours || 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 100 }]}>{a.breakTime || '0 mins'}</Text>
                           <View style={[styles.td, { width: 100 }]}>
                             <Text style={[styles.badge, { 
-                              backgroundColor: a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'regular' ? '#dcfce7' : '#fee2e2',
-                              color: a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'regular' ? '#10b981' : '#ef4444'
+                              backgroundColor: a.status?.toLowerCase() === 'on duty' ? '#dcfce7' : 
+                                               a.status?.toLowerCase() === 'checked out' ? '#e2e8f0' : '#fee2e2',
+                              color: a.status?.toLowerCase() === 'on duty' ? '#10b981' : 
+                                     a.status?.toLowerCase() === 'checked out' ? '#475569' : '#ef4444'
                             }]}>
                               {a.status || 'Present'}
                             </Text>
