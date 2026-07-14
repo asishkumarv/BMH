@@ -153,45 +153,79 @@ exports.getOrders = async (req, res) => {
 
     const { customer_phone, delivery_boy_id, status, search, fromDate, toDate, page = 1, limit = 50 } = req.query;
     let query = `
-      SELECT mo.*,
+      WITH combined_orders AS (
+        SELECT 
+          mo.id, mo.order_no, mo.invoice_no, mo.amount, mo.delivery_charge, mo.mode_of_delivery,
+          mo.order_date, mo.order_time, mo.customer_phone, mo.customer_name,
+          mo.ship_to_phone, mo.ship_to_name, mo.address, mo.location_link,
+          mo.status, mo.created_by_id, mo.created_by_type, mo.delivery_otp, mo.notes,
+          mo.payment_mode, mo.payment_txn_id, mo.is_scheduled, mo.scheduled_date, mo.scheduled_time,
+          mo.bus_travels_name, mo.bus_driver_name, mo.bus_driver_number, mo.bus_number,
+          mo.bus_date, mo.est_reach_time, mo.picked_up_at, mo.started_at, mo.delivered_at,
+          mo.modified_by_id, mo.modified_by_type, mo.modified_by_name,
+          'manual_order' as order_source_type,
+          NULL as submitted_to_id, NULL as submitted_to_name, NULL as submitted_to_role, NULL as submitted_to_dept,
+          mo.delivery_boy_id,
+          mo.created_at
+        FROM manual_orders mo
+        
+        UNION ALL
+        
+        SELECT 
+          po.id, po.srno::varchar as order_no, po.prefix as invoice_no, po.total as amount, 0.00 as delivery_charge, po.delivery_type as mode_of_delivery,
+          po.created_at::date::varchar as order_date, po.created_at::time::varchar as order_time, NULL as customer_phone, po.custname as customer_name,
+          NULL as ship_to_phone, po.custname as ship_to_name, po.address, NULL as location_link,
+          po.status, NULL as created_by_id, 'System' as created_by_type, NULL as delivery_otp, po.details::varchar as notes,
+          NULL as payment_mode, NULL as payment_txn_id, false as is_scheduled, NULL::date as scheduled_date, NULL as scheduled_time,
+          NULL as bus_travels_name, NULL as bus_driver_name, NULL as bus_driver_number, NULL as bus_number,
+          NULL::date as bus_date, NULL as est_reach_time, NULL::timestamp as picked_up_at, NULL::timestamp as started_at, po.delivered_at,
+          NULL as modified_by_id, NULL as modified_by_type, NULL as modified_by_name,
+          'purchase_order' as order_source_type,
+          po.submitted_to_id, po.submitted_to_name, po.submitted_to_role, po.submitted_to_dept,
+          po.delivery_boy_id::varchar as delivery_boy_id,
+          po.created_at
+        FROM ecogreenpurchase_orders po
+        WHERE po.status != 'Pending'
+      )
+      SELECT co.*,
         emp.full_name as delivery_boy_name, emp.profile_data as delivery_boy_profile, emp.mobile as delivery_boy_phone,
         cre.full_name as creator_name, cre.profile_data as creator_profile,
         admin.full_name as admin_creator_name, admin.image as admin_creator_profile
-      FROM manual_orders mo
-      LEFT JOIN employees emp ON mo.delivery_boy_id = emp.id::varchar
-      LEFT JOIN employees cre ON mo.created_by_id = cre.id::varchar AND mo.created_by_type != 'Admin'
-      LEFT JOIN department_admins admin ON mo.created_by_id = admin.id::varchar AND mo.created_by_type = 'Admin'
+      FROM combined_orders co
+      LEFT JOIN employees emp ON co.delivery_boy_id = emp.id::varchar
+      LEFT JOIN employees cre ON co.created_by_id = cre.id::varchar AND co.created_by_type != 'Admin'
+      LEFT JOIN department_admins admin ON co.created_by_id = admin.id::varchar AND co.created_by_type = 'Admin'
       WHERE 1=1
     `;
     const params = [];
     
     if (customer_phone) {
       params.push(customer_phone);
-      query += ` AND mo.customer_phone = $${params.length}`;
+      query += ` AND co.customer_phone = $${params.length}`;
     }
     if (delivery_boy_id) {
       params.push(delivery_boy_id);
-      query += ` AND mo.delivery_boy_id = $${params.length}`;
+      query += ` AND co.delivery_boy_id = $${params.length}`;
     }
     if (status) {
       params.push(status);
-      query += ` AND mo.status = $${params.length}`;
+      query += ` AND co.status = $${params.length}`;
     }
     if (fromDate) {
       params.push(fromDate);
-      query += ` AND mo.created_at::date >= $${params.length}`;
+      query += ` AND co.created_at::date >= $${params.length}`;
     }
     if (toDate) {
       params.push(toDate);
-      query += ` AND mo.created_at::date <= $${params.length}`;
+      query += ` AND co.created_at::date <= $${params.length}`;
     }
     if (search) {
       params.push(`%${search}%`);
       query += ` AND (
-        mo.customer_name ILIKE $${params.length} OR 
-        mo.customer_phone ILIKE $${params.length} OR 
-        mo.order_no ILIKE $${params.length} OR 
-        mo.invoice_no ILIKE $${params.length}
+        co.customer_name ILIKE $${params.length} OR 
+        co.customer_phone ILIKE $${params.length} OR 
+        co.order_no ILIKE $${params.length} OR 
+        co.invoice_no ILIKE $${params.length}
       )`;
     }
 
@@ -202,7 +236,7 @@ exports.getOrders = async (req, res) => {
     const totalCount = parseInt(countResult.rows[0].count);
 
     // Apply sorting & pagination
-    query += ' ORDER BY mo.created_at DESC';
+    query += ' ORDER BY co.created_at DESC';
     
     const parsedPage = parseInt(page);
     const parsedLimit = parseInt(limit);

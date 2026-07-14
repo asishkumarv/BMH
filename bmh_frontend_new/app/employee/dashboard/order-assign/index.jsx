@@ -37,7 +37,8 @@ export default function OrderAssignScreen() {
     driver_name: '',
     driver_number: '',
     waybill_number: '',
-    drop_location: ''
+    drop_location: '',
+    bus_date: ''
   });
 
   // Search & Filter State
@@ -171,6 +172,16 @@ export default function OrderAssignScreen() {
       } catch (e) {
         // ignore
       }
+    } else {
+      setBusDetails({
+        bus_number: '',
+        arrival_time: '',
+        driver_name: '',
+        driver_number: '',
+        waybill_number: '',
+        drop_location: '',
+        bus_date: new Date().toISOString().split('T')[0]
+      });
     }
   };
 
@@ -451,6 +462,10 @@ export default function OrderAssignScreen() {
                       <View style={styles.inputGroup}>
                         <Text style={styles.label}>Arrival/Departure Time</Text>
                         <TextInput style={styles.textInput} value={busDetails.arrival_time} onChangeText={(v) => setBusDetails({...busDetails, arrival_time: v})} placeholder="10:00 AM"/>
+                      </View>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Bus Date (YYYY-MM-DD)</Text>
+                        <TextInput style={styles.textInput} value={busDetails.bus_date} onChangeText={(v) => setBusDetails({...busDetails, bus_date: v})} placeholder="YYYY-MM-DD"/>
                       </View>
                       <View style={styles.inputGroup}>
                         <Text style={styles.label}>Drop Location</Text>

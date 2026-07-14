@@ -88,6 +88,26 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 
   // Run DB Patches / Migrations
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_to_id VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched submitted_to_id in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_to_id):', err.message));
+
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_to_name VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched submitted_to_name in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_to_name):', err.message));
+
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_to_role VARCHAR(100)')
+    .then(() => console.log('Successfully checked/patched submitted_to_role in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_to_role):', err.message));
+
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_to_dept VARCHAR(100)')
+    .then(() => console.log('Successfully checked/patched submitted_to_dept in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_to_dept):', err.message));
+
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP')
+    .then(() => console.log('Successfully checked/patched submitted_at in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_at):', err.message));
+
   pool.query('ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS note TEXT')
     .then(() => console.log('Successfully checked/patched note column in cash_handovers table.'))
     .catch(err => console.error('Error patching cash_handovers table:', err.message));

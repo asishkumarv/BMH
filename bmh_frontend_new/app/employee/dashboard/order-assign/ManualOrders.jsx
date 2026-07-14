@@ -538,7 +538,12 @@ export default function ManualOrders({ deliveryBoys }) {
         {/* Customer */}
         <View style={[styles.cell, { flex: 1.5 }]}>
           <Text style={styles.cellTextBold}>{item.customer_name}</Text>
-          <Text style={styles.cellSubText}>{item.customer_phone}</Text>
+          {item.customer_phone ? <Text style={styles.cellSubText}>{item.customer_phone}</Text> : null}
+          {item.order_source_type === 'purchase_order' && (
+            <View style={{backgroundColor: '#e0e7ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start'}}>
+              <Text style={{fontSize: 9, color: '#4338ca', fontWeight: 'bold'}}>PURCHASE ORDER</Text>
+            </View>
+          )}
         </View>
         
         {/* Order/Invoice No */}
@@ -549,7 +554,19 @@ export default function ManualOrders({ deliveryBoys }) {
         
         {/* Delivery Boy */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {(item.delivery_boy_id && item.status === 'Delivered') ? (
+          {item.order_source_type === 'purchase_order' ? (
+            <View style={{flexDirection: 'column'}}>
+               <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                 {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
+                 <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name || 'Unassigned'}</Text>
+               </View>
+               {item.submitted_to_name && (
+                 <Text style={{fontSize: 10, color: '#059669', marginTop: 2, fontWeight: 'bold'}} numberOfLines={2}>
+                   Sub: {item.submitted_to_name} ({item.submitted_to_role || ''} - {item.submitted_to_dept || ''})
+                 </Text>
+               )}
+            </View>
+          ) : (item.delivery_boy_id && item.status === 'Delivered') ? (
             <View style={{flexDirection: 'row', alignItems: 'center'}}>
                {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
                <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name}</Text>
@@ -572,7 +589,7 @@ export default function ManualOrders({ deliveryBoys }) {
             </TouchableOpacity>
           )}
         </View>
-
+ 
         {/* Charge/Amount */}
         <View style={[styles.cell, { flex: 1 }]}>
           <Text style={styles.cellText}>₹{item.delivery_charge || 0}</Text>
@@ -614,7 +631,7 @@ export default function ManualOrders({ deliveryBoys }) {
           <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#dcfce7'}]}>
              <Share2 size={14} color="#15803d" />
           </TouchableOpacity>
-          {['pending', 'assigned'].includes(item.status?.toLowerCase()) && (
+          {item.order_source_type !== 'purchase_order' && ['pending', 'assigned'].includes(item.status?.toLowerCase()) && (
             <TouchableOpacity 
               onPress={() => {
                 setDeleteOrderTarget(item);

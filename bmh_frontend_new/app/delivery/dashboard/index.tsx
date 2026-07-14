@@ -122,6 +122,79 @@ export default function DeliveryDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const ordersRef = useRef<any[]>([]);
 
+  // Purchase Order Submission Modal State
+  const [submissionModalVisible, setSubmissionModalVisible] = useState(false);
+  const [submissionSearchQuery, setSubmissionSearchQuery] = useState('');
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [selectedPO, setSelectedPO] = useState<any>(null);
+  const [submissionLoading, setSubmissionLoading] = useState(false);
+
+  const isAssigned = (status: string) => {
+    if (!status) return true;
+    const s = status.toLowerCase();
+    return s !== 'picked up' && s !== 'out for delivery' && s !== 'delivered' && s !== 'completed' && s !== 'cancelled' && s !== 'received' && !s.startsWith('starts to');
+  };
+
+  const openSubmissionModal = async (order: any) => {
+    setSelectedPO(order);
+    setSubmissionSearchQuery('');
+    setSubmissionModalVisible(true);
+    
+    if (usersList.length === 0) {
+      try {
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
+        if (res.data && res.data.success) {
+          const filtered = res.data.data.filter((u: any) => u.type === 'employee' || u.role?.toLowerCase() === 'subadmin' || u.role?.toLowerCase() === 'sub_admin');
+          setUsersList(filtered);
+        }
+      } catch (err) {
+        console.error("Error fetching users:", err);
+      }
+    }
+  };
+
+  const handleSelectEmployee = (emp: any) => {
+    if (!selectedPO) return;
+    
+    const confirmMsg = `Confirm submitting Purchase Order #${selectedPO.id} to ${emp.full_name} (${emp.role}, ${emp.department})?`;
+    
+    const proceedSubmit = async () => {
+      setSubmissionLoading(true);
+      try {
+        await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/status/${selectedPO.id}`, {
+          status: 'Delivered',
+          submitted_to_id: emp.id,
+          submitted_to_name: emp.full_name,
+          submitted_to_role: emp.role,
+          submitted_to_dept: emp.department
+        });
+        
+        alert("Purchase Order submitted successfully!");
+        setSubmissionModalVisible(false);
+        if (user) fetchOrders(user.id);
+      } catch (err: any) {
+        alert("Failed to submit Purchase Order: " + (err.response?.data?.message || err.message));
+      } finally {
+        setSubmissionLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmMsg)) {
+        proceedSubmit();
+      }
+    } else {
+      Alert.alert(
+        "Confirm Submission",
+        confirmMsg,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Yes", onPress: proceedSubmit }
+        ]
+      );
+    }
+  };
+
   useEffect(() => {
     ordersRef.current = orders;
   }, [orders]);
@@ -365,11 +438,26 @@ export default function DeliveryDashboard() {
         await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, {
           status: newStatus
         });
-        if (user) fetchOrders(user.id);
+      } else if (type === 'online_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, {
+          status: newStatus
+        });
+      } else if (type === 'sales_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/status`, {
+          status: newStatus
+        });
+      } else if (type === 'purchase_order') {
+        await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/status/${orderId}`, {
+          status: newStatus
+        });
       } else {
-        alert("Status updates not yet supported for this order type.");
+        alert("Status updates not yet supported for this order type: " + type);
+        return;
       }
+      alert(`Status updated to ${newStatus}`);
+      if (user) fetchOrders(user.id);
     } catch (err) {
+      console.error(err);
       alert('Failed to update status');
     }
   };
@@ -715,15 +803,17 @@ export default function DeliveryDashboard() {
              </TouchableOpacity>
           )}
 
-          {item.type === 'manual_order' && item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && (
+          {/* Manual, Online, Sales Orders */}
+          {(item.type === 'manual_order' || item.type === 'online_order' || item.type === 'sales_order') && 
+           item.status?.toLowerCase() !== 'delivered' && item.status?.toLowerCase() !== 'completed' && item.status?.toLowerCase() !== 'cancelled' && (
             <>
-              {item.status === 'Assigned' && (
+              {isAssigned(item.status) && (
                 <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#F59E0B'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
                   <Package color="#fff" size={14} style={{marginRight: 4}} />
                   <Text style={[styles.footerBtnText, {color: '#fff'}]}>Pickup</Text>
                 </TouchableOpacity>
               )}
-              {item.status === 'Picked Up' && (
+              {item.status?.toLowerCase() === 'picked up' && (
                 <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#3B82F6'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}>
                   <Navigation color="#fff" size={14} style={{marginRight: 4}} />
                   <Text style={[styles.footerBtnText, {color: '#fff'}]}>Start</Text>
@@ -732,14 +822,51 @@ export default function DeliveryDashboard() {
             </>
           )}
 
-          {item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && (
+          {/* Purchase Orders */}
+          {item.type === 'purchase_order' && 
+           item.status?.toLowerCase() !== 'delivered' && item.status?.toLowerCase() !== 'completed' && item.status?.toLowerCase() !== 'received' && (
+            <>
+              {isAssigned(item.status) && (
+                <TouchableOpacity 
+                  style={[styles.footerBtn, {backgroundColor: '#F59E0B'}]} 
+                  onPress={() => {
+                    const nextStatus = item.delivery_type === 'Bus' ? 'Starts to Bus Stand' : 
+                                       item.delivery_type === 'Store' ? 'Starts to Store' : 
+                                       'Starts to Wholesaler';
+                    handleUpdateStatus(item.id, item.type, nextStatus);
+                  }}
+                >
+                  <Navigation color="#fff" size={14} style={{marginRight: 4}} />
+                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>
+                    {item.delivery_type === 'Bus' ? 'Start to Bus Stand' : 
+                     item.delivery_type === 'Store' ? 'Start to Store' : 
+                     'Start to Wholesaler'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {(item.status === 'Starts to Wholesaler' || item.status === 'Starts to Bus Stand' || item.status === 'Starts to Store') && (
+                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#3B82F6'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
+                  <Package color="#fff" size={14} style={{marginRight: 4}} />
+                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Pickup</Text>
+                </TouchableOpacity>
+              )}
+              {item.status === 'Picked Up' && (
+                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#10B981'}]} onPress={() => openSubmissionModal(item)}>
+                  <CheckCircle color="#fff" size={14} style={{marginRight: 4}} />
+                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Submitted To</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+
+          {item.status !== 'Delivered' && item.status !== 'Completed' && item.status !== 'Cancelled' && item.status?.toLowerCase() !== 'received' && (
               <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#6366F1'}]} onPress={() => openUpdateModal(item)}>
                 <Text style={[styles.footerBtnText, {color: '#fff'}]}>Update</Text>
               </TouchableOpacity>
           )}
 
-          {((item.type === 'manual_order' && item.status === 'Out for Delivery') || 
-            (item.type !== 'manual_order' && item.status?.toLowerCase() !== 'delivered' && item.type !== 'purchase_order')) && (
+          {((item.type === 'manual_order' || item.type === 'online_order' || item.type === 'sales_order') && 
+            item.status?.toLowerCase() === 'out for delivery') && (
             <TouchableOpacity 
             style={[styles.footerBtn, {backgroundColor: '#10B981'}]} 
             onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode)}
@@ -1120,6 +1247,99 @@ export default function DeliveryDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* PO Submission Modal */}
+      {submissionModalVisible && (
+        <Modal transparent animationType="slide" visible={submissionModalVisible} onRequestClose={() => setSubmissionModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: '90%', maxWidth: 500, maxHeight: '80%' }]}>
+              <Text style={styles.modalTitle}>Submit Purchase Order #{selectedPO?.id}</Text>
+              
+              <View style={{ marginBottom: 15 }}>
+                <TextInput
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#cbd5e1',
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    backgroundColor: '#f8fafc'
+                  }}
+                  placeholder="Search Employee by Name, Role, or Dept..."
+                  value={submissionSearchQuery}
+                  onChangeText={setSubmissionSearchQuery}
+                />
+              </View>
+
+              {submissionLoading ? (
+                <ActivityIndicator size="large" color="#10B981" style={{ marginVertical: 20 }} />
+              ) : (
+                <ScrollView style={{ flex: 1, maxHeight: 400 }}>
+                  {usersList.filter(u => {
+                    if (!submissionSearchQuery) return true;
+                    const q = submissionSearchQuery.toLowerCase();
+                    return (
+                      u.full_name?.toLowerCase().includes(q) ||
+                      u.role?.toLowerCase().includes(q) ||
+                      u.department?.toLowerCase().includes(q)
+                    );
+                  }).length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No employees found</Text>
+                  ) : (
+                    usersList.filter(u => {
+                      if (!submissionSearchQuery) return true;
+                      const q = submissionSearchQuery.toLowerCase();
+                      return (
+                        u.full_name?.toLowerCase().includes(q) ||
+                        u.role?.toLowerCase().includes(q) ||
+                        u.department?.toLowerCase().includes(q)
+                      );
+                    }).map((emp: any) => (
+                      <TouchableOpacity
+                        key={emp.id}
+                        onPress={() => handleSelectEmployee(emp)}
+                        style={{
+                          padding: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '#f1f5f9',
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: '600', fontSize: 14, color: '#0f172a' }}>{emp.full_name}</Text>
+                          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                            {emp.role} • {emp.department}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                          <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: 'bold' }}>Select</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+              )}
+
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 15 }}>
+                <TouchableOpacity
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    backgroundColor: '#e2e8f0',
+                    borderRadius: 8,
+                  }}
+                  onPress={() => setSubmissionModalVisible(false)}
+                >
+                  <Text style={{ color: '#475569', fontWeight: 'bold' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </View>
   );
