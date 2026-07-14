@@ -112,6 +112,68 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched delivered_at in ecogreenpurchase_orders.'))
     .catch(err => console.error('Error patching ecogreenpurchase_orders (delivered_at):', err.message));
 
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS modified_by_id VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched modified_by_id in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (modified_by_id):', err.message));
+
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS modified_by_type VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched modified_by_type in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (modified_by_type):', err.message));
+
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS modified_by_name VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched modified_by_name in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (modified_by_name):', err.message));
+
+  // online_orders modifications
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP')
+    .then(() => console.log('Successfully checked/patched delivered_at in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (delivered_at):', err.message));
+
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS assigned_by INTEGER')
+    .then(() => console.log('Successfully checked/patched assigned_by in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (assigned_by):', err.message));
+
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS modified_by_id VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched modified_by_id in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (modified_by_id):', err.message));
+
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS modified_by_type VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched modified_by_type in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (modified_by_type):', err.message));
+
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS modified_by_name VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched modified_by_name in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (modified_by_name):', err.message));
+
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT \'[]\'::jsonb')
+    .then(() => console.log('Successfully checked/patched notes in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (notes):', err.message));
+
+  // ecogreen_sales_orders modifications
+  pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP')
+    .then(() => console.log('Successfully checked/patched delivered_at in ecogreen_sales_orders.'))
+    .catch(err => console.error('Error patching ecogreen_sales_orders (delivered_at):', err.message));
+
+  pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS assigned_by INTEGER')
+    .then(() => console.log('Successfully checked/patched assigned_by in ecogreen_sales_orders.'))
+    .catch(err => console.error('Error patching ecogreen_sales_orders (assigned_by):', err.message));
+
+  pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS modified_by_id VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched modified_by_id in ecogreen_sales_orders.'))
+    .catch(err => console.error('Error patching ecogreen_sales_orders (modified_by_id):', err.message));
+
+  pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS modified_by_type VARCHAR(50)')
+    .then(() => console.log('Successfully checked/patched modified_by_type in ecogreen_sales_orders.'))
+    .catch(err => console.error('Error patching ecogreen_sales_orders (modified_by_type):', err.message));
+
+  pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS modified_by_name VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched modified_by_name in ecogreen_sales_orders.'))
+    .catch(err => console.error('Error patching ecogreen_sales_orders (modified_by_name):', err.message));
+
+  pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT \'[]\'::jsonb')
+    .then(() => console.log('Successfully checked/patched notes in ecogreen_sales_orders.'))
+    .catch(err => console.error('Error patching ecogreen_sales_orders (notes):', err.message));
+
   pool.query('ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS note TEXT')
     .then(() => console.log('Successfully checked/patched note column in cash_handovers table.'))
     .catch(err => console.error('Error patching cash_handovers table:', err.message));

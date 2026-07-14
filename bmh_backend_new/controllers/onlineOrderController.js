@@ -85,7 +85,7 @@ exports.updateOrderStatus = async (req, res) => {
         const { id } = req.params;
         const { status, delivery_otp, pod_payment_mode } = req.body;
         
-        if (status === 'DELIVERED') {
+        if (status === 'DELIVERED' || status === 'Delivered') {
             const checkQuery = 'SELECT delivery_otp FROM online_orders WHERE id = $1';
             const checkRes = await pool.query(checkQuery, [id]);
             if (checkRes.rowCount > 0 && checkRes.rows[0].delivery_otp) {
@@ -97,7 +97,9 @@ exports.updateOrderStatus = async (req, res) => {
         
         const queryText = `
             UPDATE online_orders 
-            SET status = $1, updated_at = CURRENT_TIMESTAMP
+            SET status = $1, 
+                delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = $2
             RETURNING *;
         `;
@@ -130,18 +132,21 @@ exports.getOrdersByPatient = async (req, res) => {
 exports.assignDelivery = async (req, res) => {
     try {
         const { id } = req.params;
-        const { delivery_boy_id } = req.body;
+        const { delivery_boy_id, assigned_by } = req.body;
         
         // Generate 6-digit OTP
         const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
         
         const queryText = `
             UPDATE online_orders 
-            SET delivery_boy_id = $1, delivery_otp = $2, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
+            SET delivery_boy_id = $1, 
+                delivery_otp = $2, 
+                assigned_by = COALESCE($3::integer, assigned_by),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $4
             RETURNING *;
         `;
-        const { rows } = await pool.query(queryText, [delivery_boy_id, delivery_otp, id]);
+        const { rows } = await pool.query(queryText, [delivery_boy_id, delivery_otp, assigned_by || null, id]);
         if (rows.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
         
         try {
@@ -171,6 +176,60 @@ exports.assignDelivery = async (req, res) => {
         res.status(200).json({ success: true, message: 'Delivery assigned', order: rows[0], delivery_otp });
     } catch (err) {
         console.error("Assign delivery error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.updateOrderDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { address, new_note, note_author, modified_by_id, modified_by_type, modified_by_name } = req.body;
+
+        // Fetch current notes to append
+        const currentRes = await pool.query('SELECT notes FROM online_orders WHERE id = $1', [id]);
+        if (currentRes.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        let updatedNotes = currentRes.rows[0].notes || '[]';
+        if (new_note) {
+            let notesArr = [];
+            try {
+                notesArr = typeof updatedNotes === 'string' ? JSON.parse(updatedNotes) : updatedNotes;
+                if (!Array.isArray(notesArr)) notesArr = [];
+            } catch (e) {
+                notesArr = [];
+            }
+            notesArr.push({
+                text: new_note,
+                author: note_author || 'System',
+                timestamp: new Date().toISOString()
+            });
+            updatedNotes = notesArr;
+        }
+
+        const queryText = `
+            UPDATE online_orders 
+            SET manual_address = COALESCE($1, manual_address),
+                notes = $2,
+                modified_by_id = $3,
+                modified_by_type = $4,
+                modified_by_name = $5,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $6
+            RETURNING *;
+        `;
+        const { rows } = await pool.query(queryText, [
+            address || null, 
+            JSON.stringify(updatedNotes), 
+            modified_by_id || null, 
+            modified_by_type || null, 
+            modified_by_name || null, 
+            id
+        ]);
+        res.status(200).json({ success: true, message: 'Order details updated', order: rows[0] });
+    } catch (err) {
+        console.error("Update order details error:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 };

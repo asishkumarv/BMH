@@ -335,15 +335,44 @@ export default function ManualOrders({ deliveryBoys }) {
         }
       }
 
-      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
-        ...selectedOrder,
-        address: editAddress,
-        new_note: newNote,
-        note_author: authName,
-        modified_by_id: modifiedById,
-        modified_by_type: modifiedByType,
-        modified_by_name: authName
-      });
+      if (selectedOrder.order_source_type === 'purchase_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/update/${selectedOrder.id}`, {
+          address: editAddress,
+          new_note: newNote,
+          note_author: authName,
+          modified_by_id: modifiedById,
+          modified_by_type: modifiedByType,
+          modified_by_name: authName
+        });
+      } else if (selectedOrder.order_source_type === 'online_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${selectedOrder.id}/update`, {
+          address: editAddress,
+          new_note: newNote,
+          note_author: authName,
+          modified_by_id: modifiedById,
+          modified_by_type: modifiedByType,
+          modified_by_name: authName
+        });
+      } else if (selectedOrder.order_source_type === 'sales_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${selectedOrder.id}/update`, {
+          address: editAddress,
+          new_note: newNote,
+          note_author: authName,
+          modified_by_id: modifiedById,
+          modified_by_type: modifiedByType,
+          modified_by_name: authName
+        });
+      } else {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
+          ...selectedOrder,
+          address: editAddress,
+          new_note: newNote,
+          note_author: authName,
+          modified_by_id: modifiedById,
+          modified_by_type: modifiedByType,
+          modified_by_name: authName
+        });
+      }
       alert('Order updated successfully!');
       setNewNote('');
       fetchManualOrders();
@@ -377,13 +406,36 @@ export default function ManualOrders({ deliveryBoys }) {
         }
       }
 
-      await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, {
-        delivery_boy_id: isUnassign ? null : boyId,
-        status: isUnassign ? 'Pending' : 'Assigned',
-        modified_by_id: modifiedById,
-        modified_by_type: modifiedByType,
-        modified_by_name: authName
-      });
+      if (assignOrder && assignOrder.order_source_type === 'purchase_order') {
+        await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/assign/${orderId}`, {
+          delivery_boy_id: isUnassign ? null : boyId,
+          delivery_type: assignOrder.mode_of_delivery || assignOrder.delivery_type || 'Local',
+          address: assignOrder.address || null,
+          gps_location: assignOrder.gps_location || null,
+          bus_details: assignOrder.bus_details || null,
+          assigned_by: modifiedById
+        });
+      } else if (assignOrder && assignOrder.order_source_type === 'online_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/assign-delivery`, {
+          delivery_boy_id: isUnassign ? null : boyId,
+          assigned_by: modifiedById
+        });
+      } else if (assignOrder && assignOrder.order_source_type === 'sales_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/assign-delivery`, {
+          delivery_boy_id: isUnassign ? null : boyId,
+          delivery_type: assignOrder.mode_of_delivery || assignOrder.delivery_type || 'Local',
+          bus_details: assignOrder.bus_details || null,
+          assigned_by: modifiedById
+        });
+      } else {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, {
+          delivery_boy_id: isUnassign ? null : boyId,
+          status: isUnassign ? 'Pending' : 'Assigned',
+          modified_by_id: modifiedById,
+          modified_by_type: modifiedByType,
+          modified_by_name: authName
+        });
+      }
       fetchManualOrders();
     } catch (err) {
       alert('Failed to assign boy');
@@ -544,6 +596,16 @@ export default function ManualOrders({ deliveryBoys }) {
               <Text style={{fontSize: 9, color: '#4338ca', fontWeight: 'bold'}}>PURCHASE ORDER</Text>
             </View>
           )}
+          {item.order_source_type === 'online_order' && (
+            <View style={{backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start'}}>
+              <Text style={{fontSize: 9, color: '#b91c1c', fontWeight: 'bold'}}>ONLINE ORDER</Text>
+            </View>
+          )}
+          {item.order_source_type === 'sales_order' && (
+            <View style={{backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start'}}>
+              <Text style={{fontSize: 9, color: '#b45309', fontWeight: 'bold'}}>SALES ORDER</Text>
+            </View>
+          )}
         </View>
         
         {/* Order/Invoice No */}
@@ -554,7 +616,7 @@ export default function ManualOrders({ deliveryBoys }) {
         
         {/* Delivery Boy */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {item.order_source_type === 'purchase_order' ? (
+          {(item.status === 'Delivered') ? (
             <View style={{flexDirection: 'column'}}>
                <View style={{flexDirection: 'row', alignItems: 'center'}}>
                  {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
@@ -565,11 +627,6 @@ export default function ManualOrders({ deliveryBoys }) {
                    Sub: {item.submitted_to_name} ({item.submitted_to_role || ''} - {item.submitted_to_dept || ''})
                  </Text>
                )}
-            </View>
-          ) : (item.delivery_boy_id && item.status === 'Delivered') ? (
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-               {boyImg ? <Image source={{uri: boyImg}} style={styles.avatar} /> : <User size={16} color="#94a3b8" style={{marginRight: 4}}/>}
-               <Text style={styles.cellText} numberOfLines={1}>{item.delivery_boy_name}</Text>
             </View>
           ) : (
             <TouchableOpacity 
@@ -631,7 +688,7 @@ export default function ManualOrders({ deliveryBoys }) {
           <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#dcfce7'}]}>
              <Share2 size={14} color="#15803d" />
           </TouchableOpacity>
-          {item.order_source_type !== 'purchase_order' && ['pending', 'assigned'].includes(item.status?.toLowerCase()) && (
+          {item.order_source_type === 'manual_order' && ['pending', 'assigned'].includes(item.status?.toLowerCase()) && (
             <TouchableOpacity 
               onPress={() => {
                 setDeleteOrderTarget(item);

@@ -145,14 +145,21 @@ router.get('/', async (req, res) => {
 router.put('/:id/assign-delivery', async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_boy_id, delivery_type, bus_details } = req.body;
+    const { delivery_boy_id, delivery_type, bus_details, assigned_by } = req.body;
     
     // Generate 6-digit OTP
     const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
     
     const result = await pool.query(
-      'UPDATE ecogreen_sales_orders SET delivery_boy_id = $1, delivery_type = $2, bus_details = $3, delivery_otp = $4 WHERE id = $5 RETURNING *',
-      [delivery_boy_id, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, id]
+      `UPDATE ecogreen_sales_orders 
+       SET delivery_boy_id = $1, 
+           delivery_type = $2, 
+           bus_details = $3, 
+           delivery_otp = $4,
+           assigned_by = COALESCE($5::integer, assigned_by)
+       WHERE id = $6 
+       RETURNING *`,
+      [delivery_boy_id, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, assigned_by || null, id]
     );
 
     if (result.rows.length === 0) {
@@ -388,18 +395,22 @@ router.put('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status, delivery_otp } = req.body;
     
-    if (status === 'DELIVERED') {
+    if (status === 'DELIVERED' || status === 'Delivered') {
       const checkQuery = 'SELECT delivery_otp FROM ecogreen_sales_orders WHERE id = $1';
       const checkRes = await pool.query(checkQuery, [id]);
       if (checkRes.rowCount > 0 && checkRes.rows[0].delivery_otp) {
           if (checkRes.rows[0].delivery_otp !== delivery_otp) {
-              return res.status(400).json({ success: false, message: 'Invalid OTP' });
+               return res.status(400).json({ success: false, message: 'Invalid OTP' });
           }
       }
     }
     
     const result = await pool.query(
-      'UPDATE ecogreen_sales_orders SET status = $1 WHERE id = $2 RETURNING *',
+      `UPDATE ecogreen_sales_orders 
+       SET status = $1,
+           delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
+       WHERE id = $2 
+       RETURNING *`,
       [status, id]
     );
 
@@ -411,6 +422,59 @@ router.put('/:id/status', async (req, res) => {
   } catch (err) {
     console.error('Error updating order status:', err);
     res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// Update details (address, notes, modified_by metadata)
+router.put('/:id/update', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { address, new_note, note_author, modified_by_id, modified_by_type, modified_by_name } = req.body;
+
+    const currentRes = await pool.query('SELECT notes FROM ecogreen_sales_orders WHERE id = $1', [id]);
+    if (currentRes.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    let updatedNotes = currentRes.rows[0].notes || '[]';
+    if (new_note) {
+      let notesArr = [];
+      try {
+        notesArr = typeof updatedNotes === 'string' ? JSON.parse(updatedNotes) : updatedNotes;
+        if (!Array.isArray(notesArr)) notesArr = [];
+      } catch (e) {
+        notesArr = [];
+      }
+      notesArr.push({
+        text: new_note,
+        author: note_author || 'System',
+        timestamp: new Date().toISOString()
+      });
+      updatedNotes = notesArr;
+    }
+
+    const queryText = `
+      UPDATE ecogreen_sales_orders 
+      SET patient_address = COALESCE($1, patient_address),
+          notes = $2,
+          modified_by_id = $3,
+          modified_by_type = $4,
+          modified_by_name = $5
+      WHERE id = $6
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(queryText, [
+      address || null, 
+      JSON.stringify(updatedNotes), 
+      modified_by_id || null, 
+      modified_by_type || null, 
+      modified_by_name || null, 
+      id
+    ]);
+    res.json({ success: true, message: 'Order details updated', order: rows[0] });
+  } catch (err) {
+    console.error("Update sales order details error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
