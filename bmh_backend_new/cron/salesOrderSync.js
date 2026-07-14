@@ -75,20 +75,24 @@ async function syncSalesOrders() {
                 const checkRes = await client.query('SELECT order_no FROM ecogreensales_orders WHERE order_no = ANY($1)', [orderNos]);
                 const existingOrderNos = new Set(checkRes.rows.map(r => r.order_no));
                 
-                const insertQuery = `
+                const insertQueryStart = `
                   INSERT INTO ecogreensales_orders (
                     order_id, order_no, createduser, invoice_id, payment_status,
                     total_price, total_discount, order_for, delivered_by, shipping_charge,
                     patient_name, patient_contact_no, patient_address, pharmacy, order_items,
                     created_at, status
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Pending')
+                  ) VALUES 
                 `;
-
+                
+                const valueRows = [];
+                const queryParams = [];
+                let paramCount = 1;
+                
                 for (const order of orders) {
                     if (!order.order_no) continue;
                     if (existingOrderNos.has(order.order_no)) continue;
-
-                    await client.query(insertQuery, [
+                    
+                    const rowParams = [
                         order.order_id || null,
                         order.order_no,
                         order.createduser || null,
@@ -105,7 +109,19 @@ async function syncSalesOrders() {
                         order.pharmacy ? JSON.stringify(order.pharmacy) : null,
                         order.order_items ? JSON.stringify(order.order_items) : null,
                         order.created_at || new Date()
-                    ]);
+                    ];
+                    
+                    const placeholders = rowParams.map(() => `$${paramCount++}`);
+                    placeholders.push("'Pending'");
+                    
+                    valueRows.push(`(${placeholders.join(', ')})`);
+                    queryParams.push(...rowParams);
+                }
+                
+                if (valueRows.length > 0) {
+                    const finalQuery = insertQueryStart + valueRows.join(', ');
+                    await client.query(finalQuery, queryParams);
+                    console.log(`Bulk inserted ${valueRows.length} sales orders.`);
                 }
                 
                 await client.query('COMMIT');
