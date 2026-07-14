@@ -1799,7 +1799,7 @@ router.get("/sales-orders", async (req, res) => {
       paramIdx++;
     }
     
-    query += ` ORDER BY id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    query += ` ORDER BY created_at DESC, id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
     
     const totalRes = await pool.query(countQuery, queryParams.slice(0, paramIdx - 1));
     const totalCount = parseInt(totalRes.rows[0].count, 10);
@@ -2969,6 +2969,49 @@ router.put('/sales-orders/otp/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to verify OTP' });
+  }
+});
+
+/* =========================================================
+   ✅ Update Sales Order Details (e.g., patient details, address)
+========================================================= */
+router.put('/sales-orders/details/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { patient_address, patient_name, patient_contact_no } = req.body;
+    
+    const result = await pool.query(`
+      UPDATE ecogreensales_orders
+      SET patient_address = $1,
+          patient_name = $2,
+          patient_contact_no = $3
+      WHERE id = $4
+      RETURNING *
+    `, [
+      typeof patient_address === 'string' ? patient_address : JSON.stringify(patient_address),
+      patient_name,
+      patient_contact_no,
+      id
+    ]);
+    
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update details' });
+  }
+});
+
+/* =========================================================
+   ✅ Delete Sales Order
+========================================================= */
+router.delete('/sales-orders/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM ecogreensales_orders WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Order deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete order' });
   }
 });
 
