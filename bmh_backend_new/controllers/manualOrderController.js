@@ -201,7 +201,7 @@ exports.getOrders = async (req, res) => {
           NULL::varchar as bus_driver_number,
           NULL::varchar as bus_number,
           NULL::date as bus_date,
-          NULL::timestamp as est_reach_time,
+          NULL::varchar as est_reach_time,
           NULL::timestamp as picked_up_at,
           NULL::timestamp as started_at,
           po.delivered_at,
