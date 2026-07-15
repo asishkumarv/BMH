@@ -205,6 +205,19 @@ app.listen(PORT, () => {
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS location_lat VARCHAR(50)").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS location_lng VARCHAR(50)").catch(e => console.error(e.message));
 
+  // ecogreensales_invoices modifications
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending'").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivered_by_id INTEGER").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivered_by VARCHAR(255)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivery_type VARCHAR(50) DEFAULT 'Local'").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS bus_details JSONB").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivery_otp VARCHAR(20)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT '[]'::jsonb").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS location_lat VARCHAR(50)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS location_lng VARCHAR(50)").catch(e => console.error(e.message));
+
   // Add appraisal columns to employees
   const empAppraisalCols = [
     'quality_score INTEGER DEFAULT 85',
