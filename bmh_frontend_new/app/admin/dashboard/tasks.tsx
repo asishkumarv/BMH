@@ -23,6 +23,15 @@ export default function AdminTasksScreen() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'super_admins' | 'department_admins' | 'employees' | 'recurring'>('all');
   const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
+  
+  // Filtering states
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [selectedDateFilter, setSelectedDateFilter] = useState('all');
+  const [customDateStr, setCustomDateStr] = useState('');
+  const [selectedStatFilter, setSelectedStatFilter] = useState<string>('all');
+  const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState('daily');
   const [specificDays, setSpecificDays] = useState('');
@@ -456,13 +465,124 @@ export default function AdminTasksScreen() {
     }
   };
 
-  const stats = {
-    total: tasks.length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    high: tasks.filter(t => t.priority === 'High').length,
-    moderate: tasks.filter(t => t.priority === 'Moderate' || !t.priority).length,
-    low: tasks.filter(t => t.priority === 'Low').length,
+  const matchesEmployee = (t: any) => {
+    if (!selectedEmployeeId) return true;
+    return String(t.assignee_id) === String(selectedEmployeeId);
   };
+
+  const matchesDate = (t: any) => {
+    if (!selectedDateFilter || selectedDateFilter === 'all') return true;
+    if (!t.due_date) return false;
+    
+    try {
+      const taskDate = new Date(t.due_date);
+      const today = new Date();
+      
+      const tYear = taskDate.getFullYear();
+      const tMonth = taskDate.getMonth();
+      const tDay = taskDate.getDate();
+      
+      const todayYear = today.getFullYear();
+      const todayMonth = today.getMonth();
+      const todayDay = today.getDate();
+      
+      if (selectedDateFilter === 'today') {
+        return tYear === todayYear && tMonth === todayMonth && tDay === todayDay;
+      }
+      
+      if (selectedDateFilter === 'tomorrow') {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        return tYear === tomorrow.getFullYear() && tMonth === tomorrow.getMonth() && tDay === tomorrow.getDate();
+      }
+      
+      if (selectedDateFilter === 'this_week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        startOfWeek.setHours(0,0,0,0);
+        
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() - today.getDay() + 6);
+        endOfWeek.setHours(23,59,59,999);
+        
+        return taskDate >= startOfWeek && taskDate <= endOfWeek;
+      }
+      
+      if (selectedDateFilter === 'overdue') {
+        const now = new Date();
+        return taskDate < now && !['completed', 'terminated'].includes(t.status);
+      }
+      
+      if (selectedDateFilter === 'custom' && customDateStr) {
+        const parts = customDateStr.split('-');
+        if (parts.length === 3) {
+          const cy = parseInt(parts[0], 10);
+          const cm = parseInt(parts[1], 10) - 1;
+          const cd = parseInt(parts[2], 10);
+          return tYear === cy && tMonth === cm && tDay === cd;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return true;
+  };
+
+  const matchesStat = (t: any) => {
+    if (!selectedStatFilter || selectedStatFilter === 'all') return true;
+    if (selectedStatFilter === 'completed') return t.status === 'completed';
+    if (selectedStatFilter === 'pending') return ['pending', 'assigned', 'accepted', 'in_progress'].includes(t.status);
+    if (selectedStatFilter === 'High') return t.priority === 'High';
+    if (selectedStatFilter === 'Moderate') return t.priority === 'Moderate' || !t.priority;
+    if (selectedStatFilter === 'Low') return t.priority === 'Low';
+    return true;
+  };
+
+  const handleStatCardPress = (filterType: string) => {
+    if (selectedStatFilter === filterType) {
+      setSelectedStatFilter('all');
+    } else {
+      setSelectedStatFilter(filterType);
+    }
+  };
+
+  const getFilteredTasks = () => {
+    const tabTasks = getTasksForTab();
+    return tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && matchesStat(t));
+  };
+
+  const tabTasks = getTasksForTab();
+
+  const getStatCounts = () => {
+    const totalFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t)).length;
+    const totalOverall = tabTasks.length;
+    
+    const completedFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.status === 'completed').length;
+    const completedOverall = tabTasks.filter(t => t.status === 'completed').length;
+    
+    const pendingFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && ['pending', 'assigned', 'accepted', 'in_progress'].includes(t.status)).length;
+    const pendingOverall = tabTasks.filter(t => ['pending', 'assigned', 'accepted', 'in_progress'].includes(t.status)).length;
+    
+    const highFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.priority === 'High').length;
+    const highOverall = tabTasks.filter(t => t.priority === 'High').length;
+    
+    const moderateFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && (t.priority === 'Moderate' || !t.priority)).length;
+    const moderateOverall = tabTasks.filter(t => t.priority === 'Moderate' || !t.priority).length;
+    
+    const lowFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.priority === 'Low').length;
+    const lowOverall = tabTasks.filter(t => t.priority === 'Low').length;
+    
+    return {
+      total: { filtered: totalFiltered, overall: totalOverall },
+      completed: { filtered: completedFiltered, overall: completedOverall },
+      pending: { filtered: pendingFiltered, overall: pendingOverall },
+      high: { filtered: highFiltered, overall: highOverall },
+      moderate: { filtered: moderateFiltered, overall: moderateOverall },
+      low: { filtered: lowFiltered, overall: lowOverall }
+    };
+  };
+
+  const stats = getStatCounts();
 
   return (
     <View style={styles.container}>
@@ -498,34 +618,258 @@ export default function AdminTasksScreen() {
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
+          {/* Filters Section */}
+          {activeTab !== 'recurring' && (
+            <View style={[styles.filterSection, !isDesktop && styles.filterSectionMobile]}>
+              {/* Employee Autocomplete Search */}
+              <View style={[styles.filterItem, { zIndex: 100 }]}>
+                <Text style={styles.filterLabel}>Assignee Name</Text>
+                <View style={styles.searchContainer}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search employee..."
+                    value={employeeSearchQuery}
+                    onChangeText={(txt) => {
+                      setEmployeeSearchQuery(txt);
+                      setShowEmployeeDropdown(true);
+                      if (!txt) {
+                        setSelectedEmployeeId(null);
+                      }
+                    }}
+                    onFocus={() => setShowEmployeeDropdown(true)}
+                  />
+                  {employeeSearchQuery ? (
+                    <Pressable
+                      style={styles.clearBtn}
+                      onPress={() => {
+                        setSelectedEmployeeId(null);
+                        setEmployeeSearchQuery('');
+                        setShowEmployeeDropdown(false);
+                      }}
+                    >
+                      <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                {showEmployeeDropdown && (
+                  <View style={styles.dropdownList}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                      <Pressable
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setSelectedEmployeeId(null);
+                          setEmployeeSearchQuery('All Employees');
+                          setShowEmployeeDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, { fontWeight: '700' }]}>-- All Employees --</Text>
+                      </Pressable>
+                      {globalUsers
+                        .filter(u => {
+                          const q = employeeSearchQuery.toLowerCase();
+                          return !employeeSearchQuery || 
+                                 u.full_name?.toLowerCase().includes(q) || 
+                                 u.department?.toLowerCase().includes(q) ||
+                                 u.role?.toLowerCase().includes(q);
+                        })
+                        .map(u => (
+                          <Pressable
+                            key={u.id}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setSelectedEmployeeId(String(u.id));
+                              setEmployeeSearchQuery(u.full_name);
+                              setShowEmployeeDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.dropdownItemText}>{u.full_name}</Text>
+                            <Text style={styles.dropdownItemSubText}>{u.department} - {u.role}</Text>
+                          </Pressable>
+                        ))
+                      }
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* Date Filter Dropdown */}
+              <View style={styles.filterItem}>
+                <Text style={styles.filterLabel}>Due Date Filter</Text>
+                <View style={styles.dateSelectContainer}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={styles.webSelect}
+                      value={selectedDateFilter}
+                      onChange={(e) => {
+                        setSelectedDateFilter(e.target.value);
+                        if (e.target.value !== 'custom') {
+                          setCustomDateStr('');
+                        }
+                      }}
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="tomorrow">Tomorrow</option>
+                      <option value="this_week">This Week</option>
+                      <option value="overdue">Overdue Tasks</option>
+                      <option value="custom">Custom Date...</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={selectedDateFilter}
+                      onValueChange={(val: string) => {
+                        setSelectedDateFilter(val);
+                        if (val !== 'custom') {
+                          setCustomDateStr('');
+                        }
+                      }}
+                      style={{ height: 44, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="All Dates" value="all" />
+                      <Picker.Item label="Today" value="today" />
+                      <Picker.Item label="Tomorrow" value="tomorrow" />
+                      <Picker.Item label="This Week" value="this_week" />
+                      <Picker.Item label="Overdue Tasks" value="overdue" />
+                      <Picker.Item label="Custom Date..." value="custom" />
+                    </Picker>
+                  )}
+                </View>
+
+                {selectedDateFilter === 'custom' && (
+                  <View style={{ zIndex: 10 }}>
+                    {Platform.OS === 'web' ? (
+                      <input
+                        type="date"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '10px',
+                          border: `1px solid ${Colors.light.border}`,
+                          backgroundColor: Colors.light.card,
+                          color: Colors.light.text,
+                          marginTop: 8,
+                          boxSizing: 'border-box'
+                        }}
+                        value={customDateStr}
+                        onChange={(e) => setCustomDateStr(e.target.value)}
+                      />
+                    ) : (
+                      <>
+                        <Pressable
+                          style={styles.customDateBtn}
+                          onPress={() => setShowFilterDatePicker(true)}
+                        >
+                          <Text style={{ color: customDateStr ? Colors.light.text : Colors.light.icon }}>
+                            {customDateStr || 'Pick specific date'}
+                          </Text>
+                        </Pressable>
+                        {showFilterDatePicker && (
+                          <DateTimePicker
+                            value={new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={(event: any, date?: Date) => {
+                              setShowFilterDatePicker(false);
+                              if (date && event.type !== 'dismissed') {
+                                const formatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                setCustomDateStr(formatted);
+                              }
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { borderLeftColor: '#3B82F6' }]}>
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#3B82F6' },
+                selectedStatFilter === 'all' && { borderColor: '#3B82F6', borderWidth: 2, backgroundColor: '#eff6ff' }
+              ]}
+              onPress={() => handleStatCardPress('all')}
+            >
               <Text style={styles.statLabel}>Total Tasks</Text>
-              <Text style={styles.statValue}>{stats.total}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#10B981' }]}>
+              <Text style={styles.statValue}>{stats.total.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.total.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#10B981' },
+                selectedStatFilter === 'completed' && { borderColor: '#10B981', borderWidth: 2, backgroundColor: '#ecfdf5' }
+              ]}
+              onPress={() => handleStatCardPress('completed')}
+            >
               <Text style={styles.statLabel}>Completed</Text>
-              <Text style={styles.statValue}>{stats.completed}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#EF4444' }]}>
-              <Text style={styles.statLabel}>High</Text>
-              <Text style={styles.statValue}>{stats.high}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#F59E0B' }]}>
+              <Text style={styles.statValue}>{stats.completed.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.completed.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#F97316' },
+                selectedStatFilter === 'pending' && { borderColor: '#F97316', borderWidth: 2, backgroundColor: '#fff7ed' }
+              ]}
+              onPress={() => handleStatCardPress('pending')}
+            >
+              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={styles.statValue}>{stats.pending.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.pending.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#EF4444' },
+                selectedStatFilter === 'High' && { borderColor: '#EF4444', borderWidth: 2, backgroundColor: '#fef2f2' }
+              ]}
+              onPress={() => handleStatCardPress('High')}
+            >
+              <Text style={styles.statLabel}>High Priority</Text>
+              <Text style={styles.statValue}>{stats.high.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.high.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#F59E0B' },
+                selectedStatFilter === 'Moderate' && { borderColor: '#F59E0B', borderWidth: 2, backgroundColor: '#fffbeb' }
+              ]}
+              onPress={() => handleStatCardPress('Moderate')}
+            >
               <Text style={styles.statLabel}>Moderate</Text>
-              <Text style={styles.statValue}>{stats.moderate}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#0EA5E9' }]}>
-              <Text style={styles.statLabel}>Low</Text>
-              <Text style={styles.statValue}>{stats.low}</Text>
-            </View>
+              <Text style={styles.statValue}>{stats.moderate.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.moderate.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#0EA5E9' },
+                selectedStatFilter === 'Low' && { borderColor: '#0EA5E9', borderWidth: 2, backgroundColor: '#f0f9ff' }
+              ]}
+              onPress={() => handleStatCardPress('Low')}
+            >
+              <Text style={styles.statLabel}>Low Priority</Text>
+              <Text style={styles.statValue}>{stats.low.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.low.overall}</Text>
+            </Pressable>
           </View>
 
-          {(activeTab === 'recurring' ? recurringTasks.length : getTasksForTab().length) === 0 ? (
+          {(activeTab === 'recurring' ? recurringTasks.length : getFilteredTasks().length) === 0 ? (
             <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
           ) : (
-            activeTab === 'recurring' ? recurringTasks.map(renderRecurringTaskCard) : getTasksForTab().map(renderTaskCard)
+            activeTab === 'recurring' ? recurringTasks.map(renderRecurringTaskCard) : getFilteredTasks().map(renderTaskCard)
           )}
         </ScrollView>
       )}
@@ -981,5 +1325,118 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
     marginTop: 4,
+  },
+  statSubValue: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  filterSection: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 20,
+    zIndex: 50,
+  },
+  filterSectionMobile: {
+    flexDirection: 'column',
+    gap: 12,
+    marginBottom: 16,
+  },
+  filterItem: {
+    flex: 1,
+    position: 'relative',
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 6,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.light.text,
+    paddingVertical: 8,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: 68,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    maxHeight: 180,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: Colors.light.text,
+  },
+  dropdownItemSubText: {
+    fontSize: 12,
+    color: Colors.light.icon,
+    marginTop: 2,
+  },
+  dateSelectContainer: {
+    height: 44,
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  webSelect: {
+    width: '100%',
+    height: '100%',
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+    color: Colors.light.text,
+    fontSize: 14,
+    ...Platform.select({
+      web: {
+        border: 'none',
+        outline: 'none',
+      } as any,
+      default: {}
+    })
+  },
+  customDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    marginTop: 8,
   },
 });

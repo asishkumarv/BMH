@@ -12,20 +12,32 @@ router.post("/sales-order", async (req, res) => {
     const order = req.body;
 
     // ✅ SAFE JSON NORMALIZATION
-    const pharmacy =
-      typeof order.pharmacy === "string"
-        ? JSON.parse(order.pharmacy)
-        : order.pharmacy;
+    let pharmacy = order.pharmacy;
+    if (typeof order.pharmacy === "string") {
+      try {
+        pharmacy = JSON.parse(order.pharmacy);
+      } catch (e) {
+        pharmacy = { name: order.pharmacy };
+      }
+    }
 
-    const patient_address =
-      typeof order.patient_address === "string"
-        ? JSON.parse(order.patient_address)
-        : order.patient_address;
+    let patient_address = order.patient_address;
+    if (typeof order.patient_address === "string") {
+      try {
+        patient_address = JSON.parse(order.patient_address);
+      } catch (e) {
+        patient_address = { address: order.patient_address };
+      }
+    }
 
-    const order_items =
-      typeof order.order_items === "string"
-        ? JSON.parse(order.order_items)
-        : order.order_items;
+    let order_items = order.order_items;
+    if (typeof order.order_items === "string") {
+      try {
+        order_items = JSON.parse(order.order_items);
+      } catch (e) {
+        order_items = [];
+      }
+    }
 
     const result = await pool.query(
       `INSERT INTO salesorders (

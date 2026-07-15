@@ -1807,21 +1807,47 @@ router.get("/sales-orders", async (req, res) => {
     const pageParams = [...queryParams, parsedLimit, offset];
     const result = await pool.query(query, pageParams);
     
-    const orders = result.rows.map((order) => ({
-      ...order,
-      patient_address:
-        typeof order.patient_address === "string"
-          ? JSON.parse(order.patient_address || "{}")
-          : order.patient_address || {},
-      pharmacy:
-        typeof order.pharmacy === "string"
-          ? JSON.parse(order.pharmacy || "{}")
-          : order.pharmacy || {},
-      order_items:
-        typeof order.order_items === "string"
-          ? JSON.parse(order.order_items || "[]")
-          : order.order_items || [],
-    }));
+    const orders = result.rows.map((order) => {
+      let parsedAddress = {};
+      if (typeof order.patient_address === "string") {
+        try {
+          parsedAddress = JSON.parse(order.patient_address || "{}");
+        } catch (e) {
+          parsedAddress = { address: order.patient_address };
+        }
+      } else {
+        parsedAddress = order.patient_address || {};
+      }
+
+      let parsedPharmacy = {};
+      if (typeof order.pharmacy === "string") {
+        try {
+          parsedPharmacy = JSON.parse(order.pharmacy || "{}");
+        } catch (e) {
+          parsedPharmacy = { name: order.pharmacy };
+        }
+      } else {
+        parsedPharmacy = order.pharmacy || {};
+      }
+
+      let parsedItems = [];
+      if (typeof order.order_items === "string") {
+        try {
+          parsedItems = JSON.parse(order.order_items || "[]");
+        } catch (e) {
+          parsedItems = [];
+        }
+      } else {
+        parsedItems = order.order_items || [];
+      }
+
+      return {
+        ...order,
+        patient_address: parsedAddress,
+        pharmacy: parsedPharmacy,
+        order_items: parsedItems,
+      };
+    });
     
     res.status(200).json({
       success: true,
@@ -1846,9 +1872,21 @@ router.get("/sales-orders/:id", async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: "Order not found" });
 
     const order = result.rows[0];
-    order.patient_address = JSON.parse(order.patient_address || "{}");
-    order.pharmacy = JSON.parse(order.pharmacy || "{}");
-    order.order_items = JSON.parse(order.order_items || "[]");
+    try {
+      order.patient_address = JSON.parse(order.patient_address || "{}");
+    } catch (e) {
+      order.patient_address = { address: order.patient_address };
+    }
+    try {
+      order.pharmacy = JSON.parse(order.pharmacy || "{}");
+    } catch (e) {
+      order.pharmacy = { name: order.pharmacy };
+    }
+    try {
+      order.order_items = JSON.parse(order.order_items || "[]");
+    } catch (e) {
+      order.order_items = [];
+    }
 
     res.status(200).json(order);
   } catch (err) {
@@ -2011,15 +2049,25 @@ router.get("/sales-invoice/by-order", async (req, res) => {
 
     const invoice = result.rows[0];
 
-    invoice.patient_address =
-      typeof invoice.patient_address === "string"
-        ? JSON.parse(invoice.patient_address)
-        : invoice.patient_address;
+    if (typeof invoice.patient_address === "string") {
+      try {
+        invoice.patient_address = JSON.parse(invoice.patient_address || "{}");
+      } catch (e) {
+        invoice.patient_address = { address: invoice.patient_address };
+      }
+    } else {
+      invoice.patient_address = invoice.patient_address || {};
+    }
 
-    invoice.order_items =
-      typeof invoice.order_items === "string"
-        ? JSON.parse(invoice.order_items)
-        : invoice.order_items;
+    if (typeof invoice.order_items === "string") {
+      try {
+        invoice.order_items = JSON.parse(invoice.order_items || "[]");
+      } catch (e) {
+        invoice.order_items = [];
+      }
+    } else {
+      invoice.order_items = invoice.order_items || [];
+    }
 
     res.status(200).json({
       success: true,
