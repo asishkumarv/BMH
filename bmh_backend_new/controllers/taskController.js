@@ -12,21 +12,41 @@ const createNotification = async (userType, userId, message) => {
   }
 };
 
+
+
 exports.createTask = async (req, res) => {
   try {
-    const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority } = req.body;
+    const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees } = req.body;
 
     const result = await pool.query(
       `INSERT INTO tasks 
-      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date || null, priority || 'Moderate']
+      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        title,
+        description,
+        assigner_type,
+        assigner_id,
+        is_group_task ? 'group' : assignee_type,
+        is_group_task ? 0 : assignee_id,
+        department,
+        due_date || null,
+        priority || 'Moderate',
+        is_group_task || false,
+        is_group_task ? (typeof group_assignees === 'string' ? group_assignees : JSON.stringify(group_assignees || [])) : '[]'
+      ]
     );
 
     const task = result.rows[0];
 
-    // Create notification for assignee
-    await createNotification(assignee_type, assignee_id, `You have been assigned a new task: "${title}" by a ${assigner_type.replace('_', ' ')}.`);
+    // Create notifications
+    if (is_group_task && Array.isArray(group_assignees)) {
+      for (const item of group_assignees) {
+        await createNotification(item.assignee_type, item.assignee_id, `You have been assigned a new group task: "${title}" by a ${assigner_type.replace('_', ' ')}.`);
+      }
+    } else {
+      await createNotification(assignee_type, assignee_id, `You have been assigned a new task: "${title}" by a ${assigner_type.replace('_', ' ')}.`);
+    }
 
     res.status(201).json({ success: true, data: task });
   } catch (error) {
@@ -37,9 +57,11 @@ exports.createTask = async (req, res) => {
 
 exports.getTasks = async (req, res) => {
   try {
-    // Run schema migrations for duration metrics tracking
+    // Run schema migrations for duration metrics tracking and group tasks
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_group_task BOOLEAN DEFAULT false`);
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS group_assignees JSONB DEFAULT '[]'`);
 
     const { user_type, user_id, department } = req.query;
 
@@ -64,18 +86,26 @@ exports.getTasks = async (req, res) => {
     if (user_type === 'super_admin') {
       // Super admin sees all tasks. Query is already select all.
     } else if (user_type === 'department_admin') {
-      // Sub admin sees tasks assigned TO them, BY them, OR in their department
+      // Sub admin sees tasks assigned TO them, BY them, OR in their department, or group tasks they are in
       query = `SELECT ${fields} FROM tasks t 
                WHERE (t.assignee_type = 'department_admin' AND t.assignee_id = $1) 
                   OR (t.assigner_type = 'department_admin' AND t.assigner_id = $1)
                   OR t.department = $2
+                  OR (t.is_group_task = true AND EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(t.group_assignees) AS ga
+                      WHERE (ga->>'assignee_id')::int = $1 AND ga->>'assignee_type' = 'department_admin'
+                  ))
                ORDER BY t.created_at DESC`;
       params = [user_id, department];
     } else if (user_type === 'employee') {
-      // Employee sees tasks assigned TO them OR BY them
+      // Employee sees tasks assigned TO them OR BY them, or group tasks they are in
       query = `SELECT ${fields} FROM tasks t 
                WHERE (t.assignee_type = 'employee' AND t.assignee_id = $1) 
                   OR (t.assigner_type = 'employee' AND t.assigner_id = $1)
+                  OR (t.is_group_task = true AND EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(t.group_assignees) AS ga
+                      WHERE (ga->>'assignee_id')::int = $1 AND ga->>'assignee_type' = 'employee'
+                  ))
                ORDER BY t.created_at DESC`;
       params = [user_id];
     }
@@ -102,42 +132,90 @@ exports.updateTaskStatus = async (req, res) => {
     const task = existingTaskResult.rows[0];
 
     let result;
-    if (status === 'accepted') {
+    if (task.is_group_task) {
+      let groupAssignees = typeof task.group_assignees === 'string' 
+        ? JSON.parse(task.group_assignees) 
+        : (task.group_assignees || []);
+      
+      let updated = false;
+      groupAssignees = groupAssignees.map(ga => {
+        if (Number(ga.assignee_id) === Number(updater_id) && ga.assignee_type === updater_type) {
+          updated = true;
+          return {
+            ...ga,
+            status: status || ga.status,
+            rejection_reason: rejection_reason !== undefined ? rejection_reason : ga.rejection_reason,
+            notes: notes !== undefined ? notes : ga.notes,
+            accepted_at: status === 'accepted' ? new Date().toISOString() : ga.accepted_at,
+            completed_at: status === 'completed' ? new Date().toISOString() : ga.completed_at,
+            updated_at: new Date().toISOString()
+          };
+        }
+        return ga;
+      });
+
+      if (!updated) {
+        return res.status(400).json({ success: false, message: 'User is not an assignee of this group task' });
+      }
+
+      // Determine overall summary status for the top level:
+      // - If all are completed -> completed
+      // - If any is accepted/in_progress -> in_progress
+      // - Otherwise -> assigned
+      let overallStatus = 'assigned';
+      const allCompleted = groupAssignees.every(ga => ga.status === 'completed');
+      const anyInProgress = groupAssignees.some(ga => ga.status === 'accepted' || ga.status === 'in_progress');
+      if (allCompleted) {
+        overallStatus = 'completed';
+      } else if (anyInProgress) {
+        overallStatus = 'in_progress';
+      }
+
       result = await pool.query(
         `UPDATE tasks 
-         SET status = $1, rejection_reason = $2, notes = $3, accepted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $4 RETURNING *`,
-        [
-          status || task.status,
-          rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
-          notes !== undefined ? notes : task.notes,
-          id
-        ]
-      );
-    } else if (status === 'completed') {
-      result = await pool.query(
-        `UPDATE tasks 
-         SET status = $1, rejection_reason = $2, notes = $3, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $4 RETURNING *`,
-        [
-          status || task.status,
-          rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
-          notes !== undefined ? notes : task.notes,
-          id
-        ]
+         SET group_assignees = $1, status = $2, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $3 RETURNING *`,
+        [JSON.stringify(groupAssignees), overallStatus, id]
       );
     } else {
-      result = await pool.query(
-        `UPDATE tasks 
-         SET status = $1, rejection_reason = $2, notes = $3, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $4 RETURNING *`,
-        [
-          status || task.status,
-          rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
-          notes !== undefined ? notes : task.notes,
-          id
-        ]
-      );
+      // Normal single assignee task update logic
+      if (status === 'accepted') {
+        result = await pool.query(
+          `UPDATE tasks 
+           SET status = $1, rejection_reason = $2, notes = $3, accepted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $4 RETURNING *`,
+          [
+            status || task.status,
+            rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
+            notes !== undefined ? notes : task.notes,
+            id
+          ]
+        );
+      } else if (status === 'completed') {
+        result = await pool.query(
+          `UPDATE tasks 
+           SET status = $1, rejection_reason = $2, notes = $3, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $4 RETURNING *`,
+          [
+            status || task.status,
+            rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
+            notes !== undefined ? notes : task.notes,
+            id
+          ]
+        );
+      } else {
+        result = await pool.query(
+          `UPDATE tasks 
+           SET status = $1, rejection_reason = $2, notes = $3, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $4 RETURNING *`,
+          [
+            status || task.status,
+            rejection_reason !== undefined ? rejection_reason : task.rejection_reason,
+            notes !== undefined ? notes : task.notes,
+            id
+          ]
+        );
+      }
     }
 
     const updatedTask = result.rows[0];
@@ -146,13 +224,7 @@ exports.updateTaskStatus = async (req, res) => {
     const updaterString = updater_type ? updater_type.replace('_', ' ') : 'someone';
     
     if (status === 'rejected') {
-      // Notify assigner
       await createNotification(task.assigner_type, task.assigner_id, `Task "${task.title}" was REJECTED by assignee. Reason: ${rejection_reason}`);
-      // Notify super admins broadly (in a real app we'd fetch super admin IDs, here we might broadcast or just notify assigner if assigner is super admin)
-      if (task.assigner_type !== 'super_admin') {
-         // Optionally, notify all super admins. Let's assume user_id=1 is a main super admin, or we add a role 'super_admin' without id for global things?
-         // We will just notify the assigner for now. If a sub-admin assigned it, the sub admin knows.
-      }
     } else if (status === 'completed' || status === 'terminated') {
       await createNotification(task.assigner_type, task.assigner_id, `Task "${task.title}" was marked as ${status.toUpperCase()} by the assignee.`);
     }

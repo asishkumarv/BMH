@@ -31,6 +31,12 @@ export default function EmployeeTasksScreen() {
   const [assigneeId, setAssigneeId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState('Moderate');
+  const [isGroupTask, setIsGroupTask] = useState(false);
+  const [groupAssigneeIds, setGroupAssigneeIds] = useState<string[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState('');
+  const [deptSearchQuery, setDeptSearchQuery] = useState('');
+  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const [depts, setDepts] = useState<any[]>([]);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<'date' | 'time'>('date');
@@ -63,12 +69,14 @@ export default function EmployeeTasksScreen() {
 
   const fetchInitData = async (user = empUser) => {
     try {
-      const [taskRes, usersRes] = await Promise.all([
+      const [taskRes, usersRes, deptRes] = await Promise.all([
         axios.get(`https://napi.bharatmedicalhallplus.com/tasks?user_type=employee&user_id=${user.id}`),
-        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users')
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users'),
+        axios.get('https://napi.bharatmedicalhallplus.com/department')
       ]);
 
       if (taskRes.data.success) setTasks(taskRes.data.data);
+      if (deptRes.data.success) setDepts(deptRes.data.data);
       if (usersRes.data.success) {
         setGlobalUsers(usersRes.data.data);
       }
@@ -90,13 +98,39 @@ export default function EmployeeTasksScreen() {
     if (assigneeType === 'self') {
       finalAssigneeId = String(empUser.id);
       finalAssigneeType = 'employee';
+      finalDept = empUser.department || '';
     } else {
-      if (!assigneeId) return Alert.alert('Error', 'Assignee is required.');
+      if (!isGroupTask && !assigneeId) return Alert.alert('Error', 'Assignee is required.');
+      if (isGroupTask && groupAssigneeIds.length === 0) return Alert.alert('Error', 'Please select at least one assignee for the group task.');
+
       const selectedUser = globalUsers.find(u => String(u.id) === String(assigneeId));
       if (selectedUser) {
         finalAssigneeType = selectedUser.type; // 'employee' or 'department_admin'
         finalDept = selectedUser.department;
       }
+    }
+
+    // Resolve group assignees list
+    let resolvedGroupAssignees: any[] = [];
+    if (isGroupTask) {
+      resolvedGroupAssignees = groupAssigneeIds.map(id => {
+        let name = 'User';
+        let dept = '';
+        const u = globalUsers.find(x => String(x.id) === String(id));
+        if (u) {
+          name = u.full_name;
+          dept = u.department;
+        }
+        if (dept && !finalDept) {
+          finalDept = dept;
+        }
+        return {
+          assignee_id: parseInt(id),
+          assignee_type: u ? u.type : assigneeType,
+          assignee_name: name,
+          status: 'assigned'
+        };
+      });
     }
 
     try {
@@ -106,10 +140,12 @@ export default function EmployeeTasksScreen() {
         assigner_type: 'employee',
         assigner_id: empUser.id,
         assignee_type: finalAssigneeType,
-        assignee_id: finalAssigneeId.startsWith('SA-') ? parseInt(finalAssigneeId.replace('SA-', '')) : parseInt(finalAssigneeId),
+        assignee_id: isGroupTask ? 0 : (finalAssigneeId.startsWith('SA-') ? parseInt(finalAssigneeId.replace('SA-', '')) : parseInt(finalAssigneeId)),
         department: finalDept,
         due_date: dueDate ? new Date(dueDate.replace(' ', 'T')).toISOString() : null,
-        priority
+        priority,
+        is_group_task: isGroupTask,
+        group_assignees: resolvedGroupAssignees
       });
       setShowCreateModal(false);
       fetchInitData();
@@ -117,6 +153,12 @@ export default function EmployeeTasksScreen() {
       setDescription('');
       setDueDate('');
       setPriority('Moderate');
+      setIsGroupTask(false);
+      setGroupAssigneeIds([]);
+      setDeptSearchQuery('');
+      setDeptDropdownOpen(false);
+      setAssigneeSearchQuery('');
+      setAssigneeDropdownOpen(false);
       Alert.alert('Success', 'Task assigned successfully');
     } catch (e) {
       console.error(e);
@@ -244,11 +286,17 @@ export default function EmployeeTasksScreen() {
     }
   };
 
-  const filteredTasks = activeTab === 'assigned_to_me' 
-    ? tasks.filter(t => t.assignee_type === 'employee' && t.assignee_id === empUser.id)
-    : tasks.filter(t => t.assigner_type === 'employee' && t.assigner_id === empUser.id);
+  const isUserGroupAssignee = (task: any, userId: number, userType: string) => {
+    if (!task.is_group_task) return false;
+    const members = typeof task.group_assignees === 'string' ? JSON.parse(task.group_assignees) : (task.group_assignees || []);
+    return members.some((m: any) => Number(m.assignee_id) === Number(userId) && m.assignee_type === userType);
+  };
 
-  const myWorkload = tasks.filter(t => t.assignee_type === 'employee' && t.assignee_id === empUser.id);
+  const filteredTasks = activeTab === 'assigned_to_me' 
+    ? tasks.filter(t => (t.assignee_type === 'employee' && Number(t.assignee_id) === Number(empUser.id)) || (t.is_group_task && isUserGroupAssignee(t, empUser.id, 'employee')))
+    : tasks.filter(t => t.assigner_type === 'employee' && Number(t.assigner_id) === Number(empUser.id));
+
+  const myWorkload = tasks.filter(t => (t.assignee_type === 'employee' && Number(t.assignee_id) === Number(empUser.id)) || (t.is_group_task && isUserGroupAssignee(t, empUser.id, 'employee')));
   const stats = {
     total: myWorkload.length,
     completed: myWorkload.filter(t => t.status === 'completed').length,
@@ -331,10 +379,32 @@ export default function EmployeeTasksScreen() {
                     <User color={Colors.light.icon} size={16} />
                     <Text style={styles.metaText}>Assigner: {task.assigner_name || 'Unknown'} ({task.assigner_type.replace('_', ' ')} #{task.assigner_id})</Text>
                   </View>
-                  <View style={styles.metaItem}>
-                    <User color={Colors.light.icon} size={16} />
-                    <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} ({task.assignee_type.replace('_', ' ')} #{task.assignee_id}) - {task.department || 'N/A'}</Text>
-                  </View>
+                  {task.is_group_task ? (
+                    <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                      <Text style={{ fontWeight: '700', fontSize: 13, color: '#334155', marginBottom: 4 }}>Group Members Status:</Text>
+                      {(() => {
+                        const members = typeof task.group_assignees === 'string' ? JSON.parse(task.group_assignees) : (task.group_assignees || []);
+                        return members.map((m: any, idx: number) => {
+                          let statusColor = '#6b7280';
+                          if (m.status === 'accepted') statusColor = '#3b82f6';
+                          if (m.status === 'in_progress') statusColor = '#f59e0b';
+                          if (m.status === 'completed') statusColor = '#10b981';
+                          if (m.status === 'rejected') statusColor = '#ef4444';
+                          return (
+                            <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: idx < members.length - 1 ? 0.5 : 0, borderBottomColor: '#cbd5e1' }}>
+                              <Text style={{ fontSize: 12, color: '#475569' }}>{m.assignee_name} ({m.assignee_type.replace('_', ' ')})</Text>
+                              <Text style={{ fontSize: 12, color: statusColor, fontWeight: 'bold' }}>{m.status.toUpperCase()}</Text>
+                            </View>
+                          );
+                        });
+                      })()}
+                    </View>
+                  ) : (
+                    <View style={styles.metaItem}>
+                      <User color={Colors.light.icon} size={16} />
+                      <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} ({task.assignee_type.replace('_', ' ')} #{task.assignee_id}) - {task.department || 'N/A'}</Text>
+                    </View>
+                  )}
                   <View style={styles.metaItem}>
                     <Clock color={Colors.light.icon} size={16} />
                     <Text style={styles.metaText}>Created: {formatTaskDate(task.created_at)}</Text>
@@ -346,21 +416,21 @@ export default function EmployeeTasksScreen() {
                     </View>
                   )}
                 </View>
-
+ 
                 {task.status === 'rejected' && (
                   <View style={styles.rejectionBox}>
                     <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
                     <Text style={styles.rejectionText}>{task.rejection_reason}</Text>
                   </View>
                 )}
-
+ 
                 {task.notes ? (
                   <View style={styles.notesBox}>
                     <Text style={styles.notesTitle}>Latest Notes:</Text>
                     <Text style={styles.notesText}>{task.notes}</Text>
                   </View>
                 ) : null}
-
+ 
                 {task.status === 'completed' && (
                   <View style={{ backgroundColor: '#f0fdf4', padding: 12, borderRadius: 8, marginBottom: 16, borderLeftWidth: 3, borderLeftColor: '#10b981' }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#15803d', marginBottom: 4 }}>Completion Metrics:</Text>
@@ -376,9 +446,9 @@ export default function EmployeeTasksScreen() {
                     )}
                   </View>
                 )}
-
+ 
                 <View style={[styles.taskActions, { gap: 8, flexDirection: 'row', flexWrap: 'wrap' }]}>
-                    {(task.status === 'assigned' || task.status === 'pending') && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id) && (
+                    {(task.status === 'assigned' || task.status === 'pending') && !task.is_group_task && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id) && (
                       <>
                         <Pressable 
                           style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
@@ -398,26 +468,30 @@ export default function EmployeeTasksScreen() {
                         </Pressable>
                       </>
                     )}
-                    <Pressable 
-                      style={styles.actionBtn}
-                      onPress={() => {
-                        setSelectedTask(task);
-                        setStatusNotes(task.notes || '');
-                        setRejectionReason(task.rejection_reason || '');
-                        setShowStatusModal(true);
-                      }}
-                    >
-                      <Text style={styles.actionBtnText}>Update Status</Text>
-                    </Pressable>
+                    {((!task.is_group_task && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id)) ||
+                      (task.is_group_task && isUserGroupAssignee(task, empUser.id, 'employee'))) && (
+                      <Pressable 
+                        style={styles.actionBtn}
+                        onPress={() => {
+                          setSelectedTask(task);
+                          setStatusNotes(task.notes || '');
+                          setRejectionReason(task.rejection_reason || '');
+                          setShowStatusModal(true);
+                        }}
+                      >
+                        <Text style={styles.actionBtnText}>Update Status</Text>
+                      </Pressable>
+                    )}
                    {task.status === 'rejected' &&
+                    !task.is_group_task &&
                     task.assigner_type === 'employee' &&
                     String(task.assigner_id) === String(empUser.id) && (
-                     <Pressable
-                       style={[styles.actionBtn, { backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fb923c' }]}
-                       onPress={() => { setSelectedTask(task); setAssigneeId(''); setShowReassignModal(true); }}
-                     >
-                       <Text style={[styles.actionBtnText, { color: '#ea580c' }]}>Reassign</Text>
-                     </Pressable>
+                      <Pressable
+                        style={[styles.actionBtn, { backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fb923c' }]}
+                        onPress={() => { setSelectedTask(task); setAssigneeId(''); setShowReassignModal(true); }}
+                      >
+                        <Text style={[styles.actionBtnText, { color: '#ea580c' }]}>Reassign</Text>
+                      </Pressable>
                    )}
                 </View>
               </View>
@@ -439,11 +513,21 @@ export default function EmployeeTasksScreen() {
                 
                 <Text style={styles.label}>Description</Text>
                 <TextInput style={[styles.input, { height: 50 }]} multiline value={description} onChangeText={setDescription} placeholder="Task Details..." />
+                
+                <Text style={styles.label}>Task Mode</Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+                  <Pressable style={[styles.radioBtn, !isGroupTask && styles.radioActive]} onPress={() => { setIsGroupTask(false); setGroupAssigneeIds([]); }}>
+                    <Text style={{ color: !isGroupTask ? '#FFF' : Colors.light.text }}>Single Assignee</Text>
+                  </Pressable>
+                  <Pressable style={[styles.radioBtn, isGroupTask && styles.radioActive]} onPress={() => { setIsGroupTask(true); setAssigneeId(''); }}>
+                    <Text style={{ color: isGroupTask ? '#FFF' : Colors.light.text }}>Group Task</Text>
+                  </Pressable>
+                </View>
 
                 <Text style={styles.label}>Assignee Type</Text>
                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
                   {['employee', 'self'].map(type => (
-                    <Pressable key={type} style={[styles.radioBtn, assigneeType === type && styles.radioActive]} onPress={() => { setAssigneeType(type); setAssigneeId(''); }}>
+                    <Pressable key={type} style={[styles.radioBtn, assigneeType === type && styles.radioActive]} onPress={() => { setAssigneeType(type); setAssigneeId(''); setGroupAssigneeIds([]); }}>
                       <Text style={{ color: assigneeType === type ? '#FFF' : Colors.light.text }}>{type.replace('_', ' ')}</Text>
                     </Pressable>
                   ))}
@@ -451,8 +535,8 @@ export default function EmployeeTasksScreen() {
 
                 {assigneeType !== 'self' && (
                   <>
-                    <Text style={styles.label}>Select Assignee</Text>
-                    <View style={{ position: 'relative', zIndex: 9999, marginBottom: 16 }}>
+                    <Text style={styles.label}>Select Department (Optional)</Text>
+                    <View style={{ position: 'relative', zIndex: 99999, marginBottom: 12 }}>
                       <Pressable 
                         style={{ 
                           borderWidth: 1, 
@@ -464,19 +548,17 @@ export default function EmployeeTasksScreen() {
                           justifyContent: 'space-between',
                           alignItems: 'center'
                         }}
-                        onPress={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+                        onPress={() => setDeptDropdownOpen(!deptDropdownOpen)}
                       >
-                        <Text style={{ fontSize: 15, color: assigneeId ? Colors.light.text : Colors.light.icon }}>
-                          {assigneeId 
-                            ? (globalUsers.find(u => String(u.id) === String(assigneeId))
-                                ? `${globalUsers.find(u => String(u.id) === String(assigneeId)).full_name} - ${globalUsers.find(u => String(u.id) === String(assigneeId)).department} (${globalUsers.find(u => String(u.id) === String(assigneeId)).role})`
-                                : '-- Choose Assignee --')
-                            : '-- Choose Assignee --'}
+                        <Text style={{ fontSize: 15, color: selectedDeptId ? Colors.light.text : Colors.light.icon }}>
+                          {selectedDeptId 
+                            ? (depts.find(d => String(d.id) === String(selectedDeptId))?.name || '-- All Departments --')
+                            : '-- All Departments --'}
                         </Text>
                         <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
                       </Pressable>
 
-                      {assigneeDropdownOpen && (
+                      {deptDropdownOpen && (
                         <View style={{
                           position: 'absolute',
                           top: 50,
@@ -493,7 +575,7 @@ export default function EmployeeTasksScreen() {
                           shadowRadius: 4,
                           elevation: 4,
                           padding: 8,
-                          zIndex: 10000
+                          zIndex: 100000
                         }}>
                           <TextInput
                             style={{ 
@@ -505,50 +587,220 @@ export default function EmployeeTasksScreen() {
                               marginBottom: 8,
                               backgroundColor: '#f8fafc'
                             }}
-                            placeholder="Search employee..."
-                            value={assigneeSearchQuery}
-                            onChangeText={setAssigneeSearchQuery}
+                            placeholder="Search department..."
+                            value={deptSearchQuery}
+                            onChangeText={setDeptSearchQuery}
                             autoFocus
                           />
                           <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
                             <Pressable 
                               style={{ padding: 10, borderRadius: 6 }}
                               onPress={() => {
+                                setSelectedDeptId('');
+                                setDeptDropdownOpen(false);
+                                setDeptSearchQuery('');
                                 setAssigneeId('');
-                                setAssigneeDropdownOpen(false);
-                                setAssigneeSearchQuery('');
+                                setGroupAssigneeIds([]);
                               }}
                             >
-                              <Text style={{ fontSize: 14, color: Colors.light.text }}>-- Choose Assignee --</Text>
+                              <Text style={{ fontSize: 14, color: Colors.light.text, fontWeight: 'bold' }}>-- All Departments --</Text>
                             </Pressable>
-                            {globalUsers.filter(u => 
-                              u.full_name?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
-                              u.department?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
-                              u.role?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())
-                            ).map(u => (
+                            {depts.filter(d => 
+                              !deptSearchQuery || d.name?.toLowerCase().includes(deptSearchQuery.toLowerCase())
+                            ).map(d => (
                               <Pressable 
-                                key={u.id}
+                                key={d.id}
                                 style={{ 
                                   padding: 10, 
                                   borderRadius: 6, 
-                                  backgroundColor: String(assigneeId) === String(u.id) ? '#f1f5f9' : 'transparent',
+                                  backgroundColor: String(selectedDeptId) === String(d.id) ? '#f1f5f9' : 'transparent',
                                   marginTop: 2
                                 }}
                                 onPress={() => {
-                                  setAssigneeId(String(u.id));
-                                  setAssigneeDropdownOpen(false);
-                                  setAssigneeSearchQuery('');
+                                  setSelectedDeptId(String(d.id));
+                                  setDeptDropdownOpen(false);
+                                  setDeptSearchQuery('');
+                                  setAssigneeId('');
+                                  setGroupAssigneeIds([]);
                                 }}
                               >
-                                <Text style={{ fontSize: 14, color: Colors.light.text }}>
-                                  {u.full_name} - {u.department} ({u.role})
-                                </Text>
+                                <Text style={{ fontSize: 14, color: Colors.light.text }}>{d.name}</Text>
                               </Pressable>
                             ))}
                           </ScrollView>
                         </View>
                       )}
                     </View>
+
+                    <Text style={styles.label}>{isGroupTask ? 'Select Group Members' : 'Select Assignee'}</Text>
+                    {isGroupTask ? (
+                      <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 8, backgroundColor: '#f8fafc', marginBottom: 16 }}>
+                        <TextInput
+                          style={{ 
+                            borderWidth: 1, 
+                            borderColor: Colors.light.border, 
+                            borderRadius: 6, 
+                            padding: 8, 
+                            fontSize: 14,
+                            marginBottom: 8,
+                            backgroundColor: '#fff'
+                          }}
+                          placeholder="Search group members..."
+                          value={assigneeSearchQuery}
+                          onChangeText={setAssigneeSearchQuery}
+                        />
+                        <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+                          {(() => {
+                            const list = globalUsers
+                              .filter(u => u.type === 'employee' && u.id !== empUser.id)
+                              .filter(u => {
+                                if (!selectedDeptId) return true;
+                                const d = depts.find(dept => String(dept.id) === String(selectedDeptId));
+                                return d && u.department === d.name;
+                              })
+                              .filter(u => 
+                                !assigneeSearchQuery || 
+                                u.full_name?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+                                u.department?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+                                u.role?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())
+                              );
+                            if (list.length === 0) return <Text style={{ color: Colors.light.icon, textAlign: 'center', padding: 12 }}>No assignees found.</Text>;
+                            return list.map(u => {
+                              const isSelected = groupAssigneeIds.includes(String(u.id));
+                              return (
+                                <Pressable 
+                                  key={u.id}
+                                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 0.5, borderBottomColor: '#cbd5e1', backgroundColor: isSelected ? '#e0e7ff' : 'transparent', borderRadius: 6, marginBottom: 4 }}
+                                  onPress={() => {
+                                    if (isSelected) {
+                                      setGroupAssigneeIds(groupAssigneeIds.filter(id => id !== String(u.id)));
+                                    } else {
+                                      setGroupAssigneeIds([...groupAssigneeIds, String(u.id)]);
+                                    }
+                                  }}
+                                >
+                                  <View style={{ flex: 1, paddingRight: 8 }}>
+                                    <Text style={{ fontWeight: '600', color: Colors.light.text }}>{u.full_name}</Text>
+                                    <Text style={{ fontSize: 11, color: '#64748b' }}>{u.department} - {u.role}</Text>
+                                  </View>
+                                  <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#4338ca', justifyContent: 'center', alignItems: 'center', backgroundColor: isSelected ? '#4338ca' : 'transparent' }}>
+                                    {isSelected && <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                                  </View>
+                                </Pressable>
+                              );
+                            });
+                          })()}
+                        </ScrollView>
+                      </View>
+                    ) : (
+                      <View style={{ position: 'relative', zIndex: 9998, marginBottom: 16 }}>
+                        <Pressable 
+                          style={{ 
+                            borderWidth: 1, 
+                            borderColor: Colors.light.border, 
+                            borderRadius: 8, 
+                            backgroundColor: Colors.light.background,
+                            padding: 12,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                          onPress={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+                        >
+                          <Text style={{ fontSize: 15, color: assigneeId ? Colors.light.text : Colors.light.icon }}>
+                            {assigneeId 
+                              ? (globalUsers.find(u => String(u.id) === String(assigneeId))
+                                  ? `${globalUsers.find(u => String(u.id) === String(assigneeId)).full_name} - ${globalUsers.find(u => String(u.id) === String(assigneeId)).department} (${globalUsers.find(u => String(u.id) === String(assigneeId)).role})`
+                                  : '-- Choose Assignee --')
+                              : '-- Choose Assignee --'}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
+                        </Pressable>
+
+                        {assigneeDropdownOpen && (
+                          <View style={{
+                            position: 'absolute',
+                            top: 50,
+                            left: 0,
+                            right: 0,
+                            backgroundColor: '#FFF',
+                            borderWidth: 1,
+                            borderColor: Colors.light.border,
+                            borderRadius: 8,
+                            maxHeight: 250,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 4,
+                            elevation: 4,
+                            padding: 8,
+                            zIndex: 10000
+                          }}>
+                            <TextInput
+                              style={{ 
+                                borderWidth: 1, 
+                                borderColor: Colors.light.border, 
+                                borderRadius: 6, 
+                                padding: 8, 
+                                fontSize: 14,
+                                marginBottom: 8,
+                                backgroundColor: '#f8fafc'
+                              }}
+                              placeholder="Search employee..."
+                              value={assigneeSearchQuery}
+                              onChangeText={setAssigneeSearchQuery}
+                              autoFocus
+                            />
+                            <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+                              <Pressable 
+                                style={{ padding: 10, borderRadius: 6 }}
+                                onPress={() => {
+                                  setAssigneeId('');
+                                  setAssigneeDropdownOpen(false);
+                                  setAssigneeSearchQuery('');
+                                }}
+                              >
+                                <Text style={{ fontSize: 14, color: Colors.light.text }}>-- Choose Assignee --</Text>
+                              </Pressable>
+                              {(() => {
+                                const list = globalUsers
+                                  .filter(u => u.type === 'employee' && u.id !== empUser.id)
+                                  .filter(u => {
+                                    if (!selectedDeptId) return true;
+                                    const d = depts.find(dept => String(dept.id) === String(selectedDeptId));
+                                    return d && u.department === d.name;
+                                  })
+                                  .filter(u => 
+                                    u.full_name?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+                                    u.department?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+                                    u.role?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())
+                                  );
+                                return list.map(u => (
+                                  <Pressable 
+                                    key={u.id}
+                                    style={{ 
+                                      padding: 10, 
+                                      borderRadius: 6, 
+                                      backgroundColor: String(assigneeId) === String(u.id) ? '#f1f5f9' : 'transparent',
+                                      marginTop: 2
+                                    }}
+                                    onPress={() => {
+                                      setAssigneeId(String(u.id));
+                                      setAssigneeDropdownOpen(false);
+                                      setAssigneeSearchQuery('');
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 14, color: Colors.light.text }}>
+                                      {u.full_name} - {u.department} ({u.role})
+                                    </Text>
+                                  </Pressable>
+                                ));
+                              })()}
+                            </ScrollView>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </>
                 )}
 
