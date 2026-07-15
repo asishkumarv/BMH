@@ -333,8 +333,8 @@ router.get("/available", async (req, res) => {
         (
           COALESCE((SELECT COUNT(*)::integer FROM online_orders WHERE delivery_boy_id = e.id AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available')), 0) +
           COALESCE((SELECT COUNT(*)::integer FROM manual_orders WHERE delivery_boy_id = e.id::varchar AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
-          COALESCE((SELECT COUNT(*)::integer FROM ecogreen_sales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
-          COALESCE((SELECT COUNT(*)::integer FROM ecogreen_sales_invoices WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0)
+          COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
+          COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_invoices WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0)
         ) AS pending_count
       FROM employees e
       LEFT JOIN attendance a ON a.employee_id = e.id
@@ -1021,7 +1021,7 @@ router.get('/location/:orderId', async (req, res) => {
 
 
 
-router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else if(type==='ecogreen_invoice' || type==='sales_invoice') table='ecogreen_sales_invoices'; else if(type==='sales_order') table='ecogreen_sales_orders'; else if(type==='purchase_order') table='ecogreenpurchase_orders'; else return res.status(400).json({error:'Invalid type: ' + type}); 
+router.patch('/update-notes', async (req, res) => { try { const { id, type, note } = req.body; if(!id || !type || !note) return res.status(400).json({error:'Missing fields'}); let table = ''; if(type==='manual_order') table='manual_orders'; else if(type==='online_order') table='online_orders'; else if(type==='ecogreen_invoice' || type==='sales_invoice') table='ecogreensales_invoices'; else if(type==='sales_order') table='ecogreensales_orders'; else if(type==='purchase_order') table='ecogreenpurchase_orders'; else return res.status(400).json({error:'Invalid type: ' + type}); 
       const db = require('../db');
       const { rows } = await db.query(`SELECT notes FROM ${table} WHERE id = $1`, [id]);
       if (rows.length === 0) return res.status(404).json({error: 'Order not found'});
@@ -1149,11 +1149,11 @@ router.post('/order/update-patient-gps', async (req, res) => {
       }
     } else if (orderType === 'sales_order') {
       await pool.query(
-        'UPDATE ecogreen_sales_orders SET location_lat = $1, location_lng = $2 WHERE id = $3',
+        'UPDATE ecogreensales_orders SET location_lat = $1, location_lng = $2 WHERE id = $3',
         [latitude, longitude, orderId]
       ).catch(() => {});
       
-      const orderRes = await pool.query('SELECT patient_id FROM ecogreen_sales_orders WHERE id = $1', [orderId]);
+      const orderRes = await pool.query('SELECT patient_id FROM ecogreensales_orders WHERE id = $1', [orderId]);
       if (orderRes.rows.length > 0) {
         patientId = orderRes.rows[0].patient_id;
       }

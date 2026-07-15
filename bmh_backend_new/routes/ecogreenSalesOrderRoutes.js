@@ -373,9 +373,18 @@ router.put('/:id/update-bus-details', async (req, res) => {
     const { id } = req.params;
     const { bus_details } = req.body;
     
+    let targetTable = 'ecogreen_sales_orders';
+    let checkRes = await pool.query('SELECT id FROM ecogreen_sales_orders WHERE id = $1', [id]);
+    if (checkRes.rowCount === 0) {
+      checkRes = await pool.query('SELECT id FROM ecogreensales_orders WHERE id = $1', [id]);
+      if (checkRes.rowCount > 0) {
+        targetTable = 'ecogreensales_orders';
+      }
+    }
+
     const result = await pool.query(
-      'UPDATE ecogreen_sales_orders SET bus_details = $1 WHERE id = $2 RETURNING *',
-      [bus_details ? JSON.stringify(bus_details) : null, id]
+      `UPDATE ${targetTable} SET bus_details = $1 WHERE id = $2 RETURNING *`,
+      [bus_details ? (typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details)) : null, id]
     );
 
     if (result.rows.length === 0) {
@@ -395,9 +404,16 @@ router.put('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status, delivery_otp } = req.body;
     
+    let targetTable = 'ecogreen_sales_orders';
+    let checkRes = await pool.query('SELECT delivery_otp FROM ecogreen_sales_orders WHERE id = $1', [id]);
+    if (checkRes.rowCount === 0) {
+      checkRes = await pool.query('SELECT delivery_otp FROM ecogreensales_orders WHERE id = $1', [id]);
+      if (checkRes.rowCount > 0) {
+        targetTable = 'ecogreensales_orders';
+      }
+    }
+
     if (status === 'DELIVERED' || status === 'Delivered') {
-      const checkQuery = 'SELECT delivery_otp FROM ecogreen_sales_orders WHERE id = $1';
-      const checkRes = await pool.query(checkQuery, [id]);
       if (checkRes.rowCount > 0 && checkRes.rows[0].delivery_otp) {
           if (checkRes.rows[0].delivery_otp !== delivery_otp) {
                return res.status(400).json({ success: false, message: 'Invalid OTP' });
@@ -406,7 +422,7 @@ router.put('/:id/status', async (req, res) => {
     }
     
     const result = await pool.query(
-      `UPDATE ecogreen_sales_orders 
+      `UPDATE ${targetTable} 
        SET status = $1,
            delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
        WHERE id = $2 
