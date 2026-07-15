@@ -63,15 +63,35 @@ cron.schedule('1 0 * * *', async () => {
                     }
                 }
 
+function calculateDueDate(today, rTask) {
+    const dueAt = new Date(today);
+    const type = rTask.due_time_type || 'default';
+    const hours = parseInt(rTask.due_time_hours) || 0;
+    const days = parseInt(rTask.due_time_days) || 0;
+
+    if (type === 'hours') {
+        dueAt.setHours(dueAt.getHours() + hours);
+    } else if (type === 'days') {
+        dueAt.setDate(dueAt.getDate() + days);
+        dueAt.setHours(23, 59, 59, 999);
+    } else if (type === 'days_hours') {
+        dueAt.setDate(dueAt.getDate() + days);
+        dueAt.setHours(dueAt.getHours() + hours);
+    } else { // default: next day evening 5:30pm
+        dueAt.setDate(dueAt.getDate() + 1);
+        dueAt.setHours(17, 30, 0, 0);
+    }
+    return dueAt;
+}
+
                 if (!alreadyGenerated) {
-                    const dueAt = new Date(today);
-                    dueAt.setHours(23, 59, 59, 999);
+                    const dueAt = calculateDueDate(today, rTask);
 
                     const insertTask = `
                         INSERT INTO tasks (
                             title, description, department, assigner_type, assigner_id, 
-                            assignee_type, assignee_id, priority, due_date, status
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+                            assignee_type, assignee_id, priority, due_date, status, is_recurring
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', true)
                     `;
                     const values = [
                         rTask.title,

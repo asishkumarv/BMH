@@ -23,6 +23,11 @@ export default function EmployeeTasksScreen() {
   const [reassignDropdownOpen, setReassignDropdownOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'assigned_to_me' | 'assigned_by_me'>('assigned_to_me');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [customDateStr, setCustomDateStr] = useState('');
+  const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
+  const [selectedStatFilter, setSelectedStatFilter] = useState('all');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -292,17 +297,102 @@ export default function EmployeeTasksScreen() {
     return members.some((m: any) => Number(m.assignee_id) === Number(userId) && m.assignee_type === userType);
   };
 
-  const filteredTasks = activeTab === 'assigned_to_me' 
-    ? tasks.filter(t => (t.assignee_type === 'employee' && Number(t.assignee_id) === Number(empUser.id)) || (t.is_group_task && isUserGroupAssignee(t, empUser.id, 'employee')))
-    : tasks.filter(t => t.assigner_type === 'employee' && Number(t.assigner_id) === Number(empUser.id));
+  const getTasksForTab = () => {
+    return activeTab === 'assigned_to_me' 
+      ? tasks.filter(t => (t.assignee_type === 'employee' && Number(t.assignee_id) === Number(empUser.id)) || (t.is_group_task && isUserGroupAssignee(t, empUser.id, 'employee')))
+      : tasks.filter(t => t.assigner_type === 'employee' && Number(t.assigner_id) === Number(empUser.id));
+  };
 
-  const myWorkload = tasks.filter(t => (t.assignee_type === 'employee' && Number(t.assignee_id) === Number(empUser.id)) || (t.is_group_task && isUserGroupAssignee(t, empUser.id, 'employee')));
-  const stats = {
-    total: myWorkload.length,
-    completed: myWorkload.filter(t => t.status === 'completed').length,
-    high: myWorkload.filter(t => t.priority === 'High').length,
-    moderate: myWorkload.filter(t => t.priority === 'Moderate' || !t.priority).length,
-    low: myWorkload.filter(t => t.priority === 'Low').length,
+  const tabTasks = getTasksForTab();
+
+  const matchesDate = (t: any) => {
+    if (dateFilter === 'all') return true;
+    if (!t.created_at) return false;
+    const taskDate = new Date(t.created_at);
+    const today = new Date();
+    
+    if (dateFilter === 'today') {
+      return taskDate.toDateString() === today.toDateString();
+    }
+    if (dateFilter === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      return taskDate.toDateString() === yesterday.toDateString();
+    }
+    if (dateFilter === 'this_week') {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(today.getDate() - 7);
+      return taskDate >= oneWeekAgo;
+    }
+    if (dateFilter === 'custom' && customDateStr) {
+      const dStr = taskDate.getFullYear() + '-' + String(taskDate.getMonth() + 1).padStart(2, '0') + '-' + String(taskDate.getDate()).padStart(2, '0');
+      return dStr === customDateStr;
+    }
+    return true;
+  };
+
+  const matchesSearch = (t: any) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      t.title?.toLowerCase().includes(query) ||
+      t.description?.toLowerCase().includes(query) ||
+      t.assignee_name?.toLowerCase().includes(query) ||
+      t.assigner_name?.toLowerCase().includes(query)
+    );
+  };
+
+  const matchesStat = (t: any) => {
+    if (selectedStatFilter === 'all') return true;
+    if (selectedStatFilter === 'completed') return t.status === 'completed';
+    if (selectedStatFilter === 'pending') return !['completed', 'terminated'].includes(t.status);
+    if (selectedStatFilter === 'High') return t.priority === 'High';
+    if (selectedStatFilter === 'Moderate') return t.priority === 'Moderate' || !t.priority;
+    if (selectedStatFilter === 'Low') return t.priority === 'Low';
+    return true;
+  };
+
+  const getFilteredTasks = () => {
+    return tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && matchesStat(t));
+  };
+
+  const getStatCounts = () => {
+    const totalFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t)).length;
+    const totalOverall = tabTasks.length;
+    
+    const completedFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.status === 'completed').length;
+    const completedOverall = tabTasks.filter(t => t.status === 'completed').length;
+    
+    const pendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && !['completed', 'terminated'].includes(t.status)).length;
+    const pendingOverall = tabTasks.filter(t => !['completed', 'terminated'].includes(t.status)).length;
+    
+    const highPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'High' && !['completed', 'terminated'].includes(t.status)).length;
+    const highOverall = tabTasks.filter(t => t.priority === 'High').length;
+    
+    const moderatePendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated'].includes(t.status)).length;
+    const moderateOverall = tabTasks.filter(t => t.priority === 'Moderate' || !t.priority).length;
+    
+    const lowPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'Low' && !['completed', 'terminated'].includes(t.status)).length;
+    const lowOverall = tabTasks.filter(t => t.priority === 'Low').length;
+    
+    return {
+      total: { filtered: totalFiltered, overall: totalOverall },
+      completed: { filtered: completedFiltered, overall: completedOverall },
+      pending: { filtered: pendingFiltered, overall: pendingOverall },
+      high: { filtered: highPendingFiltered, overall: highOverall },
+      moderate: { filtered: moderatePendingFiltered, overall: moderateOverall },
+      low: { filtered: lowPendingFiltered, overall: lowOverall }
+    };
+  };
+
+  const stats = getStatCounts();
+
+  const handleStatCardPress = (filterType: string) => {
+    if (selectedStatFilter === filterType) {
+      setSelectedStatFilter('all');
+    } else {
+      setSelectedStatFilter(filterType);
+    }
   };
 
   return (
@@ -331,44 +421,224 @@ export default function EmployeeTasksScreen() {
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
-          {/* Stats Grid */}
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { borderLeftColor: '#3B82F6' }]}>
-              <Text style={styles.statLabel}>Total Tasks</Text>
-              <Text style={styles.statValue}>{stats.total}</Text>
+          {/* Filters Section */}
+          <View style={[styles.filterSection, !isDesktop && styles.filterSectionMobile]}>
+            {/* Keyword Search */}
+            <View style={styles.filterItem}>
+              <Text style={styles.filterLabel}>Keyword Search</Text>
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search task, details..."
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery ? (
+                  <Pressable
+                    style={styles.clearBtn}
+                    onPress={() => setSearchQuery('')}
+                  >
+                    <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-            <View style={[styles.statCard, { borderLeftColor: '#10B981' }]}>
-              <Text style={styles.statLabel}>Completed</Text>
-              <Text style={styles.statValue}>{stats.completed}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#EF4444' }]}>
-              <Text style={styles.statLabel}>High</Text>
-              <Text style={styles.statValue}>{stats.high}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#F59E0B' }]}>
-              <Text style={styles.statLabel}>Moderate</Text>
-              <Text style={styles.statValue}>{stats.moderate}</Text>
-            </View>
-            <View style={[styles.statCard, { borderLeftColor: '#0EA5E9' }]}>
-              <Text style={styles.statLabel}>Low</Text>
-              <Text style={styles.statValue}>{stats.low}</Text>
+
+            {/* Date Filter Dropdown */}
+            <View style={styles.filterItem}>
+              <Text style={styles.filterLabel}>Due Date Filter</Text>
+              <View style={styles.dateSelectContainer}>
+                {Platform.OS === 'web' ? (
+                  <select
+                    style={styles.webSelect}
+                    value={dateFilter}
+                    onChange={(e) => {
+                      setDateFilter(e.target.value);
+                      if (e.target.value !== 'custom') {
+                        setCustomDateStr('');
+                      }
+                    }}
+                  >
+                    <option value="all">All Dates</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="this_week">This Week</option>
+                    <option value="custom">Custom Date...</option>
+                  </select>
+                ) : (
+                  <Picker
+                    selectedValue={dateFilter}
+                    onValueChange={(val: string) => {
+                      setDateFilter(val);
+                      if (val !== 'custom') {
+                        setCustomDateStr('');
+                      }
+                    }}
+                    style={{ height: 44, color: Colors.light.text }}
+                  >
+                    <Picker.Item label="All Dates" value="all" />
+                    <Picker.Item label="Today" value="today" />
+                    <Picker.Item label="Yesterday" value="yesterday" />
+                    <Picker.Item label="This Week" value="this_week" />
+                    <Picker.Item label="Custom Date..." value="custom" />
+                  </Picker>
+                )}
+              </View>
+
+              {dateFilter === 'custom' && (
+                <View style={{ zIndex: 10 }}>
+                  {Platform.OS === 'web' ? (
+                    <input
+                      type="date"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: `1px solid ${Colors.light.border}`,
+                        backgroundColor: Colors.light.card,
+                        color: Colors.light.text,
+                        marginTop: 8,
+                        boxSizing: 'border-box'
+                      }}
+                      value={customDateStr}
+                      onChange={(e) => setCustomDateStr(e.target.value)}
+                    />
+                  ) : (
+                    <>
+                      <Pressable
+                        style={styles.customDateBtn}
+                        onPress={() => setShowFilterDatePicker(true)}
+                      >
+                        <Text style={{ color: customDateStr ? Colors.light.text : Colors.light.icon }}>
+                          {customDateStr || 'Pick specific date'}
+                        </Text>
+                      </Pressable>
+                      {showFilterDatePicker && (
+                        <DateTimePicker
+                          value={new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={(event: any, date?: Date) => {
+                            setShowFilterDatePicker(false);
+                            if (date && event.type !== 'dismissed') {
+                              const formatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                              setCustomDateStr(formatted);
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
             </View>
           </View>
 
-          {filteredTasks.length === 0 ? (
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#3B82F6' },
+                selectedStatFilter === 'all' && { borderColor: '#3B82F6', borderWidth: 2, backgroundColor: '#eff6ff' }
+              ]}
+              onPress={() => handleStatCardPress('all')}
+            >
+              <Text style={styles.statLabel}>Total Tasks</Text>
+              <Text style={styles.statValue}>{stats.total.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.total.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#10B981' },
+                selectedStatFilter === 'completed' && { borderColor: '#10B981', borderWidth: 2, backgroundColor: '#ecfdf5' }
+              ]}
+              onPress={() => handleStatCardPress('completed')}
+            >
+              <Text style={styles.statLabel}>Completed</Text>
+              <Text style={styles.statValue}>{stats.completed.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.completed.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#F97316' },
+                selectedStatFilter === 'pending' && { borderColor: '#F97316', borderWidth: 2, backgroundColor: '#fff7ed' }
+              ]}
+              onPress={() => handleStatCardPress('pending')}
+            >
+              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={styles.statValue}>{stats.pending.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.pending.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#EF4444' },
+                selectedStatFilter === 'High' && { borderColor: '#EF4444', borderWidth: 2, backgroundColor: '#fef2f2' }
+              ]}
+              onPress={() => handleStatCardPress('High')}
+            >
+              <Text style={styles.statLabel}>High Priority</Text>
+              <Text style={styles.statValue}>{stats.high.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.high.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#F59E0B' },
+                selectedStatFilter === 'Moderate' && { borderColor: '#F59E0B', borderWidth: 2, backgroundColor: '#fffbeb' }
+              ]}
+              onPress={() => handleStatCardPress('Moderate')}
+            >
+              <Text style={styles.statLabel}>Moderate</Text>
+              <Text style={styles.statValue}>{stats.moderate.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.moderate.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#0EA5E9' },
+                selectedStatFilter === 'Low' && { borderColor: '#0EA5E9', borderWidth: 2, backgroundColor: '#e0f2fe' }
+              ]}
+              onPress={() => handleStatCardPress('Low')}
+            >
+              <Text style={styles.statLabel}>Low Priority</Text>
+              <Text style={styles.statValue}>{stats.low.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.low.overall}</Text>
+            </Pressable>
+          </View>
+
+          {getFilteredTasks().length === 0 ? (
             <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
           ) : (
-            filteredTasks.map(task => (
+            getFilteredTasks().map(task => (
               <View key={task.id} style={styles.taskCard}>
                 <View style={styles.taskHeader}>
                   <Text style={styles.taskTitle}>{task.title}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
                       <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status.toUpperCase()}</Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: task.priority === 'High' ? '#fee2e2' : task.priority === 'Moderate' ? '#fef3c7' : '#e0f2fe' }]}>
                       <Text style={[styles.statusText, { color: task.priority === 'High' ? '#ef4444' : task.priority === 'Moderate' ? '#f59e0b' : '#0ea5e9' }]}>{task.priority || 'Moderate'}</Text>
                     </View>
+                    <View style={[styles.statusBadge, { backgroundColor: task.is_recurring ? '#e0e7ff' : '#f1f5f9' }]}>
+                      <Text style={[styles.statusText, { color: task.is_recurring ? '#4338ca' : '#475569' }]}>
+                        {task.is_recurring ? 'Recurring' : 'One-time'}
+                      </Text>
+                    </View>
+                    {task.is_group_task && (
+                      <View style={[styles.statusBadge, { backgroundColor: '#fae8ff' }]}>
+                        <Text style={[styles.statusText, { color: '#d946ef' }]}>Group</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
                 
@@ -390,9 +660,15 @@ export default function EmployeeTasksScreen() {
                           if (m.status === 'in_progress') statusColor = '#f59e0b';
                           if (m.status === 'completed') statusColor = '#10b981';
                           if (m.status === 'rejected') statusColor = '#ef4444';
+
+                          const foundUser = globalUsers.find(u => String(u.id) === String(m.assignee_id));
+                          const dept = m.department || foundUser?.department || '';
+                          const role = m.role || foundUser?.role || '';
+                          const label = dept || role ? ` (${dept}${dept && role ? ' - ' : ''}${role})` : ` (${m.assignee_type.replace('_', ' ')})`;
+
                           return (
                             <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: idx < members.length - 1 ? 0.5 : 0, borderBottomColor: '#cbd5e1' }}>
-                              <Text style={{ fontSize: 12, color: '#475569' }}>{m.assignee_name} ({m.assignee_type.replace('_', ' ')})</Text>
+                              <Text style={{ fontSize: 12, color: '#475569' }}>{m.assignee_name}{label}</Text>
                               <Text style={{ fontSize: 12, color: statusColor, fontWeight: 'bold' }}>{m.status.toUpperCase()}</Text>
                             </View>
                           );
@@ -448,40 +724,55 @@ export default function EmployeeTasksScreen() {
                 )}
  
                 <View style={[styles.taskActions, { gap: 8, flexDirection: 'row', flexWrap: 'wrap' }]}>
-                    {(task.status === 'assigned' || task.status === 'pending') && !task.is_group_task && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id) && (
-                      <>
+                    {(() => {
+                      const userStatus = task.is_group_task
+                        ? (task.group_assignees?.find((ga: any) => String(ga.assignee_id) === String(empUser.id) && ga.assignee_type === 'employee')?.status || 'assigned')
+                        : task.status;
+                      const isAssignee = (!task.is_group_task && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id)) ||
+                                         (task.is_group_task && isUserGroupAssignee(task, empUser.id, 'employee'));
+                      
+                      return (userStatus === 'assigned' || userStatus === 'pending') && isAssignee ? (
+                        <>
+                          <Pressable 
+                            style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
+                            onPress={() => handleDirectAccept(task)}
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#fff' }]}>Accept</Text>
+                          </Pressable>
+                          <Pressable 
+                            style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                            onPress={() => {
+                              setDirectRejectTask(task);
+                              setDirectRejectText('');
+                              setShowDirectRejectModal(true);
+                            }}
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#fff' }]}>Reject</Text>
+                          </Pressable>
+                        </>
+                      ) : null;
+                    })()}
+                    {(() => {
+                      const userStatus = task.is_group_task
+                        ? (task.group_assignees?.find((ga: any) => String(ga.assignee_id) === String(empUser.id) && ga.assignee_type === 'employee')?.status || 'assigned')
+                        : task.status;
+                      const isAssignee = (!task.is_group_task && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id)) ||
+                                         (task.is_group_task && isUserGroupAssignee(task, empUser.id, 'employee'));
+                      
+                      return isAssignee && userStatus !== 'assigned' && userStatus !== 'pending' && userStatus !== 'rejected' && userStatus !== 'completed' && userStatus !== 'terminated' ? (
                         <Pressable 
-                          style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
-                          onPress={() => handleDirectAccept(task)}
-                        >
-                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Accept</Text>
-                        </Pressable>
-                        <Pressable 
-                          style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                          style={styles.actionBtn}
                           onPress={() => {
-                            setDirectRejectTask(task);
-                            setDirectRejectText('');
-                            setShowDirectRejectModal(true);
+                            setSelectedTask(task);
+                            setStatusNotes(task.notes || '');
+                            setRejectionReason(task.rejection_reason || '');
+                            setShowStatusModal(true);
                           }}
                         >
-                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Reject</Text>
+                          <Text style={styles.actionBtnText}>Update Status</Text>
                         </Pressable>
-                      </>
-                    )}
-                    {((!task.is_group_task && task.assignee_type === 'employee' && String(task.assignee_id) === String(empUser.id)) ||
-                      (task.is_group_task && isUserGroupAssignee(task, empUser.id, 'employee'))) && (
-                      <Pressable 
-                        style={styles.actionBtn}
-                        onPress={() => {
-                          setSelectedTask(task);
-                          setStatusNotes(task.notes || '');
-                          setRejectionReason(task.rejection_reason || '');
-                          setShowStatusModal(true);
-                        }}
-                      >
-                        <Text style={styles.actionBtnText}>Update Status</Text>
-                      </Pressable>
-                    )}
+                      ) : null;
+                    })()}
                    {task.status === 'rejected' &&
                     !task.is_group_task &&
                     task.assigner_type === 'employee' &&
@@ -901,23 +1192,35 @@ export default function EmployeeTasksScreen() {
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
 
-              {selectedTask?.assignee_type === 'employee' && String(selectedTask?.assignee_id) === String(empUser.id) && (selectedTask?.status === 'pending' || selectedTask?.status === 'assigned' || selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
-                <>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus('in_progress')}>
-                    <Text style={styles.saveBtnText}>Mark In Progress</Text>
+              {(() => {
+                const isAssigneeOfTask = selectedTask && (
+                  (!selectedTask.is_group_task && selectedTask.assignee_type === 'employee' && String(selectedTask.assignee_id) === String(empUser.id)) ||
+                  (selectedTask.is_group_task && isUserGroupAssignee(selectedTask, empUser.id, 'employee'))
+                );
+                const currentAssigneeStatus = selectedTask
+                  ? (selectedTask.is_group_task
+                      ? (selectedTask.group_assignees?.find((ga: any) => String(ga.assignee_id) === String(empUser.id) && ga.assignee_type === 'employee')?.status || 'assigned')
+                      : selectedTask.status)
+                  : 'assigned';
+
+                return isAssigneeOfTask && (currentAssigneeStatus === 'pending' || currentAssigneeStatus === 'assigned' || currentAssigneeStatus === 'accepted' || currentAssigneeStatus === 'in_progress') ? (
+                  <>
+                    <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6', marginRight: 8, marginBottom: 8 }]} onPress={() => handleUpdateStatus('in_progress')}>
+                      <Text style={styles.saveBtnText}>Mark In Progress</Text>
+                    </Pressable>
+                    <Pressable style={[styles.saveBtn, { backgroundColor: '#8B5CF6', marginRight: 8, marginBottom: 8 }]} onPress={() => handleUpdateStatus('completed')}>
+                      <Text style={styles.saveBtnText}>Complete</Text>
+                    </Pressable>
+                    <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary, marginBottom: 8 }]} onPress={() => handleUpdateStatus(currentAssigneeStatus)}>
+                      <Text style={styles.saveBtnText}>Save Notes</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(selectedTask?.status)}>
+                    <Text style={styles.saveBtnText}>Save Notes</Text>
                   </Pressable>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#8B5CF6' }]} onPress={() => handleUpdateStatus('completed')}>
-                    <Text style={styles.saveBtnText}>Complete</Text>
-                  </Pressable>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#64748B' }]} onPress={() => handleUpdateStatus('terminated')}>
-                    <Text style={styles.saveBtnText}>Terminate</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(selectedTask?.status)}>
-                  <Text style={styles.saveBtnText}>Save Notes</Text>
-                </Pressable>
-              )}
+                );
+              })()}
             </View>
 
             <View style={[styles.modalActions, { marginTop: 24 }]}>
@@ -1028,36 +1331,36 @@ const getStatusColor = (status: string) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
-  header: { padding: 32, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: 16 },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.light.text },
-  subtitle: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
-  createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 8 },
-  createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: 32, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
-  tabsContainerMobile: { paddingHorizontal: 16 },
-  tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  header: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 12 },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.light.text },
+  subtitle: { fontSize: 12, color: Colors.light.icon, marginTop: 2 },
+  createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6 },
+  createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  tabsContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tabsContainerMobile: { paddingHorizontal: 12 },
+  tab: { paddingVertical: 8, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: Colors.light.primary },
-  tabText: { fontSize: 15, fontWeight: '600', color: Colors.light.icon },
+  tabText: { fontSize: 14, fontWeight: '600', color: Colors.light.icon },
   activeTabText: { color: Colors.light.primary },
-  taskCard: { backgroundColor: Colors.light.card, borderRadius: 16, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: Colors.light.border },
-  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  taskTitle: { fontSize: 18, fontWeight: '700', color: Colors.light.text, flex: 1, marginRight: 16 },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  statusText: { fontSize: 12, fontWeight: '700' },
-  taskDesc: { fontSize: 15, color: Colors.light.icon, marginBottom: 20, lineHeight: 22 },
-  taskMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, marginBottom: 20 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontSize: 14, color: Colors.light.icon, fontWeight: '500' },
-  rejectionBox: { backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#FCA5A5' },
-  rejectionTitle: { fontSize: 13, fontWeight: '700', color: '#B91C1C', marginBottom: 4 },
-  rejectionText: { fontSize: 14, color: '#991B1B' },
-  notesBox: { backgroundColor: Colors.light.secondary, padding: 16, borderRadius: 8, marginBottom: 16 },
-  notesTitle: { fontSize: 13, fontWeight: '700', color: Colors.light.primary, marginBottom: 4 },
-  notesText: { fontSize: 14, color: Colors.light.text },
-  taskActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.light.border },
-  actionBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.light.secondary, borderRadius: 8 },
-  actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 14 },
+  taskCard: { backgroundColor: Colors.light.card, borderRadius: 10, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.light.border },
+  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  taskTitle: { fontSize: 16, fontWeight: '700', color: Colors.light.text, flex: 1, marginRight: 12 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  taskDesc: { fontSize: 14, color: '#1e293b', fontWeight: '600', marginBottom: 10, lineHeight: 18, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6, borderWidth: 0.5, borderColor: '#e2e8f0' },
+  taskMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 10 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 12, color: Colors.light.icon, fontWeight: '500' },
+  rejectionBox: { backgroundColor: '#FEF2F2', padding: 10, borderRadius: 6, marginBottom: 10, borderWidth: 1, borderColor: '#FCA5A5' },
+  rejectionTitle: { fontSize: 12, fontWeight: '700', color: '#B91C1C', marginBottom: 2 },
+  rejectionText: { fontSize: 13, color: '#991B1B' },
+  notesBox: { backgroundColor: Colors.light.secondary, padding: 10, borderRadius: 6, marginBottom: 10 },
+  notesTitle: { fontSize: 12, fontWeight: '700', color: Colors.light.primary, marginBottom: 2 },
+  notesText: { fontSize: 13, color: Colors.light.text },
+  taskActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.light.border },
+  actionBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.light.secondary, borderRadius: 6 },
+  actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 13 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   modalContent: { backgroundColor: Colors.light.card, borderRadius: 24, padding: 16, width: '100%', maxHeight: '95%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
@@ -1106,5 +1409,86 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
     marginTop: 4,
+  },
+  statSubValue: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  filterSection: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 20,
+    zIndex: 50,
+  },
+  filterSectionMobile: {
+    flexDirection: 'column',
+    gap: 12,
+    marginBottom: 16,
+  },
+  filterItem: {
+    flex: 1,
+    position: 'relative',
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 6,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.light.text,
+    paddingVertical: 8,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  dateSelectContainer: {
+    height: 44,
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  webSelect: {
+    width: '100%',
+    height: '100%',
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+    color: Colors.light.text,
+    fontSize: 14,
+    ...Platform.select({
+      web: {
+        border: 'none',
+        outline: 'none',
+      } as any,
+      default: {}
+    })
+  },
+  customDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.light.card,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    marginTop: 8,
   },
 });

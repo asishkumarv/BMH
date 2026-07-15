@@ -62,6 +62,7 @@ exports.getTasks = async (req, res) => {
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_group_task BOOLEAN DEFAULT false`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS group_assignees JSONB DEFAULT '[]'`);
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT false`);
 
     const { user_type, user_id, department } = req.query;
 
@@ -275,19 +276,47 @@ exports.reassignTask = async (req, res) => {
   }
 };
 
+function calculateDueDate(today, rTask) {
+    const dueAt = new Date(today);
+    const type = rTask.due_time_type || 'default';
+    const hours = parseInt(rTask.due_time_hours) || 0;
+    const days = parseInt(rTask.due_time_days) || 0;
+
+    if (type === 'hours') {
+        dueAt.setHours(dueAt.getHours() + hours);
+    } else if (type === 'days') {
+        dueAt.setDate(dueAt.getDate() + days);
+        dueAt.setHours(23, 59, 59, 999);
+    } else if (type === 'days_hours') {
+        dueAt.setDate(dueAt.getDate() + days);
+        dueAt.setHours(dueAt.getHours() + hours);
+    } else { // default: next day evening 5:30pm
+        dueAt.setDate(dueAt.getDate() + 1);
+        dueAt.setHours(17, 30, 0, 0);
+    }
+    return dueAt;
+}
+
 exports.createRecurringTask = async (req, res) => {
   try {
-    const { title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days } = req.body;
+    const { 
+      title, description, department, assigner_type, assigner_id, 
+      assignee_type, assignee_id, priority, frequency, specific_days,
+      due_time_type, due_time_hours, due_time_days
+    } = req.body;
     
     if (!title || !assignee_id || !frequency) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const query = 'INSERT INTO recurring_tasks (title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *';
+    const query = 'INSERT INTO recurring_tasks (title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days, due_time_type, due_time_hours, due_time_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *';
     const values = [
       title, description, department, assigner_type, assigner_id,
       assignee_type, assignee_id, priority || 'Medium', frequency,
-      specific_days ? JSON.stringify(specific_days) : null
+      specific_days ? JSON.stringify(specific_days) : null,
+      due_time_type || 'default',
+      parseInt(due_time_hours) || 0,
+      parseInt(due_time_days) || 0
     ];
     const result = await pool.query(query, values);
     const rTask = result.rows[0];
@@ -335,13 +364,12 @@ exports.createRecurringTask = async (req, res) => {
         }
 
         if (shouldGenerate) {
-            const dueAt = new Date(today);
-            dueAt.setHours(23, 59, 59, 999);
+            const dueAt = calculateDueDate(today, rTask);
             const insertTask = `
                 INSERT INTO tasks (
                     title, description, department, assigner_type, assigner_id, 
-                    assignee_type, assignee_id, priority, due_date, status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'assigned')
+                    assignee_type, assignee_id, priority, due_date, status, is_recurring
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'assigned', true)
             `;
             const tValues = [
                 rTask.title, rTask.description, rTask.department, rTask.assigner_type, rTask.assigner_id,
@@ -367,6 +395,11 @@ exports.getRecurringTasks = async (req, res) => {
 
     const createTableQuery = `CREATE TABLE IF NOT EXISTS recurring_tasks (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, description TEXT, department VARCHAR(255), assigner_type VARCHAR(50) NOT NULL, assigner_id INTEGER NOT NULL, assignee_type VARCHAR(50) NOT NULL, assignee_id INTEGER NOT NULL, priority VARCHAR(50) DEFAULT 'Medium', frequency VARCHAR(50) NOT NULL, specific_days JSONB, status VARCHAR(50) DEFAULT 'active', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, last_generated_at TIMESTAMP);`;
     await pool.query(createTableQuery);
+    
+    // Auto columns migration
+    await pool.query(`ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS due_time_type VARCHAR(50) DEFAULT 'default'`);
+    await pool.query(`ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS due_time_hours INTEGER DEFAULT 0`);
+    await pool.query(`ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS due_time_days INTEGER DEFAULT 0`);
     
     let query = 'SELECT r.*, emp.full_name as assignee_name, emp.profile_data as assignee_profile FROM recurring_tasks r LEFT JOIN employees emp ON r.assignee_id = emp.id AND r.assignee_type = \'employee\' ORDER BY r.created_at DESC';
        

@@ -48,6 +48,9 @@ export default function AdminTasksScreen() {
   const [groupAssigneeIds, setGroupAssigneeIds] = useState<string[]>([]);
   const [deptSearchQuery, setDeptSearchQuery] = useState('');
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const [dueTimeType, setDueTimeType] = useState('default');
+  const [dueTimeHours, setDueTimeHours] = useState('0');
+  const [dueTimeDays, setDueTimeDays] = useState('0');
 
   // Status update state
   const [statusNotes, setStatusNotes] = useState('');
@@ -150,19 +153,21 @@ export default function AdminTasksScreen() {
       resolvedGroupAssignees = groupAssigneeIds.map(id => {
         let name = 'User';
         let dept = '';
+        let role = '';
         if (assigneeType === 'super_admin') {
           const sa = users.superAdmins.find(x => String(x.id) === String(id));
-          if (sa) { name = sa.full_name; dept = 'Admin'; }
+          if (sa) { name = sa.full_name; dept = 'Admin'; role = 'Super Admin'; }
         } else if (assigneeType === 'department_admin') {
           const admin = users.admins.find(x => String(x.id) === String(id));
           if (admin) {
             name = admin.full_name;
             const d = users.depts.find(dept => dept.id === admin.department_id);
             if (d) dept = d.name;
+            role = admin.role || 'Department Admin';
           }
         } else if (assigneeType === 'employee') {
           const emp = users.emps.find(x => String(x.id) === String(id));
-          if (emp) { name = emp.full_name; dept = emp.department; }
+          if (emp) { name = emp.full_name; dept = emp.department; role = emp.role || 'Employee'; }
         }
         if (dept && !finalDept) {
           finalDept = dept;
@@ -171,6 +176,8 @@ export default function AdminTasksScreen() {
           assignee_id: parseInt(id),
           assignee_type: assigneeType,
           assignee_name: name,
+          department: dept,
+          role: role,
           status: 'assigned'
         };
       });
@@ -186,7 +193,10 @@ export default function AdminTasksScreen() {
         await axios.post('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
           title, description, assigner_type: 'super_admin', assigner_id: adminUser.id || 1,
           assignee_type: finalAssigneeType, assignee_id: parseInt(finalAssigneeId), department: finalDept,
-          priority, frequency, specific_days: parsedDays
+          priority, frequency, specific_days: parsedDays,
+          due_time_type: dueTimeType,
+          due_time_hours: parseInt(dueTimeHours) || 0,
+          due_time_days: parseInt(dueTimeDays) || 0
         });
         fetchTasks();
       } else {
@@ -219,6 +229,9 @@ export default function AdminTasksScreen() {
       setDeptDropdownOpen(false);
       setAssigneeSearchQuery('');
       setAssigneeDropdownOpen(false);
+      setDueTimeType('default');
+      setDueTimeHours('0');
+      setDueTimeDays('0');
       Alert.alert('Success', 'Task created successfully');
     } catch (e) {
       console.error(e);
@@ -418,13 +431,23 @@ export default function AdminTasksScreen() {
     <View key={task.id} style={styles.taskCard}>
       <View style={styles.taskHeader}>
         <Text style={styles.taskTitle}>{task.title}</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
             <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status.toUpperCase()}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: task.priority === 'High' ? '#fee2e2' : task.priority === 'Moderate' ? '#fef3c7' : '#e0f2fe' }]}>
             <Text style={[styles.statusText, { color: task.priority === 'High' ? '#ef4444' : task.priority === 'Moderate' ? '#f59e0b' : '#0ea5e9' }]}>{task.priority || 'Moderate'}</Text>
           </View>
+          <View style={[styles.statusBadge, { backgroundColor: task.is_recurring ? '#e0e7ff' : '#f1f5f9' }]}>
+            <Text style={[styles.statusText, { color: task.is_recurring ? '#4338ca' : '#475569' }]}>
+              {task.is_recurring ? 'Recurring' : 'One-time'}
+            </Text>
+          </View>
+          {task.is_group_task && (
+            <View style={[styles.statusBadge, { backgroundColor: '#fae8ff' }]}>
+              <Text style={[styles.statusText, { color: '#d946ef' }]}>Group</Text>
+            </View>
+          )}
         </View>
       </View>
       
@@ -446,9 +469,15 @@ export default function AdminTasksScreen() {
                 if (m.status === 'in_progress') statusColor = '#f59e0b';
                 if (m.status === 'completed') statusColor = '#10b981';
                 if (m.status === 'rejected') statusColor = '#ef4444';
+
+                const foundUser = globalUsers.find(u => String(u.id) === String(m.assignee_id));
+                const dept = m.department || foundUser?.department || '';
+                const role = m.role || foundUser?.role || '';
+                const label = dept || role ? ` (${dept}${dept && role ? ' - ' : ''}${role})` : ` (${m.assignee_type.replace('_', ' ')})`;
+
                 return (
                   <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: idx < members.length - 1 ? 0.5 : 0, borderBottomColor: '#cbd5e1' }}>
-                    <Text style={{ fontSize: 12, color: '#475569' }}>{m.assignee_name} ({m.assignee_type.replace('_', ' ')})</Text>
+                    <Text style={{ fontSize: 12, color: '#475569' }}>{m.assignee_name}{label}</Text>
                     <Text style={{ fontSize: 12, color: statusColor, fontWeight: 'bold' }}>{m.status.toUpperCase()}</Text>
                   </View>
                 );
@@ -484,40 +513,55 @@ export default function AdminTasksScreen() {
       ) : null}
 
       <View style={[styles.taskActions, { gap: 8, flexDirection: 'row', flexWrap: 'wrap' }]}>
-                    {(task.status === 'assigned' || task.status === 'pending') && !task.is_group_task && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id) && (
-                      <>
+                    {(() => {
+                      const userStatus = task.is_group_task
+                        ? (task.group_assignees?.find((ga: any) => String(ga.assignee_id) === String(adminUser.id) && ga.assignee_type === 'super_admin')?.status || 'assigned')
+                        : task.status;
+                      const isAssignee = (!task.is_group_task && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id)) ||
+                                         (task.is_group_task && isUserGroupAssignee(task, adminUser.id, 'super_admin'));
+                      
+                      return (userStatus === 'assigned' || userStatus === 'pending') && isAssignee ? (
+                        <>
+                          <Pressable 
+                            style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
+                            onPress={() => handleDirectAccept(task)}
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#fff' }]}>Accept</Text>
+                          </Pressable>
+                          <Pressable 
+                            style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                            onPress={() => {
+                              setDirectRejectTask(task);
+                              setDirectRejectText('');
+                              setShowDirectRejectModal(true);
+                            }}
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#fff' }]}>Reject</Text>
+                          </Pressable>
+                        </>
+                      ) : null;
+                    })()}
+                    {(() => {
+                      const userStatus = task.is_group_task
+                        ? (task.group_assignees?.find((ga: any) => String(ga.assignee_id) === String(adminUser.id) && ga.assignee_type === 'super_admin')?.status || 'assigned')
+                        : task.status;
+                      const isAssignee = (!task.is_group_task && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id)) ||
+                                         (task.is_group_task && isUserGroupAssignee(task, adminUser.id, 'super_admin'));
+                      
+                      return isAssignee && userStatus !== 'assigned' && userStatus !== 'pending' && userStatus !== 'rejected' && userStatus !== 'completed' && userStatus !== 'terminated' ? (
                         <Pressable 
-                          style={[styles.actionBtn, { backgroundColor: '#10b981' }]}
-                          onPress={() => handleDirectAccept(task)}
-                        >
-                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Accept</Text>
-                        </Pressable>
-                        <Pressable 
-                          style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+                          style={styles.actionBtn}
                           onPress={() => {
-                            setDirectRejectTask(task);
-                            setDirectRejectText('');
-                            setShowDirectRejectModal(true);
+                            setSelectedTask(task);
+                            setStatusNotes(task.notes || '');
+                            setRejectionReason(task.rejection_reason || '');
+                            setShowStatusModal(true);
                           }}
                         >
-                          <Text style={[styles.actionBtnText, { color: '#fff' }]}>Reject</Text>
+                          <Text style={styles.actionBtnText}>Update Status</Text>
                         </Pressable>
-                      </>
-                    )}
-                    {((!task.is_group_task && task.assignee_type === 'super_admin' && String(task.assignee_id) === String(adminUser.id)) ||
-                      (task.is_group_task && isUserGroupAssignee(task, adminUser.id, 'super_admin'))) && (
-                      <Pressable 
-                        style={styles.actionBtn}
-                        onPress={() => {
-                          setSelectedTask(task);
-                          setStatusNotes(task.notes || '');
-                          setRejectionReason(task.rejection_reason || '');
-                          setShowStatusModal(true);
-                        }}
-                      >
-                        <Text style={styles.actionBtnText}>Update Status</Text>
-                      </Pressable>
-                    )}
+                      ) : null;
+                    })()}
           {task.status === 'rejected' &&
            !task.is_group_task &&
            task.assigner_type === 'super_admin' &&
@@ -641,22 +685,22 @@ export default function AdminTasksScreen() {
     const pendingFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && !['completed', 'terminated'].includes(t.status)).length;
     const pendingOverall = tabTasks.filter(t => !['completed', 'terminated'].includes(t.status)).length;
     
-    const highFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.priority === 'High').length;
+    const highPendingFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.priority === 'High' && !['completed', 'terminated'].includes(t.status)).length;
     const highOverall = tabTasks.filter(t => t.priority === 'High').length;
     
-    const moderateFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && (t.priority === 'Moderate' || !t.priority)).length;
+    const moderatePendingFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated'].includes(t.status)).length;
     const moderateOverall = tabTasks.filter(t => t.priority === 'Moderate' || !t.priority).length;
     
-    const lowFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.priority === 'Low').length;
+    const lowPendingFiltered = tabTasks.filter(t => matchesEmployee(t) && matchesDate(t) && t.priority === 'Low' && !['completed', 'terminated'].includes(t.status)).length;
     const lowOverall = tabTasks.filter(t => t.priority === 'Low').length;
     
     return {
       total: { filtered: totalFiltered, overall: totalOverall },
       completed: { filtered: completedFiltered, overall: completedOverall },
       pending: { filtered: pendingFiltered, overall: pendingOverall },
-      high: { filtered: highFiltered, overall: highOverall },
-      moderate: { filtered: moderateFiltered, overall: moderateOverall },
-      low: { filtered: lowFiltered, overall: lowOverall }
+      high: { filtered: highPendingFiltered, overall: highOverall },
+      moderate: { filtered: moderatePendingFiltered, overall: moderateOverall },
+      low: { filtered: lowPendingFiltered, overall: lowOverall }
     };
   };
 
@@ -1300,6 +1344,63 @@ export default function AdminTasksScreen() {
                     <TextInput style={styles.input} value={specificDays} onChangeText={setSpecificDays} placeholder="1, 15, 28" />
                   </>
                 )}
+
+                <Text style={styles.label}>Due Date Configuration</Text>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 12, backgroundColor: '#fff', marginTop: 8 }}>
+                  <Text style={{ fontSize: 13, color: '#475569', marginBottom: 8 }}>Select configuration type:</Text>
+                  
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={{ width: '100%', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: Colors.light.border, backgroundColor: '#fff', marginBottom: 12 }}
+                      value={dueTimeType}
+                      onChange={(e) => setDueTimeType(e.target.value)}
+                    >
+                      <option value="default">Default (Next day 5:30 PM)</option>
+                      <option value="hours">Within Hours</option>
+                      <option value="days">Within Days</option>
+                      <option value="days_hours">Days + Hours</option>
+                    </select>
+                  ) : (
+                    <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 6, marginBottom: 12 }}>
+                      <Picker
+                        selectedValue={dueTimeType}
+                        onValueChange={(val: any) => setDueTimeType(val)}
+                        style={{ height: 50 }}
+                      >
+                        <Picker.Item label="Default (Next day 5:30 PM)" value="default" />
+                        <Picker.Item label="Within Hours" value="hours" />
+                        <Picker.Item label="Within Days" value="days" />
+                        <Picker.Item label="Days + Hours" value="days_hours" />
+                      </Picker>
+                    </View>
+                  )}
+
+                  {(dueTimeType === 'days' || dueTimeType === 'days_hours') && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 4 }}>Due Days</Text>
+                      <TextInput 
+                        style={styles.input} 
+                        keyboardType="numeric" 
+                        value={dueTimeDays} 
+                        onChangeText={setDueTimeDays} 
+                        placeholder="e.g. 1" 
+                      />
+                    </View>
+                  )}
+
+                  {(dueTimeType === 'hours' || dueTimeType === 'days_hours') && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 4 }}>Due Hours</Text>
+                      <TextInput 
+                        style={styles.input} 
+                        keyboardType="numeric" 
+                        value={dueTimeHours} 
+                        onChangeText={setDueTimeHours} 
+                        placeholder="e.g. 4" 
+                      />
+                    </View>
+                  )}
+                </View>
               </View>
             )}
 
@@ -1408,23 +1509,35 @@ export default function AdminTasksScreen() {
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
 
-              {selectedTask?.assignee_type === 'super_admin' && String(selectedTask?.assignee_id) === String(adminUser.id) && (selectedTask?.status === 'pending' || selectedTask?.status === 'assigned' || selectedTask?.status === 'accepted' || selectedTask?.status === 'in_progress') ? (
-                <>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus('in_progress')}>
-                    <Text style={styles.saveBtnText}>Mark In Progress</Text>
+              {(() => {
+                const isAssigneeOfTask = selectedTask && (
+                  (!selectedTask.is_group_task && selectedTask.assignee_type === 'super_admin' && String(selectedTask.assignee_id) === String(adminUser.id)) ||
+                  (selectedTask.is_group_task && isUserGroupAssignee(selectedTask, adminUser.id, 'super_admin'))
+                );
+                const currentAssigneeStatus = selectedTask
+                  ? (selectedTask.is_group_task
+                      ? (selectedTask.group_assignees?.find((ga: any) => String(ga.assignee_id) === String(adminUser.id) && ga.assignee_type === 'super_admin')?.status || 'assigned')
+                      : selectedTask.status)
+                  : 'assigned';
+
+                return isAssigneeOfTask && (currentAssigneeStatus === 'pending' || currentAssigneeStatus === 'assigned' || currentAssigneeStatus === 'accepted' || currentAssigneeStatus === 'in_progress') ? (
+                  <>
+                    <Pressable style={[styles.saveBtn, { backgroundColor: '#3B82F6', marginRight: 8, marginBottom: 8 }]} onPress={() => handleUpdateStatus('in_progress')}>
+                      <Text style={styles.saveBtnText}>Mark In Progress</Text>
+                    </Pressable>
+                    <Pressable style={[styles.saveBtn, { backgroundColor: '#8B5CF6', marginRight: 8, marginBottom: 8 }]} onPress={() => handleUpdateStatus('completed')}>
+                      <Text style={styles.saveBtnText}>Complete</Text>
+                    </Pressable>
+                    <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary, marginBottom: 8 }]} onPress={() => handleUpdateStatus(currentAssigneeStatus)}>
+                      <Text style={styles.saveBtnText}>Save Notes</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(selectedTask?.status)}>
+                    <Text style={styles.saveBtnText}>Save Notes</Text>
                   </Pressable>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#8B5CF6' }]} onPress={() => handleUpdateStatus('completed')}>
-                    <Text style={styles.saveBtnText}>Complete</Text>
-                  </Pressable>
-                  <Pressable style={[styles.saveBtn, { backgroundColor: '#64748B' }]} onPress={() => handleUpdateStatus('terminated')}>
-                    <Text style={styles.saveBtnText}>Terminate</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <Pressable style={[styles.saveBtn, { backgroundColor: Colors.light.primary }]} onPress={() => handleUpdateStatus(selectedTask?.status)}>
-                  <Text style={styles.saveBtnText}>Save Notes</Text>
-                </Pressable>
-              )}
+                );
+              })()}
             </View>
 
             <View style={[styles.modalActions, { marginTop: 24 }]}>
@@ -1534,36 +1647,36 @@ const getStatusColor = (status: string) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
-  header: { padding: 32, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: 16 },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.light.text },
-  subtitle: { fontSize: 14, color: Colors.light.icon, marginTop: 4 },
-  createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, gap: 8 },
-  createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: 32, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
-  tabsContainerMobile: { paddingHorizontal: 16 },
-  tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  header: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 12 },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.light.text },
+  subtitle: { fontSize: 12, color: Colors.light.icon, marginTop: 2 },
+  createBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6 },
+  createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  tabsContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tabsContainerMobile: { paddingHorizontal: 12 },
+  tab: { paddingVertical: 8, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: Colors.light.primary },
-  tabText: { fontSize: 15, fontWeight: '600', color: Colors.light.icon },
+  tabText: { fontSize: 14, fontWeight: '600', color: Colors.light.icon },
   activeTabText: { color: Colors.light.primary },
-  taskCard: { backgroundColor: Colors.light.card, borderRadius: 16, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: Colors.light.border },
-  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  taskTitle: { fontSize: 18, fontWeight: '700', color: Colors.light.text, flex: 1, marginRight: 16 },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  statusText: { fontSize: 12, fontWeight: '700' },
-  taskDesc: { fontSize: 15, color: Colors.light.icon, marginBottom: 20, lineHeight: 22 },
-  taskMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 24, marginBottom: 20 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontSize: 14, color: Colors.light.icon, fontWeight: '500' },
-  rejectionBox: { backgroundColor: '#FEF2F2', padding: 16, borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#FCA5A5' },
-  rejectionTitle: { fontSize: 13, fontWeight: '700', color: '#B91C1C', marginBottom: 4 },
-  rejectionText: { fontSize: 14, color: '#991B1B' },
-  notesBox: { backgroundColor: Colors.light.secondary, padding: 16, borderRadius: 8, marginBottom: 16 },
-  notesTitle: { fontSize: 13, fontWeight: '700', color: Colors.light.primary, marginBottom: 4 },
-  notesText: { fontSize: 14, color: Colors.light.text },
-  taskActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.light.border },
-  actionBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.light.secondary, borderRadius: 8 },
-  actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 14 },
+  taskCard: { backgroundColor: Colors.light.card, borderRadius: 10, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.light.border },
+  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  taskTitle: { fontSize: 16, fontWeight: '700', color: Colors.light.text, flex: 1, marginRight: 12 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  taskDesc: { fontSize: 14, color: '#1e293b', fontWeight: '600', marginBottom: 10, lineHeight: 18, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6, borderWidth: 0.5, borderColor: '#e2e8f0' },
+  taskMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 10 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 12, color: Colors.light.icon, fontWeight: '500' },
+  rejectionBox: { backgroundColor: '#FEF2F2', padding: 10, borderRadius: 6, marginBottom: 10, borderWidth: 1, borderColor: '#FCA5A5' },
+  rejectionTitle: { fontSize: 12, fontWeight: '700', color: '#B91C1C', marginBottom: 2 },
+  rejectionText: { fontSize: 13, color: '#991B1B' },
+  notesBox: { backgroundColor: Colors.light.secondary, padding: 10, borderRadius: 6, marginBottom: 10 },
+  notesTitle: { fontSize: 12, fontWeight: '700', color: Colors.light.primary, marginBottom: 2 },
+  notesText: { fontSize: 13, color: Colors.light.text },
+  taskActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.light.border },
+  actionBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.light.secondary, borderRadius: 6 },
+  actionBtnText: { color: Colors.light.primary, fontWeight: '600', fontSize: 13 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   modalContent: { backgroundColor: Colors.light.card, borderRadius: 24, padding: 16, width: '100%', maxHeight: '95%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
