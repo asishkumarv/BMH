@@ -407,7 +407,7 @@ exports.updateOrder = async (req, res) => {
       scheduled_time, scheduled_date,
       customer_name, customer_phone, amount, order_no, location_link, mode_of_delivery,
       modified_by_id, modified_by_type, modified_by_name,
-      invoice_no
+      invoice_no, ship_to_name, ship_to_phone
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -443,6 +443,8 @@ exports.updateOrder = async (req, res) => {
     addField('scheduled_date', scheduled_date);
     addField('customer_name', customer_name);
     addField('customer_phone', customer_phone);
+    addField('ship_to_name', ship_to_name);
+    addField('ship_to_phone', ship_to_phone);
     addField('amount', amount);
     addField('order_no', order_no);
     addField('location_link', location_link);
@@ -556,8 +558,8 @@ exports.updateOrder = async (req, res) => {
             'Cash',
             updatedOrder.order_no || updatedOrder.id,
             updatedOrder.invoice_no || '',
-            updatedOrder.customer_name || '',
-            updatedOrder.customer_phone || '',
+            updatedOrder.ship_to_name || updatedOrder.customer_name || '',
+            updatedOrder.ship_to_phone || updatedOrder.customer_phone || '',
             updatedOrder.mode_of_delivery || '',
             amt,
             0
@@ -582,8 +584,8 @@ exports.updateOrder = async (req, res) => {
             'Online',
             updatedOrder.order_no || updatedOrder.id,
             updatedOrder.invoice_no || '',
-            updatedOrder.customer_name || '',
-            updatedOrder.customer_phone || '',
+            updatedOrder.ship_to_name || updatedOrder.customer_name || '',
+            updatedOrder.ship_to_phone || updatedOrder.customer_phone || '',
             updatedOrder.mode_of_delivery || '',
             0,
             amt

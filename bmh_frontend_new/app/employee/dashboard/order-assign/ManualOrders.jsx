@@ -591,6 +591,11 @@ export default function ManualOrders({ deliveryBoys }) {
         <View style={[styles.cell, { flex: 1.5 }]}>
           <Text style={styles.cellTextBold}>{item.customer_name}</Text>
           {item.customer_phone ? <Text style={styles.cellSubText}>{item.customer_phone}</Text> : null}
+          {item.ship_to_name ? (
+            <Text style={[styles.cellSubText, { color: '#3b82f6', fontWeight: 'bold', marginTop: 4 }]}>
+              Ship to: {item.ship_to_name} ({item.ship_to_phone || 'No Phone'})
+            </Text>
+          ) : null}
           {item.order_source_type === 'purchase_order' && (
             <View style={{backgroundColor: '#e0e7ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start'}}>
               <Text style={{fontSize: 9, color: '#4338ca', fontWeight: 'bold'}}>PURCHASE ORDER</Text>
@@ -1311,15 +1316,26 @@ export default function ManualOrders({ deliveryBoys }) {
                </View>
 
                <View style={styles.formRow}>
-                 <View style={styles.formCol}>
-                   <Text style={styles.label}>Customer Name</Text>
-                   <TextInput style={styles.input} value={selectedOrder.customer_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, customer_name: t})} placeholder="Customer Name" />
-                 </View>
-                 <View style={styles.formCol}>
-                   <Text style={styles.label}>Customer Phone</Text>
-                   <TextInput style={styles.input} value={selectedOrder.customer_phone || ''} onChangeText={t => setSelectedOrder({...selectedOrder, customer_phone: t.replace(/\s+/g, '')})} placeholder="Customer Phone" />
-                 </View>
-               </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Customer Name</Text>
+                    <TextInput style={styles.input} value={selectedOrder.customer_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, customer_name: t})} placeholder="Customer Name" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Customer Phone</Text>
+                    <TextInput style={styles.input} value={selectedOrder.customer_phone || ''} onChangeText={t => setSelectedOrder({...selectedOrder, customer_phone: t.replace(/\s+/g, '')})} placeholder="Customer Phone" />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Ship To Name (Optional)</Text>
+                    <TextInput style={styles.input} value={selectedOrder.ship_to_name || ''} onChangeText={t => setSelectedOrder({...selectedOrder, ship_to_name: t})} placeholder="Ship To Name" />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Ship To Phone (Optional)</Text>
+                    <TextInput style={styles.input} value={selectedOrder.ship_to_phone || ''} onChangeText={t => setSelectedOrder({...selectedOrder, ship_to_phone: t.replace(/\s+/g, '')})} placeholder="Ship To Phone" />
+                  </View>
+                </View>
 
                <View style={styles.formRow}>
                  <View style={styles.formCol}>
