@@ -26,6 +26,7 @@ export default function SubAdminEmployeesScreen() {
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [rolesModalVisible, setRolesModalVisible] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -129,6 +130,17 @@ export default function SubAdminEmployeesScreen() {
       Alert.alert('Error', `Failed to update status to ${newStatus}`);
       console.error(error);
     }
+  };
+
+  const getFilteredEmployees = () => {
+    if (!searchQuery) return employees;
+    const query = searchQuery.toLowerCase();
+    return employees.filter(emp => {
+      return (
+        emp.full_name?.toLowerCase().includes(query) ||
+        emp.email?.toLowerCase().includes(query)
+      );
+    });
   };
 
   const renderHeader = () => {
@@ -255,7 +267,29 @@ export default function SubAdminEmployeesScreen() {
         <View style={styles.toolbar}>
            <View style={[styles.searchBox, !isDesktop && { width: '100%' }]}>
               <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
-              <Text style={styles.searchPlaceholder}>Search employees...</Text>
+              <TextInput
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: Colors.light.text,
+                  padding: 0,
+                  height: '100%',
+                  ...Platform.select({
+                    web: {
+                      outlineWidth: 0,
+                    } as any
+                  })
+                }}
+                placeholder="Search by name or email..."
+                placeholderTextColor={Colors.light.icon}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery ? (
+                <Pressable onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                  <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
+                </Pressable>
+              ) : null}
            </View>
         </View>
 
@@ -263,7 +297,7 @@ export default function SubAdminEmployeesScreen() {
           <ActivityIndicator size="large" color={Colors.light.primary} style={{ padding: 40 }} />
         ) : (
           <FlatList
-            data={employees}
+            data={getFilteredEmployees()}
             keyExtractor={(item) => item.id}
             ListHeaderComponent={renderHeader}
             renderItem={renderItem}

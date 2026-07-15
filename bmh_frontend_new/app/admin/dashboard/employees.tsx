@@ -45,6 +45,7 @@ export default function EmployeesScreen() {
   const [generatingPayslip, setGeneratingPayslip] = useState(false);
 
   const [selectedUserType, setSelectedUserType] = useState('employee');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Edit Profile States
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -181,6 +182,17 @@ export default function EmployeesScreen() {
   const getDeptName = (deptId: string) => {
     if (deptId === 'all') return 'All Departments';
     return departments.find(d => String(d.id) === String(deptId))?.name || 'Unknown';
+  };
+
+  const getFilteredEmployees = () => {
+    if (!searchQuery) return employees;
+    const query = searchQuery.toLowerCase();
+    return employees.filter(emp => {
+      return (
+        emp.full_name?.toLowerCase().includes(query) ||
+        emp.email?.toLowerCase().includes(query)
+      );
+    });
   };
 
   const renderHeader = () => {
@@ -324,7 +336,29 @@ export default function EmployeesScreen() {
         <View style={styles.toolbar}>
           <View style={styles.searchBox}>
             <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
-            <Text style={styles.searchPlaceholder}>Search employees...</Text>
+            <TextInput
+              style={{
+                flex: 1,
+                fontSize: 15,
+                color: Colors.light.text,
+                padding: 0,
+                height: '100%',
+                ...Platform.select({
+                  web: {
+                    outlineWidth: 0,
+                  } as any
+                })
+              }}
+              placeholder="Search by name or email..."
+              placeholderTextColor={Colors.light.icon}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <Pressable onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
@@ -334,7 +368,7 @@ export default function EmployeesScreen() {
           <ScrollView horizontal={true} style={{ width: '100%' }} showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
             <View style={{ minWidth: 900, flex: 1 }}>
               <FlatList
-                data={employees}
+                data={getFilteredEmployees()}
                 keyExtractor={(item) => item.id}
                 ListHeaderComponent={renderHeader}
                 renderItem={renderItem}

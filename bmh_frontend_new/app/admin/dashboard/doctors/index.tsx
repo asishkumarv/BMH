@@ -828,30 +828,121 @@ const fetchData = async () => {
               </TouchableOpacity>
             </View>
             <Text style={{fontSize: 14, color: '#64748b', marginBottom: 15}}>
-              Select multiple tokens to block/unblock (VIP Quota). Tokens in red are patient bookings. Orange are VIP Quota. Selected tokens show a blue outline.
+              Green: Available. Orange: Blocked (VIP). Purple: Completed Consultation. Blue: Checked In (In Waiting). Red: Booked (Not Attended). Selected tokens show a blue outline.
             </Text>
+
+            {(() => {
+              const totalTokens = manageTokenSlot?.total_tokens || 0;
+              let totalBooked = 0;
+              let totalBlocked = 0;
+              let totalCompleted = 0;
+              let totalInWaiting = 0;
+              let totalNotAttended = 0;
+
+              if (manageTokenSlot) {
+                Array.from({length: totalTokens}, (_, i) => i + 1).forEach(t => {
+                  const status = slotBookingsMap[t];
+                  if (status) {
+                    if (status === 'VIP Quota') {
+                      totalBlocked++;
+                    } else if (status === 'Completed') {
+                      totalCompleted++;
+                      totalBooked++;
+                    } else if (status === 'Waiting') {
+                      totalInWaiting++;
+                      totalBooked++;
+                    } else if (status === 'Booked') {
+                      totalNotAttended++;
+                      totalBooked++;
+                    } else if (status !== 'Cancelled') {
+                      totalBooked++;
+                    }
+                  }
+                });
+              }
+
+              return (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
+                  <View style={{ flex: 1, minWidth: 80, backgroundColor: '#f1f5f9', padding: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#475569', textAlign: 'center' }}>Total Tokens</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1e293b', marginTop: 2 }}>{totalTokens}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 80, backgroundColor: '#ffe4e6', padding: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fca5a5' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#b91c1c', textAlign: 'center' }}>Booked</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#991b1b', marginTop: 2 }}>{totalBooked}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 80, backgroundColor: '#ffedd5', padding: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fed7aa' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#c2410c', textAlign: 'center' }}>Blocked</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#9a3412', marginTop: 2 }}>{totalBlocked}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 80, backgroundColor: '#f3e8ff', padding: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#d8b4fe' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#6b21a8', textAlign: 'center' }}>Completed</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#581c87', marginTop: 2 }}>{totalCompleted}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 80, backgroundColor: '#dbeafe', padding: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#1d4ed8', textAlign: 'center' }}>Waiting</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1e3a8a', marginTop: 2 }}>{totalInWaiting}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 80, backgroundColor: '#fee2e2', padding: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fca5a5' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#b91c1c', textAlign: 'center' }}>Not Attended</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#991b1b', marginTop: 2 }}>{totalNotAttended}</Text>
+                  </View>
+                </View>
+              );
+            })()}
             
             <ScrollView contentContainerStyle={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingBottom: 10}}>
               {manageTokenSlot && Array.from({length: manageTokenSlot.total_tokens}, (_, i) => i + 1).map(t => {
                 const status = slotBookingsMap[t];
-                const isBooked = status && status !== 'VIP Quota';
-                const isVip = status === 'VIP Quota';
                 const isSelected = selectedTokens.includes(t);
+                const isActionable = !status || status === 'VIP Quota';
+                
+                let bgColor = '#d1fae5'; // Available (Green)
+                let borderColor = '#10b981';
+                let textColor = '#047857';
+                let label = '';
+                
+                if (status === 'VIP Quota') {
+                  bgColor = '#ffedd5'; // Blocked (Orange)
+                  borderColor = '#f97316';
+                  textColor = '#c2410c';
+                  label = 'Blocked';
+                } else if (status === 'Completed') {
+                  bgColor = '#f3e8ff'; // Completed (Purple)
+                  borderColor = '#a855f7';
+                  textColor = '#6b21a8';
+                  label = 'Completed';
+                } else if (status === 'Waiting') {
+                  bgColor = '#dbeafe'; // In Waiting (Blue)
+                  borderColor = '#3b82f6';
+                  textColor = '#1d4ed8';
+                  label = 'Waiting';
+                } else if (status === 'Booked') {
+                  bgColor = '#fee2e2'; // Not Attended / Booked (Red)
+                  borderColor = '#ef4444';
+                  textColor = '#b91c1c';
+                  label = 'Booked';
+                } else if (status) {
+                  bgColor = '#fee2e2';
+                  borderColor = '#ef4444';
+                  textColor = '#b91c1c';
+                  label = status;
+                }
                 
                 return (
                   <TouchableOpacity
                     key={t}
                     style={{
-                      width: 60, height: 60, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
-                      backgroundColor: isBooked ? '#fecaca' : (isVip ? '#ffedd5' : '#d1fae5'),
+                      width: 70, height: 70, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+                      backgroundColor: bgColor,
                       borderWidth: isSelected ? 3 : 1, 
-                      borderColor: isSelected ? '#3b82f6' : (isBooked ? '#ef4444' : (isVip ? '#f97316' : '#10b981')),
-                      opacity: isBooked ? 0.6 : 1
+                      borderColor: isSelected ? '#3b82f6' : borderColor,
+                      opacity: isActionable ? 1 : 0.8
                     }}
                     onPress={() => handleTokenSelect(t)}
                   >
-                    <Text style={{fontWeight: 'bold', color: isBooked ? '#b91c1c' : (isVip ? '#c2410c' : '#047857')}}>{t}</Text>
-                    {isVip && <Text style={{fontSize: 9, color: '#c2410c', fontWeight: 'bold', marginTop: 2}}>Blocked</Text>}
+                    <Text style={{fontWeight: 'bold', fontSize: 16, color: textColor}}>{t}</Text>
+                    {label ? <Text style={{fontSize: 9, color: textColor, fontWeight: '700', marginTop: 2, textAlign: 'center'}} numberOfLines={1}>{label}</Text> : null}
                   </TouchableOpacity>
                 );
               })}

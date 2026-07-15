@@ -162,9 +162,28 @@ export default function EmployeeWalletScreen() {
         `"Department:","${user?.department || 'N/A'}"`,
         `"Role:","${user?.role || 'Delivery Boy'}"`,
         `"Date Range:","${startDate || 'All'} to ${endDate || 'All'}"`,
-        ``,
-        headers.map(h => `"${h}"`).join(',')
       ];
+
+      if (filename === 'Order_Collections') {
+        const totalAmt = data.reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const totalCash = data.filter(tx => tx.payment_mode === 'Cash').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const totalOnline = data.filter(tx => tx.payment_mode === 'Online').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const numDelivered = data.length;
+        const numBus = data.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('bus')).length;
+        const numLocal = data.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('local')).length;
+        const numSchedule = data.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('sched')).length;
+
+        headerRows.push(`"Total Amount:","₹${totalAmt.toFixed(2)}"`);
+        headerRows.push(`"Total Cash Collections:","₹${totalCash.toFixed(2)}"`);
+        headerRows.push(`"Total Online Collections:","₹${totalOnline.toFixed(2)}"`);
+        headerRows.push(`"No of Orders Delivered:","${numDelivered}"`);
+        headerRows.push(`"No of Bus Orders:","${numBus}"`);
+        headerRows.push(`"No of Local Orders:","${numLocal}"`);
+        headerRows.push(`"No of Schedule Orders:","${numSchedule}"`);
+      }
+
+      headerRows.push(``);
+      headerRows.push(headers.map(h => `"${h}"`).join(','));
 
       const dataRows = data.map(item => rowMapper(item).map(val => `"${String(val).replace(/"/g, '""')}"`).join(','));
       const csvContent = [...headerRows, ...dataRows].join('\n');
@@ -198,6 +217,32 @@ export default function EmployeeWalletScreen() {
         return `<tr>${cells}</tr>`;
       }).join('');
 
+      let summaryHtml = '';
+      if (title === 'My Order Collections') {
+        const totalAmt = rows.reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const totalCash = rows.filter(tx => tx.payment_mode === 'Cash').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const totalOnline = rows.filter(tx => tx.payment_mode === 'Online').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const numDelivered = rows.length;
+        const numBus = rows.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('bus')).length;
+        const numLocal = rows.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('local')).length;
+        const numSchedule = rows.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('sched')).length;
+
+        summaryHtml = `
+          <div class="summary-section">
+            <h3 style="margin-top: 0; color: #1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; font-size: 15px;">Collections Summary</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 13px;">
+              <div><strong>Total Amount:</strong> ₹${totalAmt.toFixed(2)}</div>
+              <div><strong>No of Orders Delivered:</strong> ${numDelivered}</div>
+              <div><strong>Total Cash Collections:</strong> ₹${totalCash.toFixed(2)}</div>
+              <div><strong>No of Bus Orders:</strong> ${numBus}</div>
+              <div><strong>Total Online Collections:</strong> ₹${totalOnline.toFixed(2)}</div>
+              <div><strong>No of Local Orders:</strong> ${numLocal}</div>
+              <div><strong>No of Schedule Orders:</strong> ${numSchedule}</div>
+            </div>
+          </div>
+        `;
+      }
+
       const htmlContent = `
         <html>
           <head>
@@ -207,6 +252,7 @@ export default function EmployeeWalletScreen() {
               .meta-section { margin-top: 15px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
               .meta-row { display: flex; margin-bottom: 6px; font-size: 14px; }
               .meta-label { font-weight: bold; width: 150px; color: #475569; }
+              .summary-section { margin-top: 15px; margin-bottom: 20px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; }
               table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
               th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
               th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
@@ -222,6 +268,7 @@ export default function EmployeeWalletScreen() {
               <div class="meta-row"><span class="meta-label">Role:</span><span>${user?.role || 'Delivery Boy'}</span></div>
               <div class="meta-row"><span class="meta-label">Date Range:</span><span>${startDate || 'All'} to ${endDate || 'All'}</span></div>
             </div>
+            ${summaryHtml}
             <table>
               <thead>
                 <tr>${tableHeadersHtml}</tr>
