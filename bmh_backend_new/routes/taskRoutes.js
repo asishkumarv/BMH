@@ -7,11 +7,14 @@ router.get('/', taskController.getTasks);
 router.put('/:id/status', taskController.updateTaskStatus);
 router.put('/:id/reassign', taskController.reassignTask);
 
+router.put('/:id', taskController.updateTask);
+
 // Recurring tasks
 router.post('/recurring', taskController.createRecurringTask);
 router.get('/recurring', taskController.getRecurringTasks);
 router.put('/recurring/:id/status', taskController.updateRecurringTaskStatus);
 router.delete('/recurring/:id', taskController.deleteRecurringTask);
+router.put('/recurring/:id', taskController.updateRecurringTask);
 
 router.get('/create-recurring-table', async (req, res) => {
   try {

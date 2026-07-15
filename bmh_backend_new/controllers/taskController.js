@@ -444,3 +444,59 @@ exports.deleteRecurringTask = async (req, res) => {
   }
 };
 
+exports.updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, due_date } = req.body;
+    
+    const query = `
+      UPDATE tasks 
+      SET title = $1, description = $2, due_date = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+      RETURNING *
+    `;
+    const result = await pool.query(query, [title, description, due_date, id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+    res.json({ success: true, message: 'Task updated successfully', data: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating task:', err);
+    res.status(500).json({ success: false, message: 'Failed to update task' });
+  }
+};
+
+exports.updateRecurringTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      title, description, frequency, specific_days, priority, 
+      assignee_type, assignee_id, department, due_time_type, due_time_hours, due_time_days 
+    } = req.body;
+    
+    const query = `
+      UPDATE recurring_tasks 
+      SET title = $1, description = $2, frequency = $3, specific_days = $4, priority = $5,
+          assignee_type = $6, assignee_id = $7, department = $8,
+          due_time_type = $9, due_time_hours = $10, due_time_days = $11
+      WHERE id = $12
+      RETURNING *
+    `;
+    const sDays = typeof specific_days === 'string' ? specific_days : JSON.stringify(specific_days || []);
+    const values = [
+      title, description, frequency, sDays, priority,
+      assignee_type, assignee_id, department,
+      due_time_type, due_time_hours, due_time_days, id
+    ];
+    
+    const result = await pool.query(query, values);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Recurring task template not found' });
+    }
+    res.json({ success: true, message: 'Recurring task updated successfully', data: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating recurring task:', err);
+    res.status(500).json({ success: false, message: 'Failed to update recurring task' });
+  }
+};
+

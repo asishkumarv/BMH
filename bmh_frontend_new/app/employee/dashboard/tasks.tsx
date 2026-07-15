@@ -50,6 +50,18 @@ export default function EmployeeTasksScreen() {
   const [statusNotes, setStatusNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTaskId, setEditTaskId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editIsRecurring, setEditIsRecurring] = useState(false);
+  const [editPriority, setEditPriority] = useState('Moderate');
+  const [editDueTimeType, setEditDueTimeType] = useState('default');
+  const [editDueTimeHours, setEditDueTimeHours] = useState('0');
+  const [editDueTimeDays, setEditDueTimeDays] = useState('0');
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+
   const [globalUsers, setGlobalUsers] = useState<any[]>([]);
 
   const [empUser, setEmpUser] = useState<any>({ id: 1, full_name: 'Employee', department: '' });
@@ -288,6 +300,50 @@ export default function EmployeeTasksScreen() {
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to reassign task');
+    }
+  };
+
+  const handleOpenEditModal = (task: any, isRec: boolean) => {
+    setEditTaskId(task.id);
+    setEditIsRecurring(isRec);
+    setEditTitle(task.title || '');
+    setEditDescription(task.description || '');
+    if (isRec) {
+      setEditPriority(task.priority || 'Moderate');
+      setEditDueTimeType(task.due_time_type || 'default');
+      setEditDueTimeHours(String(task.due_time_hours || '0'));
+      setEditDueTimeDays(String(task.due_time_days || '0'));
+    } else {
+      setEditDueDate(task.due_date ? new Date(task.due_date).toISOString() : '');
+    }
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTask = async () => {
+    if (!editTitle) return Alert.alert('Error', 'Title is required');
+    try {
+      if (editIsRecurring) {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/recurring/${editTaskId}`, {
+          title: editTitle,
+          description: editDescription,
+          priority: editPriority,
+          due_time_type: editDueTimeType,
+          due_time_hours: parseInt(editDueTimeHours) || 0,
+          due_time_days: parseInt(editDueTimeDays) || 0
+        });
+      } else {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${editTaskId}`, {
+          title: editTitle,
+          description: editDescription,
+          due_date: editDueDate ? new Date(editDueDate).toISOString() : null
+        });
+      }
+      setShowEditModal(false);
+      fetchInitData();
+      Alert.alert('Success', 'Task updated successfully');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to update task');
     }
   };
 
@@ -676,10 +732,17 @@ export default function EmployeeTasksScreen() {
                       })()}
                     </View>
                   ) : (
-                    <View style={styles.metaItem}>
-                      <User color={Colors.light.icon} size={16} />
-                      <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} ({task.assignee_type.replace('_', ' ')} #{task.assignee_id}) - {task.department || 'N/A'}</Text>
-                    </View>
+                    (() => {
+                      const foundUser = globalUsers.find(u => String(u.id) === String(task.assignee_id));
+                      const role = foundUser?.role || task.assignee_type.replace('_', ' ');
+                      const dept = task.department || foundUser?.department || 'N/A';
+                      return (
+                        <View style={styles.metaItem}>
+                          <User color={Colors.light.icon} size={16} />
+                          <Text style={styles.metaText}>Assignee: {task.assignee_name || 'Unknown'} ({role} #{task.assignee_id}) - {dept}</Text>
+                        </View>
+                      );
+                    })()
                   )}
                   <View style={styles.metaItem}>
                     <Clock color={Colors.light.icon} size={16} />
@@ -773,17 +836,25 @@ export default function EmployeeTasksScreen() {
                         </Pressable>
                       ) : null;
                     })()}
-                   {task.status === 'rejected' &&
-                    !task.is_group_task &&
-                    task.assigner_type === 'employee' &&
-                    String(task.assigner_id) === String(empUser.id) && (
+                    {task.status === 'rejected' &&
+                     !task.is_group_task &&
+                     task.assigner_type === 'employee' &&
+                     String(task.assigner_id) === String(empUser.id) && (
+                       <Pressable
+                         style={[styles.actionBtn, { backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fb923c' }]}
+                         onPress={() => { setSelectedTask(task); setAssigneeId(''); setShowReassignModal(true); }}
+                       >
+                         <Text style={[styles.actionBtnText, { color: '#ea580c' }]}>Reassign</Text>
+                       </Pressable>
+                    )}
+                    {task.assigner_type === 'employee' && String(task.assigner_id) === String(empUser.id) && (
                       <Pressable
-                        style={[styles.actionBtn, { backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fb923c' }]}
-                        onPress={() => { setSelectedTask(task); setAssigneeId(''); setShowReassignModal(true); }}
+                        style={[styles.actionBtn, { backgroundColor: '#e0f2fe', marginLeft: 8 }]}
+                        onPress={() => handleOpenEditModal(task, false)}
                       >
-                        <Text style={[styles.actionBtnText, { color: '#ea580c' }]}>Reassign</Text>
+                        <Text style={[styles.actionBtnText, { color: '#0369a1' }]}>Edit</Text>
                       </Pressable>
-                   )}
+                    )}
                 </View>
               </View>
             ))
@@ -1313,6 +1384,154 @@ export default function EmployeeTasksScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Edit Task Modal */}
+      <Modal visible={showEditModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
+            <Text style={styles.modalTitle}>Edit Task Details</Text>
+            
+            <ScrollView style={{ maxHeight: isDesktop ? 600 : 500 }} showsVerticalScrollIndicator={false}>
+              <View style={{ paddingBottom: 8 }}>
+                <Text style={styles.label}>Title</Text>
+                <TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle} placeholder="Task Title" />
+                
+                <Text style={styles.label}>Description</Text>
+                <TextInput style={[styles.input, { height: 70 }]} multiline value={editDescription} onChangeText={setEditDescription} placeholder="Task Details..." />
+
+                {editIsRecurring ? (
+                  <>
+                    <Text style={styles.label}>Priority</Text>
+                    <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
+                      {Platform.OS === 'web' ? (
+                        <select 
+                          style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value)}
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Moderate">Moderate</option>
+                          <option value="High">High</option>
+                        </select>
+                      ) : (
+                        <Picker
+                          selectedValue={editPriority}
+                          onValueChange={(val) => setEditPriority(val)}
+                          style={{ width: '100%', height: 50 }}
+                        >
+                          <Picker.Item label="Low" value="Low" />
+                          <Picker.Item label="Moderate" value="Moderate" />
+                          <Picker.Item label="High" value="High" />
+                        </Picker>
+                      )}
+                    </View>
+
+                    <Text style={styles.label}>Due Time Type</Text>
+                    <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 6, marginBottom: 8 }}>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                          value={editDueTimeType}
+                          onChange={(e) => setEditDueTimeType(e.target.value)}
+                        >
+                          <option value="default">Default (Next day 5:30 PM)</option>
+                          <option value="hours">Within Hours</option>
+                          <option value="days">Within Days</option>
+                          <option value="days_hours">Days + Hours</option>
+                        </select>
+                      ) : (
+                        <Picker
+                          selectedValue={editDueTimeType}
+                          onValueChange={(val: any) => setEditDueTimeType(val)}
+                          style={{ height: 50 }}
+                        >
+                          <Picker.Item label="Default (Next day 5:30 PM)" value="default" />
+                          <Picker.Item label="Within Hours" value="hours" />
+                          <Picker.Item label="Within Days" value="days" />
+                          <Picker.Item label="Days + Hours" value="days_hours" />
+                        </Picker>
+                      )}
+                    </View>
+
+                    {(editDueTimeType === 'days' || editDueTimeType === 'days_hours') && (
+                      <View style={{ marginBottom: 8 }}>
+                        <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 4 }}>Due Days</Text>
+                        <TextInput 
+                          style={styles.input} 
+                          keyboardType="numeric" 
+                          value={editDueTimeDays} 
+                          onChangeText={setEditDueTimeDays} 
+                        />
+                      </View>
+                    )}
+
+                    {(editDueTimeType === 'hours' || editDueTimeType === 'days_hours') && (
+                      <View style={{ marginBottom: 8 }}>
+                        <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 4 }}>Due Hours</Text>
+                        <TextInput 
+                          style={styles.input} 
+                          keyboardType="numeric" 
+                          value={editDueTimeHours} 
+                          onChangeText={setEditDueTimeHours} 
+                        />
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.label}>Due Date & Time</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TextInput 
+                        style={[styles.input, { flex: 1 }]} 
+                        value={editDueDate ? new Date(editDueDate).toLocaleString() : 'No due date'} 
+                        editable={false} 
+                      />
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="datetime-local" 
+                          style={{ padding: 8, borderRadius: 8, borderWidth: 1, borderColor: Colors.light.border }}
+                          value={editDueDate ? new Date(new Date(editDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                          onChange={(e) => setEditDueDate(new Date(e.target.value).toISOString())}
+                        />
+                      ) : (
+                        <Pressable 
+                          style={[styles.actionBtn, { backgroundColor: Colors.light.primary }]}
+                          onPress={() => setShowEditDatePicker(true)}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Change</Text>
+                        </Pressable>
+                      )}
+                    </View>
+
+                    {showEditDatePicker && Platform.OS !== 'web' && (
+                      <DateTimePicker
+                        value={editDueDate ? new Date(editDueDate) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event: any, date?: Date) => {
+                          setShowEditDatePicker(false);
+                          if (date && event.type !== 'dismissed') {
+                            setEditDueDate(date.toISOString());
+                          }
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.saveBtn} onPress={handleUpdateTask}>
+                <Text style={styles.saveBtnText}>Save Changes</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 </View>
   );
 }
