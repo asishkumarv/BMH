@@ -32,6 +32,8 @@ export default function SalesOrders({ deliveryBoys }) {
   const [newNote, setNewNote] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [otpVerifying, setOtpVerifying] = useState(false);
+  const [editCreatedAtDate, setEditCreatedAtDate] = useState('');
+  const [editCreatedAtTime, setEditCreatedAtTime] = useState('');
 
   // Buses list and manage states
   const [buses, setBuses] = useState([]);
@@ -146,7 +148,7 @@ export default function SalesOrders({ deliveryBoys }) {
 
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen/sales-orders/assign/${orderId}`, payload);
       if (res.data.success) {
-        alert(`Rider assigned successfully! Generated OTP: ${res.data.delivery_otp || 'N/A'}`);
+        alert('Rider assigned successfully!');
         fetchSalesOrders(true);
       }
     } catch (err) {
@@ -212,6 +214,30 @@ export default function SalesOrders({ deliveryBoys }) {
     setSelectedOrder(order);
     setEditAddress(typeof order.patient_address === 'object' ? order.patient_address?.address || order.patient_address?.locality || '' : order.patient_address || '');
     
+    if (order.created_at) {
+      try {
+        const d = new Date(order.created_at);
+        if (!isNaN(d.getTime())) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const hours = String(d.getHours()).padStart(2, '0');
+          const minutes = String(d.getMinutes()).padStart(2, '0');
+          setEditCreatedAtDate(`${year}-${month}-${day}`);
+          setEditCreatedAtTime(`${hours}:${minutes}`);
+        } else {
+          setEditCreatedAtDate('');
+          setEditCreatedAtTime('');
+        }
+      } catch (e) {
+        setEditCreatedAtDate('');
+        setEditCreatedAtTime('');
+      }
+    } else {
+      setEditCreatedAtDate('');
+      setEditCreatedAtTime('');
+    }
+
     // Parse bus details
     let bDetails = {
       bus_travels_name: '',
@@ -235,6 +261,11 @@ export default function SalesOrders({ deliveryBoys }) {
 
   const handleUpdateOrderDetails = async () => {
     try {
+      let finalCreatedAt = null;
+      if (editCreatedAtDate) {
+        finalCreatedAt = `${editCreatedAtDate}T${editCreatedAtTime || '00:00'}:00`;
+      }
+
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen/sales-orders/details/${selectedOrder.id}`, {
         patient_address: editAddress,
         patient_name: selectedOrder.patient_name,
@@ -242,7 +273,8 @@ export default function SalesOrders({ deliveryBoys }) {
         delivery_type: selectedOrder.delivery_type || 'Local',
         bus_details: busDetails,
         order_no: selectedOrder.order_no,
-        invoice_id: selectedOrder.invoice_id
+        invoice_id: selectedOrder.invoice_id,
+        created_at: finalCreatedAt
       });
       if (res.data.success) {
         alert('Order details updated successfully!');
@@ -698,6 +730,17 @@ export default function SalesOrders({ deliveryBoys }) {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                      {(() => {
+                        const pendingVal = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
+                        if (pendingVal !== undefined) {
+                          return (
+                            <Text style={{ fontSize: 12, color: pendingVal > 0 ? '#d97706' : '#10b981', fontWeight: '500' }}>
+                              ({pendingVal} pending)
+                            </Text>
+                          );
+                        }
+                        return null;
+                      })()}
                     </View>
                     {assignOrder.delivery_boy_id?.toString() === boy.id.toString() && <CheckCircle size={16} color="#4338ca" />}
                   </TouchableOpacity>
@@ -884,11 +927,35 @@ export default function SalesOrders({ deliveryBoys }) {
                   />
                   <Text style={styles.label}>Invoice Number</Text>
                   <TextInput 
-                    style={styles.input} 
+                    style={[styles.input, { marginBottom: 8 }]} 
                     value={selectedOrder.invoice_id || ''} 
                     onChangeText={t => setSelectedOrder({...selectedOrder, invoice_id: t})}
                     placeholder="Invoice Number"
                   />
+                  
+                  <Text style={styles.label}>Ordered Date</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="date" 
+                      value={editCreatedAtDate} 
+                      onChange={(e) => setEditCreatedAtDate(e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 8, height: 32 }}
+                    />
+                  ) : (
+                    <TextInput style={[styles.input, { marginBottom: 8, height: 32 }]} placeholder="Date YYYY-MM-DD" value={editCreatedAtDate} onChangeText={setEditCreatedAtDate} />
+                  )}
+
+                  <Text style={styles.label}>Ordered Time</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time" 
+                      value={editCreatedAtTime} 
+                      onChange={(e) => setEditCreatedAtTime(e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 8, height: 32 }}
+                    />
+                  ) : (
+                    <TextInput style={[styles.input, { marginBottom: 8, height: 32 }]} placeholder="Time HH:MM" value={editCreatedAtTime} onChangeText={setEditCreatedAtTime} />
+                  )}
                 </View>
 
                 <View style={styles.detailsGroup}>
@@ -908,20 +975,6 @@ export default function SalesOrders({ deliveryBoys }) {
                     </View>
                   ))}
                 </View>
-
-                {/* OTP Delivery Verification */}
-                {selectedOrder.status === 'Assigned' && selectedOrder.delivery_otp && (
-                  <View style={[styles.detailsGroup, { backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8 }]}>
-                    <Text style={[styles.detailsTitle, { color: '#166534' }]}>Deliver Verification OTP</Text>
-                    <Text style={{ fontSize: 12, color: '#166534', marginBottom: 8 }}>Enter the OTP shared with the customer to complete delivery.</Text>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <TextInput style={[styles.input, { flex: 1, backgroundColor: '#fff' }]} value={otpInput} onChangeText={setOtpInput} placeholder="Enter 6-digit OTP" keyboardType="numeric" />
-                      <TouchableOpacity disabled={otpVerifying} onPress={handleVerifyOtp} style={styles.otpBtn}>
-                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Verify</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
 
                 {/* Status Transitions */}
                 <View style={styles.detailsGroup}>

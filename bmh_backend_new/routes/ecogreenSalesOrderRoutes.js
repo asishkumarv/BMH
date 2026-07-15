@@ -147,8 +147,8 @@ router.put('/:id/assign-delivery', async (req, res) => {
     const { id } = req.params;
     const { delivery_boy_id, delivery_type, bus_details, assigned_by } = req.body;
     
-    // Generate 6-digit OTP
-    const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 4-digit OTP
+    const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
     
     const result = await pool.query(
       `UPDATE ecogreen_sales_orders 

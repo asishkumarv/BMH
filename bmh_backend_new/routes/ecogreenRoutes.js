@@ -2882,8 +2882,8 @@ router.put('/sales-orders/assign/:id', async (req, res) => {
     const { id } = req.params;
     const { delivery_boy_id, delivery_type, bus_details, assigned_by } = req.body;
     
-    // Generate 6 digit OTP (matching ecogreenSalesOrderRoutes.js)
-    const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 4 digit OTP (matching ecogreenSalesOrderRoutes.js)
+    const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
     
     const checkRes = await pool.query('SELECT * FROM ecogreensales_orders WHERE id = $1', [id]);
     if (checkRes.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
@@ -3026,7 +3026,7 @@ router.put('/sales-orders/otp/:id', async (req, res) => {
 router.put('/sales-orders/details/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { patient_address, patient_name, patient_contact_no, delivery_type, bus_details, order_no, invoice_id } = req.body;
+    const { patient_address, patient_name, patient_contact_no, delivery_type, bus_details, order_no, invoice_id, created_at } = req.body;
     
     const result = await pool.query(`
       UPDATE ecogreensales_orders
@@ -3036,8 +3036,9 @@ router.put('/sales-orders/details/:id', async (req, res) => {
           delivery_type = $4,
           bus_details = $5,
           order_no = $6,
-          invoice_id = $7
-      WHERE id = $8
+          invoice_id = $7,
+          created_at = COALESCE($8::timestamp, created_at)
+      WHERE id = $9
       RETURNING *
     `, [
       typeof patient_address === 'string' ? patient_address : JSON.stringify(patient_address),
@@ -3047,6 +3048,7 @@ router.put('/sales-orders/details/:id', async (req, res) => {
       typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details || null),
       order_no,
       invoice_id,
+      created_at || null,
       id
     ]);
     

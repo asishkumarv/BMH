@@ -134,8 +134,8 @@ exports.assignDelivery = async (req, res) => {
         const { id } = req.params;
         const { delivery_boy_id, assigned_by } = req.body;
         
-        // Generate 6-digit OTP
-        const delivery_otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // Generate 4-digit OTP
+        const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
         
         const queryText = `
             UPDATE online_orders 
