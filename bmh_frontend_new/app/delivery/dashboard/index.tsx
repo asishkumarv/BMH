@@ -132,12 +132,22 @@ export default function DeliveryDashboard() {
       const lng = parseFloat(order.map_lng);
       if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
     }
-    const link = order.location_link || order.address || '';
-    if (link && (link.includes('maps.google.com') || link.includes('maps.app.goo.gl') || link.includes('google.com/maps'))) {
-      const match = link.match(/query=([-\d.]+),([-\d.]+)/) || 
-                    link.match(/q=([-\d.]+),([-\d.]+)/) ||
-                    link.match(/place\/([-\d.]+),([-\d.]+)/) ||
-                    link.match(/@([-\d.]+),([-\d.]+)/);
+    
+    // Check location_link or address for raw coordinate string "lat,lng"
+    const link = order.location_link || '';
+    if (link && link.includes(',')) {
+      const parts = link.split(',');
+      const lat = parseFloat(parts[0].trim());
+      const lng = parseFloat(parts[1].trim());
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+    
+    const url = order.location_link || order.address || '';
+    if (url && (url.includes('maps.google.com') || url.includes('maps.app.goo.gl') || url.includes('google.com/maps'))) {
+      const match = url.match(/query=([-\d.]+),([-\d.]+)/) || 
+                    url.match(/q=([-\d.]+),([-\d.]+)/) ||
+                    url.match(/place\/([-\d.]+),([-\d.]+)/) ||
+                    url.match(/@([-\d.]+),([-\d.]+)/);
       if (match) {
         const lat = parseFloat(match[1]);
         const lng = parseFloat(match[2]);
@@ -751,15 +761,26 @@ export default function DeliveryDashboard() {
     
     if (locationLink && (locationLink.startsWith('http://') || locationLink.startsWith('https://'))) {
       url = locationLink;
-    } else if (address && (address.startsWith('http://') || address.startsWith('https://'))) {
-      url = address;
-    } else if (lat && lng) {
-      url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-    } else if (address) {
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    } else {
-      alert('No location data available');
-      return;
+    } else if (locationLink && locationLink.includes(',')) {
+      const parts = locationLink.split(',');
+      const latVal = parseFloat(parts[0].trim());
+      const lngVal = parseFloat(parts[1].trim());
+      if (!isNaN(latVal) && !isNaN(lngVal)) {
+        url = `https://www.google.com/maps/search/?api=1&query=${latVal},${lngVal}`;
+      }
+    }
+    
+    if (!url) {
+      if (address && (address.startsWith('http://') || address.startsWith('https://'))) {
+        url = address;
+      } else if (lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && String(lat).toLowerCase() !== 'null' && String(lng).toLowerCase() !== 'null') {
+        url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+      } else if (address) {
+        url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+      } else {
+        alert('No location data available');
+        return;
+      }
     }
 
     if (Platform.OS === 'web') {

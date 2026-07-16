@@ -218,6 +218,25 @@ exports.getAssignedOrders = async (req, res) => {
         }
       } catch (e) {}
 
+      // If location_link has coordinate format or Google maps URL, extract coordinates
+      if (location_link && typeof location_link === 'string' && (!map_lat || !map_lng)) {
+        const trimmed = location_link.trim();
+        const decMatch = trimmed.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+        if (decMatch) {
+          map_lat = parseFloat(decMatch[1]);
+          map_lng = parseFloat(decMatch[2]);
+        } else {
+          const urlMatch = trimmed.match(/query=([-\d.]+),([-\d.]+)/) || 
+                           trimmed.match(/q=([-\d.]+),([-\d.]+)/) ||
+                           trimmed.match(/place\/([-\d.]+),([-\d.]+)/) ||
+                           trimmed.match(/@([-\d.]+),([-\d.]+)/);
+          if (urlMatch) {
+            map_lat = parseFloat(urlMatch[1]);
+            map_lng = parseFloat(urlMatch[2]);
+          }
+        }
+      }
+
       return {
         ...row,
         address,
