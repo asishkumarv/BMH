@@ -162,7 +162,46 @@ export default function OrderAssignScreen() {
   };
 
 
+  const onStartAssignment = async (order) => {
+    let lat = '';
+    let lng = '';
+    if (order.map_lat && order.map_lng) {
+      lat = order.map_lat;
+      lng = order.map_lng;
+    } else if (order.location_link || order.gps_location) {
+      const link = order.location_link || order.gps_location;
+      const decMatch = String(link).trim().match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+      if (decMatch) {
+        lat = decMatch[1];
+        lng = decMatch[2];
+      } else {
+        const urlMatch = String(link).match(/query=([-\d.]+),([-\d.]+)/) || 
+                         String(link).match(/q=([-\d.]+),([-\d.]+)/) ||
+                         String(link).match(/place\/([-\d.]+),([-\d.]+)/) ||
+                         String(link).match(/@([-\d.]+),([-\d.]+)/);
+        if (urlMatch) {
+          lat = urlMatch[1];
+          lng = urlMatch[2];
+        }
+      }
+    }
+    
+    let url = 'https://napi.bharatmedicalhallplus.com/employees/delivery-fleet';
+    if (lat && lng) {
+      url += `?lat=${lat}&lng=${lng}`;
+    }
+    try {
+      const res = await axios.get(url);
+      if (res.data && res.data.success) {
+        setDeliveryBoys(res.data.data);
+      }
+    } catch (err) {
+      console.log('Error fetching delivery fleet with coordinates:', err);
+    }
+  };
+
   const openAssignModal = (order) => {
+    onStartAssignment(order);
     setSelectedOrder(order);
     setAddress(order.address || '');
     setGpsLocation(order.map_lat && order.map_lng ? `${order.map_lat},${order.map_lng}` : '');
@@ -262,11 +301,11 @@ export default function OrderAssignScreen() {
       </View>
 
       {activeTab === 'Manual Orders' ? (
-        <ManualOrders deliveryBoys={deliveryBoys} />
+        <ManualOrders deliveryBoys={deliveryBoys} onStartAssignment={onStartAssignment} />
       ) : activeTab === 'Sales Orders' ? (
-        <SalesOrders deliveryBoys={deliveryBoys} />
+        <SalesOrders deliveryBoys={deliveryBoys} onStartAssignment={onStartAssignment} />
       ) : activeTab === 'Purchase Orders' ? (
-        <PurchaseOrders deliveryBoys={deliveryBoys} />
+        <PurchaseOrders deliveryBoys={deliveryBoys} onStartAssignment={onStartAssignment} />
       ) : (
       <>
         {/* Header */}

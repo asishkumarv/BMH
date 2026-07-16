@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Eye, Share2, Trash2, Plus, Phone, Navigation, ChevronDown, X } from 'lucide-react-native';
 
-export default function SalesOrders({ deliveryBoys }) {
+export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   const { width } = useWindowDimensions();
   const isDesktop = width > 1024;
   const isTablet = width > 768 && width <= 1024;
@@ -456,6 +456,7 @@ export default function SalesOrders({ deliveryBoys }) {
             <TouchableOpacity 
               style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
               onPress={() => {
+                if (onStartAssignment) onStartAssignment(item);
                 setAssignOrder(item);
                 setAssignSearchQuery('');
                 setAssignModalVisible(true);
@@ -736,6 +737,11 @@ export default function SalesOrders({ deliveryBoys }) {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                      {boy.recommended && (
+                        <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 10, color: '#15803d', fontWeight: 'bold' }}>⭐ Recommended (Nearest)</Text>
+                        </View>
+                      )}
                       {(() => {
                         const pendingOrders = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
                         const pendingTasks = boy.pending_tasks_count || 0;

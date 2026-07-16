@@ -208,6 +208,9 @@ export default function DeliveryDashboard() {
       const isCompleted = ['delivered', 'completed', 'received', 'cancelled'].includes(statusLower);
       if (isCompleted) return false;
       
+      const isBus = o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus';
+      if (isBus) return false;
+      
       if (routeToggle === 'All') {
         return true;
       } else if (routeToggle === 'Assigned') {
@@ -759,24 +762,57 @@ export default function DeliveryDashboard() {
   const openMap = (lat: any, lng: any, address: string, locationLink?: string) => {
     let url = '';
     
-    if (locationLink && (locationLink.startsWith('http://') || locationLink.startsWith('https://'))) {
-      url = locationLink;
-    } else if (locationLink && locationLink.includes(',')) {
-      const parts = locationLink.split(',');
-      const latVal = parseFloat(parts[0].trim());
-      const lngVal = parseFloat(parts[1].trim());
-      if (!isNaN(latVal) && !isNaN(lngVal)) {
-        url = `https://www.google.com/maps/search/?api=1&query=${latVal},${lngVal}`;
+    let parsedLat = parseFloat(lat);
+    let parsedLng = parseFloat(lng);
+    
+    if (isNaN(parsedLat) || isNaN(parsedLng) || String(lat).toLowerCase() === 'null' || String(lng).toLowerCase() === 'null') {
+      parsedLat = NaN;
+      parsedLng = NaN;
+    }
+    
+    let cleanLink = locationLink ? String(locationLink).trim() : '';
+    
+    // Parse coordinates from link if they exist
+    if (cleanLink && (isNaN(parsedLat) || isNaN(parsedLng))) {
+      const parts = cleanLink.split(',');
+      if (parts.length === 2) {
+        const latVal = parseFloat(parts[0].trim());
+        const lngVal = parseFloat(parts[1].trim());
+        if (!isNaN(latVal) && !isNaN(lngVal)) {
+          parsedLat = latVal;
+          parsedLng = lngVal;
+        }
+      } else {
+        const match = cleanLink.match(/query=([-\d.]+),([-\d.]+)/) || 
+                      cleanLink.match(/q=([-\d.]+),([-\d.]+)/) ||
+                      cleanLink.match(/place\/([-\d.]+),([-\d.]+)/) ||
+                      cleanLink.match(/@([-\d.]+),([-\d.]+)/);
+        if (match) {
+          parsedLat = parseFloat(match[1]);
+          parsedLng = parseFloat(match[2]);
+        }
+      }
+    }
+    
+    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+      url = `https://www.google.com/maps/search/?api=1&query=${parsedLat},${parsedLng}`;
+    } else if (cleanLink) {
+      if (cleanLink.startsWith('www.')) {
+        cleanLink = 'https://' + cleanLink;
+      }
+      if (cleanLink.startsWith('http://') || cleanLink.startsWith('https://')) {
+        url = cleanLink;
+      } else if (cleanLink.includes('maps.google.com') || cleanLink.includes('google.com/maps') || cleanLink.includes('maps.app.goo.gl')) {
+        url = 'https://' + cleanLink;
       }
     }
     
     if (!url) {
-      if (address && (address.startsWith('http://') || address.startsWith('https://'))) {
-        url = address;
-      } else if (lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && String(lat).toLowerCase() !== 'null' && String(lng).toLowerCase() !== 'null') {
-        url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-      } else if (address) {
-        url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+      const cleanAddress = address ? String(address).trim() : '';
+      if (cleanAddress.startsWith('http://') || cleanAddress.startsWith('https://')) {
+        url = cleanAddress;
+      } else if (cleanAddress) {
+        url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanAddress)}`;
       } else {
         alert('No location data available');
         return;
@@ -1152,6 +1188,12 @@ export default function DeliveryDashboard() {
             const bComp = ['delivered', 'completed', 'received'].includes(b.status?.toLowerCase());
             if (aComp && !bComp) return 1;
             if (!aComp && bComp) return -1;
+            
+            const aBus = a.delivery_type?.toLowerCase() === 'bus' || a.mode_of_delivery?.toLowerCase() === 'bus';
+            const bBus = b.delivery_type?.toLowerCase() === 'bus' || b.mode_of_delivery?.toLowerCase() === 'bus';
+            if (aBus && !bBus) return -1;
+            if (!aBus && bBus) return 1;
+            
             return 0;
           })}
           keyExtractor={item => `${item.type}-${item.id}`}

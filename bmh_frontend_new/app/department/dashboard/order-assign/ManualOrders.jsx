@@ -6,7 +6,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Plus, Eye, Share2, Phone, Navigation, ChevronDown, Trash2, X } from 'lucide-react-native';
 import { Share } from 'react-native';
 
-export default function ManualOrders({ deliveryBoys }) {
+export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
   const { width } = useWindowDimensions();
   const isDesktop = width > 1024;
   const isTablet = width > 768 && width <= 1024;
@@ -612,6 +612,7 @@ export default function ManualOrders({ deliveryBoys }) {
             <TouchableOpacity 
               style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
               onPress={() => {
+                if (onStartAssignment) onStartAssignment(item);
                 setAssignOrder(item);
                 setAssignSearchQuery('');
                 setAssignModalVisible(true);
@@ -1631,7 +1632,12 @@ export default function ManualOrders({ deliveryBoys }) {
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                       <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                       {boy.recommended && (
+                         <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                           <Text style={{ fontSize: 10, color: '#15803d', fontWeight: 'bold' }}>⭐ Recommended (Nearest)</Text>
+                         </View>
+                       )}
                       {(() => {
                         const pendingOrders = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
                         const pendingTasks = boy.pending_tasks_count || 0;

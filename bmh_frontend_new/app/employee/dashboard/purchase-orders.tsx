@@ -142,6 +142,43 @@ export default function PurchaseOrdersScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (assignOrder) {
+      let lat = '';
+      let lng = '';
+      if (assignOrder.map_lat && assignOrder.map_lng) {
+        lat = assignOrder.map_lat;
+        lng = assignOrder.map_lng;
+      } else if (assignOrder.location_link || assignOrder.gps_location) {
+        const link = assignOrder.location_link || assignOrder.gps_location;
+        const decMatch = String(link).trim().match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+        if (decMatch) {
+          lat = decMatch[1];
+          lng = decMatch[2];
+        } else {
+          const urlMatch = String(link).match(/query=([-\d.]+),([-\d.]+)/) || 
+                           String(link).match(/q=([-\d.]+),([-\d.]+)/) ||
+                           String(link).match(/place\/([-\d.]+),([-\d.]+)/) ||
+                           String(link).match(/@([-\d.]+),([-\d.]+)/);
+          if (urlMatch) {
+            lat = urlMatch[1];
+            lng = urlMatch[2];
+          }
+        }
+      }
+      
+      let url = 'https://napi.bharatmedicalhallplus.com/employees/delivery-fleet';
+      if (lat && lng) {
+        url += `?lat=${lat}&lng=${lng}`;
+      }
+      axios.get(url).then(res => {
+        if (res.data && res.data.success) {
+          setDeliveryBoys(res.data.data);
+        }
+      }).catch(err => console.log("Failed to fetch fleet recommendations:", err));
+    }
+  }, [assignOrder]);
+
   const handleBusSelection = (busId: string) => {
     if (!busId) return;
     const bus = buses.find(b => b.id.toString() === busId.toString());
@@ -1220,6 +1257,11 @@ export default function PurchaseOrdersScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                      {boy.recommended && (
+                        <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 9, color: '#15803d', fontWeight: 'bold' }}>⭐ Recommended (Nearest)</Text>
+                        </View>
+                      )}
                       {(() => {
                         const pendingOrders = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
                         const pendingTasks = boy.pending_tasks_count || 0;

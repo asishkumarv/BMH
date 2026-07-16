@@ -268,17 +268,26 @@ exports.getAssignedOrders = async (req, res) => {
 };
 
 exports.getDeliveryFleet = async (req, res) => {
-      try {
-        // Get all delivery boys who are approved
-        const boysRes = await pool.query(`
-          SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, schedule_in, schedule_out, COALESCE(location_updated_at, created_at) AS updated_at,
-          (id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)) as is_active
-          FROM employees 
-          WHERE department = 'Delivery' AND status = 'approved'
-        `);
-      const boys = boysRes.rows;
+  try {
+    const targetLat = parseFloat(req.query.lat);
+    const targetLng = parseFloat(req.query.lng);
+
+    // Get all delivery boys who are approved
+    const boysRes = await pool.query(`
+      SELECT id, full_name, email, mobile AS phone, location_lat, location_lng, schedule_in, schedule_out, COALESCE(location_updated_at, created_at) AS updated_at,
+      (id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)) as is_active
+      FROM employees 
+      WHERE department = 'Delivery' AND status = 'approved'
+    `);
+    const boys = boysRes.rows;
+
+    let recommendedRiderId = null;
+    let absoluteMinDistance = Infinity;
 
     for (let boy of boys) {
+      boy.recommended = false;
+      boy.min_distance = Infinity;
+
       // Get pending orders count for each boy
       const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
       const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
@@ -315,13 +324,99 @@ exports.getDeliveryFleet = async (req, res) => {
       const d5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND status = 'Delivered' AND updated_at::date = CURRENT_DATE`, [boy.id]);
       boy.delivered_today_count = parseInt(d1.rows[0].count) + parseInt(d2.rows[0].count) + parseInt(d3.rows[0].count) + parseInt(d4.rows[0].count) + parseInt(d5.rows[0].count);
 
-      // Get assigned today count (all orders where delivery_boy_id matches and was updated today)
+      // Get assigned today count
       const a1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND updated_at::date = CURRENT_DATE`, [boy.id]);
       const a2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND created_at::date = CURRENT_DATE`, [boy.id]);
       const a3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND created_at::date = CURRENT_DATE`, [boy.id]);
       const a4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND created_at::date = CURRENT_DATE`, [boy.id]);
       const a5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND updated_at::date = CURRENT_DATE`, [boy.id]);
       boy.assigned_today_count = parseInt(a1.rows[0].count) + parseInt(a2.rows[0].count) + parseInt(a3.rows[0].count) + parseInt(a4.rows[0].count) + parseInt(a5.rows[0].count);
+
+      // Calculate nearest order recommendation if lat/lng are provided
+      if (!isNaN(targetLat) && !isNaN(targetLng)) {
+        const coordsList = [];
+        const addCoords = (lat, lng, address, link) => {
+          let map_lat = lat;
+          let map_lng = lng;
+          if (address && typeof address === 'string') {
+            try {
+              const parsed = JSON.parse(address);
+              if (parsed && typeof parsed === 'object') {
+                map_lat = parsed.latitude || parsed.lat || map_lat;
+                map_lng = parsed.longitude || parsed.lng || map_lng;
+              }
+            } catch (e) {}
+          }
+          if (link && typeof link === 'string' && (!map_lat || !map_lng)) {
+            const trimmed = link.trim();
+            const decMatch = trimmed.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+            if (decMatch) {
+              map_lat = parseFloat(decMatch[1]);
+              map_lng = parseFloat(decMatch[2]);
+            } else {
+              const urlMatch = trimmed.match(/query=([-\d.]+),([-\d.]+)/) || 
+                               trimmed.match(/q=([-\d.]+),([-\d.]+)/) ||
+                               trimmed.match(/place\/([-\d.]+),([-\d.]+)/) ||
+                               trimmed.match(/@([-\d.]+),([-\d.]+)/);
+              if (urlMatch) {
+                map_lat = parseFloat(urlMatch[1]);
+                map_lng = parseFloat(urlMatch[2]);
+              }
+            }
+          }
+          const finalLat = parseFloat(map_lat);
+          const finalLng = parseFloat(map_lng);
+          if (!isNaN(finalLat) && !isNaN(finalLng)) {
+            coordsList.push({ lat: finalLat, lng: finalLng });
+          }
+        };
+
+        const onlineOrders = await pool.query(
+          `SELECT map_lat, map_lng FROM online_orders WHERE delivery_boy_id = $1 AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+        );
+        const manualOrders = await pool.query(
+          `SELECT address, location_link FROM manual_orders WHERE delivery_boy_id = $1::varchar AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(mode_of_delivery, '') != 'Bus' AND is_scheduled = false`, [boy.id]
+        );
+        const salesOrders = await pool.query(
+          `SELECT patient_address as address FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+        );
+        const salesInvoices = await pool.query(
+          `SELECT patient_address as address FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+        );
+        const purchaseOrders = await pool.query(
+          `SELECT address, gps_location FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Received', 'Returned') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+        );
+
+        onlineOrders.rows.forEach(r => addCoords(r.map_lat, r.map_lng));
+        manualOrders.rows.forEach(r => addCoords(null, null, r.address, r.location_link));
+        salesOrders.rows.forEach(r => addCoords(null, null, r.address));
+        salesInvoices.rows.forEach(r => addCoords(null, null, r.address));
+        purchaseOrders.rows.forEach(r => addCoords(null, null, r.address, r.gps_location));
+
+        coordsList.forEach(c => {
+          const dy = targetLat - c.lat;
+          const dx = targetLng - c.lng;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < boy.min_distance) {
+            boy.min_distance = dist;
+          }
+        });
+
+        if (boy.min_distance < absoluteMinDistance) {
+          absoluteMinDistance = boy.min_distance;
+          recommendedRiderId = boy.id;
+        }
+      }
+    }
+
+    if (recommendedRiderId !== null) {
+      boys.forEach(b => {
+        if (b.id === recommendedRiderId) {
+          b.recommended = true;
+        }
+      });
+      // Sort recommended boy to the top
+      boys.sort((x, y) => (x.id === recommendedRiderId ? -1 : y.id === recommendedRiderId ? 1 : 0));
     }
 
     // Fetch delivery department ideal location coordinates
