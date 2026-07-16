@@ -335,7 +335,24 @@ router.get("/available", async (req, res) => {
           COALESCE((SELECT COUNT(*)::integer FROM manual_orders WHERE delivery_boy_id = e.id::varchar AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
           COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
           COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_invoices WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0)
-        ) AS pending_count
+        ) AS pending_count,
+        (
+          SELECT COUNT(*)::integer FROM tasks t
+          WHERE 
+            (
+              t.assignee_id = e.id 
+              AND t.assignee_type = 'employee' 
+              AND t.status IN ('pending', 'assigned', 'in_progress', 'accepted')
+            ) OR (
+              t.is_group_task = true 
+              AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements(t.group_assignees) AS ga
+                WHERE (ga->>'assignee_id')::int = e.id 
+                  AND ga->>'assignee_type' = 'employee' 
+                  AND ga->>'status' IN ('pending', 'assigned', 'in_progress', 'accepted')
+              )
+            )
+        ) AS pending_tasks_count
       FROM employees e
       LEFT JOIN attendance a ON a.employee_id = e.id
       LEFT JOIN break_logs b ON b.employee_id = e.id

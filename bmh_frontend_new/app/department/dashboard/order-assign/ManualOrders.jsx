@@ -1632,11 +1632,12 @@ export default function ManualOrders({ deliveryBoys }) {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
                       {(() => {
-                        const pendingVal = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
-                        if (pendingVal !== undefined) {
+                        const pendingOrders = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
+                        const pendingTasks = boy.pending_tasks_count || 0;
+                        if (pendingOrders !== undefined) {
                           return (
-                            <Text style={{ fontSize: 12, color: pendingVal > 0 ? '#d97706' : '#10b981', fontWeight: '500' }}>
-                              ({pendingVal} pending)
+                            <Text style={{ fontSize: 12, color: (pendingOrders > 0 || pendingTasks > 0) ? '#d97706' : '#10b981', fontWeight: '500' }}>
+                              ({pendingOrders} orders, {pendingTasks} tasks)
                             </Text>
                           );
                         }

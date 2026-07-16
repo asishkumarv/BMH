@@ -241,6 +241,26 @@ exports.getDeliveryFleet = async (req, res) => {
       const o5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed')`, [boy.id]);
       boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count) + parseInt(o4.rows[0].count) + parseInt(o5.rows[0].count);
 
+      // Get pending tasks count for each boy
+      const tasksRes = await pool.query(`
+        SELECT COUNT(*) FROM tasks 
+        WHERE 
+          (
+            assignee_id = $1 
+            AND assignee_type = 'employee' 
+            AND status IN ('pending', 'assigned', 'in_progress', 'accepted')
+          ) OR (
+            is_group_task = true 
+            AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements(group_assignees) AS ga
+              WHERE (ga->>'assignee_id')::int = $1 
+                AND ga->>'assignee_type' = 'employee' 
+                AND ga->>'status' IN ('pending', 'assigned', 'in_progress', 'accepted')
+            )
+          )
+      `, [boy.id]);
+      boy.pending_tasks_count = parseInt(tasksRes.rows[0].count);
+
       // Get delivered today count
       const d1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND updated_at::date = CURRENT_DATE`, [boy.id]);
       const d2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND created_at::date = CURRENT_DATE`, [boy.id]);
