@@ -372,16 +372,16 @@ exports.getDeliveryFleet = async (req, res) => {
         };
 
         const onlineOrders = await pool.query(
-          `SELECT map_lat, map_lng FROM online_orders WHERE delivery_boy_id = $1 AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+          `SELECT map_lat, map_lng FROM online_orders WHERE delivery_boy_id = $1 AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED')`, [boy.id]
         );
         const manualOrders = await pool.query(
           `SELECT address, location_link FROM manual_orders WHERE delivery_boy_id = $1::varchar AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(mode_of_delivery, '') != 'Bus' AND is_scheduled = false`, [boy.id]
         );
         const salesOrders = await pool.query(
-          `SELECT patient_address as address FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+          `SELECT patient_address as address FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(mode_of_delivery, '') != 'Bus'`, [boy.id]
         );
         const salesInvoices = await pool.query(
-          `SELECT patient_address as address FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
+          `SELECT patient_address as address FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned') AND COALESCE(mode_of_delivery, '') != 'Bus'`, [boy.id]
         );
         const purchaseOrders = await pool.query(
           `SELECT address, gps_location FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Received', 'Returned') AND COALESCE(delivery_type, '') != 'Bus'`, [boy.id]
