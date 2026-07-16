@@ -1510,7 +1510,7 @@ export default function DeliveryDashboard() {
             {/* Map Container */}
             <View style={{ height: 350, backgroundColor: '#e2e8f0' }}>
               <CrossPlatformMap 
-                mapPoints={optimizedRoute.filter(o => o.coords).map(o => ({
+                mapPoints={optimizedRoute.filter(o => o.coords && o.delivery_type?.toLowerCase() !== 'bus').map(o => ({
                   id: o.id,
                   lat: o.coords.lat,
                   lng: o.coords.lng,
@@ -1520,7 +1520,7 @@ export default function DeliveryDashboard() {
                 deliveryBoyLocation={currentLocation || { lat: 17.385044, lng: 78.486671 }}
                 linePositions={[
                   [currentLocation?.lat || 17.385044, currentLocation?.lng || 78.486671],
-                  ...optimizedRoute.filter(o => o.coords).map(o => [o.coords.lat, o.coords.lng])
+                  ...optimizedRoute.filter(o => o.coords && o.delivery_type?.toLowerCase() !== 'bus').map(o => [o.coords.lat, o.coords.lng])
                 ] as any}
                 onMarkerPress={() => {}}
               />

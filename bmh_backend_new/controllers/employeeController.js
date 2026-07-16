@@ -186,32 +186,59 @@ exports.getAssignedOrders = async (req, res) => {
        FROM manual_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 
-    const formatAddress = (addr) => {
-      if (!addr) return '';
-      if (typeof addr === 'object') {
-        return addr.address || addr.locality || JSON.stringify(addr);
+    const parseLocation = (row) => {
+      let address = row.address;
+      let map_lat = row.map_lat;
+      let map_lng = row.map_lng;
+      let location_link = row.location_link;
+
+      if (address) {
+        if (typeof address === 'object') {
+          map_lat = address.latitude || address.lat || map_lat;
+          map_lng = address.longitude || address.lng || map_lng;
+          location_link = address.location_link || address.url || location_link;
+          address = address.address || address.locality || JSON.stringify(address);
+        } else {
+          try {
+            const parsed = JSON.parse(address);
+            if (parsed && typeof parsed === 'object') {
+              map_lat = parsed.latitude || parsed.lat || map_lat;
+              map_lng = parsed.longitude || parsed.lng || map_lng;
+              location_link = parsed.location_link || parsed.url || location_link;
+              address = parsed.address || parsed.locality || address;
+            }
+          } catch (e) {}
+        }
       }
+      
       try {
-        const parsed = JSON.parse(addr);
-        if (typeof parsed === 'object') {
-          return parsed.address || parsed.locality || addr;
+        const parsed = JSON.parse(address);
+        if (parsed && typeof parsed === 'object') {
+          address = parsed.address || parsed.locality || address;
         }
       } catch (e) {}
-      return addr;
+
+      return {
+        ...row,
+        address,
+        map_lat,
+        map_lng,
+        location_link
+      };
     };
 
     const orders = [
-      ...onlineOrdersRes.rows,
-      ...ecogreenSalesOrdersRes.rows.map(row => ({ ...row, address: formatAddress(row.address) })),
-      ...ecogreenSalesInvoicesRes.rows.map(row => ({ ...row, address: formatAddress(row.address) })),
-      ...manualOrdersRes.rows
+      ...onlineOrdersRes.rows.map(parseLocation),
+      ...ecogreenSalesOrdersRes.rows.map(parseLocation),
+      ...ecogreenSalesInvoicesRes.rows.map(parseLocation),
+      ...manualOrdersRes.rows.map(parseLocation)
     ];
     // Fetch from ecogreenpurchase_orders
     const purchaseOrdersRes = await pool.query(
       `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no
        FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
-    orders.push(...purchaseOrdersRes.rows.map(row => ({ ...row, address: formatAddress(row.address) })));
+    orders.push(...purchaseOrdersRes.rows.map(parseLocation));
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     res.json({ success: true, data: orders });
