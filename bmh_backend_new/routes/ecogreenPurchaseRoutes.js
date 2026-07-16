@@ -192,4 +192,56 @@ router.put('/update/:id', async (req, res) => {
     }
 });
 
+// Create manual purchase order
+router.post('/add', async (req, res) => {
+    try {
+        const { br_code, year, prefix, srno, custcode, custname, refcode, refname, total, details, delivery_type, address, gps_location, bus_details, createuser } = req.body;
+        
+        const query = `
+            INSERT INTO ecogreenpurchase_orders (
+                br_code, year, prefix, srno, custcode, custname, refcode, refname, total, details, status, delivery_type, address, gps_location, bus_details, createuser, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pending', $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+            RETURNING *
+        `;
+        
+        const values = [
+            br_code || '001',
+            year || String(new Date().getFullYear()),
+            prefix || 'PO',
+            srno || String(Date.now()).substring(6),
+            custcode || 'CUST',
+            custname,
+            refcode || null,
+            refname || null,
+            total ? parseFloat(total) : 0,
+            details ? (typeof details === 'string' ? details : JSON.stringify(details)) : '[]',
+            delivery_type || 'Local',
+            address || null,
+            gps_location || null,
+            bus_details ? (typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details)) : null,
+            createuser || 'SYSTEM'
+        ];
+        
+        const result = await pool.query(query, values);
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        console.error("Error creating manual purchase order:", err.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Delete purchase order
+router.delete('/:id', async (req, res) => {
+    try {
+        const result = await pool.query('DELETE FROM ecogreenpurchase_orders WHERE id = $1 RETURNING *', [req.params.id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Purchase order not found' });
+        }
+        res.json({ success: true, message: 'Purchase order deleted successfully', data: result.rows[0] });
+    } catch (err) {
+        console.error("Error deleting purchase order:", err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;

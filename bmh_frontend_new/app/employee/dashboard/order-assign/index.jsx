@@ -5,6 +5,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Filter, Calendar, List, Plus } from 'lucide-react-native';
 import ManualOrders from './ManualOrders';
 import SalesOrders from './SalesOrders';
+import PurchaseOrders from './PurchaseOrders';
 
 export default function OrderAssignScreen() {
   const { width } = useWindowDimensions();
@@ -255,12 +256,17 @@ export default function OrderAssignScreen() {
         <TouchableOpacity onPress={() => setActiveTab('Sales Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Sales Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
           <Text style={{fontWeight: activeTab === 'Sales Orders' ? 'bold' : 'normal', color: activeTab === 'Sales Orders' ? '#4338ca' : '#64748b'}}>Sales Orders</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setActiveTab('Purchase Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Purchase Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+          <Text style={{fontWeight: activeTab === 'Purchase Orders' ? 'bold' : 'normal', color: activeTab === 'Purchase Orders' ? '#4338ca' : '#64748b'}}>Purchase Orders</Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'Manual Orders' ? (
         <ManualOrders deliveryBoys={deliveryBoys} />
       ) : activeTab === 'Sales Orders' ? (
         <SalesOrders deliveryBoys={deliveryBoys} />
+      ) : activeTab === 'Purchase Orders' ? (
+        <PurchaseOrders deliveryBoys={deliveryBoys} />
       ) : (
       <>
         {/* Header */}

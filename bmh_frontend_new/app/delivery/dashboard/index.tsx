@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated, RefreshControl, SafeAreaView } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
-import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee, FileText } from 'lucide-react-native';
+import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee, FileText, X } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Colors } from '../../../constants/Colors';
+import CrossPlatformMap from './CrossPlatformMap';
 
 const formatDateTime = (dateStr: string, timeStr?: string) => {
   if (!dateStr) return 'N/A';
@@ -111,6 +112,9 @@ export default function DeliveryDashboard() {
 
   // New State
   const [filterState, setFilterState] = useState('All');
+  const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [routeModalVisible, setRouteModalVisible] = useState(false);
+  const [routeToggle, setRouteToggle] = useState<'All' | 'Assigned' | 'PickedUp'>('All');
   const [summary, setSummary] = useState<any>(null);
   const [cameraVisible, setCameraVisible] = useState(false);
   const [actionType, setActionType] = useState('');
@@ -122,6 +126,93 @@ export default function DeliveryDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const ordersRef = useRef<any[]>([]);
 
+  const getOrderLatLng = (order: any) => {
+    if (order.map_lat && order.map_lng) {
+      const lat = parseFloat(order.map_lat);
+      const lng = parseFloat(order.map_lng);
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+    const link = order.location_link || order.address || '';
+    if (link && (link.includes('maps.google.com') || link.includes('maps.app.goo.gl') || link.includes('google.com/maps'))) {
+      const match = link.match(/query=([-\d.]+),([-\d.]+)/) || 
+                    link.match(/q=([-\d.]+),([-\d.]+)/) ||
+                    link.match(/place\/([-\d.]+),([-\d.]+)/) ||
+                    link.match(/@([-\d.]+),([-\d.]+)/);
+      if (match) {
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+      }
+    }
+    return null;
+  };
+
+  const calculateShortestRoute = (startLoc: {lat: number, lng: number}, points: any[]) => {
+    if (points.length === 0) return [];
+    
+    const getDist = (p1: {lat: number, lng: number}, p2: {lat: number, lng: number}) => {
+      const dy = p1.lat - p2.lat;
+      const dx = p1.lng - p2.lng;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const withCoords: any[] = [];
+    const withoutCoords: any[] = [];
+
+    points.forEach(p => {
+      const coords = getOrderLatLng(p);
+      if (coords) {
+        withCoords.push({ ...p, coords });
+      } else {
+        withoutCoords.push(p);
+      }
+    });
+
+    let unvisited = [...withCoords];
+    let current = { lat: startLoc.lat, lng: startLoc.lng };
+    let route: any[] = [];
+
+    while (unvisited.length > 0) {
+      let nearestIdx = 0;
+      let minDistance = Infinity;
+      for (let i = 0; i < unvisited.length; i++) {
+        const dist = getDist(current, unvisited[i].coords);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestIdx = i;
+        }
+      }
+      const nearest = unvisited[nearestIdx];
+      route.push(nearest);
+      current = nearest.coords;
+      unvisited.splice(nearestIdx, 1);
+    }
+
+    route.push(...withoutCoords);
+    return route;
+  };
+
+  const getRouteOrders = () => {
+    return orders.filter(o => {
+      const statusLower = o.status?.toLowerCase() || '';
+      const isCompleted = ['delivered', 'completed', 'received', 'cancelled'].includes(statusLower);
+      if (isCompleted) return false;
+      
+      if (routeToggle === 'All') {
+        return true;
+      } else if (routeToggle === 'Assigned') {
+        return isAssigned(o.status) || statusLower.startsWith('starts to');
+      } else {
+        return statusLower === 'picked up' || statusLower === 'out for delivery';
+      }
+    });
+  };
+
+  const optimizedRoute = calculateShortestRoute(
+    currentLocation || { lat: 17.385044, lng: 78.486671 },
+    getRouteOrders()
+  );
+
   // Purchase Order Submission Modal State
   const [submissionModalVisible, setSubmissionModalVisible] = useState(false);
   const [submissionSearchQuery, setSubmissionSearchQuery] = useState('');
@@ -129,11 +220,11 @@ export default function DeliveryDashboard() {
   const [selectedPO, setSelectedPO] = useState<any>(null);
   const [submissionLoading, setSubmissionLoading] = useState(false);
 
-  const isAssigned = (status: string) => {
+  function isAssigned(status: string) {
     if (!status) return true;
     const s = status.toLowerCase();
     return s !== 'picked up' && s !== 'out for delivery' && s !== 'delivered' && s !== 'completed' && s !== 'cancelled' && s !== 'received' && !s.startsWith('starts to');
-  };
+  }
 
   const openSubmissionModal = async (order: any) => {
     setSelectedPO(order);
@@ -318,6 +409,10 @@ export default function DeliveryDashboard() {
           fetchOrders(storedUser.id);
           fetchSummary(storedUser.id);
           startLocationTracking(storedUser.id);
+          
+          Location.getCurrentPositionAsync({}).then(loc => {
+            setCurrentLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+          }).catch(() => {});
         }
       } catch (err) {
         console.error(err);
@@ -401,11 +496,10 @@ export default function DeliveryDashboard() {
         distanceInterval: 10,
       },
       async (location) => {
+        const coords = { lat: location.coords.latitude, lng: location.coords.longitude };
+        setCurrentLocation(coords);
         try {
-          await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${userId}/location`, {
-            lat: location.coords.latitude,
-            lng: location.coords.longitude
-          });
+          await axios.put(`https://napi.bharatmedicalhallplus.com/employees/${userId}/location`, coords);
         } catch (err) {
           console.log("Failed to update location to server");
         }
@@ -704,6 +798,12 @@ export default function DeliveryDashboard() {
                 )}
             </View>
             <Text style={styles.orderId}>Order #{item.id}</Text>
+            {item.order_no ? (
+              <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 2 }}>Order No: {item.order_no}</Text>
+            ) : null}
+            {item.invoice_no ? (
+              <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 2 }}>Invoice No: {item.invoice_no}</Text>
+            ) : null}
           </View>
         <View style={[styles.statusBadge, ['delivered', 'completed', 'received'].includes(item.status?.toLowerCase()) ? styles.statusDelivered : styles.statusPending]}>
           <Text style={styles.statusText}>{item.status}</Text>
@@ -912,13 +1012,13 @@ export default function DeliveryDashboard() {
       )}
 
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Welcome, {user?.full_name}</Text>
+        <View style={{ flex: 1, marginRight: 10 }}>
+          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">Welcome, {user?.full_name}</Text>
           <Text style={styles.subtitle}>GPS: {locationStatus}</Text>
         </View>
         
         {/* Creative Attendance Widget */}
-        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
           {(!summary || summary.can_check_in) && (
             <TouchableOpacity style={{ backgroundColor: '#10b981', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }} onPress={() => handleAction('login')}>
               <Sun size={16} color="#fff" />
@@ -972,6 +1072,40 @@ export default function DeliveryDashboard() {
         </TouchableOpacity>
       </View>
 
+      {/* Route Planner / Shortest Path Segmented Widget */}
+      <View style={{ backgroundColor: '#fff', padding: 15, marginHorizontal: 15, marginBottom: 15, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+        <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b', marginBottom: 10 }}>🗺️ Route Planner (Shortest Path)</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 3, flex: 1 }}>
+            <TouchableOpacity 
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'All' ? '#fff' : 'transparent', alignItems: 'center' }} 
+              onPress={() => setRouteToggle('All')}
+            >
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: routeToggle === 'All' ? '#1e293b' : '#64748b' }}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'Assigned' ? '#fff' : 'transparent', alignItems: 'center' }} 
+              onPress={() => setRouteToggle('Assigned')}
+            >
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: routeToggle === 'Assigned' ? '#1e293b' : '#64748b' }}>Assigned</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'PickedUp' ? '#fff' : 'transparent', alignItems: 'center' }} 
+              onPress={() => setRouteToggle('PickedUp')}
+            >
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: routeToggle === 'PickedUp' ? '#1e293b' : '#64748b' }}>Picked Up</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={{ backgroundColor: '#6366f1', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+            onPress={() => setRouteModalVisible(true)}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>View Map</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={{flexDirection:'row', gap: 10, paddingHorizontal: 15, marginBottom: 15}}>
         {alarmSound && (
           <TouchableOpacity style={[styles.refreshBtn, {backgroundColor: '#ef4444'}]} onPress={stopAlarm}>
@@ -992,6 +1126,12 @@ export default function DeliveryDashboard() {
             if (filterState === 'Completed') return isCompleted; 
             if (filterState === 'Pending') return !isCompleted; 
             return true; 
+          }).sort((a, b) => {
+            const aComp = ['delivered', 'completed', 'received'].includes(a.status?.toLowerCase());
+            const bComp = ['delivered', 'completed', 'received'].includes(b.status?.toLowerCase());
+            if (aComp && !bComp) return 1;
+            if (!aComp && bComp) return -1;
+            return 0;
           })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}
@@ -1353,6 +1493,74 @@ export default function DeliveryDashboard() {
               </View>
             </View>
           </View>
+        </Modal>
+      )}
+
+      {/* ROUTE PLANNER MAP MODAL */}
+      {routeModalVisible && (
+        <Modal visible={routeModalVisible} animationType="slide" onRequestClose={() => setRouteModalVisible(false)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0f172a' }}>Shortest Route ({routeToggle === 'All' ? 'All Active' : routeToggle === 'Assigned' ? 'Assigned' : 'Picked Up'})</Text>
+              <TouchableOpacity onPress={() => setRouteModalVisible(false)} style={{ padding: 4 }}>
+                <X size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Map Container */}
+            <View style={{ height: 350, backgroundColor: '#e2e8f0' }}>
+              <CrossPlatformMap 
+                mapPoints={optimizedRoute.filter(o => o.coords).map(o => ({
+                  id: o.id,
+                  lat: o.coords.lat,
+                  lng: o.coords.lng,
+                  name: o.patient_name || `Order #${o.id}`,
+                  address: o.address
+                })) as any}
+                deliveryBoyLocation={currentLocation || { lat: 17.385044, lng: 78.486671 }}
+                linePositions={[
+                  [currentLocation?.lat || 17.385044, currentLocation?.lng || 78.486671],
+                  ...optimizedRoute.filter(o => o.coords).map(o => [o.coords.lat, o.coords.lng])
+                ] as any}
+                onMarkerPress={() => {}}
+              />
+            </View>
+
+            {/* Stop Sequence List */}
+            <View style={{ flex: 1, padding: 16 }}>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b', marginBottom: 12 }}>Delivery Sequence stops:</Text>
+              {optimizedRoute.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: '#64748b', fontSize: 14, fontStyle: 'italic' }}>No active orders in this list.</Text>
+                </View>
+              ) : (
+                <ScrollView style={{ flex: 1 }}>
+                  {optimizedRoute.map((order, index) => (
+                    <View key={order.id} style={{ flexDirection: 'row', backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', gap: 12 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#e0e7ff', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#4338ca' }}>{index + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: '600', fontSize: 14, color: '#0f172a' }}>{order.patient_name || 'Customer'}</Text>
+                        <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }} numberOfLines={1}>{order.address}</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                          <Text style={{ fontSize: 11, color: '#6366f1', fontWeight: '500' }}>#{order.id}</Text>
+                          {order.order_no && <Text style={{ fontSize: 11, color: '#475569' }}>• Order No: {order.order_no}</Text>}
+                          {order.invoice_no && <Text style={{ fontSize: 11, color: '#475569' }}>• Invoice No: {order.invoice_no}</Text>}
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        style={{ padding: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 
+                        onPress={() => openMap(order.coords?.lat, order.coords?.lng, order.address, order.location_link)}
+                      >
+                        <Navigation size={16} color="#2563eb" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </SafeAreaView>
         </Modal>
       )}
 

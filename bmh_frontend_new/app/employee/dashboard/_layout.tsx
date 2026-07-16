@@ -40,18 +40,24 @@ export default function EmployeeLayout() {
         }
 
         if (!userDataStr) {
-          router.replace('/employee/login');
+          setTimeout(() => {
+            router.replace('/employee/login');
+          }, 0);
         } else {
           const u = JSON.parse(userDataStr);
           if (u.department === 'Delivery') {
-            router.replace('/delivery/dashboard');
+            setTimeout(() => {
+              router.replace('/delivery/dashboard');
+            }, 0);
           } else {
             setUser(u);
             setLoading(false);
           }
         }
       } catch (e) {
-        router.replace('/employee/login');
+        setTimeout(() => {
+          router.replace('/employee/login');
+        }, 0);
       }
     };
     checkAuth();

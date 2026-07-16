@@ -2,33 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, TextInput, useWindowDimensions, ScrollView, Image } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
-import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Eye, Share2, Plus, Phone, Navigation, ChevronDown, X } from 'lucide-react-native';
+import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Eye, Share2, Trash2, Plus, Phone, Navigation, ChevronDown, X } from 'lucide-react-native';
 import { Share } from 'react-native';
 
-const webDatePickerStyle: any = {
-  height: '40px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
-  borderColor: '#cbd5e1',
-  borderRadius: '8px',
-  paddingHorizontal: '12px',
-  fontSize: '14px',
-  backgroundColor: '#fff',
-  color: '#334155',
-  outlineStyle: 'none',
-  padding: '6px 12px',
-  fontFamily: 'inherit'
-};
-
-const webFilterInputStyle = webDatePickerStyle;
-
-export default function PurchaseOrdersScreen() {
+export default function PurchaseOrders({ deliveryBoys }) {
   const { width } = useWindowDimensions();
   const isDesktop = width > 1024;
   const isTablet = width > 768 && width <= 1024;
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [deliveryBoys, setDeliveryBoys] = useState<any[]>([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Search & Filter State
@@ -48,12 +30,13 @@ export default function PurchaseOrdersScreen() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
-  const [assignOrder, setAssignOrder] = useState<any>(null);
+  const [assignOrder, setAssignOrder] = useState(null);
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
   
   // Assign options
-  const [deliveryType, setDeliveryType] = useState('Store'); // Store, Local, Bus
+  const [deliveryType, setDeliveryType] = useState('Local'); // Store, Local, Bus
   const [selectedRiderId, setSelectedRiderId] = useState('');
   const [address, setAddress] = useState('');
   const [gpsLocation, setGpsLocation] = useState('');
@@ -66,12 +49,13 @@ export default function PurchaseOrdersScreen() {
     scheduled_time: ''
   });
 
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [editAddress, setEditAddress] = useState('');
   const [newNote, setNewNote] = useState('');
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState(null);
 
   // Buses list for picker
-  const [buses, setBuses] = useState<any[]>([]);
+  const [buses, setBuses] = useState([]);
 
   // Create Form State (Wholesaler Purchase Order creation)
   const initialFormData = {
@@ -80,8 +64,8 @@ export default function PurchaseOrdersScreen() {
     refname: '',
     refcode: '',
     total: '',
-    details: '[]',
-    delivery_type: 'Store',
+    details: '', // JSON items string
+    delivery_type: 'Local',
     address: '',
     gps_location: '',
     bus_travels_name: '',
@@ -103,7 +87,7 @@ export default function PurchaseOrdersScreen() {
       if (res.data && res.data.success) {
         setOrders(res.data.data);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching purchase orders:', err.message || err);
     } finally {
       if (!silent) setLoading(false);
@@ -121,28 +105,16 @@ export default function PurchaseOrdersScreen() {
     }
   };
 
-  const fetchDeliveryBoys = async () => {
-    try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/delivery-fleet');
-      if (res.data && res.data.success) {
-        setDeliveryBoys(res.data.data);
-      }
-    } catch (err) {
-      console.log('Error fetching delivery fleet:', err);
-    }
-  };
-
   useEffect(() => {
     fetchPurchaseOrders();
     fetchBuses();
-    fetchDeliveryBoys();
     const interval = setInterval(() => {
       fetchPurchaseOrders(true);
     }, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleBusSelection = (busId: string) => {
+  const handleBusSelection = (busId) => {
     if (!busId) return;
     const bus = buses.find(b => b.id.toString() === busId.toString());
     if (bus) {
@@ -210,7 +182,7 @@ export default function PurchaseOrdersScreen() {
     }
   };
 
-  const handleAssignBoy = async (orderId: number, boyId: string) => {
+  const handleAssignBoy = async (orderId, boyId) => {
     try {
       const isUnassign = boyId === 'null' || !boyId;
       
@@ -225,20 +197,27 @@ export default function PurchaseOrdersScreen() {
         }
       }
 
-      const targetOrder = assignOrder || orders.find(o => o.id === orderId);
+      const useModalState = assignOrder && assignOrder.id === orderId;
+      const targetOrder = orders.find(o => o.id === orderId);
 
       const payload = {
-        delivery_type: deliveryType,
+        delivery_type: useModalState ? deliveryType : (targetOrder?.delivery_type || 'Store'),
         delivery_boy_id: isUnassign ? null : boyId,
-        address: deliveryType === 'Local' ? address : null,
-        gps_location: deliveryType === 'Local' ? gpsLocation : null,
-        bus_details: deliveryType === 'Bus' ? busDetails : null,
+        address: useModalState 
+          ? (deliveryType === 'Local' ? address : null) 
+          : (targetOrder?.delivery_type === 'Local' ? targetOrder?.address : null),
+        gps_location: useModalState 
+          ? (deliveryType === 'Local' ? gpsLocation : null) 
+          : (targetOrder?.delivery_type === 'Local' ? targetOrder?.gps_location : null),
+        bus_details: useModalState 
+          ? (deliveryType === 'Bus' ? busDetails : null) 
+          : (targetOrder?.delivery_type === 'Bus' ? targetOrder?.bus_details : null),
         assigned_by: assignedBy
       };
 
       const res = await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/assign/${orderId}`, payload);
       if (res.data.success) {
-        alert('Rider assigned successfully!');
+        alert('Assignment updated successfully!');
         fetchPurchaseOrders(true);
       }
     } catch (err) {
@@ -266,169 +245,168 @@ export default function PurchaseOrdersScreen() {
         const empUser = localStorage.getItem('employeeUser');
         if (adminUser) {
           const auth = JSON.parse(adminUser);
-          author = 'Admin';
+          author = auth.full_name || auth.name || 'Admin';
+          authName = auth.full_name || auth.name || 'Admin';
           modifiedById = auth.id;
           modifiedByType = 'Admin';
-          authName = auth.full_name || auth.name || 'Admin';
         } else if (empUser) {
           const auth = JSON.parse(empUser);
-          author = 'Employee';
+          author = auth.name || 'Employee';
+          authName = auth.name || 'Employee';
           modifiedById = auth.id;
           modifiedByType = 'Employee';
-          authName = auth.name || 'Employee';
         }
       }
 
-      const newNoteObj = {
-        id: Date.now().toString(),
-        text: newNote,
-        date: new Date().toISOString(),
-        author: authName
-      };
-
-      let existingNotes: any[] = [];
-      try {
-        existingNotes = typeof selectedOrder.notes === 'string' ? JSON.parse(selectedOrder.notes) : (selectedOrder.notes || []);
-      } catch(e) {}
-      if (!Array.isArray(existingNotes)) existingNotes = [];
-
-      const updatedNotes = [...existingNotes, newNoteObj];
-
-      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/notes/${selectedOrder.id}`, {
-        notes: JSON.stringify(updatedNotes),
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/update/${selectedOrder.id}`, {
+        address: editAddress || null,
+        new_note: newNote,
+        note_author: author,
         modified_by_id: modifiedById,
         modified_by_type: modifiedByType,
         modified_by_name: authName
       });
-
       if (res.data.success) {
+        setSelectedOrder(res.data.data);
         setNewNote('');
-        const updatedOrd = { ...selectedOrder, notes: updatedNotes, modified_by_name: authName };
-        setSelectedOrder(updatedOrd);
-        // refresh in list
-        setOrders(orders.map(o => o.id === selectedOrder.id ? updatedOrd : o));
+        fetchPurchaseOrders(true);
       }
-    } catch(err) {
+    } catch (err) {
       alert('Failed to add note');
     }
   };
 
-  const handleSaveAddress = async () => {
+  const handleUpdateStatus = async (status) => {
     try {
-      let modifiedById = null;
-      let modifiedByType = 'Employee';
-      let authName = 'Employee';
-
-      if (typeof window !== 'undefined') {
-        const adminUser = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser');
-        const empUser = localStorage.getItem('employeeUser');
-        if (adminUser) {
-          const auth = JSON.parse(adminUser);
-          modifiedById = auth.id;
-          modifiedByType = 'Admin';
-          authName = auth.full_name || auth.name || 'Admin';
-        } else if (empUser) {
-          const auth = JSON.parse(empUser);
-          modifiedById = auth.id;
-          modifiedByType = 'Employee';
-          authName = auth.name || 'Employee';
-        }
-      }
-
-      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/address/${selectedOrder.id}`, {
-        address: editAddress,
-        modified_by_id: modifiedById,
-        modified_by_type: modifiedByType,
-        modified_by_name: authName
-      });
-
+      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/status/${selectedOrder.id}`, { status });
       if (res.data.success) {
-        alert('Address updated successfully!');
-        const updatedOrd = { ...selectedOrder, address: editAddress, modified_by_name: authName };
-        setSelectedOrder(updatedOrd);
-        setOrders(orders.map(o => o.id === selectedOrder.id ? updatedOrd : o));
+        setSelectedOrder(res.data.data);
+        fetchPurchaseOrders(true);
       }
     } catch (err) {
-      alert('Failed to update address');
+      alert('Failed to update status');
     }
   };
 
-  const handleSelectOrderForView = (order: any) => {
-    let parsedNotes = [];
+  const handleDeleteSubmit = async () => {
+    if (!deleteOrderTarget) return;
     try {
-      parsedNotes = typeof order.notes === 'string' ? JSON.parse(order.notes) : (order.notes || []);
-    } catch(e) {}
-    if (!Array.isArray(parsedNotes)) parsedNotes = [];
-    
-    setSelectedOrder({ ...order, notes: parsedNotes });
-    setEditAddress(order.address || '');
-    setViewModalVisible(true);
-  };
-
-  const handleShareOrder = async (order: any) => {
-    let itemsStr = '';
-    try {
-      const items = typeof order.details === 'string' ? JSON.parse(order.details) : (order.details || []);
-      if (Array.isArray(items)) {
-        itemsStr = items.map(itm => `- ${itm.itemName || itm.name} (Qty: ${itm.Qty || itm.quantity})`).join('\n');
+      const res = await axios.delete(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/${deleteOrderTarget.id}`);
+      if (res.data.success) {
+        alert('Purchase Order deleted successfully!');
+        fetchPurchaseOrders();
       }
-    } catch (e) {}
-
-    const text = `*BHARAT MEDICAL HALL - PURCHASE ORDER*\n\nOrder No: ${order.prefix || ''}${order.year || ''}${order.srno || ''}\nWholesaler: ${order.custname || '-'}\nTotal Amount: ₹${order.total || '0.00'}\n\n*Items:*\n${itemsStr || 'No details'}\n\nDelivery Mode: ${order.delivery_type || 'Local'}\n${order.address ? `Address: ${order.address}\n` : ''}`;
-    try {
-      await Share.share({ message: text });
-    } catch (e) {
-      console.log('Sharing failed', e);
+    } catch (err) {
+      alert('Failed to delete purchase order');
+    } finally {
+      setDeleteModalVisible(false);
+      setDeleteOrderTarget(null);
     }
   };
 
-  const openAssignModal = (order: any) => {
+  const handleShareOrder = async (item) => {
+    try {
+      let header = '';
+      if (item.delivery_type === 'Bus') {
+        let busParsed = {};
+        try {
+          busParsed = typeof item.bus_details === 'string' ? JSON.parse(item.bus_details) : item.bus_details;
+        } catch (e) {}
+        header = `${busParsed?.bus_travels_name || 'Bus Travels'} Bus Driver\nPhone: +91${busParsed?.bus_driver_number || ''}`;
+      } else {
+        header = `${item.custname || 'Wholesaler'}\nRef: ${item.refname || 'N/A'}`;
+      }
+
+      const assignedBoy = deliveryBoys.find(b => b.id?.toString() === item.delivery_boy_id?.toString());
+
+      let msg = `${header}\n\n` +
+                `Purchase Order Information:\n` +
+                `Order No: ${item.prefix || ''}${item.year || ''}${item.srno || ''}\n` +
+                `Amount: ${item.total || '0.00'}\n\n` +
+                `Rider Information:\n` +
+                `Name: ${assignedBoy ? assignedBoy.full_name : 'Not assigned'}\n` +
+                `Phone: ${assignedBoy?.phone ? '+91' + assignedBoy.phone : 'N/A'}`;
+
+      if (item.delivery_type === 'Bus') {
+        let busParsed = {};
+        try {
+          busParsed = typeof item.bus_details === 'string' ? JSON.parse(item.bus_details) : item.bus_details;
+        } catch (e) {}
+        msg += `\n\nBus Information:\n` +
+               `Bus Name: ${busParsed?.bus_travels_name || '--'}\n` +
+               `Bus No: ${busParsed?.bus_number || '--'}\n` +
+               `Bus Contact Number: ${busParsed?.bus_driver_number || '--'}\n` +
+               `Date: ${busParsed?.bus_date || '--'}\n` +
+               `Time of Dispatch: ${busParsed?.scheduled_time || '--'}`;
+      }
+      
+      if (Platform.OS === 'web') {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(msg);
+          alert('Details copied to clipboard!');
+        } else {
+          alert('Clipboard not supported on this browser');
+        }
+      } else {
+        await Share.share({ message: msg });
+      }
+    } catch(err) {
+      alert('Error sharing order details');
+    }
+  };
+
+  const handleSelectOrderForView = (order) => {
+    setSelectedOrder(order);
+    setEditAddress(order.address || '');
+  };
+
+  const openAssignModal = (order) => {
     setAssignOrder(order);
     setDeliveryType(order.delivery_type || 'Store');
     setSelectedRiderId(order.delivery_boy_id?.toString() || '');
     setAddress(order.address || '');
     setGpsLocation(order.gps_location || '');
+    
+    let parsedBus = { bus_travels_name: '', bus_driver_name: '', bus_driver_number: '', bus_number: '', bus_date: '', scheduled_time: '' };
     if (order.bus_details) {
       try {
-        const bd = typeof order.bus_details === 'string' ? JSON.parse(order.bus_details) : order.bus_details;
-        setBusDetails({
-          bus_travels_name: bd.bus_travels_name || '',
-          bus_driver_name: bd.bus_driver_name || '',
-          bus_driver_number: bd.bus_driver_number || '',
-          bus_number: bd.bus_number || '',
-          bus_date: bd.bus_date || '',
-          scheduled_time: bd.scheduled_time || ''
-        });
-      } catch (e) {
-        setBusDetails({ bus_travels_name: '', bus_driver_name: '', bus_driver_number: '', bus_number: '', bus_date: '', scheduled_time: '' });
-      }
-    } else {
-      setBusDetails({ bus_travels_name: '', bus_driver_name: '', bus_driver_number: '', bus_number: '', bus_date: '', scheduled_time: '' });
+        parsedBus = typeof order.bus_details === 'string' ? JSON.parse(order.bus_details) : order.bus_details;
+      } catch (e) {}
     }
+    setBusDetails(parsedBus);
     setAssignModalVisible(true);
   };
 
-  // Unique creators dynamically
-  const uniqueCreators = ['All', ...Array.from(new Set(orders.map(o => o.createuser || o.modified_by_name || 'SYSTEM').filter(Boolean)))];
-
-  // Filtering
+  // Filtering purchase orders
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      (order.custname || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (`${order.prefix || ''}${order.year || ''}${order.srno || ''}`).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (order.refname || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const orderNo = `${order.prefix || ''}${order.year || ''}${order.srno || ''}`.toLowerCase();
+    const custName = (order.custname || '').toLowerCase();
+    const refName = (order.refname || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    
+    const matchesSearch = orderNo.includes(query) || custName.includes(query) || refName.includes(query);
 
-    // Status Assignment filter
+    // Assignment filter
     let matchesAssignment = true;
     if (assignmentFilter === 'Pending') {
-      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Completed';
+      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered';
     } else if (assignmentFilter === 'Assigned') {
       matchesAssignment = order.status === 'Assigned';
     } else if (assignmentFilter === 'Delivered') {
-      matchesAssignment = order.status === 'Delivered' || order.status === 'Completed';
+      matchesAssignment = order.status === 'Delivered';
     }
 
-    // Date range filter
+    // Selected boy filter
+    let matchesBoy = true;
+    if (selectedBoyId !== 'All') {
+      if (selectedBoyId === 'unassigned') {
+        matchesBoy = !order.delivery_boy_id;
+      } else {
+        matchesBoy = order.delivery_boy_id?.toString() === selectedBoyId.toString();
+      }
+    }
+
+    // Date filters
     let matchesDate = true;
     if (startDate) {
       const orderDate = new Date(order.created_at || order.createdatetime).toISOString().split('T')[0];
@@ -439,75 +417,67 @@ export default function PurchaseOrdersScreen() {
       matchesDate = orderDate <= endDate;
     }
 
-    // Rider filter
-    let matchesRider = true;
-    if (selectedBoyId !== 'All') {
-      matchesRider = order.delivery_boy_id?.toString() === selectedBoyId.toString();
-    }
-
     // Creator filter
     let matchesCreator = true;
     if (selectedCreator !== 'All') {
-      matchesCreator = (order.createuser || order.modified_by_name || 'SYSTEM').toLowerCase() === selectedCreator.toLowerCase();
+      const orderCreator = order.createuser || order.modified_by_name || 'SYSTEM';
+      matchesCreator = orderCreator.toLowerCase() === selectedCreator.toLowerCase();
     }
 
-    return matchesSearch && matchesAssignment && matchesDate && matchesRider && matchesCreator;
+    return matchesSearch && matchesAssignment && matchesBoy && matchesDate && matchesCreator;
   });
 
-  // Sort latest on top
+  // Sort: Latest dated and time on top (guaranteed)
   const sortedOrders = [...filteredOrders].sort((a, b) => {
-    const dA = new Date(a.created_at || a.createdatetime || 0).getTime();
-    const dB = new Date(b.created_at || b.createdatetime || 0).getTime();
-    return dB - dA;
+    const dateA = new Date(a.created_at || a.createdatetime || 0);
+    const dateB = new Date(b.created_at || b.createdatetime || 0);
+    return dateB.getTime() - dateA.getTime();
   });
 
-  const rowsPerPage = 50;
-  const totalPages = Math.ceil(sortedOrders.length / rowsPerPage) || 1;
-  const paginatedOrders = sortedOrders.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  // Paginated orders
+  const totalPages = Math.ceil(sortedOrders.length / 50) || 1;
+  const paginatedOrders = sortedOrders.slice((page - 1) * 50, page * 50);
 
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, assignmentFilter, startDate, endDate, selectedBoyId, selectedCreator]);
-
-  const renderOrderItem = ({ item, index }: { item: any, index: number }) => {
-    const formattedDate = item.created_at || item.createdatetime
-      ? new Date(item.created_at || item.createdatetime).toLocaleString('en-IN', {
-          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
-        })
-      : '-';
-
-    let statusColor = '#ef4444'; 
-    if (item.status === 'Pending') statusColor = '#3b82f6';
-    else if (item.status === 'Assigned') statusColor = '#f59e0b';
+  const renderOrderItem = ({ item, index }) => {
+    // Determine status badge color
+    let statusColor = '#3b82f6';
+    if (item.status === 'Assigned') statusColor = '#f59e0b';
     else if (item.status === 'Delivered' || item.status === 'Completed') statusColor = '#10b981';
+
+    const formattedDate = item.created_at || item.createdatetime 
+      ? new Date(item.created_at || item.createdatetime).toLocaleDateString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        })
+      : '';
 
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
         {/* Status Badge & Mode Icon */}
-        <View style={[styles.cell, { flex: 0.8, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-          {item.delivery_type === 'Bus' ? <Bus size={14} color="#64748b" /> : 
-           item.delivery_type === 'Local' ? <MapPin size={14} color="#64748b" /> :
-           <Package size={14} color="#64748b" />}
+        <View style={[styles.cell, { flex: 0.8, flexDirection: 'row', alignItems: 'center' }]}>
+          {item.delivery_type === 'Bus' ? <Bus size={14} color="#64748b" style={{ marginRight: 4 }}/> : 
+           item.delivery_type === 'Local' ? <MapPin size={14} color="#64748b" style={{ marginRight: 4 }}/> :
+           <Package size={14} color="#64748b" style={{ marginRight: 4 }}/>}
           <View style={[styles.badge, { backgroundColor: statusColor }]}>
             <Text style={styles.badgeText}>{item.status || 'Pending'}</Text>
           </View>
         </View>
 
-        {/* Customer / Wholesaler */}
+        {/* Wholesaler / Customer Name */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          <Text style={styles.cellTextBold} numberOfLines={1}>{item.custname || '-'}</Text>
-          <Text style={styles.cellSubText}>Ref: {item.refname || '-'}</Text>
+          <Text style={styles.cellTextBold}>{item.custname}</Text>
+          {item.refname ? <Text style={styles.cellSubText}>Ref: {item.refname}</Text> : null}
+          {item.address ? <Text style={[styles.cellSubText, { color: '#4338ca' }]} numberOfLines={1}>Addr: {item.address}</Text> : null}
         </View>
 
-        {/* Order Number */}
+        {/* Order Identifier */}
         <View style={[styles.cell, { flex: 1 }]}>
           <Text style={styles.cellTextBold}>{item.prefix || ''}{item.year || ''}{item.srno || ''}</Text>
           <Text style={styles.cellSubText}>Br: {item.br_code || '001'}</Text>
         </View>
 
-        {/* Delivery Boy selection dropdown */}
+        {/* Delivery boy picker directly inline */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {item.status === 'Delivered' || item.status === 'Completed' ? (
+          {item.status === 'Delivered' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <User size={16} color="#94a3b8" style={{ marginRight: 4 }}/>
               <Text style={styles.cellText} numberOfLines={1}>
@@ -564,6 +534,12 @@ export default function PurchaseOrdersScreen() {
           >
             <Share2 size={14} color="#b45309" />
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: '#fee2e2' }]} 
+            onPress={() => { setDeleteOrderTarget(item); setDeleteModalVisible(true); }}
+          >
+            <Trash2 size={14} color="#ef4444" />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -571,164 +547,147 @@ export default function PurchaseOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Top Filter Panel */}
+      {/* Top Filter & Actions Header */}
       <View style={styles.header}>
         <View style={styles.filters}>
+          {/* Search */}
           <View style={styles.searchContainer}>
-            <Search size={16} color="#64748b" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search PO/Wholesaler..."
+            <Search size={16} color="#94a3b8" style={styles.searchIcon} />
+            <TextInput 
+              style={styles.searchInput} 
+              placeholder="Search PO/Wholesaler..." 
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#94a3b8"
             />
           </View>
 
-          {/* Rider selection dropdown */}
-          <View style={{ position: 'relative', zIndex: 999 }}>
+          {/* Rider Selection Dropdown */}
+          <View style={{ position: 'relative', zIndex: 110 }}>
             <TouchableOpacity 
-              style={styles.riderSelectBtn}
               onPress={() => setRiderDropdownOpen(!riderDropdownOpen)}
+              style={styles.riderSelectBtn}
             >
-              <Text style={{ fontSize: 13, color: '#334155' }} numberOfLines={1}>
-                Rider: {deliveryBoys.find(b => b.id?.toString() === selectedBoyId.toString())?.full_name || 'All Riders'}
+              <Text style={{ fontSize: 13, color: '#334155' }}>
+                Rider: {selectedBoyId === 'All' ? 'All Riders' : selectedBoyId === 'unassigned' ? 'Unassigned' : deliveryBoys.find(b => b.id.toString() === selectedBoyId.toString())?.full_name || 'Selected Rider'}
               </Text>
               <ChevronDown size={14} color="#64748b" />
             </TouchableOpacity>
 
             {riderDropdownOpen && (
               <View style={styles.riderDropdown}>
-                <TextInput
+                <TextInput 
                   style={styles.riderSearchInput}
-                  placeholder="Search Rider..."
+                  placeholder="Search rider..."
                   value={deliveryBoySearchQuery}
                   onChangeText={setDeliveryBoySearchQuery}
-                  placeholderTextColor="#94a3b8"
                 />
                 <ScrollView style={{ maxHeight: 200 }}>
                   <TouchableOpacity 
-                    style={styles.riderDropdownItem}
                     onPress={() => {
                       setSelectedBoyId('All');
                       setRiderDropdownOpen(false);
                       setDeliveryBoySearchQuery('');
                     }}
+                    style={styles.riderDropdownItem}
                   >
-                    <Text style={{ fontSize: 13, color: selectedBoyId === 'All' ? '#4338ca' : '#334155', fontWeight: selectedBoyId === 'All' ? '600' : '400' }}>All Riders</Text>
+                    <Text style={{ fontSize: 13, color: selectedBoyId === 'All' ? '#4338ca' : '#334155', fontWeight: selectedBoyId === 'All' ? '600' : 'normal' }}>All Riders</Text>
                   </TouchableOpacity>
-                  {deliveryBoys
-                    .filter(b => b.full_name?.toLowerCase().includes(deliveryBoySearchQuery.toLowerCase()))
-                    .map(boy => (
-                      <TouchableOpacity 
-                        key={boy.id}
-                        style={styles.riderDropdownItem}
-                        onPress={() => {
-                          setSelectedBoyId(boy.id);
-                          setRiderDropdownOpen(false);
-                          setDeliveryBoySearchQuery('');
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, color: selectedBoyId?.toString() === boy.id?.toString() ? '#4338ca' : '#334155', fontWeight: selectedBoyId?.toString() === boy.id?.toString() ? '600' : '400' }}>{boy.full_name}</Text>
-                      </TouchableOpacity>
-                    ))}
+
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setSelectedBoyId('unassigned');
+                      setRiderDropdownOpen(false);
+                      setDeliveryBoySearchQuery('');
+                    }}
+                    style={styles.riderDropdownItem}
+                  >
+                    <Text style={{ fontSize: 13, color: selectedBoyId === 'unassigned' ? '#4338ca' : '#334155', fontWeight: selectedBoyId === 'unassigned' ? '600' : 'normal' }}>Unassigned</Text>
+                  </TouchableOpacity>
+
+                  {deliveryBoys.filter(b => b.full_name?.toLowerCase().includes(deliveryBoySearchQuery.toLowerCase())).map((boy) => (
+                    <TouchableOpacity 
+                      key={boy.id}
+                      onPress={() => {
+                        setSelectedBoyId(boy.id.toString());
+                        setRiderDropdownOpen(false);
+                        setDeliveryBoySearchQuery('');
+                      }}
+                      style={styles.riderDropdownItem}
+                    >
+                      <Text style={{ fontSize: 13, color: selectedBoyId.toString() === boy.id.toString() ? '#4338ca' : '#334155', fontWeight: selectedBoyId.toString() === boy.id.toString() ? '600' : 'normal' }}>
+                        {boy.full_name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </ScrollView>
               </View>
             )}
           </View>
 
-          {/* Date range inputs */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Calendar size={16} color="#64748b" />
+          {/* Creator Selection Dropdown */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={selectedCreator}
+              onValueChange={(val) => setSelectedCreator(val)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Creator: All" value="All" />
+              {['All', ...new Set(orders.map(order => order.createuser || order.modified_by_name || 'SYSTEM').filter(Boolean))].filter(c => c !== 'All').map((creator) => (
+                <Picker.Item key={creator} label={`Creator: ${creator}`} value={creator} />
+              ))}
+            </Picker>
+          </View>
+
+          {/* Date range pickers */}
+          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>Date Range:</Text>
             {Platform.OS === 'web' ? (
               <input 
                 type="date" 
                 value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)} 
-                style={webFilterInputStyle} 
+                onChange={(e) => setStartDate(e.target.value)}
+                style={webFilterInputStyle}
               />
             ) : (
-              <TextInput 
-                style={[styles.pickerWrapper, { width: 100, paddingHorizontal: 8, fontSize: 12 }]} 
-                placeholder="From Date" 
-                value={startDate} 
-                onChangeText={setStartDate} 
-              />
+              <TextInput style={styles.mobileDateInput} placeholder="Start Date" value={startDate} onChangeText={setStartDate} />
             )}
             <Text style={{ fontSize: 13, color: '#64748b' }}>to</Text>
             {Platform.OS === 'web' ? (
               <input 
                 type="date" 
                 value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
-                style={webFilterInputStyle} 
+                onChange={(e) => setEndDate(e.target.value)}
+                style={webFilterInputStyle}
               />
             ) : (
-              <TextInput 
-                style={[styles.pickerWrapper, { width: 100, paddingHorizontal: 8, fontSize: 12 }]} 
-                placeholder="To Date" 
-                value={endDate} 
-                onChangeText={setEndDate} 
-              />
+              <TextInput style={styles.mobileDateInput} placeholder="End Date" value={endDate} onChangeText={setEndDate} />
             )}
-
             {(startDate || endDate) && (
-              <TouchableOpacity onPress={() => { setStartDate(''); setEndDate(''); }} style={{ padding: 4 }}>
-                <X size={16} color="#ef4444" />
+              <TouchableOpacity onPress={() => { setStartDate(''); setEndDate(''); }} style={{ padding: 6, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Clear</Text>
               </TouchableOpacity>
             )}
           </View>
+        </View>
 
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {/* Add Manual Wholesaler Purchase Order button */}
           <TouchableOpacity style={styles.addBtn} onPress={() => setCreateModalVisible(true)}>
-            <Plus size={18} color="#fff" style={{ marginRight: 6 }} />
+            <Plus size={16} color="#fff" style={{ marginRight: 4 }} />
             <Text style={styles.addBtnText}>Add Orders</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Dynamic Creator Filter Tabs */}
-      <View style={styles.creatorTabsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-          {uniqueCreators.map((creator) => (
-            <TouchableOpacity
-              key={creator}
-              onPress={() => {
-                setSelectedCreator(creator);
-                setPage(1);
-              }}
-              style={[
-                styles.creatorTab,
-                selectedCreator === creator && styles.creatorTabActive
-              ]}
-            >
-              <Text style={[
-                styles.creatorTabText,
-                selectedCreator === creator && styles.creatorTabTextActive
-              ]}>
-                {creator === 'All' ? 'All Creators' : creator}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Assignment Filters (All, Pending, Assigned, Delivered) */}
+      {/* Main Tabular Grid Section */}
       <View style={styles.statusChipsRow}>
         {['All', 'Pending', 'Assigned', 'Delivered'].map((status) => (
-          <TouchableOpacity
+          <TouchableOpacity 
             key={status}
             onPress={() => setAssignmentFilter(status)}
-            style={[
-              styles.statusChip,
-              assignmentFilter === status && styles.statusChipActive
-            ]}
+            style={[styles.statusChip, assignmentFilter === status && styles.statusChipActive]}
           >
-            <Text style={[
-              styles.statusChipText,
-              assignmentFilter === status && styles.statusChipTextActive
-            ]}>
-              {status}
-            </Text>
+            <Text style={[styles.statusChipText, assignmentFilter === status && styles.statusChipTextActive]}>{status}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -745,7 +704,7 @@ export default function PurchaseOrdersScreen() {
           <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
           <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>Actions</Text>
         </View>
-
+        
         {loading ? (
           <ActivityIndicator size="large" color="#4338ca" style={{ marginTop: 50 }} />
         ) : (
@@ -763,7 +722,7 @@ export default function PurchaseOrdersScreen() {
           />
         )}
 
-        {/* Pagination Controls */}
+        {/* Pagination bar matching ManualOrders.jsx */}
         <View style={styles.paginationContainer}>
           <TouchableOpacity 
             disabled={page <= 1} 
@@ -806,36 +765,51 @@ export default function PurchaseOrdersScreen() {
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Wholesaler Code</Text>
-                  <TextInput style={styles.input} value={formData.custcode} onChangeText={(t) => setFormData({...formData, custcode: t})} placeholder="e.g. S00033" />
+                  <TextInput style={styles.input} value={formData.custcode} onChangeText={(t) => setFormData({...formData, custcode: t})} placeholder="e.g. WH001" />
                 </View>
               </View>
 
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
-                  <Text style={styles.label}>Sales Reference / Supplier Name</Text>
+                  <Text style={styles.label}>Reference Name</Text>
                   <TextInput style={styles.input} value={formData.refname} onChangeText={(t) => setFormData({...formData, refname: t})} placeholder="e.g. BHARAT MEDICAL HALL" />
                 </View>
                 <View style={styles.formCol}>
                   <Text style={styles.label}>Reference Code</Text>
-                  <TextInput style={styles.input} value={formData.refcode} onChangeText={(t) => setFormData({...formData, refcode: t})} placeholder="e.g. REF001" />
+                  <TextInput style={styles.input} value={formData.refcode} onChangeText={(t) => setFormData({...formData, refcode: t})} placeholder="Reference Code" />
                 </View>
               </View>
 
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
-                  <Text style={styles.label}>Total Amount *</Text>
-                  <TextInput style={styles.input} value={formData.total} onChangeText={(t) => setFormData({...formData, total: t})} placeholder="₹ Total Amount" keyboardType="numeric" />
+                  <Text style={styles.label}>Order Prefix (Default: PO)</Text>
+                  <TextInput style={styles.input} value={formData.prefix} onChangeText={(t) => setFormData({...formData, prefix: t})} placeholder="PO" />
                 </View>
                 <View style={styles.formCol}>
-                  <Text style={styles.label}>Delivery Mode *</Text>
-                  <View style={styles.pickerContainer}>
+                  <Text style={styles.label}>Order Year</Text>
+                  <TextInput style={styles.input} value={formData.year} onChangeText={(t) => setFormData({...formData, year: t})} placeholder="Year" />
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.label}>Serial Number</Text>
+                  <TextInput style={styles.input} value={formData.srno} onChangeText={(t) => setFormData({...formData, srno: t})} placeholder="Serial No" />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.label}>Total Amount (₹)</Text>
+                  <TextInput style={styles.input} value={formData.total} onChangeText={(t) => setFormData({...formData, total: t})} placeholder="Total price" keyboardType="numeric" />
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.label}>Mode of Delivery</Text>
+                  <View style={styles.dropdownWrapper}>
                     <Picker
                       selectedValue={formData.delivery_type}
-                      onValueChange={(itemValue) => setFormData({...formData, delivery_type: itemValue})}
-                      style={styles.formPicker}
+                      onValueChange={(val) => setFormData({...formData, delivery_type: val})}
+                      style={styles.picker}
                     >
-                      <Picker.Item label="Direct Store Pickup" value="Store" />
-                      <Picker.Item label="Local Delivery" value="Local" />
+                      <Picker.Item label="Store Pickup" value="Store" />
+                      <Picker.Item label="Local Pickup/Delivery" value="Local" />
                       <Picker.Item label="Bus Transport" value="Bus" />
                     </Picker>
                   </View>
@@ -845,267 +819,115 @@ export default function PurchaseOrdersScreen() {
               {formData.delivery_type === 'Local' && (
                 <View style={styles.formRow}>
                   <View style={styles.formCol}>
-                    <Text style={styles.label}>Delivery Address</Text>
-                    <TextInput style={styles.input} value={formData.address} onChangeText={(t) => setFormData({...formData, address: t})} placeholder="e.g. Baripada, Odisha" />
+                    <Text style={styles.label}>Pickup Address</Text>
+                    <TextInput style={styles.input} value={formData.address} onChangeText={(t) => setFormData({...formData, address: t})} placeholder="Pickup address details" />
                   </View>
                   <View style={styles.formCol}>
-                    <Text style={styles.label}>GPS Coordinates / Location URL</Text>
-                    <TextInput style={styles.input} value={formData.gps_location} onChangeText={(t) => setFormData({...formData, gps_location: t})} placeholder="GPS link" />
+                    <Text style={styles.label}>Google Maps Navigation Link</Text>
+                    <TextInput style={styles.input} value={formData.gps_location} onChangeText={(t) => setFormData({...formData, gps_location: t})} placeholder="Google Maps URL" />
                   </View>
                 </View>
               )}
 
               {formData.delivery_type === 'Bus' && (
-                <>
+                <View style={{ marginTop: 10, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#334155', marginBottom: 8 }}>Bus Details Setup</Text>
+                  
                   <View style={styles.formRow}>
                     <View style={styles.formCol}>
-                      <Text style={styles.label}>Select From Template (Pre-configured Buses)</Text>
-                      <View style={styles.pickerContainer}>
+                      <Text style={styles.label}>Select Saved Bus Stop</Text>
+                      <View style={styles.dropdownWrapper}>
                         <Picker
                           selectedValue=""
                           onValueChange={(val) => handleBusSelection(val)}
-                          style={styles.formPicker}
+                          style={styles.picker}
                         >
-                          <Picker.Item label="-- Choose Bus Route --" value="" />
+                          <Picker.Item label="-- Choose Bus --" value="" />
                           {buses.map(b => (
-                            <Picker.Item key={b.id} label={`${b.operator_name || b.bus_name} (${b.bus_number})`} value={b.id.toString()} />
+                            <Picker.Item key={b.id} label={`${b.operator_name || b.bus_name} (${b.departure_time || ''}) - to ${b.destination}`} value={b.id.toString()} />
                           ))}
                         </Picker>
                       </View>
                     </View>
-                  </View>
-
-                  <View style={styles.formRow}>
                     <View style={styles.formCol}>
-                      <Text style={styles.label}>Bus Travels / Operator Name</Text>
-                      <TextInput style={styles.input} value={formData.bus_travels_name} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="e.g. Dilip Travels" />
-                    </View>
-                    <View style={styles.formCol}>
-                      <Text style={styles.label}>Driver Name</Text>
-                      <TextInput style={styles.input} value={formData.bus_driver_name} onChangeText={(t) => setFormData({...formData, bus_driver_name: t})} placeholder="e.g. John Doe" />
+                      <Text style={styles.label}>Bus Driver Name</Text>
+                      <TextInput style={styles.input} value={formData.bus_driver_name} onChangeText={(t) => setFormData({...formData, bus_driver_name: t})} placeholder="Driver Name" />
                     </View>
                   </View>
 
                   <View style={styles.formRow}>
                     <View style={styles.formCol}>
-                      <Text style={styles.label}>Driver Contact Number</Text>
-                      <TextInput style={styles.input} value={formData.bus_driver_number} onChangeText={(t) => setFormData({...formData, bus_driver_number: t})} placeholder="e.g. 9876543210" />
+                      <Text style={styles.label}>Bus Driver Number</Text>
+                      <TextInput style={styles.input} value={formData.bus_driver_number} onChangeText={(t) => setFormData({...formData, bus_driver_number: t.replace(/\s+/g, '')})} placeholder="Driver Phone" />
                     </View>
                     <View style={styles.formCol}>
-                      <Text style={styles.label}>Bus Plate Number</Text>
-                      <TextInput style={styles.input} value={formData.bus_number} onChangeText={(t) => setFormData({...formData, bus_number: t})} placeholder="e.g. OR 11 A 1234" />
+                      <Text style={styles.label}>Bus Number</Text>
+                      <TextInput style={styles.input} value={formData.bus_number} onChangeText={(t) => setFormData({...formData, bus_number: t})} placeholder="Plate No" />
+                    </View>
+                    <View style={styles.formCol}>
+                      <Text style={styles.label}>Travels Name</Text>
+                      <TextInput style={styles.input} value={formData.bus_travels_name} onChangeText={(t) => setFormData({...formData, bus_travels_name: t})} placeholder="Travels" />
                     </View>
                   </View>
 
                   <View style={styles.formRow}>
                     <View style={styles.formCol}>
-                      <Text style={styles.label}>Departure/Arrival Date</Text>
+                      <Text style={styles.label}>Bus Departure Date</Text>
                       {Platform.OS === 'web' ? (
-                        <input
-                          type="date"
-                          value={formData.bus_date}
+                        <input 
+                          type="date" 
+                          value={formData.bus_date} 
                           onChange={(e) => setFormData({...formData, bus_date: e.target.value})}
-                          style={webDatePickerStyle}
+                          style={webFilterInputStyle}
                         />
                       ) : (
-                        <TextInput style={styles.input} value={formData.bus_date} onChangeText={(t) => setFormData({...formData, bus_date: t})} placeholder="YYYY-MM-DD" />
+                        <TextInput style={styles.input} placeholder="YYYY-MM-DD" value={formData.bus_date} onChangeText={(t) => setFormData({...formData, bus_date: t})} />
                       )}
                     </View>
                     <View style={styles.formCol}>
-                      <Text style={styles.label}>Scheduled Departure Time</Text>
-                      <TextInput style={styles.input} value={formData.scheduled_time} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} placeholder="e.g. 10:30 AM" />
+                      <Text style={styles.label}>Departure Time</Text>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="time" 
+                          value={formData.scheduled_time} 
+                          onChange={(e) => setFormData({...formData, scheduled_time: e.target.value})}
+                          style={webFilterInputStyle}
+                        />
+                      ) : (
+                        <TextInput style={styles.input} placeholder="HH:MM" value={formData.scheduled_time} onChangeText={(t) => setFormData({...formData, scheduled_time: t})} />
+                      )}
                     </View>
                   </View>
-                </>
+                </View>
               )}
 
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
-                  <Text style={styles.label}>Items / JSON Details Array</Text>
-                  <TextInput
-                    style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
-                    multiline
-                    value={formData.details}
-                    onChangeText={(t) => setFormData({...formData, details: t})}
-                    placeholder='e.g. [{"itemName":"Product A","itemCode":"P1","Qty":10,"rate":100}]'
+                  <Text style={styles.label}>Items / Details (JSON Array format or Text)</Text>
+                  <TextInput 
+                    style={[styles.input, { height: 60 }]} 
+                    multiline 
+                    value={formData.details} 
+                    onChangeText={(t) => setFormData({...formData, details: t})} 
+                    placeholder='e.g. [{"itemName": "Paracetamol", "Qty": 10, "rate": 15}]' 
                   />
                 </View>
               </View>
-
-              <TouchableOpacity style={styles.saveBtn} onPress={handleCreateSubmit}>
-                <Text style={styles.saveBtnText}>Submit Order</Text>
-              </TouchableOpacity>
             </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#ef4444', marginRight: 10 }]} onPress={() => setFormData(initialFormData)}>
+                <Text style={styles.saveBtnText}>Clear Form</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleCreateSubmit}>
+                <Text style={styles.saveBtnText}>Save Purchase Order</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* VIEW ORDER DETAILS & LOGS & NOTES MODAL */}
-      {selectedOrder && (
-        <Modal visible={viewModalVisible} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { width: isDesktop ? 900 : '95%', maxHeight: '90%' }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>PO Detailed Specifications</Text>
-                <TouchableOpacity onPress={() => { setViewModalVisible(false); setSelectedOrder(null); }}>
-                  <X size={24} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={styles.modalBody}>
-                <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 20 }}>
-                  
-                  {/* Left Column: Spec Sheet */}
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.sectionHeader}>Reference Spec sheet</Text>
-                    
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Wholesaler:</Text>
-                      <Text style={styles.detailValue}>{selectedOrder.custname}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Code:</Text>
-                      <Text style={styles.detailValue}>{selectedOrder.custcode || '-'}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Order Ident:</Text>
-                      <Text style={styles.detailValue}>{selectedOrder.prefix}{selectedOrder.year}{selectedOrder.srno}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Supplier Ref:</Text>
-                      <Text style={styles.detailValue}>{selectedOrder.refname} (Code: {selectedOrder.refcode || '-'})</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Total Amount:</Text>
-                      <Text style={[styles.detailValue, { fontWeight: '700', color: '#10b981' }]}>₹{selectedOrder.total}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Delivery Mode:</Text>
-                      <Text style={styles.detailValue}>{selectedOrder.delivery_type || 'Local'}</Text>
-                    </View>
-
-                    {selectedOrder.delivery_type === 'Local' && (
-                      <View style={{ marginTop: 8, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a', marginBottom: 6 }}>Pickup Details</Text>
-                        <TextInput 
-                          style={[styles.input, { marginBottom: 8, fontSize: 13, padding: 8 }]} 
-                          value={editAddress} 
-                          onChangeText={setEditAddress}
-                          placeholder="Edit Pickup/Delivery Address"
-                        />
-                        <TouchableOpacity style={[styles.saveBtn, { paddingVertical: 8, marginTop: 4 }]} onPress={handleSaveAddress}>
-                          <Text style={{ fontSize: 13, color: '#fff', fontWeight: 'bold' }}>Update Address</Text>
-                        </TouchableOpacity>
-                        
-                        {selectedOrder.gps_location ? (
-                          <TouchableOpacity 
-                            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}
-                            onPress={() => window.open(selectedOrder.gps_location, '_blank')}
-                          >
-                            <Navigation size={14} color="#2563eb" />
-                            <Text style={{ fontSize: 12, color: '#2563eb', textDecorationLine: 'underline' }}>Open Maps URL Coordinates</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-                    )}
-
-                    {selectedOrder.delivery_type === 'Bus' && selectedOrder.bus_details && (
-                      <View style={{ marginTop: 8, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a', marginBottom: 6 }}>Bus Consignment Details</Text>
-                        {(() => {
-                          let bd: any = {};
-                          try {
-                            bd = typeof selectedOrder.bus_details === 'string' ? JSON.parse(selectedOrder.bus_details) : selectedOrder.bus_details;
-                          } catch(e) {}
-                          return (
-                            <View style={{ gap: 4 }}>
-                              <Text style={{ fontSize: 12, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Travels:</Text> {bd.bus_travels_name || bd.bus_name || '-'}</Text>
-                              <Text style={{ fontSize: 12, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Plate:</Text> {bd.bus_number || '-'}</Text>
-                              <Text style={{ fontSize: 12, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Driver:</Text> {bd.bus_driver_name || '-'} ({bd.bus_driver_number || '-'})</Text>
-                              <Text style={{ fontSize: 12, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Departure Time:</Text> {bd.scheduled_time || '-'}</Text>
-                              <Text style={{ fontSize: 12, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Date:</Text> {bd.bus_date || '-'}</Text>
-                            </View>
-                          );
-                        })()}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Right Column: Items and Notes */}
-                  <View style={{ flex: 1.5, gap: 16 }}>
-                    {/* Items Section */}
-                    <View>
-                      <Text style={styles.sectionHeader}>Line Items Array List</Text>
-                      <View style={styles.itemsTable}>
-                        {(() => {
-                          let items: any[] = [];
-                          try {
-                            items = typeof selectedOrder.details === 'string' ? JSON.parse(selectedOrder.details) : selectedOrder.details;
-                          } catch(e) {}
-
-                          if (!Array.isArray(items) || items.length === 0) {
-                            return <Text style={{ fontSize: 13, color: '#64748b', padding: 12 }}>No items details recorded.</Text>;
-                          }
-
-                          return items.map((itm, idx) => (
-                            <View key={idx} style={styles.itemRow}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e293b' }}>{itm.itemName || itm.name}</Text>
-                                <Text style={{ fontSize: 11, color: '#64748b' }}>Code: {itm.itemCode || itm.code || '-'}</Text>
-                              </View>
-                              <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#4338ca' }}>Qty: {itm.Qty || itm.quantity}</Text>
-                                <Text style={{ fontSize: 11, color: '#64748b' }}>Rate: ₹{itm.rate}</Text>
-                              </View>
-                            </View>
-                          ));
-                        })()}
-                      </View>
-                    </View>
-
-                    {/* Notes & Audit Trails */}
-                    <View>
-                      <Text style={styles.sectionHeader}>Action Logs & Notes</Text>
-                      
-                      {/* Notes list */}
-                      <View style={{ maxHeight: 150, marginBottom: 10 }}>
-                        {selectedOrder.notes && selectedOrder.notes.length > 0 ? (
-                          selectedOrder.notes.map((n: any, idx: number) => (
-                            <View key={idx} style={styles.noteItem}>
-                              <Text style={{ fontSize: 12, color: '#334155', fontWeight: '500' }}>{n.text}</Text>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                                <Text style={{ fontSize: 10, color: '#94a3b8' }}>By: {n.author}</Text>
-                                <Text style={{ fontSize: 10, color: '#94a3b8' }}>{new Date(n.date).toLocaleDateString()}</Text>
-                              </View>
-                            </View>
-                          ))
-                        ) : (
-                          <Text style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', paddingVertical: 6 }}>No comments logged yet.</Text>
-                        )}
-                      </View>
-
-                      {/* Add note input */}
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TextInput
-                          style={[styles.input, { flex: 1, padding: 8, fontSize: 13 }]}
-                          placeholder="Log notes / delivery coordinates..."
-                          value={newNote}
-                          onChangeText={setNewNote}
-                        />
-                        <TouchableOpacity style={[styles.saveBtn, { paddingHorizontal: 16, marginTop: 0 }]} onPress={handleAddNote}>
-                          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Add Log</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* RIDER ASSIGNMENT MODAL (IDENTICAL TO ORDER-ASSIGN TAB) */}
+      {/* RIDER ASSIGNMENT MODAL */}
       {assignOrder && (
         <Modal visible={assignModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -1236,10 +1058,10 @@ export default function PurchaseOrdersScreen() {
               </ScrollView>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#ef4444', marginRight: 8, paddingHorizontal: 16 }]} onPress={() => { setAssignModalVisible(false); setAssignOrder(null); }}>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#ef4444', marginRight: 8 }]} onPress={() => { setAssignModalVisible(false); setAssignOrder(null); }}>
                   <Text style={styles.saveBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.saveBtn, { paddingHorizontal: 16 }]} onPress={handleAssignSubmit}>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleAssignSubmit}>
                   <Text style={styles.saveBtnText}>Confirm Assignment</Text>
                 </TouchableOpacity>
               </View>
@@ -1247,9 +1069,132 @@ export default function PurchaseOrdersScreen() {
           </View>
         </Modal>
       )}
+
+      {/* VIEW PO DETAILS & NOTES MODAL */}
+      {selectedOrder && (
+        <Modal visible={!!selectedOrder} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: isDesktop ? 700 : '95%', maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Purchase Order Details</Text>
+                <TouchableOpacity onPress={() => setSelectedOrder(null)}>
+                  <X size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ flex: 1, marginTop: 10 }}>
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>General Information</Text>
+                  <Text style={styles.detailsText}>Customer/Wholesaler: {selectedOrder.custname} ({selectedOrder.custcode})</Text>
+                  <Text style={styles.detailsText}>PO Code: {selectedOrder.prefix || ''}{selectedOrder.year || ''}{selectedOrder.srno || ''}</Text>
+                  <Text style={styles.detailsText}>Reference: {selectedOrder.refname || 'N/A'}</Text>
+                  <Text style={styles.detailsText}>Status: {selectedOrder.status || 'Pending'}</Text>
+                </View>
+
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>Delivery Details</Text>
+                  <Text style={styles.detailsText}>Type: {selectedOrder.delivery_type}</Text>
+                  
+                  <Text style={styles.label}>Pickup Address</Text>
+                  <TextInput 
+                    style={styles.modalInput} 
+                    value={editAddress} 
+                    onChangeText={setEditAddress}
+                    placeholder="Modify pickup address"
+                  />
+                </View>
+
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>Items Ordered</Text>
+                  {(() => {
+                    let items = [];
+                    try {
+                      items = typeof selectedOrder.details === 'string' ? JSON.parse(selectedOrder.details) : selectedOrder.details;
+                    } catch (e) {}
+
+                    if (!Array.isArray(items) || items.length === 0) {
+                      return <Text style={{ color: '#64748b' }}>No items listed.</Text>;
+                    }
+
+                    return items.map((itm, index) => (
+                      <View key={index} style={styles.itemRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: '600', color: '#1e293b' }}>{itm.itemName || itm.name}</Text>
+                          <Text style={{ fontSize: 12, color: '#64748b' }}>Code: {itm.itemCode || itm.code}</Text>
+                        </View>
+                        <Text style={{ fontWeight: '600', color: '#4338ca' }}>Qty: {itm.Qty || itm.quantity} | Rate: ₹{itm.rate}</Text>
+                      </View>
+                    ));
+                  })()}
+                </View>
+
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>Status Management</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    {selectedOrder.status !== 'Delivered' && (
+                      <TouchableOpacity onPress={() => handleUpdateStatus('Delivered')} style={[styles.stateBtn, { backgroundColor: '#10b981' }]}>
+                        <Text style={styles.stateBtnText}>Mark Delivered</Text>
+                      </TouchableOpacity>
+                    )}
+                    {selectedOrder.status !== 'Cancelled' && (
+                      <TouchableOpacity onPress={() => handleUpdateStatus('Cancelled')} style={[styles.stateBtn, { backgroundColor: '#ef4444' }]}>
+                        <Text style={styles.stateBtnText}>Cancel Order</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.detailsGroup}>
+                  <Text style={styles.detailsTitle}>Activity Logs & Notes</Text>
+                  <View style={{ marginTop: 10 }}>
+                    <TextInput 
+                      style={[styles.modalInput, { height: 60 }]} 
+                      multiline 
+                      value={newNote} 
+                      onChangeText={setNewNote} 
+                      placeholder="Add status or activity note..." 
+                    />
+                    <TouchableOpacity onPress={handleAddNote} style={styles.noteSaveBtn}>
+                      <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save note & updates</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: 350 }]}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#0f172a', marginBottom: 12 }}>Delete Purchase Order</Text>
+            <Text style={{ fontSize: 14, color: '#475569', marginBottom: 20 }}>Are you sure you want to delete this purchase order? This action cannot be undone.</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#e2e8f0' }]} onPress={() => { setDeleteModalVisible(false); setDeleteOrderTarget(null); }}>
+                <Text style={{ color: '#475569', fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#ef4444' }]} onPress={handleDeleteSubmit}>
+                <Text style={styles.saveBtnText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+const webFilterInputStyle = {
+  padding: '6px 10px',
+  borderRadius: '8px',
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#fff',
+  fontSize: '13px',
+  boxSizing: 'border-box',
+  outlineStyle: 'none'
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12 },
@@ -1257,9 +1202,9 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', gap: 10, flex: 1, flexWrap: 'wrap', alignItems: 'center', zIndex: 100, elevation: 10, position: 'relative' },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 32, width: 210 },
   searchIcon: { marginRight: 6 },
-  searchInput: { flex: 1, height: '100%', outlineStyle: 'none' as any, fontSize: 13, color: '#334155' },
+  searchInput: { flex: 1, height: '100%', outlineStyle: 'none', fontSize: 13, color: '#334155' },
   dropdownWrapper: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140 },
-  picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }) as any, fontSize: 13, color: '#334155' },
+  picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13, color: '#334155' },
   riderSelectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', minWidth: 160, gap: 6 },
   riderDropdown: { position: 'absolute', top: 36, left: 0, right: 0, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 5, padding: 8, zIndex: 999, minWidth: 200 },
   riderSearchInput: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, padding: 6, fontSize: 13, marginBottom: 8 },
@@ -1271,11 +1216,6 @@ const styles = StyleSheet.create({
   statusChipActive: { backgroundColor: '#4338ca', borderColor: '#4338ca' },
   statusChipText: { fontSize: 11, color: '#64748b', fontWeight: '500' },
   statusChipTextActive: { color: 'white', fontWeight: '600' },
-  creatorTabsWrapper: { backgroundColor: '#f8fafc', paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', marginBottom: 12, borderRadius: 8 },
-  creatorTab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#e2e8f0', marginRight: 8, justifyContent: 'center', alignItems: 'center' },
-  creatorTabActive: { backgroundColor: '#4338ca' },
-  creatorTabText: { fontSize: 12, color: '#475569', fontWeight: '600' },
-  creatorTabTextActive: { color: '#fff' },
   tableContainer: { flex: 1, minHeight: 400, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff' },
   tableHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerText: { fontSize: 12, fontWeight: '700', color: '#475569' },
@@ -1284,10 +1224,15 @@ const styles = StyleSheet.create({
   cellText: { fontSize: 13, color: '#334155' },
   cellTextBold: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
   cellSubText: { fontSize: 11, color: '#64748b', marginTop: 2 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   badgeText: { fontSize: 10, fontWeight: '600', color: '#fff', textTransform: 'capitalize' },
+  avatar: { width: 20, height: 20, borderRadius: 10, marginRight: 6 },
   pickerWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4, backgroundColor: '#fff', height: 28, justifyContent: 'center' },
+  inlinePicker: { height: 28, fontSize: 12, borderWidth: 0, backgroundColor: 'transparent', ...Platform.select({ web: { outlineStyle: 'none' } }) },
   actionBtn: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  mobileDateInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, backgroundColor: '#fff', height: 32 },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 12 },
+  emptyText: { color: '#64748b', fontSize: 14 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', borderRadius: 12, maxHeight: '95%', padding: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -1296,25 +1241,22 @@ const styles = StyleSheet.create({
   formRow: { flexDirection: 'row', gap: 8, marginBottom: 6, flexWrap: 'wrap' },
   formCol: { flex: 1, minWidth: 200 },
   label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 2, marginTop: 4 },
-  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, padding: 8, fontSize: 13 },
-  pickerContainer: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, height: 35, justifyContent: 'center', backgroundColor: '#fff' },
-  formPicker: { height: 35, borderWidth: 0, backgroundColor: 'transparent' },
-  saveBtn: { backgroundColor: '#4338ca', paddingVertical: 10, borderRadius: 6, alignItems: 'center', marginTop: 12 },
-  saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, backgroundColor: '#f8fafc' },
   modalFooter: { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 16, marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end' },
-  sectionHeader: { fontSize: 14, fontWeight: 'bold', color: '#0f172a', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 6, marginBottom: 10 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  detailLabel: { fontSize: 12, color: '#64748b', fontWeight: '600' },
-  detailValue: { fontSize: 12, color: '#0f172a' },
-  itemsTable: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden' },
-  itemRow: { flexDirection: 'row', padding: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: '#fff' },
-  noteItem: { backgroundColor: '#f8fafc', padding: 8, borderRadius: 6, borderLeftWidth: 3, borderLeftColor: '#4338ca', marginBottom: 6 },
-  emptyContainer: { alignItems: 'center', paddingVertical: 50 },
-  emptyText: { marginTop: 10, color: '#94a3b8', fontSize: 14 },
+  saveBtn: { backgroundColor: '#1e293b', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  saveBtnText: { color: '#fff', fontWeight: 'bold' },
   paginationContainer: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, marginTop: 8, alignSelf: 'flex-end' },
   pageButton: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, backgroundColor: '#4338ca', justifyContent: 'center', alignItems: 'center' },
   pageButtonDisabled: { backgroundColor: '#e2e8f0' },
   pageButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
   pageButtonTextDisabled: { color: '#94a3b8' },
-  pageInfoText: { fontSize: 12, color: '#64748b', fontWeight: '500', marginHorizontal: 4 }
+  pageInfoText: { fontSize: 12, color: '#64748b', fontWeight: '500', marginHorizontal: 4 },
+  detailsGroup: { marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12 },
+  detailsTitle: { fontSize: 14, fontWeight: 'bold', color: '#4338ca', marginBottom: 8 },
+  detailsText: { fontSize: 13, color: '#334155', marginBottom: 4 },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  stateBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  stateBtnText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
+  noteSaveBtn: { backgroundColor: '#4338ca', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 8 },
+  modalInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, fontSize: 14, backgroundColor: '#f8fafc', color: '#334155' }
 });

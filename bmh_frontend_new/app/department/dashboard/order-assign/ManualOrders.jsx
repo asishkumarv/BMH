@@ -894,6 +894,7 @@ export default function ManualOrders({ deliveryBoys }) {
           <ActivityIndicator size="large" color="#4338ca" style={{marginTop: 50}} />
         ) : (
           <FlatList
+            style={{ flex: 1 }}
             data={orders}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderOrderItem}
@@ -1666,7 +1667,7 @@ const styles = StyleSheet.create({
   picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13 },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  tableContainer: { height: 540, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
+  tableContainer: { flex: 1, minHeight: 400, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerText: { fontSize: 12, fontWeight: '700', color: '#475569' },
   tableRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },

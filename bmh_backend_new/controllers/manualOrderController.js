@@ -172,55 +172,6 @@ exports.getOrders = async (req, res) => {
         UNION ALL
         
         SELECT 
-          po.id,
-          po.srno::varchar as order_no,
-          po.prefix as invoice_no,
-          po.total::numeric as amount,
-          0.00::numeric as delivery_charge,
-          po.delivery_type as mode_of_delivery,
-          po.created_at::date as order_date,
-          po.created_at::time as order_time,
-          NULL::varchar as customer_phone,
-          po.custname as customer_name,
-          NULL::varchar as ship_to_phone,
-          po.custname as ship_to_name,
-          po.address,
-          NULL::text as location_link,
-          po.status,
-          po.assigned_by::varchar as created_by_id,
-          'Employee'::varchar as created_by_type,
-          NULL::varchar as delivery_otp,
-          COALESCE(po.details, '[]')::jsonb as notes,
-          NULL::varchar as payment_mode,
-          NULL::varchar as payment_txn_id,
-          false::boolean as is_scheduled,
-          NULL::date as scheduled_date,
-          NULL::time as scheduled_time,
-          NULL::varchar as bus_travels_name,
-          NULL::varchar as bus_driver_name,
-          NULL::varchar as bus_driver_number,
-          NULL::varchar as bus_number,
-          NULL::date as bus_date,
-          NULL::varchar as est_reach_time,
-          NULL::timestamp as picked_up_at,
-          NULL::timestamp as started_at,
-          po.delivered_at,
-          po.modified_by_id,
-          po.modified_by_type,
-          po.modified_by_name,
-          'purchase_order'::varchar as order_source_type,
-          po.submitted_to_id,
-          po.submitted_to_name,
-          po.submitted_to_role,
-          po.submitted_to_dept,
-          po.delivery_boy_id::varchar as delivery_boy_id,
-          po.created_at
-        FROM ecogreenpurchase_orders po
-        WHERE po.status != 'Pending'
-        
-        UNION ALL
-        
-        SELECT 
           oo.id,
           oo.id::varchar as order_no,
           NULL::varchar as invoice_no,

@@ -39,13 +39,17 @@ export default function SubAdminLayout() {
         }
         
         if (!userStr) {
-          router.replace('/department/login');
+          setTimeout(() => {
+            router.replace('/department/login');
+          }, 0);
         } else {
           setUser(JSON.parse(userStr));
           setLoading(false);
         }
       } catch (e) {
-        router.replace('/department/login');
+        setTimeout(() => {
+          router.replace('/department/login');
+        }, 0);
       }
     };
     init();
