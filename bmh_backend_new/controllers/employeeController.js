@@ -176,7 +176,7 @@ exports.getAssignedOrders = async (req, res) => {
 
     // Fetch from ecogreensales_invoices
     const ecogreenSalesInvoicesRes = await pool.query(
-      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_no, NULL::varchar as location_link
+      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link
        FROM ecogreensales_invoices WHERE delivered_by_id = $1 ORDER BY created_at DESC`, [id]
     );
 
