@@ -91,6 +91,9 @@ export default function CRMView({ userType }: CRMViewProps) {
 
   // Data States
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalPatients, setTotalPatients] = useState(0);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [history, setHistory] = useState<HistoryLog[]>([]);
 
@@ -106,7 +109,7 @@ export default function CRMView({ userType }: CRMViewProps) {
   const [uniqueBloodGroups, setUniqueBloodGroups] = useState<string[]>([]);
 
   // Selection & Composition State (Campaign)
-  const [selectedPatientIds, setSelectedPatientIds] = useState<Set<string>>(new Set());
+  const [selectedPatients, setSelectedPatients] = useState<Record<string, Patient>>({});
   const [messageType, setMessageType] = useState<'text' | 'template'>('text');
   const [messageText, setMessageText] = useState('');
   const [selectedTemplateName, setSelectedTemplateName] = useState('');
@@ -154,19 +157,29 @@ export default function CRMView({ userType }: CRMViewProps) {
 
   // Fetch Patients, Filter Options, and Config
   useEffect(() => {
-    fetchPatients();
-    fetchFilterOptions();
-    fetchDoubleTickConfig();
+    fetchPatients(currentPage);
+  }, [currentPage, searchQuery, cityFilter, genderFilter, bloodFilter, activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [searchQuery, cityFilter, genderFilter, bloodFilter]);
 
-  // Fetch Templates / History when tabs change
   useEffect(() => {
-    if (activeTab === 'templates') {
-      fetchTemplates();
-    } else if (activeTab === 'history') {
-      fetchHistory();
+    fetchFilterOptions();
+    fetchDoubleTickConfig();
+  }, []);
+
+  // Individual Search Fetch with Debounce
+  useEffect(() => {
+    if (activeTab === 'individual' && indivSearchQuery.trim().length >= 2) {
+      const delay = setTimeout(() => {
+        fetchPatients(1);
+      }, 300);
+      return () => clearTimeout(delay);
+    } else if (activeTab === 'individual' && !indivSearchQuery.trim()) {
+      setPatients([]);
     }
-  }, [activeTab]);
+  }, [indivSearchQuery, activeTab]);
 
   // Parse template placeholders when template is selected
   useEffect(() => {
@@ -225,18 +238,36 @@ export default function CRMView({ userType }: CRMViewProps) {
     }
   };
 
-  const fetchPatients = async () => {
+  const fetchPatients = async (page: number = 1) => {
     setLoadingPatients(true);
     try {
-      const params: any = {};
-      if (searchQuery) params.search = searchQuery;
-      if (cityFilter !== 'all') params.city = cityFilter;
-      if (genderFilter !== 'all') params.gender = genderFilter;
-      if (bloodFilter !== 'all') params.bloodGroup = bloodFilter;
+      const params: any = {
+        page,
+        limit: activeTab === 'individual' ? 10 : 15
+      };
+      
+      if (activeTab === 'individual') {
+        if (!indivSearchQuery.trim()) {
+          setPatients([]);
+          setLoadingPatients(false);
+          return;
+        }
+        params.search = indivSearchQuery.trim();
+      } else {
+        if (searchQuery) params.search = searchQuery;
+        if (cityFilter !== 'all') params.city = cityFilter;
+        if (genderFilter !== 'all') params.gender = genderFilter;
+        if (bloodFilter !== 'all') params.bloodGroup = bloodFilter;
+      }
 
       const res = await axios.get(`${API_URL}/crm/patients`, { params });
       if (res.data.success) {
-        setPatients(res.data.data);
+        setPatients(res.data.data || []);
+        if (activeTab !== 'individual') {
+          setCurrentPage(res.data.page || 1);
+          setTotalPages(Math.ceil((res.data.total || 0) / (res.data.limit || 15)) || 1);
+          setTotalPatients(res.data.total || 0);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch patients', err);
@@ -289,29 +320,35 @@ export default function CRMView({ userType }: CRMViewProps) {
   };
 
   // Toggle Patient Selection
-  const toggleSelectPatient = (id: string) => {
-    setSelectedPatientIds(prev => {
-      const updated = new Set(prev);
-      if (updated.has(id)) {
-        updated.delete(id);
+  const toggleSelectPatient = (patient: Patient) => {
+    setSelectedPatients(prev => {
+      const updated = { ...prev };
+      if (updated[patient.id]) {
+        delete updated[patient.id];
       } else {
-        updated.add(id);
+        updated[patient.id] = patient;
       }
       return updated;
     });
   };
 
   const selectAllPatients = () => {
-    if (selectedPatientIds.size === patients.length) {
-      setSelectedPatientIds(new Set());
-    } else {
-      setSelectedPatientIds(new Set(patients.map(p => p.id)));
-    }
+    setSelectedPatients(prev => {
+      const updated = { ...prev };
+      const allSelectedOnPage = patients.length > 0 && patients.every(p => updated[p.id] !== undefined);
+      if (allSelectedOnPage) {
+        patients.forEach(p => delete updated[p.id]);
+      } else {
+        patients.forEach(p => { updated[p.id] = p; });
+      }
+      return updated;
+    });
   };
 
   // Compose & Send Message
   const handleSendCampaign = async () => {
-    if (selectedPatientIds.size === 0) {
+    const selectedCount = Object.keys(selectedPatients).length;
+    if (selectedCount === 0) {
       Alert.alert('Error', 'Please select at least one recipient.');
       return;
     }
@@ -337,9 +374,7 @@ export default function CRMView({ userType }: CRMViewProps) {
 
     setSending(true);
 
-    const recipientMobiles = patients
-      .filter(p => selectedPatientIds.has(p.id))
-      .map(p => p.mobile);
+    const recipientMobiles = Object.values(selectedPatients).map(p => p.mobile);
 
     // Dynamic sender details
     const senderId = currentUser?.id?.toString() || 'admin';
@@ -361,12 +396,20 @@ export default function CRMView({ userType }: CRMViewProps) {
       const res = await axios.post(`${API_URL}/crm/send-message`, payload);
       if (res.data.success) {
         Alert.alert('Success', `Broadcast sent successfully to ${res.data.successCount} recipients.`);
-        setSelectedPatientIds(new Set());
+        setSelectedPatients({});
         setMessageText('');
         setVariableInputs({});
         setSelectedTemplateName('');
       } else {
-        Alert.alert('Partial Send', `Completed with some issues. Success: ${res.data.successCount}, Failures: ${res.data.failureCount}. Errors: ${res.data.errors?.join(', ')}`);
+        const errorMsg = res.data.errors?.join(', ') || '';
+        if (errorMsg.toLowerCase().includes('chat window is closed') || errorMsg.toLowerCase().includes('closed window')) {
+          Alert.alert(
+            'Chat Window Closed (Use Templates)',
+            'WhatsApp session windows have closed for these customers. To message them in bulk, you must use an Approved Template message instead of a plain text message.'
+          );
+        } else {
+          Alert.alert('Partial Send', `Completed with some issues. Success: ${res.data.successCount}, Failures: ${res.data.failureCount}. Errors: ${errorMsg}`);
+        }
       }
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to send campaign');
@@ -419,7 +462,15 @@ export default function CRMView({ userType }: CRMViewProps) {
         setSelectedIndivPatient(null);
         setIndivSearchQuery('');
       } else {
-        Alert.alert('Error', `Failed to send message: ${res.data.errors?.join(', ')}`);
+        const errorMsg = res.data.errors?.join(', ') || '';
+        if (errorMsg.toLowerCase().includes('chat window is closed') || errorMsg.toLowerCase().includes('closed window')) {
+          Alert.alert(
+            'Chat Window Closed',
+            'WhatsApp session window has closed for this customer. To message them, you must use an Approved Template message instead of a plain text message.'
+          );
+        } else {
+          Alert.alert('Error', `Failed to send message: ${errorMsg}`);
+        }
       }
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to send message');
@@ -442,25 +493,23 @@ export default function CRMView({ userType }: CRMViewProps) {
     setCreatingTemplate(true);
 
     // Format components structure for DoubleTick endpoint
-    const components = [
-      {
-        type: 'BODY',
+    const components: any = {
+      body: {
         text: newTemplateBody
       }
-    ];
+    };
 
     if (newTemplateHeader.trim()) {
-      components.push({
-        type: 'HEADER',
+      components.header = {
+        format: 'TEXT',
         text: newTemplateHeader
-      } as any);
+      };
     }
 
     if (newTemplateFooter.trim()) {
-      components.push({
-        type: 'FOOTER',
+      components.footer = {
         text: newTemplateFooter
-      } as any);
+      };
     }
 
     const payload = {
@@ -474,30 +523,23 @@ export default function CRMView({ userType }: CRMViewProps) {
     try {
       const res = await axios.post(`${API_URL}/crm/templates`, payload);
       if (res.data.success) {
-        Alert.alert('Success', 'Template submitted for approval successfully!');
+        setTemplateStatus('Template submitted for approval successfully!');
         setNewTemplateName('');
         setNewTemplateBody('');
         setNewTemplateHeader('');
         setNewTemplateFooter('');
         fetchTemplates(); // Refresh template list
       } else {
-        Alert.alert('Error', res.data.message || 'Failed to submit template.');
+        setTemplateStatus(`Error: ${res.data.message || 'Failed to submit template.'}`);
       }
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to submit template.');
+      setTemplateStatus(`Error: ${err.response?.data?.message || 'Failed to submit template.'}`);
     } finally {
       setCreatingTemplate(false);
     }
   };
 
   // Rendering Layout Helpers
-  const filteredPatientsForIndiv = patients.filter(p => {
-    if (!indivSearchQuery) return false;
-    return (
-      p.name.toLowerCase().includes(indivSearchQuery.toLowerCase()) ||
-      p.mobile.includes(indivSearchQuery)
-    );
-  });
 
   return (
     <View style={styles.mainContainer}>
@@ -573,7 +615,7 @@ export default function CRMView({ userType }: CRMViewProps) {
           <View style={[styles.tabContent, isDesktop && styles.desktopRow]}>
             {/* Left Column: Recipient Selection */}
             <View style={[styles.columnCard, isDesktop && { flex: 1.5, marginRight: 20 }]}>
-              <Text style={styles.cardHeader}>Select Target Audience ({patients.length} available)</Text>
+              <Text style={styles.cardHeader}>Select Target Audience ({totalPatients} matching)</Text>
               
               {/* Audience Filters */}
               <View style={styles.filterSection}>
@@ -616,10 +658,10 @@ export default function CRMView({ userType }: CRMViewProps) {
               <View style={styles.actionRow}>
                 <Pressable style={styles.selectBtn} onPress={selectAllPatients}>
                   <Text style={styles.selectBtnText}>
-                    {selectedPatientIds.size === patients.length ? 'Deselect All' : 'Select All Filtered'}
+                    {patients.length > 0 && patients.every(p => selectedPatients[p.id] !== undefined) ? 'Deselect Page' : 'Select Page'}
                   </Text>
                 </Pressable>
-                <Text style={styles.selectedCountText}>{selectedPatientIds.size} customers selected</Text>
+                <Text style={styles.selectedCountText}>{Object.keys(selectedPatients).length} selected</Text>
               </View>
 
               {loadingPatients ? (
@@ -627,12 +669,12 @@ export default function CRMView({ userType }: CRMViewProps) {
               ) : (
                 <View style={styles.listContainer}>
                   {patients.map(item => {
-                    const isSelected = selectedPatientIds.has(item.id);
+                    const isSelected = selectedPatients[item.id] !== undefined;
                     return (
                       <Pressable
                         key={item.id}
                         style={[styles.patientRow, isSelected && styles.patientRowSelected]}
-                        onPress={() => toggleSelectPatient(item.id)}
+                        onPress={() => toggleSelectPatient(item)}
                       >
                         {isSelected ? (
                           <CheckSquare size={20} color={Colors.light.primary} />
@@ -656,6 +698,29 @@ export default function CRMView({ userType }: CRMViewProps) {
                   {patients.length === 0 && (
                     <Text style={styles.emptyText}>No customers match current filters.</Text>
                   )}
+                </View>
+              )}
+
+              {/* Pagination Controls */}
+              {activeTab === 'campaign' && totalPages > 1 && (
+                <View style={styles.paginationRow}>
+                  <Pressable
+                    style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
+                    onPress={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <Text style={[styles.pageBtnText, currentPage === 1 && styles.pageBtnTextDisabled]}>Prev</Text>
+                  </Pressable>
+                  <Text style={styles.pageInfoText}>
+                    Page {currentPage} of {totalPages} ({totalPatients} total)
+                  </Text>
+                  <Pressable
+                    style={[styles.pageBtn, currentPage === totalPages && styles.pageBtnDisabled]}
+                    onPress={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <Text style={[styles.pageBtnText, currentPage === totalPages && styles.pageBtnTextDisabled]}>Next</Text>
+                  </Pressable>
                 </View>
               )}
             </View>
@@ -755,9 +820,9 @@ export default function CRMView({ userType }: CRMViewProps) {
 
               {/* Action Buttons */}
               <Pressable
-                style={[styles.sendBtn, (sending || selectedPatientIds.size === 0) && styles.sendBtnDisabled]}
+                style={[styles.sendBtn, (sending || Object.keys(selectedPatients).length === 0) && styles.sendBtnDisabled]}
                 onPress={handleSendCampaign}
-                disabled={sending || selectedPatientIds.size === 0}
+                disabled={sending || Object.keys(selectedPatients).length === 0}
               >
                 {sending ? (
                   <ActivityIndicator color="white" />
@@ -765,7 +830,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                   <>
                     <Send size={18} color="white" style={{ marginRight: 8 }} />
                     <Text style={styles.sendBtnText}>
-                      Send WhatsApp Campaign ({selectedPatientIds.size})
+                      Send WhatsApp Campaign ({Object.keys(selectedPatients).length})
                     </Text>
                   </>
                 )}
@@ -795,7 +860,7 @@ export default function CRMView({ userType }: CRMViewProps) {
               {/* Dropdown Suggestions */}
               {indivSearchQuery && !selectedIndivPatient && (
                 <View style={styles.indivDropdown}>
-                  {filteredPatientsForIndiv.map(p => (
+                  {patients.map(p => (
                     <Pressable
                       key={p.id}
                       style={styles.indivDropdownItem}
@@ -807,7 +872,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                       </Text>
                     </Pressable>
                   ))}
-                  {filteredPatientsForIndiv.length === 0 && (
+                  {patients.length === 0 && (
                     <Text style={styles.emptyText}>No matching customers found.</Text>
                   )}
                 </View>
@@ -868,6 +933,9 @@ export default function CRMView({ userType }: CRMViewProps) {
                         value={indivMessageText}
                         onChangeText={setIndivMessageText}
                       />
+                      <Text style={styles.composerHint}>
+                        Note: Direct text messages can only be sent if the customer has interacted with your business within the last 24 hours. Use templates if the chat window is closed!
+                      </Text>
                     </View>
                   ) : (
                     <View>
@@ -942,6 +1010,24 @@ export default function CRMView({ userType }: CRMViewProps) {
             {/* Create Template Form */}
             <View style={[styles.columnCard, isDesktop && { flex: 1, marginRight: 20 }]}>
               <Text style={styles.cardHeader}>Create New WhatsApp Template</Text>
+              
+              {templateStatus && (
+                <View style={[
+                  styles.inlineStatusBanner,
+                  { backgroundColor: templateStatus.startsWith('Error') ? '#fee2e2' : '#dcfce7' }
+                ]}>
+                  <Text style={[
+                    styles.inlineStatusText,
+                    { color: templateStatus.startsWith('Error') ? '#ef4444' : '#15803d' }
+                  ]}>
+                    {templateStatus}
+                  </Text>
+                  <Pressable onPress={() => setTemplateStatus(null)} style={{ marginLeft: 8 }}>
+                    <X size={16} color={templateStatus.startsWith('Error') ? '#ef4444' : '#15803d'} />
+                  </Pressable>
+                </View>
+              )}
+
               <Text style={styles.composerHint}>
                 Create marketing or utility templates and submit them to Meta for official approval.
               </Text>
@@ -1018,7 +1104,12 @@ export default function CRMView({ userType }: CRMViewProps) {
 
             {/* List DoubleTick Templates */}
             <View style={[styles.columnCard, isDesktop && { flex: 1.2 }]}>
-              <Text style={styles.cardHeader}>Template List & Statuses</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={[styles.cardHeader, { marginBottom: 0 }]}>Template List & Statuses</Text>
+                <Pressable onPress={fetchTemplates} style={styles.refreshBtn}>
+                  <Text style={styles.refreshBtnText}>Refresh</Text>
+                </Pressable>
+              </View>
               {loadingTemplates ? (
                 <ActivityIndicator size="large" color={Colors.light.primary} style={{ margin: 20 }} />
               ) : (
@@ -1665,5 +1756,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#475569',
     lineHeight: 18
+  },
+  refreshBtn: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe'
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    color: Colors.light.primary,
+    fontWeight: 'bold'
+  },
+  inlineStatusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16
+  },
+  inlineStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    marginTop: 12
+  },
+  pageBtn: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe'
+  },
+  pageBtnDisabled: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0'
+  },
+  pageBtnText: {
+    fontSize: 13,
+    color: Colors.light.primary,
+    fontWeight: 'bold'
+  },
+  pageBtnTextDisabled: {
+    color: '#cbd5e1'
+  },
+  pageInfoText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500'
   }
 });

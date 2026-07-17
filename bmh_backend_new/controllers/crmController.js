@@ -18,8 +18,14 @@ const getDoubleTickConfig = async () => {
 
 exports.getPatients = async (req, res) => {
   try {
-    const { search, city, gender, bloodGroup } = req.query;
+    const { search, city, gender, bloodGroup, page = 1, limit = 50 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
     let query = 'SELECT id, name, mobile, email, age, gender, blood_group, city, pin_code, created_at FROM patients';
+    let countQuery = 'SELECT COUNT(*) FROM patients';
+
     const params = [];
     const conditions = [];
 
@@ -42,12 +48,26 @@ exports.getPatients = async (req, res) => {
 
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
+      countQuery += ' WHERE ' + conditions.join(' AND ');
     }
 
-    query += ' ORDER BY name ASC';
+    // Fetch total count
+    const countRes = await pool.query(countQuery, params);
+    const total = parseInt(countRes.rows[0].count);
+
+    // Fetch paginated results
+    query += ` ORDER BY name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limitNum, offset);
 
     const result = await pool.query(query, params);
-    res.json({ success: true, count: result.rowCount, data: result.rows });
+    res.json({
+      success: true,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      count: result.rowCount,
+      data: result.rows
+    });
   } catch (error) {
     console.error('CRM Get Patients Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
