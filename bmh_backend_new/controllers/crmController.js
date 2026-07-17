@@ -296,11 +296,11 @@ exports.createTemplate = async (req, res) => {
       const matches = components.body.text.match(/\{\{(\d+)\}\}/g) || [];
       if (matches.length > 0) {
         const samples = matches.map((_, idx) => `sample_value_${idx + 1}`);
-        components.body.example = {
-          body_text: [samples]
-        };
+        components.body.example = samples; // 1D array of strings directly expected by DoubleTick
       }
     }
+
+    console.log('Template creation components payload:', JSON.stringify(components, null, 2));
 
     const response = await axios.post(
       'https://public.doubletick.io/template',
@@ -335,5 +335,39 @@ exports.getHistory = async (req, res) => {
   } catch (error) {
     console.error('CRM Get History Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.deleteTemplate = async (req, res) => {
+  try {
+    const config = await getDoubleTickConfig();
+    if (!config || !config.apiKey || !config.wabaNumber) {
+      return res.status(400).json({ success: false, message: 'DoubleTick API is not configured in Settings' });
+    }
+
+    const { name } = req.params;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Template name is required' });
+    }
+
+    await axios.delete(
+      'https://public.doubletick.io/template',
+      {
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'Authorization': config.apiKey
+        },
+        data: {
+          name: name,
+          wabaPhoneNumber: config.wabaNumber
+        }
+      }
+    );
+
+    res.json({ success: true, message: 'Template deleted successfully from DoubleTick and Meta' });
+  } catch (error) {
+    console.error('CRM Delete Template Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: error.response?.data?.message || error.message });
   }
 };

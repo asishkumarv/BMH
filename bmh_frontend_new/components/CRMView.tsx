@@ -33,7 +33,8 @@ import {
   User,
   ShieldCheck,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../constants/Colors';
@@ -548,6 +549,34 @@ export default function CRMView({ userType }: CRMViewProps) {
     } finally {
       setCreatingTemplate(false);
     }
+  };
+
+  // Delete Template
+  const handleDeleteTemplate = (name: string) => {
+    Alert.alert(
+      'Delete Template',
+      `Are you sure you want to delete template "${name}"? This action is permanent and cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await axios.delete(`${API_URL}/crm/templates/${name}`);
+              if (res.data.success) {
+                Alert.alert('Success', 'Template deleted successfully.');
+                fetchTemplates();
+              } else {
+                Alert.alert('Error', res.data.message || 'Failed to delete template.');
+              }
+            } catch (err: any) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to delete template.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Rendering Layout Helpers
@@ -1131,10 +1160,15 @@ export default function CRMView({ userType }: CRMViewProps) {
                       <View key={t.name} style={styles.templateItemCard}>
                         <View style={styles.templateCardHead}>
                           <Text style={styles.templateNameText}>{t.name}</Text>
-                          <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
-                            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-                              {t.status}
-                            </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
+                              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                                {t.status}
+                              </Text>
+                            </View>
+                            <Pressable onPress={() => handleDeleteTemplate(t.name)} style={styles.deleteBtn}>
+                              <Trash2 size={16} color="#ef4444" />
+                            </Pressable>
                           </View>
                         </View>
                         <Text style={styles.templateCategoryText}>
@@ -1879,5 +1913,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#475569',
     fontWeight: '500'
+  },
+  deleteBtn: {
+    padding: 5,
+    borderRadius: 6,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 });
