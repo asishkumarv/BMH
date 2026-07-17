@@ -1,6 +1,6 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight, FileText } from 'lucide-react-native';
+import { LayoutDashboard, Users, Activity, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight, FileText, MessageSquare } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -100,6 +100,14 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
             if (userId && value[userId] === true) {
               hasOrderAssign = true;
               dynamicNavItems.push({ name: 'Order Assign', icon: Package, route: '/department/dashboard/order-assign' });
+            }
+          }
+
+          if (res.data.success && res.data.settings.crm_access) {
+            let value = res.data.settings.crm_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            if (userId && value[userId] === true) {
+              dynamicNavItems.push({ name: 'CRM', icon: MessageSquare, route: '/department/dashboard/crm' });
             }
           }
         }

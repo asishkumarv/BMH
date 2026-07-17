@@ -10,6 +10,12 @@ export default function AdminSettings() {
   const [purchaseOrderAccess, setPurchaseOrderAccess] = useState<Record<string, boolean>>({});
   const [orderAssignAccess, setOrderAssignAccess] = useState<Record<string, boolean>>({});
   const [peonAssignmentAccess, setPeonAssignmentAccess] = useState<Record<string, boolean>>({});
+  const [crmAccess, setCrmAccess] = useState<Record<string, boolean>>({});
+  
+  const [doubleTickApiKey, setDoubleTickApiKey] = useState('');
+  const [doubleTickWaba, setDoubleTickWaba] = useState('');
+  const [doubleTickLang, setDoubleTickLang] = useState('en');
+  const [savingConfig, setSavingConfig] = useState(false);
   
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +60,12 @@ export default function AdminSettings() {
       setPurchaseOrderAccess(parseSetting('purchase_order_access'));
       setOrderAssignAccess(parseSetting('order_assign_access'));
       setPeonAssignmentAccess(parseSetting('peon_assignment_access'));
+      setCrmAccess(parseSetting('crm_access'));
+      
+      const configVal = parseSetting('doubletick_config');
+      setDoubleTickApiKey(configVal.apiKey || '');
+      setDoubleTickWaba(configVal.wabaNumber || '');
+      setDoubleTickLang(configVal.defaultLanguage || 'en');
 
     } catch (err) {
       console.error('Failed to fetch settings', err);
@@ -158,6 +170,26 @@ export default function AdminSettings() {
     );
   }
 
+  const saveDoubleTickConfig = async () => {
+    setSavingConfig(true);
+    try {
+      await axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+        key: 'doubletick_config',
+        value: {
+          apiKey: doubleTickApiKey,
+          wabaNumber: doubleTickWaba,
+          defaultLanguage: doubleTickLang
+        }
+      });
+      alert('DoubleTick credentials saved successfully!');
+    } catch (err) {
+      console.error('Failed to save DoubleTick config', err);
+      alert('Failed to save credentials.');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
   return (
     <View style={{flex:1}}>
       <ScrollView style={styles.container}>
@@ -169,6 +201,51 @@ export default function AdminSettings() {
         {renderCard('Sales Order & Item Master Access', 'Control which employees have access to the Sales Order and Item Master features.', 'Sales Order Access')}
         {renderCard('Purchase Order Access', 'Control which employees have access to view and assign EcoGreen Purchase Orders.', 'Purchase Order Access')}
         {renderCard('Order Assign Access', 'Control which employees have access to view and assign deliveries for all orders on the Order Assign page.', 'Order Assign Access')}
+        {renderCard('Granular CRM & Bulk Messaging Access', 'Control which Employees and Sub-Admins can access the WhatsApp CRM and send customer notifications.', 'CRM Access')}
+
+        {/* DoubleTick Configuration Section */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <ShieldCheck size={24} color={Colors.light.primary} />
+            <Text style={styles.cardTitle}>DoubleTick WhatsApp API Settings</Text>
+          </View>
+          <Text style={styles.description}>Manage your credentials for the WhatsApp Business API provider DoubleTick.</Text>
+          
+          <Text style={styles.inputLabel}>DoubleTick API Key</Text>
+          <TextInput
+            style={styles.textInput}
+            secureTextEntry
+            placeholder="Enter API Key"
+            value={doubleTickApiKey}
+            onChangeText={setDoubleTickApiKey}
+          />
+
+          <Text style={styles.inputLabel}>Registered WABA Sender Number</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="e.g. 91XXXXXXXXXX (no spaces, include country code)"
+            value={doubleTickWaba}
+            onChangeText={setDoubleTickWaba}
+          />
+
+          <Text style={styles.inputLabel}>Default Language Code</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="e.g. en"
+            value={doubleTickLang}
+            onChangeText={setDoubleTickLang}
+          />
+
+          <TouchableOpacity 
+            style={styles.saveConfigBtn} 
+            onPress={saveDoubleTickConfig}
+            disabled={savingConfig}
+          >
+            <Text style={styles.saveConfigBtnText}>
+              {savingConfig ? 'Saving...' : 'Save Configuration'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
 
@@ -177,6 +254,7 @@ export default function AdminSettings() {
       {renderAccessList('Sales Order Access', 'sales_order_access', salesOrderAccess, setSalesOrderAccess)}
       {renderAccessList('Purchase Order Access', 'purchase_order_access', purchaseOrderAccess, setPurchaseOrderAccess)}
       {renderAccessList('Order Assign Access', 'order_assign_access', orderAssignAccess, setOrderAssignAccess)}
+      {renderAccessList('CRM Access', 'crm_access', crmAccess, setCrmAccess)}
     </View>
   );
 }
@@ -209,4 +287,8 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f1f5f9' },
   settingTitle: { fontSize: 15, fontWeight: '600', color: '#334155', marginBottom: 4 },
   settingDesc: { fontSize: 13, color: '#94a3b8' },
+  inputLabel: { fontSize: 13, fontWeight: '700', color: '#475569', marginTop: 12, marginBottom: 6 },
+  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', outlineStyle: 'none' as any },
+  saveConfigBtn: { backgroundColor: Colors.light.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 20 },
+  saveConfigBtnText: { color: 'white', fontWeight: 'bold' }
 });

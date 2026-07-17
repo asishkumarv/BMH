@@ -38,6 +38,7 @@ const ecogreenSalesInvoiceRoutes = require('./routes/ecogreenSalesInvoiceRoutes'
 const onlineOrderRoutes = require('./routes/onlineOrderRoutes');
 const manualOrderRoutes = require('./routes/manualOrderRoutes');
 const busRoutes = require('./routes/busRoutes');
+const crmRoutes = require('./routes/crmRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -83,11 +84,31 @@ app.use('/manual-orders', manualOrderRoutes);
 // Buses
 app.use('/buses', busRoutes);
 
+// CRM Routing
+app.use('/crm', crmRoutes);
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 
   // Run DB Patches / Migrations
+  // CRM Messages Table Creation
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_messages (
+      id SERIAL PRIMARY KEY,
+      sender_id VARCHAR(50),
+      sender_name VARCHAR(255),
+      sender_role VARCHAR(100),
+      message_type VARCHAR(50),
+      content TEXT,
+      recipients_count INTEGER DEFAULT 0,
+      status VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+    .then(() => console.log('Successfully checked/patched crm_messages table.'))
+    .catch(err => console.error('Error creating crm_messages table:', err.message));
+
   pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_to_id VARCHAR(50)')
     .then(() => console.log('Successfully checked/patched submitted_to_id in ecogreenpurchase_orders.'))
     .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_to_id):', err.message));

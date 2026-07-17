@@ -1,6 +1,6 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, Users, Building, Activity, Settings, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react-native';
+import { LayoutDashboard, Users, Building, Activity, Settings, LogOut, Bell, Package, Wallet, CalendarDays, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { name: 'Delivery Fleet', icon: Package, route: '/admin/dashboard/delivery-fleet' },
   { name: 'KPA & KRA', icon: LayoutDashboard, route: '/admin/dashboard/performance' },
   { name: 'Notifications', icon: Bell, route: '/admin/dashboard/notifications' },
+  { name: 'CRM', icon: MessageSquare, route: '/admin/dashboard/crm' },
   { name: 'Settings', icon: Settings, route: '/admin/dashboard/settings' },
   { name: 'Profile Requests', icon: Users, route: '/admin/dashboard/profile-requests' },
   { name: 'Profile', icon: Users, route: '/admin/dashboard/profile' },

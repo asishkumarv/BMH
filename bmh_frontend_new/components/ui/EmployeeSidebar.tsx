@@ -1,6 +1,6 @@
 import React from 'react';
 import {  View, Text, StyleSheet, Pressable, Platform , Image, ScrollView } from 'react-native';
-import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User, CalendarDays, FileText, Users, ChevronDown, ChevronRight, Award } from 'lucide-react-native';
+import { LayoutDashboard, CheckSquare, LogOut, Bell, Package, Wallet, User, CalendarDays, FileText, Users, ChevronDown, ChevronRight, Award, MessageSquare } from 'lucide-react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -108,6 +108,15 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
             const empId = u.id?.toString();
             if (empId && oaa[empId] === true) {
               dynamicNavItems.push({ name: 'Order Assign', icon: Package, route: '/employee/dashboard/order-assign' });
+            }
+          }
+          
+          if (res.data.success && res.data.settings.crm_access) {
+            let value = res.data.settings.crm_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const empId = u.id?.toString();
+            if (empId && value[empId] === true) {
+              dynamicNavItems.push({ name: 'CRM', icon: MessageSquare, route: '/employee/dashboard/crm' });
             }
           }
           
