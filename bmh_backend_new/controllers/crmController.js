@@ -121,15 +121,22 @@ exports.sendMessage = async (req, res) => {
 
         const lang = config.defaultLanguage || 'en';
         
-        let formattedData = [];
-        if (Array.isArray(templateData)) {
-          formattedData = templateData;
-        } else if (typeof templateData === 'object' && templateData !== null) {
-          // Sort placeholders (e.g. "1", "2", "3") numerically to ensure correct sequential order
-          const sortedEntries = Object.entries(templateData)
-            .sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-          
-          formattedData = sortedEntries.map(([_, val]) => ({ name: String(val) }));
+        let formattedData = {};
+        if (typeof templateData === 'object' && templateData !== null && !Array.isArray(templateData)) {
+          const placeholders = Object.entries(templateData).map(([key, val]) => ({
+            [key]: String(val)
+          }));
+          formattedData = {
+            body: {
+              placeholders
+            }
+          };
+        } else if (Array.isArray(templateData)) {
+          formattedData = {
+            body: {
+              placeholders: templateData
+            }
+          };
         }
 
         return {
