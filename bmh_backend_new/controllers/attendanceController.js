@@ -473,6 +473,50 @@ exports.adminUpdateAttendance = async (req, res) => {
   }
 };
 
+exports.adminCreateAttendance = async (req, res) => {
+  try {
+    const { employee_id, user_type, date, check_in, check_out, status } = req.body;
+    if (!employee_id || !user_type || !date || !status) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    // Check if record already exists for this date and employee
+    const checkRes = await pool.query(
+      `SELECT id FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = $3`,
+      [employee_id, user_type, date]
+    );
+    if (checkRes.rowCount > 0) {
+      return res.status(400).json({ success: false, message: 'An attendance record already exists for this day' });
+    }
+
+    let checkInTimestamp = null;
+    if (check_in) {
+      checkInTimestamp = new Date(`${date}T${check_in}:00+05:30`).toISOString();
+    }
+    let checkOutTimestamp = null;
+    if (check_out) {
+      checkOutTimestamp = new Date(`${date}T${check_out}:00+05:30`).toISOString();
+    }
+
+    await pool.query(
+      `INSERT INTO attendance (employee_id, user_type, date, timestamp, checkout_timestamp, status) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [employee_id, user_type, date, checkInTimestamp, checkOutTimestamp, status]
+    );
+
+    await pool.query(
+      `INSERT INTO attendance_audit_logs (employee_id, action_type, details) 
+       VALUES ($1, 'ADMIN_CREATE', 'Attendance manually created by Super Admin')`,
+      [employee_id]
+    );
+
+    res.json({ success: true, message: 'Attendance record created successfully' });
+  } catch (error) {
+    console.error('Error creating attendance by admin:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 
 exports.quickAttendance = async (req, res) => {
   try {

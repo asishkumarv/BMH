@@ -17,6 +17,7 @@ router.get('/employee-dashboard/:employeeId', attendanceController.getEmployeeDa
 router.get('/today/:employeeId', attendanceController.checkTodayAttendance);
 
 router.put('/admin-update/:id', attendanceController.adminUpdateAttendance);
+router.post('/admin-create', attendanceController.adminCreateAttendance);
 router.get('/image/:id/:type', attendanceController.getAttendanceImage);
 router.get('/profile-image/:id/:userType', attendanceController.getProfileImage);
 

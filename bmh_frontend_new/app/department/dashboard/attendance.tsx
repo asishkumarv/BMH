@@ -766,13 +766,7 @@ export default function SubAdminAttendanceDashboard() {
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
-              <View style={[styles.tableCellView, { width: 100, alignItems: 'center', gap: 5, flexDirection: 'row' }]}>
-                <TouchableOpacity 
-                  style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 
-                  onPress={() => openEditModal(r)}
-                >
-                  <Edit2 size={16} color={Colors.light.primary} />
-                </TouchableOpacity>
+              <View style={[styles.tableCellView, { width: 100, alignItems: 'center', justifyContent: 'center' }]}>
                 <TouchableOpacity 
                   style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 
                   onPress={() => {

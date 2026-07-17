@@ -192,6 +192,78 @@ export default function AdminAttendanceScreen() {
   const [editStatus, setEditStatus] = useState('');
   const [updating, setUpdating] = useState(false);
 
+  // Add Attendance Entry State
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [addUserId, setAddUserId] = useState('');
+  const [addDate, setAddDate] = useState('');
+  const [addCheckIn, setAddCheckIn] = useState('');
+  const [addCheckOut, setAddCheckOut] = useState('');
+  const [addStatus, setAddStatus] = useState('Present');
+  const [creating, setCreating] = useState(false);
+
+  const openAddModal = async () => {
+    setAddUserId('');
+    setAddDate(new Date().toISOString().split('T')[0]);
+    setAddCheckIn('09:00');
+    setAddCheckOut('18:00');
+    setAddStatus('Present');
+    setAddModalVisible(true);
+
+    if (allUsers.length === 0) {
+      try {
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
+        if (res.data.success) {
+          setAllUsers(res.data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching all users:', err);
+      }
+    }
+  };
+
+  const handleCreateAttendance = async () => {
+    if (!addUserId || !addDate || !addCheckIn || !addStatus) {
+      Alert.alert('Error', 'Please fill all required fields');
+      return;
+    }
+    
+    const selectedUser = allUsers.find(u => u.id === addUserId);
+    if (!selectedUser) {
+      Alert.alert('Error', 'Invalid employee selected');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const rawId = selectedUser.type === 'department_admin' 
+        ? selectedUser.id.replace('SA-', '')
+        : selectedUser.id;
+      
+      const payload = {
+        employee_id: parseInt(rawId, 10),
+        user_type: selectedUser.type === 'department_admin' ? 'sub_admin' : 'employee',
+        date: addDate,
+        check_in: addCheckIn,
+        check_out: addCheckOut || null,
+        status: addStatus
+      };
+
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/admin-create', payload);
+      if (res.data.success) {
+        Alert.alert('Success', 'Attendance record created successfully!');
+        setAddModalVisible(false);
+        fetchReports(selectedReportDept, selectedUserType);
+      } else {
+        Alert.alert('Error', res.data.message || 'Failed to create record');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Server error while creating record');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
 
@@ -406,6 +478,12 @@ export default function AdminAttendanceScreen() {
     );
   });
 
+  const filteredUsers = allUsers.filter(u => {
+    if (selectedUserType === 'employee') return u.type === 'employee';
+    if (selectedUserType === 'sub_admin') return u.type === 'department_admin';
+    return false;
+  });
+
   return (
     <ScrollView style={styles.container}>
       <View style={[styles.sectionHeader, !isDesktop && { flexDirection: 'column', alignItems: 'flex-start', gap: 15 }]}>
@@ -545,10 +623,15 @@ export default function AdminAttendanceScreen() {
       <View style={[styles.section, {zIndex: 1}]}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Advanced Reports</Text>
-          <TouchableOpacity style={styles.exportButton} onPress={handleExportCSV}>
-            <Download size={20} color="white" />
-            <Text style={styles.buttonText}> Export CSV</Text>
-          </TouchableOpacity>
+          <View style={{flexDirection: 'row', gap: 10}}>
+            <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flexDirection: 'row', alignItems: 'center'}} onPress={openAddModal}>
+              <Text style={{color: 'white', fontWeight: 'bold'}}>+ Add Attendance</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.exportButton} onPress={handleExportCSV}>
+              <Download size={20} color="white" />
+              <Text style={styles.buttonText}> Export CSV</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
@@ -828,6 +911,138 @@ export default function AdminAttendanceScreen() {
                 {summaryModalData.length === 0 && (
                   <Text style={{textAlign: 'center', padding: 20, color: '#6b7280'}}>No records found.</Text>
                 )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add Attendance Entry Modal */}
+        <Modal visible={addModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxWidth: 450 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add Attendance Entry</Text>
+                <TouchableOpacity onPress={() => setAddModalVisible(false)}>
+                  <X size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                <View style={{ marginBottom: 15 }}>
+                  <Text style={styles.label}>Select {selectedUserType === 'employee' ? 'Employee' : 'Sub Admin'} *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={addUserId}
+                      onChange={(e) => setAddUserId(e.target.value)}
+                      style={webInputStyle}
+                    >
+                      <option value="" disabled>Select User</option>
+                      {filteredUsers.map((u: any) => (
+                        <option key={u.id} value={u.id}>{u.full_name} ({u.department || 'No Dept'})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <View style={[styles.input, { padding: 0 }]}>
+                      <TextInput 
+                        style={{ padding: 12 }}
+                        placeholder="Select user ID"
+                        value={addUserId}
+                        onChangeText={setAddUserId}
+                      />
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ marginBottom: 15 }}>
+                  <Text style={styles.label}>Date (YYYY-MM-DD) *</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="date"
+                      value={addDate}
+                      onChange={(e) => setAddDate(e.target.value)}
+                      style={webInputStyle}
+                    />
+                  ) : (
+                    <TextInput 
+                      style={styles.modalInput} 
+                      placeholder="YYYY-MM-DD" 
+                      value={addDate} 
+                      onChangeText={setAddDate} 
+                    />
+                  )}
+                </View>
+
+                <View style={{ marginBottom: 15 }}>
+                  <Text style={styles.label}>Check In Time (HH:mm) *</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time"
+                      value={addCheckIn}
+                      onChange={(e) => setAddCheckIn(e.target.value)}
+                      style={webInputStyle}
+                    />
+                  ) : (
+                    <TextInput 
+                      style={styles.modalInput} 
+                      placeholder="HH:mm" 
+                      value={addCheckIn} 
+                      onChangeText={setAddCheckIn} 
+                    />
+                  )}
+                </View>
+
+                <View style={{ marginBottom: 15 }}>
+                  <Text style={styles.label}>Check Out Time (HH:mm)</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time"
+                      value={addCheckOut}
+                      onChange={(e) => setAddCheckOut(e.target.value)}
+                      style={webInputStyle}
+                    />
+                  ) : (
+                    <TextInput 
+                      style={styles.modalInput} 
+                      placeholder="HH:mm" 
+                      value={addCheckOut} 
+                      onChangeText={setAddCheckOut} 
+                    />
+                  )}
+                </View>
+
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={styles.label}>Status *</Text>
+                  {Platform.OS === 'web' ? (
+                    <select 
+                      value={addStatus} 
+                      onChange={(e) => setAddStatus(e.target.value)} 
+                      style={webInputStyle}
+                    >
+                      <option value="Present">Present</option>
+                      <option value="Late">Late</option>
+                      <option value="Absent">Absent</option>
+                    </select>
+                  ) : (
+                    <TextInput 
+                      style={styles.modalInput} 
+                      placeholder="Status" 
+                      value={addStatus} 
+                      onChangeText={setAddStatus} 
+                    />
+                  )}
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.button, { marginTop: 10 }]} 
+                  onPress={handleCreateAttendance}
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.buttonText}>Create Entry</Text>
+                  )}
+                </TouchableOpacity>
               </ScrollView>
             </View>
           </View>
