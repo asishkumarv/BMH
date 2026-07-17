@@ -141,6 +141,23 @@ export default function AdminAttendanceScreen() {
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
+  const getBreakDuration = (r: any) => {
+    if (!r.breaks || r.breaks.length === 0) return '-';
+    let breakMs = 0;
+    const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    let currentBreakIn: Date | null = null;
+    sortedBreaks.forEach((b: any) => {
+      if (b.break_type === 'Break In') {
+        currentBreakIn = new Date(b.timestamp);
+      } else if (b.break_type === 'Break Out' && currentBreakIn) {
+        breakMs += new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+        currentBreakIn = null;
+      }
+    });
+    if (breakMs === 0) return '-';
+    return formatMins(Math.floor(breakMs / 60000));
+  };
+
   const [summary, setSummary] = useState<any>(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [summaryModalType, setSummaryModalType] = useState('');
@@ -599,7 +616,7 @@ export default function AdminAttendanceScreen() {
         </View>
 
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1200 }]}>
+          <View style={[styles.table, { minWidth: 1450 }]}>
           <View style={styles.tableRowHeader}>
             <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
             <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
@@ -610,6 +627,7 @@ export default function AdminAttendanceScreen() {
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Check Out</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Worked</Text>
             <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
+            <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Status</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Action</Text>
           </View>
@@ -621,7 +639,6 @@ export default function AdminAttendanceScreen() {
               </View>
               <View style={[styles.tableCellView, { width: 250 }]}>
                 <Text style={{fontWeight: '700', color: Colors.light.text}}>{r.full_name}</Text>
-                <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>
               </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.department}</Text>
@@ -639,6 +656,16 @@ export default function AdminAttendanceScreen() {
                 {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
                 {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+              </View>
+              <View style={[styles.tableCellView, { width: 200 }]}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 4 }}>Total: {getBreakDuration(r)}</Text>
+                {r.breaks && r.breaks.length > 0 ? (
+                  r.breaks.map((b: any, bi: number) => (
+                    <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
+                      {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
+                  ))
+                ) : null}
               </View>
               <Text style={[styles.tableCell, { width: 100 }]}>{r.status}</Text>
               <View style={[styles.tableCellView, { width: 100, alignItems: 'center', gap: 5 }]}>

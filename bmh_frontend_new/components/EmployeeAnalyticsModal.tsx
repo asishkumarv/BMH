@@ -131,6 +131,25 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                   <Text style={styles.exportText}>Export</Text>
                 </TouchableOpacity>
               </View>
+              
+              {(data?.employee?.shiftIn || data?.employee?.breakStart) ? (
+                <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 15 }}>
+                  {data?.employee?.shiftIn ? (
+                    <View style={{ backgroundColor: '#eff6ff', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#bfdbfe' }}>
+                      <Text style={{ fontSize: 12, color: '#1e40af', fontWeight: '600' }}>
+                        Shift Time: {data.employee.shiftIn} - {data.employee.shiftOut || '-'}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {data?.employee?.breakStart ? (
+                    <View style={{ backgroundColor: '#fff7ed', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#fed7aa' }}>
+                      <Text style={{ fontSize: 12, color: '#9a3412', fontWeight: '600' }}>
+                        Break Time: {data.employee.breakStart} - {data.employee.breakEnd || '-'}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
 
               <View style={{ padding: 20, paddingTop: 0 }}>
                 <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>

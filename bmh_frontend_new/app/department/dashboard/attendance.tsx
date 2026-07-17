@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import { Download, MapPin, ChevronDown, ChevronUp, Clock, Coffee, CheckCircle, AlertTriangle } from 'lucide-react-native';
+import { Download, MapPin, ChevronDown, ChevronUp, Clock, Coffee, CheckCircle, AlertTriangle, Edit2, X } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { Colors } from '../../../constants/Colors';
@@ -27,6 +27,32 @@ const formatMins = (mins: number) => {
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   if (h > 0) return `${h}h`;
   return `${m}m`;
+};
+
+const getWorkedHours = (r: any) => {
+  if (r.worked_mins != null) return formatMins(r.worked_mins);
+  if (r.check_in && r.check_out) {
+    const duration = Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000);
+    return formatMins(duration);
+  }
+  return '-';
+};
+
+const getBreakDuration = (r: any) => {
+  if (!r.breaks || r.breaks.length === 0) return '-';
+  let breakMs = 0;
+  const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  let currentBreakIn: Date | null = null;
+  sortedBreaks.forEach((b: any) => {
+    if (b.break_type === 'Break In') {
+      currentBreakIn = new Date(b.timestamp);
+    } else if (b.break_type === 'Break Out' && currentBreakIn) {
+      breakMs += new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+      currentBreakIn = null;
+    }
+  });
+  if (breakMs === 0) return '-';
+  return formatMins(Math.floor(breakMs / 60000));
 };
 
 const MapPicker = ({ lat, lng, onSelect }: any) => {
@@ -267,13 +293,14 @@ function MyAttendanceHistory() {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1000, width: '100%' }]}>
+          <View style={[styles.table, { minWidth: 1100, width: '100%' }]}>
             <View style={styles.tableRowHeader}>
               <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Worked Hrs</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
               <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
             </View>
@@ -291,20 +318,23 @@ function MyAttendanceHistory() {
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 120, fontWeight: '600' }]}>
-                {r.check_in && r.check_out 
-                  ? formatMins(Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000)) 
-                  : '-'}
+                {getWorkedHours(r)}
               </Text>
+              <View style={[styles.tableCellView, { width: 120 }]}>
+                {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
+                {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
+                {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
+                {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+              </View>
               <View style={[styles.tableCellView, { width: 200 }]}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 4 }}>Total: {getBreakDuration(r)}</Text>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (
                     <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
                       {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </Text>
                   ))
-                ) : (
-                  <Text style={{ fontSize: 12, color: Colors.light.icon }}>-</Text>
-                )}
+                ) : null}
               </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
             </View>
@@ -355,6 +385,47 @@ export default function SubAdminAttendanceDashboard() {
   const [modalVisible, setModalVisible] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'department' | 'personal'>('department');
+
+  // Edit State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editRecord, setEditRecord] = useState<any>(null);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [updating, setUpdating] = useState(false);
+
+  const openEditModal = (r: any) => {
+    setEditRecord(r);
+    const formatTimeForInput = (isoStr: string) => {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      const h = d.getHours().toString().padStart(2, '0');
+      const m = d.getMinutes().toString().padStart(2, '0');
+      return `${h}:${m}`;
+    };
+    setEditCheckIn(formatTimeForInput(r.check_in));
+    setEditCheckOut(formatTimeForInput(r.check_out));
+    setEditStatus(r.status || 'On Duty');
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    setUpdating(true);
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/attendance/admin-update/${editRecord.id}`, {
+        check_in: editCheckIn || null,
+        check_out: editCheckOut || null,
+        status: editStatus
+      });
+      Alert.alert('Success', 'Attendance updated');
+      setEditModalVisible(false);
+      fetchData();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.message || 'Failed to update');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -642,7 +713,7 @@ export default function SubAdminAttendanceDashboard() {
         </View>
         
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1000 }]}>
+          <View style={[styles.table, { minWidth: 1200 }]}>
             <View style={styles.tableRowHeader}>
             <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
             <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
@@ -653,15 +724,12 @@ export default function SubAdminAttendanceDashboard() {
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Worked</Text>
             <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
             <Text style={[styles.tableCellHeader, { width: 120 }]}>Status</Text>
+            <Text style={[styles.tableCellHeader, { width: 100 }]}>Action</Text>
             </View>
           {reports.map((r, i) => (
-            <TouchableOpacity 
+            <View 
               key={i} 
               style={styles.tableRow}
-              onPress={() => {
-                setSelectedEmployeeId(r.employee_id);
-                setModalVisible(true);
-              }}
             >
               <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
@@ -688,7 +756,24 @@ export default function SubAdminAttendanceDashboard() {
                 {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
-            </TouchableOpacity>
+              <View style={[styles.tableCellView, { width: 100, alignItems: 'center', gap: 5, flexDirection: 'row' }]}>
+                <TouchableOpacity 
+                  style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 
+                  onPress={() => openEditModal(r)}
+                >
+                  <Edit2 size={16} color={Colors.light.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 
+                  onPress={() => {
+                    setSelectedEmployeeId(r.employee_id);
+                    setModalVisible(true);
+                  }}
+                >
+                  <Text style={{color: Colors.light.primary, fontWeight: '600', fontSize: 12}}>Analytics</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           ))}
           </View>
         </ScrollView>
@@ -709,6 +794,86 @@ export default function SubAdminAttendanceDashboard() {
         onClose={() => setModalVisible(false)} 
         employeeId={selectedEmployeeId} 
       />
+
+      <Modal visible={editModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Attendance</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{ marginBottom: 15 }}>
+              <Text style={styles.label}>Check In Time (HH:mm)</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="time" 
+                  value={editCheckIn} 
+                  onChange={(e) => setEditCheckIn(e.target.value)} 
+                  style={webInputStyle}
+                />
+              ) : (
+                <TextInput 
+                  style={styles.modalInput} 
+                  placeholder="HH:mm" 
+                  value={editCheckIn} 
+                  onChangeText={setEditCheckIn} 
+                />
+              )}
+            </View>
+
+            <View style={{ marginBottom: 15 }}>
+              <Text style={styles.label}>Check Out Time (HH:mm)</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="time" 
+                  value={editCheckOut} 
+                  onChange={(e) => setEditCheckOut(e.target.value)} 
+                  style={webInputStyle}
+                />
+              ) : (
+                <TextInput 
+                  style={styles.modalInput} 
+                  placeholder="HH:mm" 
+                  value={editCheckOut} 
+                  onChangeText={setEditCheckOut} 
+                />
+              )}
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text style={styles.label}>Status</Text>
+              {Platform.OS === 'web' ? (
+                <select 
+                  value={editStatus} 
+                  onChange={(e) => setEditStatus(e.target.value)} 
+                  style={webInputStyle}
+                >
+                  <option value="On Duty">On Duty</option>
+                  <option value="Checked Out">Checked Out</option>
+                  <option value="Absent">Absent</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="On Break">On Break</option>
+                  <option value="Half Day">Half Day</option>
+                </select>
+              ) : (
+                <TextInput 
+                  style={styles.modalInput} 
+                  placeholder="Status" 
+                  value={editStatus} 
+                  onChangeText={setEditStatus} 
+                />
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={updating}>
+              <Text style={styles.buttonText}>{updating ? 'Saving...' : 'Save Changes'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
         </>
       )}
     </ScrollView>
@@ -758,5 +923,13 @@ const styles = StyleSheet.create({
     borderColor: '#f3f4f6'
   },
   statValue: { fontSize: 24, fontWeight: 'bold', color: '#1f2937', marginTop: 12, marginBottom: 4 },
-  statLabel: { fontSize: 13, color: '#6b7280', fontWeight: '500' }
+  statLabel: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '100%', maxWidth: 400, backgroundColor: 'white', borderRadius: 12, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  modalInput: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16 }
 });
+
+const webInputStyle = { width: '100%', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, outlineStyle: 'none' as any, fontFamily: 'inherit' };

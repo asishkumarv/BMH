@@ -130,6 +130,10 @@ exports.getAdvancedReports = async (req, res) => {
     const parsedLimit = parseInt(limit, 10) || 50;
     const parsedOffset = parseInt(offset, 10) || 0;
 
+    const extraFields = userType === 'sub_admin' 
+      ? 'e.schedule_in, e.schedule_out, e.break_in, e.break_out'
+      : 'NULL as schedule_in, NULL as schedule_out, NULL as break_in, NULL as break_out';
+
     let query = `
       SELECT 
         a.id, a.employee_id, e.full_name, ${userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = e.department_id) as department' : 'e.department'}, e.email, e.mobile, e.profile_data, a.date, 
@@ -137,10 +141,11 @@ exports.getAdvancedReports = async (req, res) => {
         CASE WHEN a.image_url IS NOT NULL AND a.image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_in') ELSE NULL END as check_in_image,
         CASE WHEN a.checkout_image_url IS NOT NULL AND a.checkout_image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_out') ELSE NULL END as check_out_image,
         a.status, a.late_duration,
+        ${extraFields},
         (
           SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
           FROM break_logs bl
-          WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
+          WHERE bl.employee_id = a.employee_id AND bl.user_type = a.user_type AND DATE(bl.timestamp) = a.date
         ) as breaks
       FROM attendance a
       JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
@@ -180,7 +185,12 @@ exports.getAdvancedReports = async (req, res) => {
       let extra_break_mins = 0;
 
       let shiftIn = null, shiftOut = null, breakStart = null, breakEnd = null;
-      if (row.profile_data) {
+      if (userType === 'sub_admin') {
+        shiftIn = row.schedule_in;
+        shiftOut = row.schedule_out;
+        breakStart = row.break_in;
+        breakEnd = row.break_out;
+      } else if (row.profile_data) {
         let pdata = typeof row.profile_data === 'string' ? JSON.parse(row.profile_data) : row.profile_data;
         shiftIn = pdata.shiftIn;
         shiftOut = pdata.shiftOut;
@@ -384,6 +394,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
         else if (diffMins < 0) early_checkout_mins = Math.round(Math.abs(diffMins));
       }
 
+      let worked_mins = null;
       if (row.check_in && row.check_out) {
         const inDate = new Date(row.check_in);
         const outDate = new Date(row.check_out);
@@ -405,6 +416,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
         }
         totalWorkMs += workMs;
         validWorkDays++;
+        worked_mins = Math.floor(workMs / 60000);
       }
       let dynamic_status = row.status;
       const rowDateStr = new Date(row.date).toISOString().split('T')[0];
@@ -420,7 +432,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
         }
       }
       
-      return { ...row, status: dynamic_status, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
+      return { ...row, status: dynamic_status, worked_mins, late_checkin_mins, early_checkin_mins, late_checkout_mins, early_checkout_mins, extra_break_mins, shiftIn, shiftOut };
     });
 
     const avgWorkMs = validWorkDays > 0 ? (totalWorkMs / validWorkDays) : 0;
@@ -437,7 +449,13 @@ exports.getEmployeeAnalytics = async (req, res) => {
 
     res.json({
       success: true,
-      employee: emp,
+      employee: {
+        ...emp,
+        shiftIn,
+        shiftOut,
+        breakStart,
+        breakEnd
+      },
       analytics: {
         avgWorkHours: avgWorkHours.toFixed(1),
         avgBreakMins: Math.round(avgBreakMins),

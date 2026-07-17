@@ -17,6 +17,37 @@ const formatDateToDDMMYYYY = (dateStr: any) => {
   return `${day}-${month}-${year}`;
 };
 
+const formatMins = (mins: number) => {
+  if (!mins) return '0m';
+  const h = Math.floor(mins / 60);
+  const m = Math.floor(mins % 60);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+};
+
+const getWorkedHours = (r: any) => {
+  if (r.worked_mins != null) return formatMins(r.worked_mins);
+  if (r.check_in && r.check_out) {
+    let workMs = new Date(r.check_out).getTime() - new Date(r.check_in).getTime();
+    if (r.breaks && r.breaks.length > 0) {
+      const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      let currentBreakIn: Date | null = null;
+      sortedBreaks.forEach((b: any) => {
+        if (b.break_type === 'Break In') {
+          currentBreakIn = new Date(b.timestamp);
+        } else if (b.break_type === 'Break Out' && currentBreakIn) {
+          const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+          workMs -= breakDuration;
+          currentBreakIn = null;
+        }
+      });
+    }
+    return formatMins(Math.floor(workMs / 60000));
+  }
+  return '-';
+};
+
 const Dropdown = ({ options, value, onChange }: any) => {
   if (Platform.OS === 'web') {
     return (
@@ -216,7 +247,7 @@ export default function EmployeeAttendanceHistory() {
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, {width: 100}]}>
-                {r.worked_mins ? `${Math.floor(r.worked_mins / 60)}h ${r.worked_mins % 60}m` : '-'}
+                {getWorkedHours(r)}
               </Text>
               <View style={[styles.tableCell, { width: 200 }]}>
                 {r.breaks && r.breaks.length > 0 ? (

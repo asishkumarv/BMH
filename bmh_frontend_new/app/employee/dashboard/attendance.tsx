@@ -26,6 +26,45 @@ const formatDateToDDMMYYYY = (dateStr: any) => {
   return `${day}-${month}-${year}`;
 };
 
+const getWorkedHours = (r: any) => {
+  if (r.worked_mins != null) return formatMins(r.worked_mins);
+  if (r.check_in && r.check_out) {
+    let workMs = new Date(r.check_out).getTime() - new Date(r.check_in).getTime();
+    if (r.breaks && r.breaks.length > 0) {
+      const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      let currentBreakIn: Date | null = null;
+      sortedBreaks.forEach((b: any) => {
+        if (b.break_type === 'Break In') {
+          currentBreakIn = new Date(b.timestamp);
+        } else if (b.break_type === 'Break Out' && currentBreakIn) {
+          const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+          workMs -= breakDuration;
+          currentBreakIn = null;
+        }
+      });
+    }
+    return formatMins(Math.floor(workMs / 60000));
+  }
+  return '-';
+};
+
+const getBreakDuration = (r: any) => {
+  if (!r.breaks || r.breaks.length === 0) return '-';
+  let breakMs = 0;
+  const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  let currentBreakIn: Date | null = null;
+  sortedBreaks.forEach((b: any) => {
+    if (b.break_type === 'Break In') {
+      currentBreakIn = new Date(b.timestamp);
+    } else if (b.break_type === 'Break Out' && currentBreakIn) {
+      breakMs += new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+      currentBreakIn = null;
+    }
+  });
+  if (breakMs === 0) return '-';
+  return formatMins(Math.floor(breakMs / 60000));
+};
+
 const Dropdown = ({ options, value, onChange }: any) => {
   if (Platform.OS === 'web') {
     return (
@@ -201,13 +240,14 @@ export default function EmployeeAttendanceHistory() {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 800, width: '100%' }]}>
+          <View style={[styles.table, { minWidth: 920, width: '100%' }]}>
             <View style={styles.tableRowHeader}>
               <Text style={[styles.tableCellHeader, { width: 80 }]}>In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
               <Text style={[styles.tableCellHeader, { width: 100 }]}>Worked</Text>
+              <Text style={[styles.tableCellHeader, { width: 120 }]}>Deviation</Text>
               <Text style={[styles.tableCellHeader, { width: 200 }]}>Breaks</Text>
               <Text style={[styles.tableCellHeader, { width: 100 }]}>Status</Text>
             </View>
@@ -225,18 +265,23 @@ export default function EmployeeAttendanceHistory() {
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, {width: 120}]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <View style={[styles.tableCell, {width: 100}]}>
-                <Text style={{fontWeight: 'bold', color: Colors.light.text}}>{r.worked_mins != null ? formatMins(r.worked_mins) : (r.check_in && r.check_out ? formatMins(Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000)) : '-')}</Text>
+                <Text style={{fontWeight: 'bold', color: Colors.light.text}}>{getWorkedHours(r)}</Text>
               </View>
-              <View style={[styles.tableCell, { width: 200 }]}>
+              <View style={[styles.tableCell, { width: 120, justifyContent: 'center' }]}>
+                {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
+                {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
+                {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
+                {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+              </View>
+              <View style={[styles.tableCell, { width: 200, justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 4 }}>Total: {getBreakDuration(r)}</Text>
                 {r.breaks && r.breaks.length > 0 ? (
                   r.breaks.map((b: any, bi: number) => (
                     <Text key={bi} style={{ fontSize: 12, color: Colors.light.icon }}>
                       {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </Text>
                   ))
-                ) : (
-                  <Text style={{ fontSize: 12, color: Colors.light.icon }}>-</Text>
-                )}
+                ) : null}
               </View>
               <View style={[styles.tableCell, { width: 100 }]}>
                 <Text style={[styles.statusBadge, 
