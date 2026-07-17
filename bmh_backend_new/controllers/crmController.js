@@ -199,10 +199,51 @@ exports.sendMessage = async (req, res) => {
       ? `Template: ${templateName} | Data: ${JSON.stringify(templateData)}` 
       : messageText;
 
+    // Resolve phone numbers to patient names for log auditing
+    let resolvedRecipients = [];
+    try {
+      const cleanPhoneList = recipients.map(r => {
+        let num = r.replace(/\D/g, '');
+        if (num.length === 12 && num.startsWith('91')) {
+          num = num.substring(2);
+        }
+        return num;
+      });
+
+      const resolveRes = await pool.query(
+        'SELECT name, mobile FROM patients WHERE mobile IN (SELECT unnest($1::text[])) OR RIGHT(mobile, 10) IN (SELECT RIGHT(unnest($1::text[]), 10))',
+        [cleanPhoneList]
+      );
+      
+      const phoneToName = {};
+      resolveRes.rows.forEach(row => {
+        const cleanMobile = row.mobile.replace(/\D/g, '');
+        phoneToName[cleanMobile.slice(-10)] = row.name;
+      });
+
+      resolvedRecipients = recipients.map(r => {
+        const cleanVal = r.replace(/\D/g, '');
+        const name = phoneToName[cleanVal.slice(-10)];
+        return name ? `${name} (${r})` : r;
+      });
+    } catch (resolveErr) {
+      console.error('Error resolving recipient names:', resolveErr);
+      resolvedRecipients = recipients;
+    }
+
     await pool.query(
-      `INSERT INTO crm_messages (sender_id, sender_name, sender_role, message_type, content, recipients_count, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [senderId || 'admin', senderName || 'Super Admin', senderRole || 'super_admin', messageType, contentLogged, recipients.length, overallStatus]
+      `INSERT INTO crm_messages (sender_id, sender_name, sender_role, message_type, content, recipients_count, status, recipients)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        senderId || 'admin',
+        senderName || 'Super Admin',
+        senderRole || 'super_admin',
+        messageType,
+        contentLogged,
+        recipients.length,
+        overallStatus,
+        JSON.stringify(resolvedRecipients)
+      ]
     );
 
     res.json({
@@ -249,6 +290,17 @@ exports.createTemplate = async (req, res) => {
     }
 
     const { name, category, language, allowCategoryUpdate, components } = req.body;
+
+    // Automatically detect template body placeholders and append example values required by Meta
+    if (components && components.body && typeof components.body.text === 'string') {
+      const matches = components.body.text.match(/\{\{(\d+)\}\}/g) || [];
+      if (matches.length > 0) {
+        const samples = matches.map((_, idx) => `sample_value_${idx + 1}`);
+        components.body.example = {
+          body_text: [samples]
+        };
+      }
+    }
 
     const response = await axios.post(
       'https://public.doubletick.io/template',

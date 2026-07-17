@@ -106,6 +106,9 @@ app.listen(PORT, () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `)
+    .then(() => {
+      return pool.query('ALTER TABLE crm_messages ADD COLUMN IF NOT EXISTS recipients TEXT');
+    })
     .then(() => console.log('Successfully checked/patched crm_messages table.'))
     .catch(err => console.error('Error creating crm_messages table:', err.message));
 

@@ -69,6 +69,7 @@ type HistoryLog = {
   recipients_count: number;
   status: string;
   created_at: string;
+  recipients?: string;
 };
 
 interface CRMViewProps {
@@ -180,6 +181,16 @@ export default function CRMView({ userType }: CRMViewProps) {
       setPatients([]);
     }
   }, [indivSearchQuery, activeTab]);
+
+  // Fetch Templates / History when tabs change
+  useEffect(() => {
+    if (activeTab === 'templates' || activeTab === 'campaign' || activeTab === 'individual') {
+      fetchTemplates();
+    }
+    if (activeTab === 'history') {
+      fetchHistory();
+    }
+  }, [activeTab]);
 
   // Parse template placeholders when template is selected
   useEffect(() => {
@@ -1193,6 +1204,29 @@ export default function CRMView({ userType }: CRMViewProps) {
                         <View style={styles.historyBody}>
                           <Text style={styles.historyBodyText}>{log.content}</Text>
                         </View>
+                        {(() => {
+                          let parsed: string[] = [];
+                          if (log.recipients) {
+                            try {
+                              parsed = JSON.parse(log.recipients);
+                            } catch (e) {
+                              parsed = [log.recipients];
+                            }
+                          }
+                          if (parsed.length === 0) return null;
+                          return (
+                            <View style={styles.recipientListWrapper}>
+                              <Text style={styles.recipientTitle}>Recipients:</Text>
+                              <View style={styles.recipientChipsContainer}>
+                                {parsed.map((r, i) => (
+                                  <View key={i} style={styles.recipientChip}>
+                                    <Text style={styles.recipientChipText}>{r}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          );
+                        })()}
                       </View>
                     );
                   })}
@@ -1814,6 +1848,36 @@ const styles = StyleSheet.create({
   pageInfoText: {
     fontSize: 13,
     color: '#64748b',
+    fontWeight: '500'
+  },
+  recipientListWrapper: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9'
+  },
+  recipientTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#64748b',
+    marginBottom: 6
+  },
+  recipientChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6
+  },
+  recipientChip: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  recipientChipText: {
+    fontSize: 11,
+    color: '#475569',
     fontWeight: '500'
   }
 });
