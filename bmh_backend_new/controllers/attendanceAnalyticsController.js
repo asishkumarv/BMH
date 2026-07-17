@@ -394,26 +394,37 @@ exports.getEmployeeAnalytics = async (req, res) => {
         else if (diffMins < 0) early_checkout_mins = Math.round(Math.abs(diffMins));
       }
 
+      let rowTotalBreakMins = 0;
+      if (row.breaks && row.breaks.length > 0) {
+        row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        let currentBreakIn = null;
+        row.breaks.forEach(b => {
+          if (b.break_type === 'Break In') {
+            currentBreakIn = new Date(b.timestamp);
+          } else if (b.break_type === 'Break Out' && currentBreakIn) {
+            const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+            rowTotalBreakMins += breakDuration / 60000;
+            currentBreakIn = null;
+          }
+        });
+      }
+
+      // Calculate break overstay
+      if (breakStart && breakEnd) {
+        const schedBreakMins = (parseTime(breakEnd, row.date) - parseTime(breakStart, row.date)) / 60000;
+        if (rowTotalBreakMins > schedBreakMins && schedBreakMins > 0) {
+          extra_break_mins = Math.round(rowTotalBreakMins - schedBreakMins);
+        }
+      }
+
       let worked_mins = null;
       if (row.check_in && row.check_out) {
         const inDate = new Date(row.check_in);
         const outDate = new Date(row.check_out);
         let workMs = outDate.getTime() - inDate.getTime();
         
-        if (row.breaks && row.breaks.length > 0) {
-          row.breaks.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-          let currentBreakIn = null;
-          row.breaks.forEach(b => {
-            if (b.break_type === 'Break In') {
-              currentBreakIn = new Date(b.timestamp);
-            } else if (b.break_type === 'Break Out' && currentBreakIn) {
-              const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
-              workMs -= breakDuration;
-              totalBreakMs += breakDuration;
-              currentBreakIn = null;
-            }
-          });
-        }
+        workMs -= (rowTotalBreakMins * 60000);
+        totalBreakMs += (rowTotalBreakMins * 60000);
         totalWorkMs += workMs;
         validWorkDays++;
         worked_mins = Math.floor(workMs / 60000);
@@ -444,6 +455,22 @@ exports.getEmployeeAnalytics = async (req, res) => {
     const earlyPercent = history.length > 0 ? ((earlyCheckInCount / history.length) * 100).toFixed(1) : 0;
     const latePercent = history.length > 0 ? ((lateCheckInCount / history.length) * 100).toFixed(1) : 0;
     
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    let currentMonthDaysPresent = 0;
+    let currentMonthWorkMs = 0;
+
+    processedHistory.forEach(row => {
+      const rowDate = new Date(row.date);
+      if (rowDate.getMonth() === currentMonth && rowDate.getFullYear() === currentYear) {
+        currentMonthDaysPresent++;
+        if (row.worked_mins != null) {
+          currentMonthWorkMs += row.worked_mins * 60000;
+        }
+      }
+    });
+    const currentMonthWorkHours = currentMonthWorkMs / (1000 * 60 * 60);
+
     const paginatedHistory = processedHistory.slice(parsedOffset, parsedOffset + parsedLimit);
     const hasMore = parsedOffset + parsedLimit < processedHistory.length;
 
@@ -461,7 +488,9 @@ exports.getEmployeeAnalytics = async (req, res) => {
         avgBreakMins: Math.round(avgBreakMins),
         earlyCheckInPercent: earlyPercent,
         lateCheckInPercent: latePercent,
-        totalDaysPresent: history.length
+        totalDaysPresent: history.length,
+        currentMonthDaysPresent,
+        currentMonthWorkHours: currentMonthWorkHours.toFixed(1)
       },
       history: paginatedHistory,
       hasMore

@@ -32,6 +32,45 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
+  const getWorkedHours = (r: any) => {
+    if (r.worked_mins != null) return formatMins(r.worked_mins);
+    if (r.check_in && r.check_out) {
+      let workMs = new Date(r.check_out).getTime() - new Date(r.check_in).getTime();
+      if (r.breaks && r.breaks.length > 0) {
+        const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        let currentBreakIn: Date | null = null;
+        sortedBreaks.forEach((b: any) => {
+          if (b.break_type === 'Break In') {
+            currentBreakIn = new Date(b.timestamp);
+          } else if (b.break_type === 'Break Out' && currentBreakIn) {
+            const breakDuration = new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+            workMs -= breakDuration;
+            currentBreakIn = null;
+          }
+        });
+      }
+      return formatMins(Math.floor(workMs / 60000));
+    }
+    return '-';
+  };
+
+  const getBreakDuration = (r: any) => {
+    if (!r.breaks || r.breaks.length === 0) return '-';
+    let breakMs = 0;
+    const sortedBreaks = [...r.breaks].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    let currentBreakIn: Date | null = null;
+    sortedBreaks.forEach((b: any) => {
+      if (b.break_type === 'Break In') {
+        currentBreakIn = new Date(b.timestamp);
+      } else if (b.break_type === 'Break Out' && currentBreakIn) {
+        breakMs += new Date(b.timestamp).getTime() - currentBreakIn.getTime();
+        currentBreakIn = null;
+      }
+    });
+    if (breakMs === 0) return '-';
+    return formatMins(Math.floor(breakMs / 60000));
+  };
+
   useEffect(() => {
     if (visible && employeeId) {
       fetchAnalytics();
@@ -121,6 +160,16 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                   <Text style={styles.statValue}>{data.analytics.lateCheckInPercent}%</Text>
                   <Text style={styles.statLabel}>Late Check In</Text>
                 </View>
+                <View style={styles.statCard}>
+                  <Clock size={24} color="#0284c7" />
+                  <Text style={styles.statValue}>{data.analytics.currentMonthWorkHours || 0}h</Text>
+                  <Text style={styles.statLabel}>Month Work Hours</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <CheckCircle size={24} color="#059669" />
+                  <Text style={styles.statValue}>{data.analytics.currentMonthDaysPresent || 0}d</Text>
+                  <Text style={styles.statLabel}>Month Days Present</Text>
+                </View>
               </View>
 
               {/* History Table */}
@@ -153,13 +202,14 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
 
               <View style={{ padding: 20, paddingTop: 0 }}>
                 <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                  <View style={{ minWidth: 600, width: '100%' }}>
+                  <View style={{ minWidth: 800, width: '100%' }}>
                     <View style={styles.tableHeaderRow}>
                       <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
                       <Text style={styles.tableCellHeader}>Date</Text>
                       <Text style={styles.tableCellHeader}>Check In</Text>
                       <Text style={styles.tableCellHeader}>Check Out</Text>
-                      <Text style={styles.tableCellHeader}>Deviation</Text>
+                      <Text style={styles.tableCellHeader}>Worked</Text>
+                      <Text style={[styles.tableCellHeader, { flex: 1.2 }]}>Deviation</Text>
                       <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
                     </View>
                     {data.history.map((row: any, idx: number) => (
@@ -171,22 +221,22 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                         <Text style={styles.tableCell}>{formatDateToDDMMYYYY(row.date)}</Text>
                         <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                         <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-                        <View style={[styles.tableCell, { justifyContent: 'center' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: '600' }]}>{getWorkedHours(row)}</Text>
+                        <View style={[styles.tableCell, { flex: 1.2, justifyContent: 'center' }]}>
                           {row.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(row.late_checkin_mins)}</Text> : null}
                           {row.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(row.early_checkout_mins)}</Text> : null}
                           {row.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(row.extra_break_mins)}</Text> : null}
                           {(!row.late_checkin_mins && !row.early_checkout_mins && !row.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
                         </View>
-                        <View style={[styles.tableCell, { flex: 2 }]}>
+                        <View style={[styles.tableCell, { flex: 2, justifyContent: 'center' }]}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#1f2937', marginBottom: 4 }}>Total: {getBreakDuration(row)}</Text>
                           {row.breaks && row.breaks.length > 0 ? (
                             row.breaks.map((b: any, bi: number) => (
                               <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
-                                {b.break_type}: {new Date(b.timestamp).toLocaleTimeString()}
+                                {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                               </Text>
                             ))
-                          ) : (
-                            <Text style={{ fontSize: 12, color: '#9ca3af' }}>No breaks</Text>
-                          )}
+                          ) : null}
                         </View>
                       </View>
                     ))}

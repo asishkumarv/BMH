@@ -192,6 +192,16 @@ export default function EmployeeAttendanceHistory() {
             <Text style={styles.statValue}>{analytics.lateCheckInPercent}%</Text>
             <Text style={styles.statLabel}>Late Check In</Text>
           </View>
+          <View style={styles.statCard}>
+            <Clock size={24} color="#0284c7" />
+            <Text style={styles.statValue}>{analytics.currentMonthWorkHours || 0}h</Text>
+            <Text style={styles.statLabel}>Month Work Hours</Text>
+          </View>
+          <View style={styles.statCard}>
+            <CheckCircle size={24} color="#059669" />
+            <Text style={styles.statValue}>{analytics.currentMonthDaysPresent || 0}d</Text>
+            <Text style={styles.statLabel}>Month Days Present</Text>
+          </View>
         </View>
       )}
 
