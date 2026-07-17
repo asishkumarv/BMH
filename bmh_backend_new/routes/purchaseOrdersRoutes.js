@@ -104,6 +104,20 @@ router.put("/update/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Purchase order not found" });
     }
 
+    if (assignedto) {
+      try {
+        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [assignedto]);
+        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+          const { sendExpoPushNotification } = require('../utils/pushNotification');
+          const title = 'New Purchase Order Assigned';
+          const body = `Purchase Order #${result.rows[0].purchase_no} has been assigned to you.`;
+          sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+        }
+      } catch (e) {
+        console.error('Push notification error on purchase order update:', e.message);
+      }
+    }
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error(err);

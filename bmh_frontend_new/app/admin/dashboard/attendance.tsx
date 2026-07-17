@@ -201,13 +201,15 @@ export default function AdminAttendanceScreen() {
   const [addCheckOut, setAddCheckOut] = useState('');
   const [addStatus, setAddStatus] = useState('Present');
   const [creating, setCreating] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
 
   const openAddModal = async () => {
     setAddUserId('');
+    setUserSearchQuery('');
     setAddDate(new Date().toISOString().split('T')[0]);
     setAddCheckIn('09:00');
-    setAddCheckOut('18:00');
-    setAddStatus('Present');
+    setAddCheckOut('');
+    setAddStatus('On Duty');
     setAddModalVisible(true);
 
     if (allUsers.length === 0) {
@@ -689,12 +691,30 @@ export default function AdminAttendanceScreen() {
             ))}
           </ScrollView>
           <View style={[styles.input, { flex: 0.5, minWidth: 200, margin: 0, padding: 8 }]}>
-             <TextInput 
-               style={[{flex: 1}, Platform.OS === 'web' && {outlineWidth: 0} as any]}
-               placeholder="Search Name, Email, Phone..." 
-               value={searchQuery} 
-               onChangeText={setSearchQuery} 
-             />
+             {Platform.OS === 'web' ? (
+               <input 
+                 type="text"
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 placeholder="Search Name, Email, Phone..."
+                 autoComplete="new-password"
+                 style={{
+                   width: '100%',
+                   border: 'none',
+                   outlineWidth: 0,
+                   fontSize: '14px',
+                   backgroundColor: 'transparent'
+                 }}
+               />
+             ) : (
+               <TextInput 
+                 key="main-reports-search-input"
+                 style={{flex: 1}}
+                 placeholder="Search Name, Email, Phone..." 
+                 value={searchQuery} 
+                 onChangeText={setSearchQuery} 
+               />
+             )}
           </View>
         </View>
 
@@ -930,27 +950,68 @@ export default function AdminAttendanceScreen() {
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
                 <View style={{ marginBottom: 15 }}>
                   <Text style={styles.label}>Select {selectedUserType === 'employee' ? 'Employee' : 'Sub Admin'} *</Text>
+                  
                   {Platform.OS === 'web' ? (
-                    <select
-                      value={addUserId}
-                      onChange={(e) => setAddUserId(e.target.value)}
-                      style={webInputStyle}
-                    >
-                      <option value="" disabled>Select User</option>
-                      {filteredUsers.map((u: any) => (
-                        <option key={u.id} value={u.id}>{u.full_name} ({u.department || 'No Dept'})</option>
-                      ))}
-                    </select>
+                    <input 
+                      type="text"
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      placeholder="Search name, email, or dept..."
+                      autoComplete="new-password"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '16px',
+                        outlineWidth: 0,
+                        backgroundColor: '#fff',
+                        boxSizing: 'border-box',
+                        marginBottom: '10px'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
                   ) : (
-                    <View style={[styles.input, { padding: 0 }]}>
-                      <TextInput 
-                        style={{ padding: 12 }}
-                        placeholder="Select user ID"
-                        value={addUserId}
-                        onChangeText={setAddUserId}
-                      />
-                    </View>
+                    <TextInput 
+                      key="modal-user-search-input"
+                      style={[styles.modalInput, { marginBottom: 10 }]} 
+                      placeholder="Search name, email, or dept..." 
+                      value={userSearchQuery}
+                      onChangeText={setUserSearchQuery}
+                    />
                   )}
+
+                  {addUserId ? (
+                    <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600', marginBottom: 10 }}>
+                      Selected: {allUsers.find(u => u.id === addUserId)?.full_name}
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 13, color: '#dc2626', fontWeight: '600', marginBottom: 10 }}>
+                      Selected: None
+                    </Text>
+                  )}
+
+                  <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 5, backgroundColor: '#f9fafb' }} nestedScrollEnabled={true}>
+                    {filteredUsers.filter(u => {
+                      const q = userSearchQuery.toLowerCase();
+                      return (
+                        u.full_name.toLowerCase().includes(q) ||
+                        (u.department && u.department.toLowerCase().includes(q)) ||
+                        (u.email && u.email.toLowerCase().includes(q))
+                      );
+                    }).map((u: any) => (
+                      <TouchableOpacity 
+                        key={u.id} 
+                        style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: addUserId === u.id ? '#eff6ff' : 'white' }}
+                        onPress={() => setAddUserId(u.id)}
+                      >
+                        <Text style={{ fontWeight: addUserId === u.id ? '700' : '400', color: addUserId === u.id ? Colors.light.primary : '#374151', fontSize: 14 }}>
+                          {u.full_name} ({u.department || 'No Dept'})
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
 
                 <View style={{ marginBottom: 15 }}>
@@ -1018,14 +1079,13 @@ export default function AdminAttendanceScreen() {
                       onChange={(e) => setAddStatus(e.target.value)} 
                       style={webInputStyle}
                     >
-                      <option value="Present">Present</option>
-                      <option value="Late">Late</option>
-                      <option value="Absent">Absent</option>
+                      <option value="On Duty">Check In</option>
+                      <option value="Checked Out">Check Out</option>
                     </select>
                   ) : (
                     <TextInput 
                       style={styles.modalInput} 
-                      placeholder="Status" 
+                      placeholder="Status (On Duty / Checked Out)" 
                       value={addStatus} 
                       onChangeText={setAddStatus} 
                     />

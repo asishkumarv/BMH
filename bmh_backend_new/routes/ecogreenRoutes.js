@@ -1197,6 +1197,7 @@ router.post("/assign_delivery_boy", async (req, res) => {
     const query = `
       UPDATE ecogreenpurchase_orders
       SET delivery_boy = $1,
+          delivery_boy_id = $1,
           assigned_by = $2,
           assigned_at = NOW()
       WHERE id = $3
@@ -1208,6 +1209,21 @@ router.post("/assign_delivery_boy", async (req, res) => {
 
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // Send push notification to the assigned rider
+    if (delivery_boy) {
+      try {
+        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy]);
+        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+          const { sendExpoPushNotification } = require('../utils/pushNotification');
+          const title = 'New Purchase Order Assigned';
+          const body = `Purchase Order #${order_id} has been assigned to you.`;
+          sendExpoPushNotification(empRes.rows[0].push_token, title, body);
+        }
+      } catch (e) {
+        console.error('Push notification error on manual assignment:', e.message);
+      }
     }
 
     res.json({
