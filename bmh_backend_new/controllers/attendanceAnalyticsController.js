@@ -469,7 +469,12 @@ exports.getEmployeeAnalytics = async (req, res) => {
         }
       }
     });
-    const currentMonthWorkHours = currentMonthWorkMs / (1000 * 60 * 60);
+    const currentMonthWorkMins = Math.floor(currentMonthWorkMs / 60000);
+    const cmH = Math.floor(currentMonthWorkMins / 60);
+    const cmM = currentMonthWorkMins % 60;
+    const currentMonthWorkHoursFormatted = cmH > 0 || cmM > 0
+      ? (cmH > 0 && cmM > 0 ? `${cmH}h ${cmM}m` : (cmH > 0 ? `${cmH}h` : `${cmM}m`))
+      : '0m';
 
     const paginatedHistory = processedHistory.slice(parsedOffset, parsedOffset + parsedLimit);
     const hasMore = parsedOffset + parsedLimit < processedHistory.length;
@@ -490,7 +495,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
         lateCheckInPercent: latePercent,
         totalDaysPresent: history.length,
         currentMonthDaysPresent,
-        currentMonthWorkHours: currentMonthWorkHours.toFixed(1)
+        currentMonthWorkHours: currentMonthWorkHoursFormatted
       },
       history: paginatedHistory,
       hasMore

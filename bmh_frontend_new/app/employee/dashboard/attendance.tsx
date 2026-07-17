@@ -194,7 +194,7 @@ export default function EmployeeAttendanceHistory() {
           </View>
           <View style={styles.statCard}>
             <Clock size={24} color="#0284c7" />
-            <Text style={styles.statValue}>{analytics.currentMonthWorkHours || 0}h</Text>
+            <Text style={styles.statValue}>{analytics.currentMonthWorkHours || '0m'}</Text>
             <Text style={styles.statLabel}>Month Work Hours</Text>
           </View>
           <View style={styles.statCard}>
