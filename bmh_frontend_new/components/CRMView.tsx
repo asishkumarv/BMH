@@ -278,6 +278,7 @@ export default function CRMView({ userType }: CRMViewProps) {
     if (selectedVoiceTemplateName) {
       const template = templates.find(t => t.name === selectedVoiceTemplateName);
       if (template) {
+        setVoiceAgentName(template.name);
         const bodyComp = template.components?.find((c: any) => c.type === 'BODY');
         if (bodyComp && bodyComp.text) {
           const matches = bodyComp.text.match(/\{\{(\d+)\}\}/g) || [];
@@ -1775,10 +1776,13 @@ export default function CRMView({ userType }: CRMViewProps) {
                 <Text style={[styles.composerLabel, { marginTop: 16 }]}>DoubleTick AI Agent Name</Text>
                 <TextInput
                   style={styles.simpleTextInput}
-                  placeholder="e.g. order_update_hindi"
+                  placeholder="Enter exact AI Agent name configured in DoubleTick..."
                   value={voiceAgentName}
                   onChangeText={setVoiceAgentName}
                 />
+                <Text style={styles.composerHint}>
+                  Note: The AI Agent Name must exactly match an active Voice Agent configured in your DoubleTick Dashboard (under Settings &gt; AI Agents).
+                </Text>
 
                 {/* Trigger Button */}
                 <Pressable

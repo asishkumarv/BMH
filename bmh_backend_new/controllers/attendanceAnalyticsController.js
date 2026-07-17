@@ -85,23 +85,37 @@ exports.getAttendanceSummary = async (req, res) => {
     const leaveIds = new Set(leaveResult.rows.map(r => r.id));
     const absent_list = empResult.rows.filter(e => !presentIds.has(e.id) && !leaveIds.has(e.id));
 
+    const cleanRows = (rows, uType) => {
+      return rows.map(r => {
+        if (r.profile_data) {
+          try {
+            const pd = typeof r.profile_data === 'string' ? JSON.parse(r.profile_data) : r.profile_data;
+            if (pd.image) pd.image = `https://napi.bharatmedicalhallplus.com/attendance/profile-image/${r.id}/${uType}`;
+            if (pd.photo) pd.photo = `https://napi.bharatmedicalhallplus.com/attendance/profile-image/${r.id}/${uType}`;
+            r.profile_data = pd;
+          } catch (e) {}
+        }
+        return r;
+      });
+    };
+
     return res.json({
       success: true,
       summary: {
         total_employees: empResult.rowCount,
-        total_employees_list: empResult.rows,
+        total_employees_list: cleanRows(empResult.rows, userType),
         total_present: presentResult.rowCount,
-        present_list: presentResult.rows,
+        present_list: cleanRows(presentResult.rows, userType),
         total_absent: absent_list.length,
-        absent_list: absent_list,
+        absent_list: cleanRows(absent_list, userType),
         total_on_leave: leaveResult.rowCount,
-        on_leave_list: leaveResult.rows,
+        on_leave_list: cleanRows(leaveResult.rows, userType),
         employees_on_break: breakResult.rowCount,
-        break_list: breakResult.rows,
+        break_list: cleanRows(breakResult.rows, userType),
         late_checkins_count: lateResult.rowCount,
-        late_checkins_list: lateResult.rows,
+        late_checkins_list: cleanRows(lateResult.rows, userType),
         early_checkouts_count: earlyResult.rowCount,
-        early_checkouts_list: earlyResult.rows
+        early_checkouts_list: cleanRows(earlyResult.rows, userType)
       }
     });
   } catch (error) {
@@ -120,7 +134,8 @@ exports.getAdvancedReports = async (req, res) => {
       SELECT 
         a.id, a.employee_id, e.full_name, ${userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = e.department_id) as department' : 'e.department'}, e.email, e.mobile, e.profile_data, a.date, 
         a.timestamp as check_in, a.checkout_timestamp as check_out, 
-        a.image_url as check_in_image, a.checkout_image_url as check_out_image,
+        CASE WHEN a.image_url IS NOT NULL AND a.image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_in') ELSE NULL END as check_in_image,
+        CASE WHEN a.checkout_image_url IS NOT NULL AND a.checkout_image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_out') ELSE NULL END as check_out_image,
         a.status, a.late_duration,
         (
           SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
@@ -278,6 +293,15 @@ exports.getEmployeeAnalytics = async (req, res) => {
     const empResult = await pool.query(`SELECT full_name, email, mobile, ${deptCol}, profile_data${extraCols} FROM ${tableName} WHERE id = $1`, [employeeId]);
     if (empResult.rowCount === 0) return res.status(404).json({ success: false, message: "Employee not found" });
     const emp = empResult.rows[0];
+
+    if (emp.profile_data) {
+      try {
+        const pd = typeof emp.profile_data === 'string' ? JSON.parse(emp.profile_data) : emp.profile_data;
+        if (pd.image) pd.image = `https://napi.bharatmedicalhallplus.com/attendance/profile-image/${employeeId}/${userType}`;
+        if (pd.photo) pd.photo = `https://napi.bharatmedicalhallplus.com/attendance/profile-image/${employeeId}/${userType}`;
+        emp.profile_data = pd;
+      } catch (e) {}
+    }
     
     let shiftIn = null, shiftOut = null, breakStart = null, breakEnd = null;
     if (userType === 'sub_admin') {
@@ -286,7 +310,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
       breakStart = emp.break_in;
       breakEnd = emp.break_out;
     } else if (emp.profile_data) {
-      let pdata = typeof emp.profile_data === 'string' ? JSON.parse(emp.profile_data) : emp.profile_data;
+      let pdata = emp.profile_data;
       shiftIn = pdata.shiftIn;
       shiftOut = pdata.shiftOut;
       breakStart = pdata.breakStart;
@@ -296,8 +320,9 @@ exports.getEmployeeAnalytics = async (req, res) => {
     // Fetch all attendance records with breaks
     let attendanceQuery = `
       SELECT 
-        a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status,
-        a.image_url as check_in_image, a.checkout_image_url as check_out_image,
+        a.id, a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status,
+        CASE WHEN a.image_url IS NOT NULL AND a.image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_in') ELSE NULL END as check_in_image,
+        CASE WHEN a.checkout_image_url IS NOT NULL AND a.checkout_image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_out') ELSE NULL END as check_out_image,
         (
           SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC'))
           FROM break_logs bl

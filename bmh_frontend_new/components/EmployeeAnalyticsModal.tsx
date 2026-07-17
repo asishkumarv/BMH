@@ -4,13 +4,24 @@ import axios from 'axios';
 import { X, Clock, AlertTriangle, CheckCircle, Download } from 'lucide-react-native';
 import { Platform, Alert } from 'react-native';
 
+const formatDateToDDMMYYYY = (dateStr: any) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 interface Props {
   visible: boolean;
   onClose: () => void;
   employeeId: number | null;
+  userType?: 'employee' | 'sub_admin';
 }
 
-export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }: Props) {
+export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, userType = 'employee' }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
@@ -30,7 +41,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${employeeId}`);
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${employeeId}&userType=${userType}`);
       if (res.data.success) {
         setData(res.data);
       }
@@ -49,7 +60,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
       const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
       const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
       
-      csvContent += `${data.employee.full_name},${data.employee.email || 'N/A'},${data.employee.mobile || 'N/A'},${data.employee.department},${new Date(r.date).toLocaleDateString()},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
+      csvContent += `${data.employee.full_name},${data.employee.email || 'N/A'},${data.employee.mobile || 'N/A'},${data.employee.department},${formatDateToDDMMYYYY(r.date)},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
 
     try {
@@ -138,7 +149,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId }:
                           {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                           {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
                         </View>
-                        <Text style={styles.tableCell}>{new Date(row.date).toLocaleDateString()}</Text>
+                        <Text style={styles.tableCell}>{formatDateToDDMMYYYY(row.date)}</Text>
                         <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                         <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
                         <View style={[styles.tableCell, { justifyContent: 'center' }]}>

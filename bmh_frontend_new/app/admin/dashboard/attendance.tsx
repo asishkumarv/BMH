@@ -8,6 +8,16 @@ import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 
+const formatDateToDDMMYYYY = (dateStr: any) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 const Dropdown = ({ options, value, onChange }: any) => {
   const [open, setOpen] = useState(false);
   
@@ -615,7 +625,7 @@ export default function AdminAttendanceScreen() {
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>
               </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.department}</Text>
-              <Text style={[styles.tableCell, { width: 100 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, { width: 100 }]}>{formatDateToDDMMYYYY(r.date)}</Text>
               <View style={[styles.tableCellView, { width: 100 }]}>
                 {r.shiftIn && r.shiftOut ? <Text style={{fontSize: 12, color: Colors.light.text}}>{r.shiftIn} - {r.shiftOut}</Text> : <Text style={{fontSize: 12, color: Colors.light.icon}}>-</Text>}
               </View>
@@ -642,22 +652,24 @@ export default function AdminAttendanceScreen() {
             </View>
           ))}
           </View>
-          
-          {hasMore && (
-            <TouchableOpacity 
-              style={{ padding: 12, backgroundColor: Colors.light.primary, borderRadius: 8, alignItems: 'center', marginTop: 15 }} 
-              onPress={() => fetchReports(selectedReportDept, selectedUserType, false, true)}
-            >
-              <Text style={{ color: 'white', fontWeight: 'bold' }}>Load More</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
+        {hasMore && (
+          <TouchableOpacity 
+            style={{ paddingVertical: 14, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 10 }} 
+            onPress={() => fetchReports(selectedReportDept, selectedUserType, false, true)}
+          >
+            <Text style={{ color: Colors.light.primary, fontWeight: '600', fontSize: 14, textDecorationLine: 'underline' }}>
+              Load More
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <EmployeeAnalyticsModal 
         visible={modalVisible} 
         onClose={() => setModalVisible(false)} 
         employeeId={selectedEmployeeId} 
+        userType={selectedUserType as 'employee' | 'sub_admin'}
       />
 
       <Modal visible={editModalVisible} transparent animationType="fade">

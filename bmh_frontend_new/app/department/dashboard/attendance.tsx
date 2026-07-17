@@ -10,6 +10,25 @@ import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
+const formatDateToDDMMYYYY = (dateStr: any) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+const formatMins = (mins: number) => {
+  if (!mins) return '0m';
+  const h = Math.floor(mins / 60);
+  const m = Math.floor(mins % 60);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+};
+
 const MapPicker = ({ lat, lng, onSelect }: any) => {
   const htmlContent = `
     <!DOCTYPE html>
@@ -162,7 +181,7 @@ function MyAttendanceHistory() {
       const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
       const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
       
-      csvContent += `${new Date(r.date).toLocaleDateString()},${checkIn},${checkOut},${r.status},${r.late_checkin_mins || 0},${r.early_checkout_mins || 0},"${breaksStr}"\n`;
+      csvContent += `${formatDateToDDMMYYYY(r.date)},${checkIn},${checkOut},${r.status},${r.late_checkin_mins || 0},${r.early_checkout_mins || 0},"${breaksStr}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -268,12 +287,12 @@ function MyAttendanceHistory() {
                  {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
                  {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
               </View>
-              <Text style={[styles.tableCell, { width: 120 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>{formatDateToDDMMYYYY(r.date)}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 120, fontWeight: '600' }]}>
                 {r.check_in && r.check_out 
-                  ? ((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / (1000 * 60 * 60)).toFixed(2) + ' h' 
+                  ? formatMins(Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000)) 
                   : '-'}
               </Text>
               <View style={[styles.tableCellView, { width: 200 }]}>
@@ -294,10 +313,12 @@ function MyAttendanceHistory() {
         </ScrollView>
         {hasMore && (
           <TouchableOpacity 
-            style={{ padding: 12, backgroundColor: Colors.light.primary, borderRadius: 8, alignItems: 'center', marginTop: 15 }} 
+            style={{ paddingVertical: 14, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 10 }} 
             onPress={() => fetchHistory(false, true)}
           >
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Load More</Text>
+            <Text style={{ color: Colors.light.primary, fontWeight: '600', fontSize: 14, textDecorationLine: 'underline' }}>
+              Load More
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -651,7 +672,7 @@ export default function SubAdminAttendanceDashboard() {
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>
               </View>
-              <Text style={[styles.tableCell, { width: 100 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+              <Text style={[styles.tableCell, { width: 100 }]}>{formatDateToDDMMYYYY(r.date)}</Text>
               <View style={[styles.tableCellView, { width: 100 }]}>
                 {r.shiftIn && r.shiftOut ? <Text style={{fontSize: 12, color: Colors.light.text}}>{r.shiftIn} - {r.shiftOut}</Text> : <Text style={{fontSize: 12, color: Colors.light.icon}}>-</Text>}
               </View>
@@ -673,10 +694,12 @@ export default function SubAdminAttendanceDashboard() {
         </ScrollView>
         {hasMore && (
           <TouchableOpacity 
-            style={{ padding: 12, backgroundColor: Colors.light.primary, borderRadius: 8, alignItems: 'center', marginTop: 15, marginBottom: 15 }} 
+            style={{ paddingVertical: 14, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 10 }} 
             onPress={() => fetchData(false, true)}
           >
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Load More</Text>
+            <Text style={{ color: Colors.light.primary, fontWeight: '600', fontSize: 14, textDecorationLine: 'underline' }}>
+              Load More
+            </Text>
           </TouchableOpacity>
         )}
       </View>

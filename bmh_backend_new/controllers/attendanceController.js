@@ -507,3 +507,92 @@ exports.quickAttendance = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+exports.getAttendanceImage = async (req, res) => {
+  try {
+    const { id, type } = req.params;
+    const fieldName = type === 'check_out' ? 'checkout_image_url' : 'image_url';
+    const result = await pool.query(
+      `SELECT ${fieldName} as img FROM attendance WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rowCount === 0 || !result.rows[0].img) {
+      return res.status(404).send('Image not found');
+    }
+
+    const base64Str = result.rows[0].img;
+    const matches = base64Str.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-+.]+);base64,(.*)$/);
+    if (!matches || matches.length < 3) {
+      // Raw base64 string
+      const buffer = Buffer.from(base64Str, 'base64');
+      res.writeHead(200, {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': buffer.length
+      });
+      return res.end(buffer);
+    }
+
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': buffer.length
+    });
+    res.end(buffer);
+  } catch (error) {
+    console.error('Error fetching attendance image:', error);
+    res.status(500).send('Server error');
+  }
+};
+
+exports.getProfileImage = async (req, res) => {
+  try {
+    const { id, userType = 'employee' } = req.params;
+    const tableName = userType === 'sub_admin' ? 'department_admins' : 'employees';
+    
+    const result = await pool.query(
+      `SELECT image, profile_data FROM ${tableName} WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).send('User not found');
+    }
+
+    let base64Str = result.rows[0].image;
+    if (!base64Str && result.rows[0].profile_data) {
+      try {
+        const pd = typeof result.rows[0].profile_data === 'string' ? JSON.parse(result.rows[0].profile_data) : result.rows[0].profile_data;
+        base64Str = pd.image || pd.photo;
+      } catch (e) {
+        console.error('Failed parsing profile_data for image');
+      }
+    }
+
+    if (!base64Str) {
+      return res.status(404).send('Profile image not found');
+    }
+
+    const matches = base64Str.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-+.]+);base64,(.*)$/);
+    if (!matches || matches.length < 3) {
+      const buffer = Buffer.from(base64Str, 'base64');
+      res.writeHead(200, {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': buffer.length
+      });
+      return res.end(buffer);
+    }
+
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': buffer.length
+    });
+    res.end(buffer);
+  } catch (error) {
+    console.error('Error fetching profile image:', error);
+    res.status(500).send('Server error');
+  }
+};
