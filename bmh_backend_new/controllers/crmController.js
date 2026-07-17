@@ -125,7 +125,11 @@ exports.sendMessage = async (req, res) => {
         if (Array.isArray(templateData)) {
           formattedData = templateData;
         } else if (typeof templateData === 'object' && templateData !== null) {
-          formattedData = Object.entries(templateData).map(([key, val]) => ({ [key]: val }));
+          // Sort placeholders (e.g. "1", "2", "3") numerically to ensure correct sequential order
+          const sortedEntries = Object.entries(templateData)
+            .sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+          
+          formattedData = sortedEntries.map(([_, val]) => ({ name: String(val) }));
         }
 
         return {
