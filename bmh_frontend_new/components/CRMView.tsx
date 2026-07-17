@@ -14,6 +14,7 @@ import {
   Modal,
   useWindowDimensions
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import {
   Send,
   Users,
@@ -108,11 +109,14 @@ export default function CRMView({ userType }: CRMViewProps) {
   const [cityFilter, setCityFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState('all');
   const [bloodFilter, setBloodFilter] = useState('all');
+  const [selectedDoctorId, setSelectedDoctorId] = useState('all');
+  const [visitMonthFilter, setVisitMonthFilter] = useState('last_month');
 
   // Filter Options from Backend
   const [uniqueCities, setUniqueCities] = useState<string[]>([]);
   const [uniqueGenders, setUniqueGenders] = useState<string[]>([]);
   const [uniqueBloodGroups, setUniqueBloodGroups] = useState<string[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
 
   // Selection & Composition State (Campaign)
   const [selectedPatients, setSelectedPatients] = useState<Record<string, Patient>>({});
@@ -197,11 +201,11 @@ export default function CRMView({ userType }: CRMViewProps) {
   // Fetch Patients, Filter Options, and Config
   useEffect(() => {
     fetchPatients(currentPage);
-  }, [currentPage, searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, activeTab]);
+  }, [currentPage, searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, selectedDoctorId, visitMonthFilter, activeTab]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter]);
+  }, [searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, selectedDoctorId, visitMonthFilter]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -331,6 +335,10 @@ export default function CRMView({ userType }: CRMViewProps) {
         if (cityFilter !== 'all') params.city = cityFilter;
         if (genderFilter !== 'all') params.gender = genderFilter;
         if (bloodFilter !== 'all') params.bloodGroup = bloodFilter;
+        if (selectedDoctorId !== 'all') {
+          params.doctorId = selectedDoctorId;
+          params.visitMonth = visitMonthFilter;
+        }
       }
 
       const res = await axios.get(`${API_URL}/crm/patients`, { params });
@@ -356,6 +364,7 @@ export default function CRMView({ userType }: CRMViewProps) {
         setUniqueCities(res.data.cities || []);
         setUniqueGenders(res.data.genders || []);
         setUniqueBloodGroups(res.data.bloodGroups || []);
+        setDoctors(res.data.doctors || []);
       }
     } catch (err) {
       console.error('Failed to fetch filter options', err);
@@ -901,6 +910,100 @@ export default function CRMView({ userType }: CRMViewProps) {
                       ))}
                     </ScrollView>
                   </View>
+
+                  <View style={styles.filterItem}>
+                    <Text style={styles.filterLabel}>Doctor History Filter</Text>
+                    {Platform.OS === 'web' ? (
+                      <select
+                        style={{
+                          width: '100%',
+                          padding: 8,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: '#cbd5e1',
+                          backgroundColor: '#fff',
+                          fontSize: 13,
+                          color: '#334155',
+                          height: 34,
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        value={selectedDoctorId}
+                        onChange={(e) => {
+                          setSelectedDoctorId(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="all">All Patients (No Doctor Filter)</option>
+                        {doctors.map(d => (
+                          <option key={d.id} value={d.id}>Dr. {d.full_name} ({d.department})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <View style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' }}>
+                        <Picker
+                          selectedValue={selectedDoctorId}
+                          onValueChange={(val: any) => {
+                            setSelectedDoctorId(val);
+                            setCurrentPage(1);
+                          }}
+                          style={{ height: 40 }}
+                        >
+                          <Picker.Item label="All Patients" value="all" />
+                          {doctors.map(d => (
+                            <Picker.Item key={d.id} label={`Dr. ${d.full_name} (${d.department})`} value={d.id} />
+                          ))}
+                        </Picker>
+                      </View>
+                    )}
+                  </View>
+
+                  {selectedDoctorId !== 'all' && (
+                    <View style={styles.filterItem}>
+                      <Text style={styles.filterLabel}>Booking Month</Text>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          style={{
+                            width: '100%',
+                            padding: 8,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: '#cbd5e1',
+                            backgroundColor: '#fff',
+                            fontSize: 13,
+                            color: '#334155',
+                            height: 34,
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                          value={visitMonthFilter}
+                          onChange={(e) => {
+                            setVisitMonthFilter(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                        >
+                          <option value="last_month">Last Calendar Month (default)</option>
+                          <option value="current_month">Current Month</option>
+                          <option value="all">All Time History</option>
+                        </select>
+                      ) : (
+                        <View style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' }}>
+                          <Picker
+                            selectedValue={visitMonthFilter}
+                            onValueChange={(val: any) => {
+                              setVisitMonthFilter(val);
+                              setCurrentPage(1);
+                            }}
+                            style={{ height: 40 }}
+                          >
+                            <Picker.Item label="Last Calendar Month" value="last_month" />
+                            <Picker.Item label="Current Month" value="current_month" />
+                            <Picker.Item label="All Time History" value="all" />
+                          </Picker>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
               </View>
 

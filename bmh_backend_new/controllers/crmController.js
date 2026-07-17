@@ -18,32 +18,75 @@ const getDoubleTickConfig = async () => {
 
 exports.getPatients = async (req, res) => {
   try {
-    const { search, city, gender, bloodGroup, page = 1, limit = 50 } = req.query;
+    const { search, city, gender, bloodGroup, doctorId, visitMonth, page = 1, limit = 50 } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    let query = 'SELECT id, name, mobile, email, age, gender, blood_group, city, pin_code, created_at FROM patients';
-    let countQuery = 'SELECT COUNT(*) FROM patients';
-
     const params = [];
     const conditions = [];
+    let isBookingJoined = false;
+
+    if (doctorId && doctorId !== 'all') {
+      isBookingJoined = true;
+      params.push(doctorId);
+      conditions.push(`ds.doctor_id = $${params.length}`);
+      
+      const vMonth = visitMonth || 'last_month';
+      if (vMonth !== 'all') {
+        const now = new Date();
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const istDate = new Date(utc + (3600000 * 5.5));
+        const year = istDate.getFullYear();
+        const month = istDate.getMonth();
+
+        let startOfRange, endOfRange;
+        if (vMonth === 'last_month') {
+          startOfRange = new Date(year, month - 1, 1);
+          endOfRange = new Date(year, month, 0, 23, 59, 59, 999);
+        } else if (vMonth === 'current_month') {
+          startOfRange = new Date(year, month, 1);
+          endOfRange = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        }
+
+        if (startOfRange && endOfRange) {
+          const startStr = `${startOfRange.getFullYear()}-${String(startOfRange.getMonth() + 1).padStart(2, '0')}-${String(startOfRange.getDate()).padStart(2, '0')}`;
+          const endStr = `${endOfRange.getFullYear()}-${String(endOfRange.getMonth() + 1).padStart(2, '0')}-${String(endOfRange.getDate()).padStart(2, '0')}`;
+          
+          params.push(startStr, endStr);
+          conditions.push(`ds.date >= $${params.length - 1}::date AND ds.date <= $${params.length}::date`);
+        }
+      }
+    }
+
+    let query = 'SELECT ';
+    let countQuery = 'SELECT ';
+
+    if (isBookingJoined) {
+      query += 'DISTINCT p.id, p.name, p.mobile, p.email, p.age, p.gender, p.blood_group, p.city, p.pin_code, p.created_at FROM patients p ';
+      query += 'JOIN patient_bookings pb ON p.id = pb.patient_id JOIN doctor_slots ds ON pb.slot_id = ds.id';
+      countQuery += 'COUNT(DISTINCT p.id) FROM patients p ';
+      countQuery += 'JOIN patient_bookings pb ON p.id = pb.patient_id JOIN doctor_slots ds ON pb.slot_id = ds.id';
+    } else {
+      query += 'p.id, p.name, p.mobile, p.email, p.age, p.gender, p.blood_group, p.city, p.pin_code, p.created_at FROM patients p';
+      countQuery += 'COUNT(*) FROM patients p';
+    }
 
     if (search) {
       params.push(`%${search}%`);
-      conditions.push(`(name ILIKE $${params.length} OR mobile ILIKE $${params.length} OR email ILIKE $${params.length})`);
+      conditions.push(`(p.name ILIKE $${params.length} OR p.mobile ILIKE $${params.length} OR p.email ILIKE $${params.length})`);
     }
     if (city) {
       params.push(city);
-      conditions.push(`city = $${params.length}`);
+      conditions.push(`p.city = $${params.length}`);
     }
     if (gender) {
       params.push(gender);
-      conditions.push(`gender = $${params.length}`);
+      conditions.push(`p.gender = $${params.length}`);
     }
     if (bloodGroup) {
       params.push(bloodGroup);
-      conditions.push(`blood_group = $${params.length}`);
+      conditions.push(`p.blood_group = $${params.length}`);
     }
 
     if (conditions.length > 0) {
@@ -56,7 +99,7 @@ exports.getPatients = async (req, res) => {
     const total = parseInt(countRes.rows[0].count);
 
     // Fetch paginated results
-    query += ` ORDER BY name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    query += ` ORDER BY p.name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limitNum, offset);
 
     const result = await pool.query(query, params);
@@ -79,12 +122,14 @@ exports.getFilterOptions = async (req, res) => {
     const citiesRes = await pool.query("SELECT DISTINCT city FROM patients WHERE city IS NOT NULL AND city != '' ORDER BY city ASC");
     const bloodRes = await pool.query("SELECT DISTINCT blood_group FROM patients WHERE blood_group IS NOT NULL AND blood_group != '' ORDER BY blood_group ASC");
     const gendersRes = await pool.query("SELECT DISTINCT gender FROM patients WHERE gender IS NOT NULL AND gender != '' ORDER BY gender ASC");
+    const doctorsRes = await pool.query("SELECT id, full_name, department FROM doctors WHERE status = 'active' OR status IS NULL ORDER BY full_name ASC");
 
     res.json({
       success: true,
       cities: citiesRes.rows.map(r => r.city),
       bloodGroups: bloodRes.rows.map(r => r.blood_group),
-      genders: gendersRes.rows.map(r => r.gender)
+      genders: gendersRes.rows.map(r => r.gender),
+      doctors: doctorsRes.rows
     });
   } catch (error) {
     console.error('CRM Get Filter Options Error:', error);
