@@ -11,7 +11,8 @@ import {
   Platform,
   Switch,
   FlatList,
-  Modal
+  Modal,
+  useWindowDimensions
 } from 'react-native';
 import {
   Send,
@@ -34,7 +35,8 @@ import {
   ShieldCheck,
   Calendar,
   AlertCircle,
-  Trash2
+  Trash2,
+  Phone
 } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../constants/Colors';
@@ -79,10 +81,12 @@ interface CRMViewProps {
 
 export default function CRMView({ userType }: CRMViewProps) {
   const { isDesktop, isMobile, contentPadding } = useResponsive();
+  const { height: windowHeight } = useWindowDimensions();
+  const desktopCardHeight = Math.max(windowHeight - 190, 400);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Tabs: 'campaign' | 'individual' | 'templates' | 'history'
-  const [activeTab, setActiveTab] = useState<'campaign' | 'individual' | 'templates' | 'history'>('campaign');
+  // Tabs: 'campaign' | 'individual' | 'templates' | 'history' | 'voice'
+  const [activeTab, setActiveTab] = useState<'campaign' | 'individual' | 'templates' | 'history' | 'voice'>('campaign');
 
   // Loading States
   const [loadingPatients, setLoadingPatients] = useState(false);
@@ -117,6 +121,7 @@ export default function CRMView({ userType }: CRMViewProps) {
   const [selectedTemplateName, setSelectedTemplateName] = useState('');
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [variableInputs, setVariableInputs] = useState<Record<string, string>>({});
+  const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
 
   // Individual Messaging State
   const [indivSearchQuery, setIndivSearchQuery] = useState('');
@@ -125,6 +130,38 @@ export default function CRMView({ userType }: CRMViewProps) {
   const [indivMessageText, setIndivMessageText] = useState('');
   const [indivTemplateName, setIndivTemplateName] = useState('');
   const [indivVariableInputs, setIndivVariableInputs] = useState<Record<string, string>>({});
+
+  // Voice Call States
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [selectedVoicePatient, setSelectedVoicePatient] = useState<Patient | null>(null);
+  const [voicePhoneInput, setVoicePhoneInput] = useState('');
+  const [voiceAgentName, setVoiceAgentName] = useState('order_update_hindi');
+  const [voiceLanguage, setVoiceLanguage] = useState('hi'); // Default Hindi
+  const [voiceChannel, setVoiceChannel] = useState<'PSTN' | 'WHATSAPP'>('PSTN'); // Default PSTN (Normal voice call)
+  const [calling, setCalling] = useState(false);
+  const [callStatus, setCallStatus] = useState<string | null>(null);
+
+  const [selectedVoicePatients, setSelectedVoicePatients] = useState<Record<string, Patient>>({});
+  const [selectedVoiceTemplateName, setSelectedVoiceTemplateName] = useState('');
+  const [voiceTemplateVariables, setVoiceTemplateVariables] = useState<string[]>([]);
+  const [voiceVariableInputs, setVoiceVariableInputs] = useState<Record<string, string>>({});
+
+  const VOICE_AGENTS = [
+    { name: 'order_update_hindi', label: 'Order Update (Hindi)' },
+    { name: 'order_update_english', label: 'Order Update (English)' },
+    { name: 'appointment_reminder_hindi', label: 'Appointment Reminder (Hindi)' },
+    { name: 'appointment_reminder_english', label: 'Appointment Reminder (English)' },
+    { name: 'payment_reminder_hindi', label: 'Payment Reminder (Hindi)' },
+    { name: 'payment_reminder_english', label: 'Payment Reminder (English)' }
+  ];
+
+  const VOICE_LANGUAGES = [
+    { code: 'hi', label: 'Hindi' },
+    { code: 'en', label: 'English' },
+    { code: 'te', label: 'Telugu' },
+    { code: 'ta', label: 'Tamil' },
+    { code: 'kn', label: 'Kannada' }
+  ];
 
   // Template Creation State
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -160,11 +197,11 @@ export default function CRMView({ userType }: CRMViewProps) {
   // Fetch Patients, Filter Options, and Config
   useEffect(() => {
     fetchPatients(currentPage);
-  }, [currentPage, searchQuery, cityFilter, genderFilter, bloodFilter, activeTab]);
+  }, [currentPage, searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, activeTab]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, cityFilter, genderFilter, bloodFilter]);
+  }, [searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -185,7 +222,7 @@ export default function CRMView({ userType }: CRMViewProps) {
 
   // Fetch Templates / History when tabs change
   useEffect(() => {
-    if (activeTab === 'templates' || activeTab === 'campaign' || activeTab === 'individual') {
+    if (activeTab === 'templates' || activeTab === 'campaign' || activeTab === 'individual' || activeTab === 'voice') {
       fetchTemplates();
     }
     if (activeTab === 'history') {
@@ -237,6 +274,28 @@ export default function CRMView({ userType }: CRMViewProps) {
     }
   }, [indivTemplateName, indivMessageType, templates]);
 
+  useEffect(() => {
+    if (selectedVoiceTemplateName) {
+      const template = templates.find(t => t.name === selectedVoiceTemplateName);
+      if (template) {
+        const bodyComp = template.components?.find((c: any) => c.type === 'BODY');
+        if (bodyComp && bodyComp.text) {
+          const matches = bodyComp.text.match(/\{\{(\d+)\}\}/g) || [];
+          const variableKeys = Array.from(new Set<string>(matches.map((m: any) => m.replace(/[\{\}]/g, ''))));
+          setVoiceTemplateVariables(variableKeys);
+          
+          const initialInputs: Record<string, string> = {};
+          variableKeys.forEach((key: string) => {
+            initialInputs[key] = '';
+          });
+          setVoiceVariableInputs(initialInputs);
+        } else {
+          setVoiceTemplateVariables([]);
+        }
+      }
+    }
+  }, [selectedVoiceTemplateName, templates]);
+
   const fetchDoubleTickConfig = async () => {
     try {
       const res = await axios.get(`${API_URL}/settings`);
@@ -266,7 +325,8 @@ export default function CRMView({ userType }: CRMViewProps) {
         }
         params.search = indivSearchQuery.trim();
       } else {
-        if (searchQuery) params.search = searchQuery;
+        const activeSearch = activeTab === 'voice' ? voiceSearchQuery : searchQuery;
+        if (activeSearch.trim()) params.search = activeSearch.trim();
         if (cityFilter !== 'all') params.city = cityFilter;
         if (genderFilter !== 'all') params.gender = genderFilter;
         if (bloodFilter !== 'all') params.bloodGroup = bloodFilter;
@@ -553,30 +613,165 @@ export default function CRMView({ userType }: CRMViewProps) {
 
   // Delete Template
   const handleDeleteTemplate = (name: string) => {
-    Alert.alert(
-      'Delete Template',
-      `Are you sure you want to delete template "${name}"? This action is permanent and cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const res = await axios.delete(`${API_URL}/crm/templates/${name}`);
-              if (res.data.success) {
-                Alert.alert('Success', 'Template deleted successfully.');
-                fetchTemplates();
-              } else {
-                Alert.alert('Error', res.data.message || 'Failed to delete template.');
-              }
-            } catch (err: any) {
-              Alert.alert('Error', err.response?.data?.message || 'Failed to delete template.');
-            }
+    const performDelete = async () => {
+      try {
+        const res = await axios.delete(`${API_URL}/crm/templates/${name}`);
+        if (res.data.success) {
+          if (Platform.OS === 'web') {
+            alert('Template deleted successfully.');
+          } else {
+            Alert.alert('Success', 'Template deleted successfully.');
+          }
+          fetchTemplates();
+        } else {
+          const errMsg = res.data.message || 'Failed to delete template.';
+          if (Platform.OS === 'web') {
+            alert('Error: ' + errMsg);
+          } else {
+            Alert.alert('Error', errMsg);
           }
         }
-      ]
-    );
+      } catch (err: any) {
+        const errMsg = err.response?.data?.message || 'Failed to delete template.';
+        if (Platform.OS === 'web') {
+          alert('Error: ' + errMsg);
+        } else {
+          Alert.alert('Error', errMsg);
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm(`Are you sure you want to delete template "${name}"? This action is permanent and cannot be undone.`);
+      if (confirmDelete) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Template',
+        `Are you sure you want to delete template "${name}"? This action is permanent and cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: performDelete
+          }
+        ]
+      );
+    }
+  };
+
+  // Toggle template expansion state
+  const toggleTemplateExpand = (name: string) => {
+    setExpandedTemplates(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  // Voice Call Outbound Call
+  const handleInitiateVoiceCall = async () => {
+    const targetPhone = selectedVoicePatient ? selectedVoicePatient.mobile : voicePhoneInput;
+    if (!targetPhone.trim()) {
+      if (Platform.OS === 'web') alert('Recipient phone number is required.');
+      else Alert.alert('Error', 'Recipient phone number is required.');
+      return;
+    }
+    if (!voiceAgentName.trim()) {
+      if (Platform.OS === 'web') alert('AI Agent template name is required.');
+      else Alert.alert('Error', 'AI Agent template name is required.');
+      return;
+    }
+
+    setCalling(true);
+    setCallStatus(null);
+    try {
+      const res = await axios.post(`${API_URL}/crm/voice-call`, {
+        to: targetPhone,
+        channel: voiceChannel,
+        aiAgentName: voiceAgentName
+      });
+
+      if (res.data.success) {
+        setCallStatus(`Success: Outbound call enqueued successfully! Call ID: ${res.data.data?.data?.callId || 'N/A'}`);
+      } else {
+        setCallStatus(`Error: ${res.data.message || 'Failed to trigger voice call.'}`);
+      }
+    } catch (err: any) {
+      setCallStatus(`Error: ${err.response?.data?.message || 'Failed to trigger voice call.'}`);
+    } finally {
+      setCalling(false);
+    }
+  };
+
+  // Voice Call Bulk Campaign
+  const handleSendVoiceCampaign = async () => {
+    const recipientList = Object.values(selectedVoicePatients);
+    if (recipientList.length === 0) {
+      if (Platform.OS === 'web') alert('Please select at least one recipient.');
+      else Alert.alert('Error', 'Please select at least one recipient.');
+      return;
+    }
+    if (!selectedVoiceTemplateName) {
+      if (Platform.OS === 'web') alert('Please select a template.');
+      else Alert.alert('Error', 'Please select a template.');
+      return;
+    }
+    if (!voiceAgentName.trim()) {
+      if (Platform.OS === 'web') alert('AI Agent name is required.');
+      else Alert.alert('Error', 'AI Agent name is required.');
+      return;
+    }
+
+    setCalling(true);
+    setCallStatus(null);
+
+    // Format templateData placeholders
+    const placeholders = Object.entries(voiceVariableInputs).map(([key, val]) => ({
+      [key]: val
+    }));
+    const templateData = {
+      body: {
+        placeholders
+      }
+    };
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Loop over each selected patient to trigger the call
+      for (const patient of recipientList) {
+        try {
+          const res = await axios.post(`${API_URL}/crm/voice-call`, {
+            to: patient.mobile,
+            channel: voiceChannel,
+            aiAgentName: voiceAgentName,
+            templateData
+          });
+          if (res.data.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          failCount++;
+        }
+      }
+
+      setCallStatus(`Voice Campaign Finished. Successfully enqueued: ${successCount} calls. Failed: ${failCount} calls.`);
+      setSelectedVoicePatients({}); // Clear selection on success
+    } catch (err: any) {
+      setCallStatus(`Error triggering campaign: ${err.message}`);
+    } finally {
+      setCalling(false);
+    }
   };
 
   // Rendering Layout Helpers
@@ -637,10 +832,23 @@ export default function CRMView({ userType }: CRMViewProps) {
           <History size={18} color={activeTab === 'history' ? Colors.light.primary : '#64748b'} />
           <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>Sent History</Text>
         </Pressable>
+
+        <Pressable
+          style={[styles.tabButton, activeTab === 'voice' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('voice')}
+        >
+          <Phone size={18} color={activeTab === 'voice' ? Colors.light.primary : '#64748b'} />
+          <Text style={[styles.tabText, activeTab === 'voice' && styles.tabTextActive]}>Voice Call</Text>
+        </Pressable>
       </View>
 
       {/* Tab Screen Content */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={isDesktop ? { flexGrow: 1, paddingBottom: 0 } : styles.scrollContent} 
+        style={isDesktop ? { flex: 1 } : undefined}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!isDesktop}
+      >
         {!dtConfig?.apiKey && (
           <View style={[styles.alertBanner, { marginBottom: 12, paddingVertical: 8 }]}>
             <AlertCircle size={20} color="#b45309" style={{ marginRight: 12 }} />
@@ -654,8 +862,9 @@ export default function CRMView({ userType }: CRMViewProps) {
         {activeTab === 'campaign' && (
           <View style={[styles.tabContent, isDesktop && styles.desktopRow]}>
             {/* Left Column: Recipient Selection */}
-            <View style={[styles.columnCard, isDesktop && { flex: 1.5, marginRight: 20 }]}>
-              <Text style={styles.cardHeader}>Select Target Audience ({totalPatients} matching)</Text>
+            <View style={[styles.columnCard, isDesktop && { flex: 1.5, marginRight: 20, height: desktopCardHeight }]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 25 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Text style={styles.cardHeader}>Select Target Audience ({totalPatients} matching)</Text>
               
               {/* Audience Filters */}
               <View style={styles.filterSection}>
@@ -763,11 +972,13 @@ export default function CRMView({ userType }: CRMViewProps) {
                   </Pressable>
                 </View>
               )}
+              </ScrollView>
             </View>
 
             {/* Right Column: Message Composer */}
-            <View style={[styles.columnCard, isDesktop && { flex: 1 }]}>
-              <Text style={styles.cardHeader}>Compose WhatsApp Message</Text>
+            <View style={[styles.columnCard, isDesktop && { flex: 1, height: desktopCardHeight }]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 25 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Text style={styles.cardHeader}>Compose WhatsApp Message</Text>
 
               {/* Message Type Toggle */}
               <View style={styles.toggleRow}>
@@ -875,6 +1086,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                   </>
                 )}
               </Pressable>
+              </ScrollView>
             </View>
           </View>
         )}
@@ -882,8 +1094,9 @@ export default function CRMView({ userType }: CRMViewProps) {
         {/* Tab 2: Individual Messages */}
         {activeTab === 'individual' && (
           <View style={styles.tabContent}>
-            <View style={styles.columnCard}>
-              <Text style={styles.cardHeader}>Send Individual Message (Order Updates / Service)</Text>
+            <View style={[styles.columnCard, isDesktop && { height: desktopCardHeight }]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 25 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Text style={styles.cardHeader}>Send Individual Message (Order Updates / Service)</Text>
 
               {/* Search Customer */}
               <Text style={styles.composerLabel}>Search Customer by Name or Phone</Text>
@@ -1040,16 +1253,18 @@ export default function CRMView({ userType }: CRMViewProps) {
                   </Pressable>
                 </View>
               )}
-            </View>
+            </ScrollView>
           </View>
-        )}
+        </View>
+      )}
 
         {/* Tab 3: Template Manager & Creation */}
         {activeTab === 'templates' && (
           <View style={[styles.tabContent, isDesktop && styles.desktopRow]}>
             {/* Create Template Form */}
-            <View style={[styles.columnCard, isDesktop && { flex: 1, marginRight: 20 }]}>
-              <Text style={styles.cardHeader}>Create New WhatsApp Template</Text>
+            <View style={[styles.columnCard, isDesktop && { flex: 1, marginRight: 20, height: desktopCardHeight }]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Text style={styles.cardHeader}>Create New WhatsApp Template</Text>
               
               {templateStatus && (
                 <View style={[
@@ -1140,10 +1355,11 @@ export default function CRMView({ userType }: CRMViewProps) {
                   </>
                 )}
               </Pressable>
+              </ScrollView>
             </View>
 
             {/* List DoubleTick Templates */}
-            <View style={[styles.columnCard, isDesktop && { flex: 1.2 }]}>
+            <View style={[styles.columnCard, isDesktop && { flex: 1.2, height: desktopCardHeight }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Text style={[styles.cardHeader, { marginBottom: 0 }]}>Template List & Statuses</Text>
                 <Pressable onPress={fetchTemplates} style={styles.refreshBtn}>
@@ -1153,50 +1369,60 @@ export default function CRMView({ userType }: CRMViewProps) {
               {loadingTemplates ? (
                 <ActivityIndicator size="large" color={Colors.light.primary} style={{ margin: 20 }} />
               ) : (
-                <View>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                   {templates.map(t => {
+                    const isExpanded = expandedTemplates.has(t.name);
                     const statusColor = t.status === 'APPROVED' ? '#10b981' : t.status === 'PENDING' ? '#f59e0b' : '#ef4444';
                     return (
                       <View key={t.name} style={styles.templateItemCard}>
-                        <View style={styles.templateCardHead}>
-                          <Text style={styles.templateNameText}>{t.name}</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
-                              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-                                {t.status}
+                        <Pressable onPress={() => toggleTemplateExpand(t.name)} style={{ paddingVertical: 4 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={[styles.templateNameText, { flex: 1, marginRight: 8 }]} numberOfLines={1}>
+                              {t.name}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
+                                <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                                  {t.status}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: '#94a3b8', fontWeight: 'bold' }}>
+                                {isExpanded ? '▲' : '▼'}
                               </Text>
                             </View>
-                            <Pressable onPress={() => handleDeleteTemplate(t.name)} style={styles.deleteBtn}>
-                              <Trash2 size={16} color="#ef4444" />
-                            </Pressable>
                           </View>
-                        </View>
-                        <Text style={styles.templateCategoryText}>
-                          Category: {t.category} | Language: {t.language}
-                        </Text>
+                        </Pressable>
                         
-                        {/* Display message text components */}
-                        <View style={styles.templateBodyPreview}>
-                          {t.components?.map((c: any, index: number) => {
-                            if (c.type === 'HEADER') {
-                              return <Text key={index} style={styles.previewHeader}>{c.text}</Text>;
-                            }
-                            if (c.type === 'BODY') {
-                              return <Text key={index} style={styles.previewBody}>{c.text}</Text>;
-                            }
-                            if (c.type === 'FOOTER') {
-                              return <Text key={index} style={styles.previewFooter}>{c.text}</Text>;
-                            }
-                            return null;
-                          })}
-                        </View>
+                        {isExpanded && (
+                          <View style={{ marginTop: 12 }}>
+                            <Text style={styles.templateCategoryText}>
+                              Category: {t.category} | Language: {t.language}
+                            </Text>
+                            
+                            {/* Display message text components */}
+                            <View style={styles.templateBodyPreview}>
+                              {t.components?.map((c: any, index: number) => {
+                                if (c.type === 'HEADER') {
+                                  return <Text key={index} style={styles.previewHeader}>{c.text}</Text>;
+                                }
+                                if (c.type === 'BODY') {
+                                  return <Text key={index} style={styles.previewBody}>{c.text}</Text>;
+                                }
+                                if (c.type === 'FOOTER') {
+                                  return <Text key={index} style={styles.previewFooter}>{c.text}</Text>;
+                                }
+                                return null;
+                              })}
+                            </View>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
                   {templates.length === 0 && (
                     <Text style={styles.emptyText}>No templates configured in DoubleTick.</Text>
                   )}
-                </View>
+                </ScrollView>
               )}
             </View>
           </View>
@@ -1205,70 +1431,377 @@ export default function CRMView({ userType }: CRMViewProps) {
         {/* Tab 4: History log */}
         {activeTab === 'history' && (
           <View style={styles.tabContent}>
-            <View style={styles.columnCard}>
+            <View style={[styles.columnCard, isDesktop && { height: desktopCardHeight }]}>
               <Text style={styles.cardHeader}>WhatsApp Messaging Campaign Audit Logs</Text>
               {loadingHistory ? (
                 <ActivityIndicator size="large" color={Colors.light.primary} style={{ margin: 20 }} />
               ) : (
-                <View style={styles.historyList}>
-                  {history.map(log => {
-                    const statusColor = log.status === 'Sent' ? '#10b981' : log.status === 'Partial' ? '#f59e0b' : '#ef4444';
-                    return (
-                      <View key={log.id} style={styles.historyRow}>
-                        <View style={styles.historyMeta}>
-                          <View>
-                            <Text style={styles.historySender}>
-                              {log.sender_name} ({log.sender_role})
-                            </Text>
-                            <Text style={styles.historyDate}>
-                              {new Date(log.created_at).toLocaleString()}
-                            </Text>
-                          </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
-                              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-                                {log.status}
+                <ScrollView style={{ flex: 1 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                  <View style={styles.historyList}>
+                    {history.map(log => {
+                      const statusColor = log.status === 'Sent' ? '#10b981' : log.status === 'Partial' ? '#f59e0b' : '#ef4444';
+                      return (
+                        <View key={log.id} style={styles.historyRow}>
+                          <View style={styles.historyMeta}>
+                            <View>
+                              <Text style={styles.historySender}>
+                                {log.sender_name} ({log.sender_role})
+                              </Text>
+                              <Text style={styles.historyDate}>
+                                {new Date(log.created_at).toLocaleString()}
                               </Text>
                             </View>
-                            <Text style={styles.historyCount}>
-                              Recipients: {log.recipients_count}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.historyBody}>
-                          <Text style={styles.historyBodyText}>{log.content}</Text>
-                        </View>
-                        {(() => {
-                          let parsed: string[] = [];
-                          if (log.recipients) {
-                            try {
-                              parsed = JSON.parse(log.recipients);
-                            } catch (e) {
-                              parsed = [log.recipients];
-                            }
-                          }
-                          if (parsed.length === 0) return null;
-                          return (
-                            <View style={styles.recipientListWrapper}>
-                              <Text style={styles.recipientTitle}>Recipients:</Text>
-                              <View style={styles.recipientChipsContainer}>
-                                {parsed.map((r, i) => (
-                                  <View key={i} style={styles.recipientChip}>
-                                    <Text style={styles.recipientChipText}>{r}</Text>
-                                  </View>
-                                ))}
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
+                                <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                                  {log.status}
+                                </Text>
                               </View>
+                              <Text style={styles.historyCount}>
+                                Recipients: {log.recipients_count}
+                              </Text>
                             </View>
-                          );
-                        })()}
-                      </View>
-                    );
-                  })}
-                  {history.length === 0 && (
-                    <Text style={styles.emptyText}>No campaign history log exists.</Text>
-                  )}
-                </View>
+                          </View>
+                          <View style={styles.historyBody}>
+                            <Text style={styles.historyBodyText}>{log.content}</Text>
+                          </View>
+                          {(() => {
+                            let parsed: string[] = [];
+                            if (log.recipients) {
+                              try {
+                                parsed = JSON.parse(log.recipients);
+                              } catch (e) {
+                                parsed = [log.recipients];
+                              }
+                            }
+                            if (parsed.length === 0) return null;
+                            return (
+                              <View style={styles.recipientListWrapper}>
+                                <Text style={styles.recipientTitle}>Recipients:</Text>
+                                <View style={styles.recipientChipsContainer}>
+                                  {parsed.map((r, i) => (
+                                    <View key={i} style={styles.recipientChip}>
+                                      <Text style={styles.recipientChipText}>{r}</Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              </View>
+                            );
+                          })()}
+                        </View>
+                      );
+                    })}
+                    {history.length === 0 && (
+                      <Text style={styles.emptyText}>No campaign history log exists.</Text>
+                    )}
+                  </View>
+                </ScrollView>
               )}
+            </View>
+          </View>
+        )}
+
+        {/* Tab 5: Voice Call (OBD) */}
+        {activeTab === 'voice' && (
+          <View style={[styles.tabContent, isDesktop && styles.desktopRow]}>
+            {/* Left Column: Recipient Selection */}
+            <View style={[styles.columnCard, isDesktop && { flex: 1.5, marginRight: 20, height: desktopCardHeight }]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 25 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Text style={styles.cardHeader}>Select Target Audience ({totalPatients} matching)</Text>
+
+                {/* Audience Filters */}
+                <View style={styles.filterSection}>
+                  <View style={styles.searchInputWrapper}>
+                    <Search size={18} color="#94a3b8" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.textInputSearch}
+                      placeholder="Search by name, phone..."
+                      value={voiceSearchQuery}
+                      onChangeText={setVoiceSearchQuery}
+                    />
+                  </View>
+
+                  {/* Filter Grid */}
+                  <View style={styles.filterGrid}>
+                    <View style={styles.filterItem}>
+                      <Text style={styles.filterLabel}>City</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
+                        <Pressable
+                          style={[styles.chip, cityFilter === 'all' && styles.chipActive]}
+                          onPress={() => setCityFilter('all')}
+                        >
+                          <Text style={[styles.chipText, cityFilter === 'all' && styles.chipTextActive]}>All</Text>
+                        </Pressable>
+                        {uniqueCities.map(city => (
+                          <Pressable
+                            key={city}
+                            style={[styles.chip, cityFilter === city && styles.chipActive]}
+                            onPress={() => setCityFilter(city)}
+                          >
+                            <Text style={[styles.chipText, cityFilter === city && styles.chipTextActive]}>{city}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Patient Selection List */}
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={styles.selectBtn}
+                    onPress={() => {
+                      const all: Record<string, Patient> = {};
+                      patients.forEach(p => {
+                        all[p.id] = p;
+                      });
+                      setSelectedVoicePatients(all);
+                    }}
+                  >
+                    <Text style={styles.selectBtnText}>Select All on Page</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.selectBtn}
+                    onPress={() => setSelectedVoicePatients({})}
+                  >
+                    <Text style={styles.selectBtnText}>Clear Selection</Text>
+                  </Pressable>
+                </View>
+
+                {loadingPatients ? (
+                  <ActivityIndicator size="large" color={Colors.light.primary} style={{ margin: 20 }} />
+                ) : (
+                  <View style={styles.listContainer}>
+                    {patients.map(item => {
+                      const isSelected = !!selectedVoicePatients[item.id];
+                      return (
+                        <Pressable
+                          key={item.id}
+                          style={[styles.patientRow, isSelected && styles.patientRowSelected]}
+                          onPress={() => {
+                            setSelectedVoicePatients(prev => {
+                              const next = { ...prev };
+                              if (next[item.id]) {
+                                delete next[item.id];
+                              } else {
+                                next[item.id] = item;
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <View style={{ marginRight: 12 }}>
+                            {isSelected ? (
+                              <CheckSquare size={20} color={Colors.light.primary} />
+                            ) : (
+                              <Square size={20} color="#94a3b8" />
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.patientName}>{item.name}</Text>
+                            <Text style={styles.patientMobile}>{item.mobile}</Text>
+                          </View>
+                          {item.city && (
+                            <View style={[styles.badge, { backgroundColor: '#f1f5f9' }]}>
+                              <Text style={[styles.badgeText, { color: '#475569' }]}>{item.city}</Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                    {patients.length === 0 && (
+                      <Text style={styles.emptyText}>No customers match current filters.</Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <View style={styles.paginationRow}>
+                    <Pressable
+                      style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
+                      onPress={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <Text style={[styles.pageBtnText, currentPage === 1 && styles.pageBtnTextDisabled]}>Prev</Text>
+                    </Pressable>
+                    <Text style={styles.pageInfoText}>
+                      Page {currentPage} of {totalPages}
+                    </Text>
+                    <Pressable
+                      style={[styles.pageBtn, currentPage === totalPages && styles.pageBtnDisabled]}
+                      onPress={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <Text style={[styles.pageBtnText, currentPage === totalPages && styles.pageBtnTextDisabled]}>Next</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+
+            {/* Right Column: Compose Voice Call Campaign */}
+            <View style={[styles.columnCard, isDesktop && { flex: 1, height: desktopCardHeight }]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 25 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Text style={styles.cardHeader}>Compose Voice Call Campaign</Text>
+
+                {callStatus && (
+                  <View style={[
+                    styles.inlineStatusBanner,
+                    { backgroundColor: callStatus.startsWith('Error') ? '#fee2e2' : '#dcfce7', marginBottom: 16 }
+                  ]}>
+                    <Text style={[
+                      styles.inlineStatusText,
+                      { color: callStatus.startsWith('Error') ? '#ef4444' : '#15803d', flex: 1 }
+                    ]}>
+                      {callStatus}
+                    </Text>
+                    <Pressable onPress={() => setCallStatus(null)} style={{ marginLeft: 8 }}>
+                      <X size={16} color={callStatus.startsWith('Error') ? '#ef4444' : '#15803d'} />
+                    </Pressable>
+                  </View>
+                )}
+
+                {/* Calling Channel */}
+                <Text style={styles.composerLabel}>Calling Channel</Text>
+                <View style={styles.toggleRow}>
+                  <Pressable
+                    style={[styles.toggleBtn, voiceChannel === 'PSTN' && styles.toggleBtnActive]}
+                    onPress={() => setVoiceChannel('PSTN')}
+                  >
+                    <Text style={[styles.toggleBtnText, voiceChannel === 'PSTN' && styles.toggleBtnTextActive]}>
+                      PSTN (Normal Call)
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.toggleBtn, voiceChannel === 'WHATSAPP' && styles.toggleBtnActive]}
+                    onPress={() => setVoiceChannel('WHATSAPP')}
+                  >
+                    <Text style={[styles.toggleBtnText, voiceChannel === 'WHATSAPP' && styles.toggleBtnTextActive]}>
+                      WhatsApp Call
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Call Language */}
+                <Text style={[styles.composerLabel, { marginTop: 12 }]}>Call Language</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 12 }}>
+                  {VOICE_LANGUAGES.map(lang => (
+                    <Pressable
+                      key={lang.code}
+                      style={[
+                        styles.chip,
+                        voiceLanguage === lang.code && styles.chipActive
+                      ]}
+                      onPress={() => setVoiceLanguage(lang.code)}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        voiceLanguage === lang.code && styles.chipTextActive
+                      ]}>
+                        {lang.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Select WhatsApp Template for Script */}
+                <Text style={styles.composerLabel}>Select Template (Script)</Text>
+                <ScrollView style={[styles.templatePicker, { maxHeight: 150 }]} nestedScrollEnabled>
+                  {templates.map(t => (
+                    <Pressable
+                      key={t.name}
+                      style={[
+                        styles.templatePickerItem,
+                        selectedVoiceTemplateName === t.name && styles.templatePickerItemActive
+                      ]}
+                      onPress={() => setSelectedVoiceTemplateName(t.name)}
+                    >
+                      <Text
+                        style={[
+                          styles.templatePickerText,
+                          selectedVoiceTemplateName === t.name && styles.templatePickerTextActive
+                        ]}
+                      >
+                        {t.name} ({t.category})
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+
+                {/* Variables Form */}
+                {voiceTemplateVariables.length > 0 && (
+                  <View style={styles.variablesBox}>
+                    <Text style={styles.composerLabel}>Placeholders</Text>
+                    {voiceTemplateVariables.map(variable => (
+                      <View key={variable} style={styles.variableRow}>
+                        <Text style={styles.variableLabel}>{"{{" + variable + "}}"}</Text>
+                        <TextInput
+                          style={styles.variableInput}
+                          placeholder={`Enter value for placeholder`}
+                          value={voiceVariableInputs[variable]}
+                          onChangeText={val =>
+                            setVoiceVariableInputs(prev => ({ ...prev, [variable]: val }))
+                          }
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Template Voice Script Preview */}
+                {selectedVoiceTemplateName && (
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={styles.composerLabel}>Template Preview (What AI will say)</Text>
+                    <View style={styles.templateBodyPreview}>
+                      {(() => {
+                        const template = templates.find(t => t.name === selectedVoiceTemplateName);
+                        if (!template) return null;
+                        const bodyComp = template.components?.find((c: any) => c.type === 'BODY');
+                        if (!bodyComp || !bodyComp.text) return null;
+
+                        let text = bodyComp.text;
+                        voiceTemplateVariables.forEach(variable => {
+                          const val = voiceVariableInputs[variable] || `{{${variable}}}`;
+                          text = text.replace(new RegExp(`\\{\\{${variable}\\}\\}`, 'g'), val);
+                        });
+                        return <Text style={styles.previewBody}>{text}</Text>;
+                      })()}
+                    </View>
+                  </View>
+                )}
+
+                {/* Custom AI Voice Agent */}
+                <Text style={[styles.composerLabel, { marginTop: 16 }]}>DoubleTick AI Agent Name</Text>
+                <TextInput
+                  style={styles.simpleTextInput}
+                  placeholder="e.g. order_update_hindi"
+                  value={voiceAgentName}
+                  onChangeText={setVoiceAgentName}
+                />
+
+                {/* Trigger Button */}
+                <Pressable
+                  style={[
+                    styles.sendBtn,
+                    (calling || Object.keys(selectedVoicePatients).length === 0 || !selectedVoiceTemplateName) && styles.sendBtnDisabled,
+                    { marginTop: 24 }
+                  ]}
+                  onPress={handleSendVoiceCampaign}
+                  disabled={calling || Object.keys(selectedVoicePatients).length === 0 || !selectedVoiceTemplateName}
+                >
+                  {calling ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <>
+                      <Phone size={18} color="white" style={{ marginRight: 8 }} />
+                      <Text style={styles.sendBtnText}>
+                        Initiate Voice Call ({Object.keys(selectedVoicePatients).length})
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </ScrollView>
             </View>
           </View>
         )}

@@ -382,3 +382,54 @@ exports.deleteTemplate = async (req, res) => {
     res.status(500).json({ success: false, message: error.response?.data?.message || error.message });
   }
 };
+
+exports.initiateVoiceCall = async (req, res) => {
+  try {
+    const config = await getDoubleTickConfig();
+    if (!config || !config.apiKey || !config.wabaNumber) {
+      return res.status(400).json({ success: false, message: 'DoubleTick API is not configured in Settings' });
+    }
+
+    const { to, channel = 'PSTN', aiAgentName } = req.body;
+    if (!to || !aiAgentName) {
+      return res.status(400).json({ success: false, message: 'Recipient number and AI Agent template name are required' });
+    }
+
+    // Clean phone number and ensure E.164 format with + prefix
+    let cleanPhone = to.replace(/[^0-9]/g, '');
+    if (cleanPhone.length === 10) {
+      cleanPhone = '91' + cleanPhone;
+    }
+    if (!cleanPhone.startsWith('+')) {
+      cleanPhone = '+' + cleanPhone;
+    }
+
+    // DoubleTick WABA or PSTN caller number in E.164 format
+    let callerNumber = config.wabaNumber.replace(/[^0-9]/g, '');
+    if (!callerNumber.startsWith('+')) {
+      callerNumber = '+' + callerNumber;
+    }
+
+    const response = await axios.post(
+      'https://public.doubletick.io/v1/call/ai-bot',
+      {
+        from: callerNumber,
+        to: cleanPhone,
+        channel: channel.toUpperCase(),
+        aiAgentName: aiAgentName
+      },
+      {
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'Authorization': config.apiKey
+        }
+      }
+    );
+
+    res.json({ success: true, data: response.data });
+  } catch (error) {
+    console.error('CRM Voice Call Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: error.response?.data?.message || error.message });
+  }
+};

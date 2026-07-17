@@ -9,5 +9,6 @@ router.get('/history', crmController.getHistory);
 router.get('/templates', crmController.getTemplates);
 router.post('/templates', crmController.createTemplate);
 router.delete('/templates/:name', crmController.deleteTemplate);
+router.post('/voice-call', crmController.initiateVoiceCall);
 
 module.exports = router;
