@@ -109,8 +109,21 @@ export default function CRMView({ userType }: CRMViewProps) {
   const [cityFilter, setCityFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState('all');
   const [bloodFilter, setBloodFilter] = useState('all');
+  const getDefaultYearAndMonth = () => {
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    if (month === 0) {
+      month = 12;
+      year = year - 1;
+    }
+    return { year: String(year), month: String(month) };
+  };
+
+  const defaults = getDefaultYearAndMonth();
   const [selectedDoctorId, setSelectedDoctorId] = useState('all');
-  const [visitMonthFilter, setVisitMonthFilter] = useState('last_month');
+  const [visitYearFilter, setVisitYearFilter] = useState(defaults.year);
+  const [visitMonthFilter, setVisitMonthFilter] = useState(defaults.month);
 
   // Filter Options from Backend
   const [uniqueCities, setUniqueCities] = useState<string[]>([]);
@@ -201,11 +214,11 @@ export default function CRMView({ userType }: CRMViewProps) {
   // Fetch Patients, Filter Options, and Config
   useEffect(() => {
     fetchPatients(currentPage);
-  }, [currentPage, searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, selectedDoctorId, visitMonthFilter, activeTab]);
+  }, [currentPage, searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, selectedDoctorId, visitYearFilter, visitMonthFilter, activeTab]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, selectedDoctorId, visitMonthFilter]);
+  }, [searchQuery, voiceSearchQuery, cityFilter, genderFilter, bloodFilter, selectedDoctorId, visitYearFilter, visitMonthFilter]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -337,6 +350,7 @@ export default function CRMView({ userType }: CRMViewProps) {
         if (bloodFilter !== 'all') params.bloodGroup = bloodFilter;
         if (selectedDoctorId !== 'all') {
           params.doctorId = selectedDoctorId;
+          params.visitYear = visitYearFilter;
           params.visitMonth = visitMonthFilter;
         }
       }
@@ -959,50 +973,125 @@ export default function CRMView({ userType }: CRMViewProps) {
                   </View>
 
                   {selectedDoctorId !== 'all' && (
-                    <View style={styles.filterItem}>
-                      <Text style={styles.filterLabel}>Booking Month</Text>
-                      {Platform.OS === 'web' ? (
-                        <select
-                          style={{
-                            width: '100%',
-                            padding: 8,
-                            borderRadius: 6,
-                            borderWidth: 1,
-                            borderColor: '#cbd5e1',
-                            backgroundColor: '#fff',
-                            fontSize: 13,
-                            color: '#334155',
-                            height: 34,
-                            outline: 'none',
-                            boxSizing: 'border-box'
-                          }}
-                          value={visitMonthFilter}
-                          onChange={(e) => {
-                            setVisitMonthFilter(e.target.value);
-                            setCurrentPage(1);
-                          }}
-                        >
-                          <option value="last_month">Last Calendar Month (default)</option>
-                          <option value="current_month">Current Month</option>
-                          <option value="all">All Time History</option>
-                        </select>
-                      ) : (
-                        <View style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' }}>
-                          <Picker
-                            selectedValue={visitMonthFilter}
-                            onValueChange={(val: any) => {
-                              setVisitMonthFilter(val);
+                    <>
+                      <View style={styles.filterItem}>
+                        <Text style={styles.filterLabel}>Booking Year</Text>
+                        {Platform.OS === 'web' ? (
+                          <select
+                            style={{
+                              width: '100%',
+                              padding: 8,
+                              borderRadius: 6,
+                              borderWidth: 1,
+                              borderColor: '#cbd5e1',
+                              backgroundColor: '#fff',
+                              fontSize: 13,
+                              color: '#334155',
+                              height: 34,
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                            value={visitYearFilter}
+                            onChange={(e) => {
+                              setVisitYearFilter(e.target.value);
                               setCurrentPage(1);
                             }}
-                            style={{ height: 40 }}
                           >
-                            <Picker.Item label="Last Calendar Month" value="last_month" />
-                            <Picker.Item label="Current Month" value="current_month" />
-                            <Picker.Item label="All Time History" value="all" />
-                          </Picker>
+                            <option value="all">All Time (No Date Filter)</option>
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                          </select>
+                        ) : (
+                          <View style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' }}>
+                            <Picker
+                              selectedValue={visitYearFilter}
+                              onValueChange={(val: any) => {
+                                setVisitYearFilter(val);
+                                setCurrentPage(1);
+                              }}
+                              style={{ height: 40 }}
+                            >
+                              <Picker.Item label="All Time" value="all" />
+                              <Picker.Item label="2024" value="2024" />
+                              <Picker.Item label="2025" value="2025" />
+                              <Picker.Item label="2026" value="2026" />
+                              <Picker.Item label="2027" value="2027" />
+                              <Picker.Item label="2028" value="2028" />
+                            </Picker>
+                          </View>
+                        )}
+                      </View>
+
+                      {visitYearFilter !== 'all' && (
+                        <View style={styles.filterItem}>
+                          <Text style={styles.filterLabel}>Booking Month</Text>
+                          {Platform.OS === 'web' ? (
+                            <select
+                              style={{
+                                width: '100%',
+                                padding: 8,
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: '#cbd5e1',
+                                backgroundColor: '#fff',
+                                fontSize: 13,
+                                color: '#334155',
+                                height: 34,
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                              value={visitMonthFilter}
+                              onChange={(e) => {
+                                setVisitMonthFilter(e.target.value);
+                                setCurrentPage(1);
+                              }}
+                            >
+                              <option value="all">All Months</option>
+                              <option value="1">January</option>
+                              <option value="2">February</option>
+                              <option value="3">March</option>
+                              <option value="4">April</option>
+                              <option value="5">May</option>
+                              <option value="6">June</option>
+                              <option value="7">July</option>
+                              <option value="8">August</option>
+                              <option value="9">September</option>
+                              <option value="10">October</option>
+                              <option value="11">November</option>
+                              <option value="12">December</option>
+                            </select>
+                          ) : (
+                            <View style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' }}>
+                              <Picker
+                                selectedValue={visitMonthFilter}
+                                onValueChange={(val: any) => {
+                                  setVisitMonthFilter(val);
+                                  setCurrentPage(1);
+                                }}
+                                style={{ height: 40 }}
+                              >
+                                <Picker.Item label="All Months" value="all" />
+                                <Picker.Item label="January" value="1" />
+                                <Picker.Item label="February" value="2" />
+                                <Picker.Item label="March" value="3" />
+                                <Picker.Item label="April" value="4" />
+                                <Picker.Item label="May" value="5" />
+                                <Picker.Item label="June" value="6" />
+                                <Picker.Item label="July" value="7" />
+                                <Picker.Item label="August" value="8" />
+                                <Picker.Item label="September" value="9" />
+                                <Picker.Item label="October" value="10" />
+                                <Picker.Item label="November" value="11" />
+                                <Picker.Item label="December" value="12" />
+                              </Picker>
+                            </View>
+                          )}
                         </View>
                       )}
-                    </View>
+                    </>
                   )}
                 </View>
               </View>

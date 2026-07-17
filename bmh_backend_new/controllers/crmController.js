@@ -18,7 +18,7 @@ const getDoubleTickConfig = async () => {
 
 exports.getPatients = async (req, res) => {
   try {
-    const { search, city, gender, bloodGroup, doctorId, visitMonth, page = 1, limit = 50 } = req.query;
+    const { search, city, gender, bloodGroup, doctorId, visitYear, visitMonth, page = 1, limit = 50 } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
@@ -32,29 +32,30 @@ exports.getPatients = async (req, res) => {
       params.push(doctorId);
       conditions.push(`ds.doctor_id = $${params.length}`);
       
-      const vMonth = visitMonth || 'last_month';
-      if (vMonth !== 'all') {
-        const now = new Date();
-        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-        const istDate = new Date(utc + (3600000 * 5.5));
-        const year = istDate.getFullYear();
-        const month = istDate.getMonth();
+      const vYear = visitYear || 'all';
+      const vMonth = visitMonth || 'all';
 
-        let startOfRange, endOfRange;
-        if (vMonth === 'last_month') {
-          startOfRange = new Date(year, month - 1, 1);
-          endOfRange = new Date(year, month, 0, 23, 59, 59, 999);
-        } else if (vMonth === 'current_month') {
-          startOfRange = new Date(year, month, 1);
-          endOfRange = new Date(year, month + 1, 0, 23, 59, 59, 999);
-        }
-
-        if (startOfRange && endOfRange) {
-          const startStr = `${startOfRange.getFullYear()}-${String(startOfRange.getMonth() + 1).padStart(2, '0')}-${String(startOfRange.getDate()).padStart(2, '0')}`;
-          const endStr = `${endOfRange.getFullYear()}-${String(endOfRange.getMonth() + 1).padStart(2, '0')}-${String(endOfRange.getDate()).padStart(2, '0')}`;
-          
-          params.push(startStr, endStr);
-          conditions.push(`ds.date >= $${params.length - 1}::date AND ds.date <= $${params.length}::date`);
+      if (vYear !== 'all') {
+        const yr = parseInt(vYear);
+        if (!isNaN(yr)) {
+          if (vMonth !== 'all') {
+            const mth = parseInt(vMonth); // 1-indexed: 1 = Jan, 12 = Dec
+            if (!isNaN(mth)) {
+              const startOfRange = new Date(yr, mth - 1, 1);
+              const endOfRange = new Date(yr, mth, 0, 23, 59, 59, 999);
+              
+              const startStr = `${startOfRange.getFullYear()}-${String(startOfRange.getMonth() + 1).padStart(2, '0')}-${String(startOfRange.getDate()).padStart(2, '0')}`;
+              const endStr = `${endOfRange.getFullYear()}-${String(endOfRange.getMonth() + 1).padStart(2, '0')}-${String(endOfRange.getDate()).padStart(2, '0')}`;
+              
+              params.push(startStr, endStr);
+              conditions.push(`ds.date >= $${params.length - 1}::date AND ds.date <= $${params.length}::date`);
+            }
+          } else {
+            const startStr = `${yr}-01-01`;
+            const endStr = `${yr}-12-31`;
+            params.push(startStr, endStr);
+            conditions.push(`ds.date >= $${params.length - 1}::date AND ds.date <= $${params.length}::date`);
+          }
         }
       }
     }
@@ -122,7 +123,7 @@ exports.getFilterOptions = async (req, res) => {
     const citiesRes = await pool.query("SELECT DISTINCT city FROM patients WHERE city IS NOT NULL AND city != '' ORDER BY city ASC");
     const bloodRes = await pool.query("SELECT DISTINCT blood_group FROM patients WHERE blood_group IS NOT NULL AND blood_group != '' ORDER BY blood_group ASC");
     const gendersRes = await pool.query("SELECT DISTINCT gender FROM patients WHERE gender IS NOT NULL AND gender != '' ORDER BY gender ASC");
-    const doctorsRes = await pool.query("SELECT id, full_name, department FROM doctors WHERE status = 'active' OR status IS NULL ORDER BY full_name ASC");
+    const doctorsRes = await pool.query("SELECT id, full_name, department FROM doctors WHERE status = 'Approved' OR status = 'active' OR status IS NULL ORDER BY full_name ASC");
 
     res.json({
       success: true,
