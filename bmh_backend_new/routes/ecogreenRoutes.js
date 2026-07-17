@@ -1186,10 +1186,10 @@ router.put("/update-bus-details/:orderId", async (req, res) => {
 router.post("/assign_delivery_boy", async (req, res) => {
   const { order_id, delivery_boy, assigned_by } = req.body;
 
-  if (!order_id || !delivery_boy || !assigned_by) {
+  if (!order_id || !delivery_boy) {
     return res.status(400).json({
       success: false,
-      message: "Order ID, delivery boy, and assigned_by employee ID are required",
+      message: "Order ID and delivery boy ID are required",
     });
   }
 
@@ -1204,7 +1204,7 @@ router.post("/assign_delivery_boy", async (req, res) => {
       RETURNING *;
     `;
 
-    const values = [delivery_boy, assigned_by, order_id];
+    const values = [delivery_boy || null, assigned_by || null, order_id];
     const result = await pool.query(query, values);
 
     if (result.rowCount === 0) {
