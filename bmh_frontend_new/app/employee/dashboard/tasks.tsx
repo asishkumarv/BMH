@@ -1434,7 +1434,7 @@ export default function EmployeeTasksScreen() {
                           value={editDueTimeType}
                           onChange={(e) => setEditDueTimeType(e.target.value)}
                         >
-                          <option value="default">Default (Next day 5:30 PM)</option>
+                          <option value="default">Default (Today 5:30 PM)</option>
                           <option value="hours">Within Hours</option>
                           <option value="days">Within Days</option>
                           <option value="days_hours">Days + Hours</option>
@@ -1445,7 +1445,7 @@ export default function EmployeeTasksScreen() {
                           onValueChange={(val: any) => setEditDueTimeType(val)}
                           style={{ height: 50 }}
                         >
-                          <Picker.Item label="Default (Next day 5:30 PM)" value="default" />
+                          <Picker.Item label="Default (Today 5:30 PM)" value="default" />
                           <Picker.Item label="Within Hours" value="hours" />
                           <Picker.Item label="Within Days" value="days" />
                           <Picker.Item label="Days + Hours" value="days_hours" />

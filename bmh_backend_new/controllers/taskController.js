@@ -290,8 +290,7 @@ function calculateDueDate(today, rTask) {
     } else if (type === 'days_hours') {
         dueAt.setDate(dueAt.getDate() + days);
         dueAt.setHours(dueAt.getHours() + hours);
-    } else { // default: next day evening 5:30pm
-        dueAt.setDate(dueAt.getDate() + 1);
+    } else { // default: today (same day) evening 5:30pm
         dueAt.setHours(17, 30, 0, 0);
     }
     return dueAt;
