@@ -1196,8 +1196,7 @@ router.post("/assign_delivery_boy", async (req, res) => {
   try {
     const query = `
       UPDATE ecogreenpurchase_orders
-      SET delivery_boy = $1,
-          delivery_boy_id = $1,
+      SET delivery_boy_id = $1,
           assigned_by = $2,
           assigned_at = NOW()
       WHERE id = $3
@@ -1278,7 +1277,7 @@ router.get("/delivery_boy/ecogreenpurchase_orders", async (req, res) => {
 
     if (delivery_boy) {
       // Fetch only orders for this delivery boy
-      query = 'SELECT * FROM ecogreenpurchase_orders WHERE delivery_boy = $1 ORDER BY id DESC';
+      query = 'SELECT * FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 ORDER BY id DESC';
       params = [delivery_boy];
     } else {
       // Fetch all orders if no delivery boy ID provided

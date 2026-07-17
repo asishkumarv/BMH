@@ -45,7 +45,6 @@ router.post('/assign/:id', async (req, res) => {
                 status = 'Assigned',
                 delivery_type = $1,
                 delivery_boy_id = $2,
-                delivery_boy = $2,
                 bus_details = $3,
                 gps_location = $4,
                 address = $5,
