@@ -153,6 +153,10 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched delivered_at in online_orders.'))
     .catch(err => console.error('Error patching online_orders (delivered_at):', err.message));
 
+  pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT \'POD\'')
+    .then(() => console.log('Successfully checked/patched payment_mode in online_orders.'))
+    .catch(err => console.error('Error patching online_orders (payment_mode):', err.message));
+
   pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS assigned_by INTEGER')
     .then(() => console.log('Successfully checked/patched assigned_by in online_orders.'))
     .catch(err => console.error('Error patching online_orders (assigned_by):', err.message));
