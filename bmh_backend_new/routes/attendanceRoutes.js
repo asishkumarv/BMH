@@ -11,6 +11,7 @@ router.post('/break', attendanceController.markBreak);
 
 // Analytics
 router.get('/summary', analyticsController.getAttendanceSummary);
+router.get('/dashboard-stats', analyticsController.getDashboardAttendanceStats);
 router.get('/reports', analyticsController.getAdvancedReports);
 router.get('/employee-analytics', analyticsController.getEmployeeAnalytics);
 router.get('/employee-dashboard/:employeeId', attendanceController.getEmployeeDashboardStatus);

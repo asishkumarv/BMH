@@ -505,3 +505,188 @@ exports.getEmployeeAnalytics = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+exports.getDashboardAttendanceStats = async (req, res) => {
+  try {
+    const empRes = await pool.query(`
+      SELECT id, full_name, email, mobile, department, role, schedule_in, schedule_out, weekly_off_days, profile_data 
+      FROM employees 
+      WHERE status = 'approved'
+    `);
+
+    const adminRes = await pool.query(`
+      SELECT da.id, da.full_name, da.email, da.mobile, d.name as department, 'Sub Admin' as role, da.schedule_in, da.schedule_out, da.weekly_off_days, da.profile_data 
+      FROM department_admins da
+      LEFT JOIN departments d ON da.department_id = d.id 
+      WHERE da.status = 'approved'
+    `);
+
+    const attRes = await pool.query(`
+      SELECT employee_id, user_type, timestamp as check_in, checkout_timestamp as check_out, status, late_duration, early_checkout_duration 
+      FROM attendance 
+      WHERE date = CURRENT_DATE
+    `);
+
+    const leaveRes = await pool.query(`
+      SELECT employee_id, user_type, start_date, end_date, status, is_half_day 
+      FROM leave_requests 
+      WHERE status = 'approved' AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
+    `);
+
+    // Index today's attendance and leaves
+    const attMap = new Map();
+    attRes.rows.forEach(r => {
+      attMap.set(`${r.employee_id}_${r.user_type}`, r);
+    });
+
+    const leaveMap = new Map();
+    leaveRes.rows.forEach(r => {
+      leaveMap.set(`${r.employee_id}_${r.user_type}`, r);
+    });
+
+    // Helper functions
+    const parseTimeToMinutes = (timeStr) => {
+      if (!timeStr) return 540; // Default to 9:00 AM (540 mins)
+      const parts = timeStr.split(':');
+      if (parts.length < 2) return 540;
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    };
+
+    const getUserShift = (user) => {
+      let shiftIn = user.schedule_in;
+      let shiftOut = user.schedule_out;
+      if (user.profile_data) {
+        try {
+          const pd = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+          if (!shiftIn && pd.shiftIn) shiftIn = pd.shiftIn;
+          if (!shiftOut && pd.shiftOut) shiftOut = pd.shiftOut;
+        } catch (e) {}
+      }
+      return {
+        shiftIn: shiftIn || '09:00',
+        shiftOut: shiftOut || '18:00'
+      };
+    };
+
+    const getProfileImage = (user, userType) => {
+      if (user.profile_data) {
+        try {
+          const pd = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+          if (pd.image || pd.photo) {
+            return `https://napi.bharatmedicalhallplus.com/attendance/profile-image/${user.id}/${userType}`;
+          }
+        } catch (e) {}
+      }
+      return null;
+    };
+
+    // Calculate current local time in India (UTC+5:30)
+    const now = new Date();
+    const indiaTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const currentMins = indiaTime.getUTCHours() * 60 + indiaTime.getUTCMinutes();
+    const todayStr = indiaTime.toISOString().split('T')[0];
+
+    // Data structures for stats
+    const categories = {
+      total_checkin: { count: 0, employees: [], sub_admins: [] },
+      on_leave: { count: 0, employees: [], sub_admins: [] },
+      yet_to_check_in: { count: 0, employees: [], sub_admins: [] },
+      absent: { count: 0, employees: [], sub_admins: [] },
+      late_checkin: { count: 0, employees: [], sub_admins: [] },
+      early_checkin: { count: 0, employees: [], sub_admins: [] }
+    };
+
+    const processUser = (user, userType) => {
+      const userKey = `${user.id}_${userType}`;
+      const att = attMap.get(userKey);
+      const leave = leaveMap.get(userKey);
+      const { shiftIn, shiftOut } = getUserShift(user);
+      
+      const parseTime = (timeStr, targetDate) => {
+        if (!timeStr || !targetDate) return null;
+        const d = new Date(targetDate);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return new Date(`${yyyy}-${mm}-${dd}T${timeStr}:00+05:30`).getTime();
+      };
+
+      const schedTime = parseTime(shiftIn, todayStr);
+      const shiftInMins = parseTimeToMinutes(shiftIn);
+
+      const targetListKey = userType === 'sub_admin' ? 'sub_admins' : 'employees';
+
+      // Item structure for UI representation
+      const item = {
+        id: user.id,
+        name: user.full_name,
+        department: user.department || 'No Dept',
+        role: user.role || (userType === 'sub_admin' ? 'Sub Admin' : 'Employee'),
+        mobile: user.mobile || '-',
+        shift: `${shiftIn} - ${shiftOut}`,
+        image: getProfileImage(user, userType),
+        check_in: null,
+        check_out: null,
+        deviation: null,
+        status: ''
+      };
+
+      if (leave || (att && att.status === 'Leave')) {
+        item.status = 'On Leave';
+        categories.on_leave.count++;
+        categories.on_leave[targetListKey].push(item);
+      } else if (att && att.check_in) {
+        // Checked in
+        item.status = att.status || 'Checked In';
+        item.check_in = att.check_in;
+        item.check_out = att.check_out;
+
+        categories.total_checkin.count++;
+        categories.total_checkin[targetListKey].push(item);
+
+        // Check late check-in
+        const checkInDate = new Date(att.check_in);
+        const checkInIndia = new Date(checkInDate.getTime() + (5.5 * 60 * 60 * 1000));
+        const checkInMins = checkInIndia.getUTCHours() * 60 + checkInIndia.getUTCMinutes();
+        
+        const diff = checkInMins - shiftInMins;
+        if (diff > 0) {
+          const lateMins = diff;
+          item.deviation = `Late by ${Math.floor(lateMins / 60) > 0 ? Math.floor(lateMins / 60) + 'h ' : ''}${lateMins % 60}m`;
+          categories.late_checkin.count++;
+          categories.late_checkin[targetListKey].push({ ...item });
+        } else if (diff < 0) {
+          const earlyMins = Math.abs(diff);
+          item.deviation = `Early by ${Math.floor(earlyMins / 60) > 0 ? Math.floor(earlyMins / 60) + 'h ' : ''}${earlyMins % 60}m`;
+          categories.early_checkin.count++;
+          categories.early_checkin[targetListKey].push({ ...item });
+        }
+      } else {
+        // Not checked in and not on leave
+        if (now.getTime() <= schedTime) {
+          item.status = 'Yet to Check In';
+          categories.yet_to_check_in.count++;
+          categories.yet_to_check_in[targetListKey].push(item);
+        } else {
+          item.status = 'Absent';
+          categories.absent.count++;
+          categories.absent[targetListKey].push(item);
+        }
+      }
+    };
+
+    // Process all employees
+    empRes.rows.forEach(u => processUser(u, 'employee'));
+
+    // Process all sub admins
+    adminRes.rows.forEach(u => processUser(u, 'sub_admin'));
+
+    return res.json({
+      success: true,
+      stats: categories
+    });
+  } catch (error) {
+    console.error("Dashboard attendance stats error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};

@@ -124,6 +124,11 @@ export default function CRMView({ userType }: CRMViewProps) {
   const [selectedDoctorId, setSelectedDoctorId] = useState('all');
   const [visitYearFilter, setVisitYearFilter] = useState(defaults.year);
   const [visitMonthFilter, setVisitMonthFilter] = useState(defaults.month);
+  const [doctorSearch, setDoctorSearch] = useState('');
+  const [citySearch, setCitySearch] = useState('');
+  const [isDoctorDropdownOpen, setIsDoctorDropdownOpen] = useState(false);
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
 
   // Filter Options from Backend
   const [uniqueCities, setUniqueCities] = useState<string[]>([]);
@@ -439,6 +444,47 @@ export default function CRMView({ userType }: CRMViewProps) {
       }
       return updated;
     });
+  };
+
+  const handleSelectAllFiltered = async () => {
+    if (Object.keys(selectedPatients).length >= totalPatients && totalPatients > 0) {
+      setSelectedPatients({});
+      return;
+    }
+
+    setSelectingAll(true);
+    try {
+      const params: any = {
+        page: 1,
+        limit: 100000
+      };
+      
+      const activeSearch = activeTab === 'voice' ? voiceSearchQuery : searchQuery;
+      if (activeSearch.trim()) params.search = activeSearch.trim();
+      if (cityFilter !== 'all') params.city = cityFilter;
+      if (genderFilter !== 'all') params.gender = genderFilter;
+      if (bloodFilter !== 'all') params.bloodGroup = bloodFilter;
+      if (selectedDoctorId !== 'all') {
+        params.doctorId = selectedDoctorId;
+        params.visitYear = visitYearFilter;
+        params.visitMonth = visitMonthFilter;
+      }
+
+      const res = await axios.get(`${API_URL}/crm/patients`, { params });
+      if (res.data.success) {
+        const allMatching: Patient[] = res.data.data || [];
+        const newSelection: Record<string, Patient> = {};
+        allMatching.forEach((p: Patient) => {
+          newSelection[p.id] = p;
+        });
+        setSelectedPatients(newSelection);
+      }
+    } catch (err) {
+      console.error('Failed to select all patients', err);
+      Alert.alert('Error', 'Failed to select all filtered patients.');
+    } finally {
+      setSelectingAll(false);
+    }
   };
 
   // Compose & Send Message
@@ -891,8 +937,25 @@ export default function CRMView({ userType }: CRMViewProps) {
                 <Text style={styles.cardHeader}>Select Target Audience ({totalPatients} matching)</Text>
               
               {/* Audience Filters */}
-              <View style={styles.filterSection}>
-                <View style={styles.searchInputWrapper}>
+              <View style={[styles.filterSection, { zIndex: 100, position: 'relative' }]}>
+                {(isCityDropdownOpen || isDoctorDropdownOpen) && (
+                  <Pressable
+                    style={{
+                      position: 'absolute',
+                      top: -200,
+                      left: -200,
+                      right: -200,
+                      bottom: -1200,
+                      zIndex: 10,
+                      backgroundColor: 'transparent'
+                    }}
+                    onPress={() => {
+                      setIsCityDropdownOpen(false);
+                      setIsDoctorDropdownOpen(false);
+                    }}
+                  />
+                )}
+                <View style={[styles.searchInputWrapper, { zIndex: 20 }]}>
                   <Search size={18} color="#94a3b8" style={{ marginRight: 8 }} />
                   <TextInput
                     style={styles.textInputSearch}
@@ -903,78 +966,148 @@ export default function CRMView({ userType }: CRMViewProps) {
                 </View>
 
                 {/* Filter Grid */}
-                <View style={styles.filterGrid}>
-                  <View style={styles.filterItem}>
-                    <Text style={styles.filterLabel}>City</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
-                      <Pressable
-                        style={[styles.chip, cityFilter === 'all' && styles.chipActive]}
-                        onPress={() => setCityFilter('all')}
-                      >
-                        <Text style={[styles.chipText, cityFilter === 'all' && styles.chipTextActive]}>All</Text>
-                      </Pressable>
-                      {uniqueCities.map(city => (
-                        <Pressable
-                          key={city}
-                          style={[styles.chip, cityFilter === city && styles.chipActive]}
-                          onPress={() => setCityFilter(city)}
-                        >
-                          <Text style={[styles.chipText, cityFilter === city && styles.chipTextActive]}>{city}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
+                <View style={[styles.filterGrid, { zIndex: 50 }]}>
+                  <View style={[styles.filterItem, { zIndex: 120 }]}>
+                    <Text style={styles.filterLabel}>City Filter</Text>
+                    <View style={{ zIndex: 150 }}>
+                      <View style={[styles.searchInputWrapper, { marginBottom: 4 }]}>
+                        <TextInput
+                          style={styles.textInputSearch}
+                          placeholder="Search & select city..."
+                          value={citySearch}
+                          onChangeText={(val) => {
+                            setCitySearch(val);
+                            setIsCityDropdownOpen(true);
+                            if (val === '') {
+                              setCityFilter('all');
+                              setCurrentPage(1);
+                            }
+                          }}
+                          onFocus={() => setIsCityDropdownOpen(true)}
+                        />
+                        {cityFilter !== 'all' && (
+                          <Pressable
+                            onPress={() => {
+                              setCityFilter('all');
+                              setCitySearch('');
+                              setIsCityDropdownOpen(false);
+                              setCurrentPage(1);
+                            }}
+                            style={{ padding: 4 }}
+                          >
+                            <X size={16} color="#64748b" />
+                          </Pressable>
+                        )}
+                      </View>
+                      
+                      {isCityDropdownOpen && (
+                        <View style={[styles.indivDropdown, { position: 'absolute', top: 42, left: 0, right: 0, zIndex: 200, backgroundColor: 'white' }]}>
+                          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                            <Pressable
+                              style={styles.indivDropdownItem}
+                              onPress={() => {
+                                setCityFilter('all');
+                                setCitySearch('');
+                                setIsCityDropdownOpen(false);
+                                setCurrentPage(1);
+                              }}
+                            >
+                              <Text style={styles.indivDropdownText}>All Cities</Text>
+                            </Pressable>
+                            {uniqueCities
+                              .filter(c => c.toLowerCase().includes(citySearch.toLowerCase()))
+                              .map(city => (
+                                <Pressable
+                                  key={city}
+                                  style={styles.indivDropdownItem}
+                                  onPress={() => {
+                                    setCityFilter(city);
+                                    setCitySearch(city);
+                                    setIsCityDropdownOpen(false);
+                                    setCurrentPage(1);
+                                  }}
+                                >
+                                  <Text style={styles.indivDropdownText}>{city}</Text>
+                                </Pressable>
+                              ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
-                  <View style={styles.filterItem}>
+                  <View style={[styles.filterItem, { zIndex: 110 }]}>
                     <Text style={styles.filterLabel}>Doctor History Filter</Text>
-                    {Platform.OS === 'web' ? (
-                      <select
-                        style={{
-                          width: '100%',
-                          padding: 8,
-                          borderRadius: 6,
-                          borderWidth: 1,
-                          borderColor: '#cbd5e1',
-                          backgroundColor: '#fff',
-                          fontSize: 13,
-                          color: '#334155',
-                          height: 34,
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                        value={selectedDoctorId}
-                        onChange={(e) => {
-                          setSelectedDoctorId(e.target.value);
-                          setCurrentPage(1);
-                        }}
-                      >
-                        <option value="all">All Patients (No Doctor Filter)</option>
-                        {doctors.map(d => (
-                          <option key={d.id} value={d.id}>Dr. {d.full_name} ({d.department})</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <View style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, backgroundColor: '#fff', height: 40, justifyContent: 'center' }}>
-                        <Picker
-                          selectedValue={selectedDoctorId}
-                          onValueChange={(val: any) => {
-                            setSelectedDoctorId(val);
-                            setCurrentPage(1);
+                    <View style={{ zIndex: 140 }}>
+                      <View style={[styles.searchInputWrapper, { marginBottom: 4 }]}>
+                        <TextInput
+                          style={styles.textInputSearch}
+                          placeholder="Search & select doctor..."
+                          value={doctorSearch}
+                          onChangeText={(val) => {
+                            setDoctorSearch(val);
+                            setIsDoctorDropdownOpen(true);
+                            if (val === '') {
+                              setSelectedDoctorId('all');
+                              setCurrentPage(1);
+                            }
                           }}
-                          style={{ height: 40 }}
-                        >
-                          <Picker.Item label="All Patients" value="all" />
-                          {doctors.map(d => (
-                            <Picker.Item key={d.id} label={`Dr. ${d.full_name} (${d.department})`} value={d.id} />
-                          ))}
-                        </Picker>
+                          onFocus={() => setIsDoctorDropdownOpen(true)}
+                        />
+                        {selectedDoctorId !== 'all' && (
+                          <Pressable
+                            onPress={() => {
+                              setSelectedDoctorId('all');
+                              setDoctorSearch('');
+                              setIsDoctorDropdownOpen(false);
+                              setCurrentPage(1);
+                            }}
+                            style={{ padding: 4 }}
+                          >
+                            <X size={16} color="#64748b" />
+                          </Pressable>
+                        )}
                       </View>
-                    )}
+
+                      {isDoctorDropdownOpen && (
+                        <View style={[styles.indivDropdown, { position: 'absolute', top: 42, left: 0, right: 0, zIndex: 190, backgroundColor: 'white' }]}>
+                          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                            <Pressable
+                              style={styles.indivDropdownItem}
+                              onPress={() => {
+                                setSelectedDoctorId('all');
+                                setDoctorSearch('');
+                                setIsDoctorDropdownOpen(false);
+                                setCurrentPage(1);
+                              }}
+                            >
+                              <Text style={styles.indivDropdownText}>All Patients (No Doctor Filter)</Text>
+                            </Pressable>
+                            {doctors
+                              .filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase()) || d.department.toLowerCase().includes(doctorSearch.toLowerCase()))
+                              .map(d => (
+                                <Pressable
+                                  key={d.id}
+                                  style={styles.indivDropdownItem}
+                                  onPress={() => {
+                                    setSelectedDoctorId(d.id);
+                                    setDoctorSearch(`Dr. ${d.full_name} (${d.department})`);
+                                    setIsDoctorDropdownOpen(false);
+                                    setCurrentPage(1);
+                                  }}
+                                >
+                                  <Text style={styles.indivDropdownText}>Dr. {d.full_name} ({d.department})</Text>
+                                </Pressable>
+                              ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   {selectedDoctorId !== 'all' && (
                     <>
-                      <View style={styles.filterItem}>
+                      <View style={[styles.filterItem, { zIndex: 100 }]}>
                         <Text style={styles.filterLabel}>Booking Year</Text>
                         {Platform.OS === 'web' ? (
                           <select
@@ -1026,7 +1159,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                       </View>
 
                       {visitYearFilter !== 'all' && (
-                        <View style={styles.filterItem}>
+                        <View style={[styles.filterItem, { zIndex: 90 }]}>
                           <Text style={styles.filterLabel}>Booking Month</Text>
                           {Platform.OS === 'web' ? (
                             <select
@@ -1098,11 +1231,26 @@ export default function CRMView({ userType }: CRMViewProps) {
 
               {/* Patient Selection List */}
               <View style={styles.actionRow}>
-                <Pressable style={styles.selectBtn} onPress={selectAllPatients}>
-                  <Text style={styles.selectBtnText}>
-                    {patients.length > 0 && patients.every(p => selectedPatients[p.id] !== undefined) ? 'Deselect Page' : 'Select Page'}
-                  </Text>
-                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable style={styles.selectBtn} onPress={selectAllPatients}>
+                    <Text style={styles.selectBtnText}>
+                      {patients.length > 0 && patients.every(p => selectedPatients[p.id] !== undefined) ? 'Deselect Page' : 'Select Page'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.selectBtn, selectingAll && { opacity: 0.7 }]}
+                    disabled={selectingAll}
+                    onPress={handleSelectAllFiltered}
+                  >
+                    {selectingAll ? (
+                      <ActivityIndicator size="small" color="#334155" />
+                    ) : (
+                      <Text style={styles.selectBtnText}>
+                        {Object.keys(selectedPatients).length >= totalPatients && totalPatients > 0 ? 'Deselect All' : `Select All Filtered (${totalPatients})`}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
                 <Text style={styles.selectedCountText}>{Object.keys(selectedPatients).length} selected</Text>
               </View>
 
