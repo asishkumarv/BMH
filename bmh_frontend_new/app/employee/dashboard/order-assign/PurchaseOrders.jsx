@@ -361,7 +361,8 @@ export default function PurchaseOrders({ deliveryBoys, onStartAssignment }) {
   };
 
   const openAssignModal = (order) => {
-    if (onStartAssignment) {
+    const isStoreOrCounter = order.delivery_type === 'Store' || order.mode_of_delivery === 'Store' || order.delivery_type === 'Counter' || order.mode_of_delivery === 'Counter';
+    if (isStoreOrCounter && onStartAssignment) {
       onStartAssignment({ ...order, type: 'purchase_order' });
     } else {
       setAssignOrder(order);

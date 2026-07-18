@@ -612,7 +612,8 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
             <TouchableOpacity 
               style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
               onPress={() => {
-                if (onStartAssignment) {
+                const isStoreOrCounter = item.mode_of_delivery === 'Store' || item.delivery_type === 'Store' || item.mode_of_delivery === 'Counter' || item.delivery_type === 'Counter';
+                if (isStoreOrCounter && onStartAssignment) {
                   onStartAssignment({ ...item, type: item.order_source_type || 'manual_order' });
                 } else {
                   setAssignOrder(item);

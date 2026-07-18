@@ -138,8 +138,9 @@ export default function OrderAssignScreen() {
                      deliveryBoys.find(b => b.id.toString() === selectedBoyId.toString());
       const userType = chosen ? (chosen.type || 'employee') : 'employee';
 
-      const payload = {
+       const payload = {
         delivery_type: deliveryType,
+        mode_of_delivery: deliveryType,
         delivery_boy_id: selectedBoyId || null,
         delivery_assigned_user_type: userType,
         address: deliveryType === 'Local' ? address : null,
@@ -158,6 +159,8 @@ export default function OrderAssignScreen() {
       } else if (selectedOrder.type === 'purchase_order') {
         url = `https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/assign/${selectedOrder.id}`;
         method = 'POST';
+      } else if (selectedOrder.type === 'manual_order' || !selectedOrder.type) {
+        url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`;
       }
 
       await executeAssignReq(url, payload, method);
@@ -214,7 +217,7 @@ export default function OrderAssignScreen() {
     setSelectedOrder(order);
     setAddress(order.address || '');
     setGpsLocation(order.map_lat && order.map_lng ? `${order.map_lat},${order.map_lng}` : '');
-    setDeliveryType(order.delivery_type || 'Local');
+    setDeliveryType(order.delivery_type || order.mode_of_delivery || 'Local');
     setSelectedBoyId(order.delivery_boy_id || '');
     if (order.bus_details) {
       try {
@@ -426,39 +429,46 @@ export default function OrderAssignScreen() {
             </View>
           }
         />
+      </>
+      )}
 
-        {/* Assignment Modal */}
-        {selectedOrder && (
+      {/* Assignment Modal */}
+      {selectedOrder && (
           <Modal transparent animationType="slide" visible={!!selectedOrder} onRequestClose={() => setSelectedOrder(null)}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Assign Delivery (Order #{selectedOrder.id})</Text>
                 
                 <ScrollView style={styles.modalScroll}>
-                  <Text style={styles.label}>Delivery Type</Text>
-                  <View style={styles.typeSelectorRow}>
-                    {['Local', 'Bus', 'Store'].map((type) => (
-                      <TouchableOpacity
-                        key={type}
-                        style={[styles.typeOption, deliveryType === type && styles.typeOptionActive]}
-                        onPress={() => setDeliveryType(type)}
-                      >
-                        {type === 'Local' && <MapPin size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
-                        {type === 'Bus' && <Bus size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
-                        {type === 'Store' && <Package size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} />}
-                        <Text style={[styles.typeOptionText, deliveryType === type && styles.typeOptionTextActive]}>
-                          {type}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  {!(deliveryType === 'Store' || deliveryType === 'Counter') ? (
+                    <>
+                      <Text style={styles.label}>Delivery Type</Text>
+                      <View style={styles.typeSelectorRow}>
+                        {['Local', 'Bus', 'Store', 'Counter'].map((type) => (
+                          <TouchableOpacity
+                            key={type}
+                            style={[styles.typeOption, deliveryType === type && styles.typeOptionActive]}
+                            onPress={() => setDeliveryType(type)}
+                          >
+                            {type === 'Local' ? <MapPin size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} /> : null}
+                            {type === 'Bus' ? <Bus size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} /> : null}
+                            {type === 'Store' ? <Package size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} /> : null}
+                            {type === 'Counter' ? <Package size={18} color={deliveryType === type ? '#0ea5e9' : '#64748b'} /> : null}
+                            <Text style={[styles.typeOptionText, deliveryType === type && styles.typeOptionTextActive]}>
+                              {type}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
 
-                  {deliveryType === 'Store' ? (
+                  {deliveryType === 'Store' || deliveryType === 'Counter' ? (
                     <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Select Store Delivery Person</Text>
+                      <Text style={styles.label}>Select Store/Counter Delivery Person</Text>
                       <View style={styles.dropdownWrapper}>
                         <Picker selectedValue={selectedBoyId} onValueChange={(val) => setSelectedBoyId(val)} style={styles.picker}>
-                          <Picker.Item label="Select Store Delivery Person" value="" />
+                          <Picker.Item label="Select Store/Counter Delivery Person" value="" />
                           {storeDeliveryFleet?.map(boy => (
                             <Picker.Item key={boy.id} label={`${boy.full_name || boy.name} (${boy.role || 'N/A'})`} value={boy.id} />
                           ))}
@@ -479,7 +489,7 @@ export default function OrderAssignScreen() {
                     </View>
                   )}
 
-                  {deliveryType === 'Local' && (
+                  {deliveryType === 'Local' ? (
                     <>
                       <View style={styles.inputGroup}>
                         <Text style={styles.label}>Delivery Address</Text>
@@ -501,9 +511,9 @@ export default function OrderAssignScreen() {
                         />
                       </View>
                     </>
-                  )}
+                  ) : null}
 
-                  {deliveryType === 'Bus' && (
+                  {deliveryType === 'Bus' ? (
                     <View style={styles.busDetailsGrid}>
                       <View style={styles.inputGroup}>
                         <Text style={styles.label}>Bus Number</Text>
@@ -530,7 +540,7 @@ export default function OrderAssignScreen() {
                         <TextInput style={styles.textInput} value={busDetails.drop_location} onChangeText={(v) => setBusDetails({...busDetails, drop_location: v})} placeholder="City Center Bus Stand"/>
                       </View>
                     </View>
-                  )}
+                  ) : null}
 
                 </ScrollView>
                 
@@ -546,8 +556,6 @@ export default function OrderAssignScreen() {
             </View>
           </Modal>
         )}
-      </>
-      )}
     </View>
   );
 }

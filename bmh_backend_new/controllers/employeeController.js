@@ -717,25 +717,25 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
        FROM online_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2 
-         AND delivery_type = 'Store'
+         AND (delivery_type = 'Store' OR delivery_type = 'Counter')
        ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
     );
 
     const ecogreenSalesOrdersRes = await pool.query(
-      `SELECT id, 'sales_order' as type, status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_id as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp
+      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp
        FROM ecogreensales_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2
-         AND delivery_type = 'Store'
+         AND (delivery_type = 'Store' OR delivery_type = 'Counter')
        ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
     );
 
     const ecogreenSalesInvoicesRes = await pool.query(
-      `SELECT id, 'sales_invoice' as type, status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, ref_no as invoice_no, NULL::varchar as location_link, delivery_otp
+      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link, delivery_otp
        FROM ecogreensales_invoices 
        WHERE delivered_by_id = $1 
          AND delivery_assigned_user_type = $2
-         AND delivery_type = 'Store'
+         AND (delivery_type = 'Store' OR delivery_type = 'Counter')
        ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
     );
 
@@ -744,7 +744,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
        FROM manual_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2
-         AND mode_of_delivery = 'Store'
+         AND (mode_of_delivery = 'Store' OR mode_of_delivery = 'Counter')
        ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
     );
 
@@ -753,7 +753,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
        FROM ecogreenpurchase_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2
-         AND delivery_type = 'Store'
+         AND (delivery_type = 'Store' OR delivery_type = 'Counter')
        ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
     );
 
