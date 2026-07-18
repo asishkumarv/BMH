@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, ScrollView, Image } from 'react-native';
-import { ShieldCheck, Clock, Heart, ArrowRight } from 'lucide-react-native';
+import { ShieldCheck, Clock, Heart, ArrowRight, Calendar } from 'lucide-react-native';
 import { useRouter, useRootNavigationState } from 'expo-router';
 import { Colors } from '../constants/Colors';
 import { useResponsive } from '../hooks/useResponsive';
@@ -109,13 +109,23 @@ export default function LandingPage() {
           Complete healthcare management solution for hospitals, doctors, and patients
         </Text>
 
-        <Pressable 
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} 
-          onPress={() => router.push('/roles')}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
-          <ArrowRight color="#FFF" size={20} />
-        </Pressable>
+        <View style={styles.buttonsContainer}>
+          <Pressable 
+            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} 
+            onPress={() => router.push('/roles')}
+          >
+            <Text style={styles.buttonText}>Get Started</Text>
+            <ArrowRight color="#FFF" size={20} />
+          </Pressable>
+
+          <Pressable 
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]} 
+            onPress={() => router.push('/doctor-schedule')}
+          >
+            <Calendar color="#0F766E" size={20} style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryButtonText}>Doctor Schedule</Text>
+          </Pressable>
+        </View>
 
         <View style={[styles.featuresGrid, isMobile && styles.featuresGridMobile]}>
           {FEATURES.map((feat, idx) => (
@@ -243,12 +253,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 16,
-    marginBottom: 48,
     ...Platform.select({
       web: {
         transition: 'transform 0.2s, box-shadow 0.2s',
       }
     })
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6F4F1',
+    borderWidth: 1.5,
+    borderColor: '#0F766E',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 16,
+    ...Platform.select({
+      web: {
+        transition: 'transform 0.2s, box-shadow 0.2s',
+      }
+    })
+  },
+  secondaryButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
+  },
+  secondaryButtonText: {
+    color: '#0F766E',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 48,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   buttonPressed: {
     transform: [{ scale: 0.98 }],

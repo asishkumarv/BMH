@@ -39,6 +39,7 @@ const onlineOrderRoutes = require('./routes/onlineOrderRoutes');
 const manualOrderRoutes = require('./routes/manualOrderRoutes');
 const busRoutes = require('./routes/busRoutes');
 const crmRoutes = require('./routes/crmRoutes');
+const doctorScheduleRoutes = require('./routes/doctorScheduleRoutes');
 
 // Mount routes
 app.use('/employees', employeeRoutes);
@@ -86,6 +87,9 @@ app.use('/buses', busRoutes);
 
 // CRM Routing
 app.use('/crm', crmRoutes);
+
+// Doctor Schedules
+app.use('/doctor-schedules', doctorScheduleRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
@@ -404,4 +408,55 @@ app.listen(PORT, () => {
   } catch (err) {
     console.error("Failed to start sales order sync cron:", err.message);
   }
+
+  // Initialize and Seed Doctor Schedules DB Table
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS doctor_schedules (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      qualification TEXT,
+      department VARCHAR(255),
+      schedule_type VARCHAR(50) DEFAULT 'Daily',
+      timing TEXT,
+      cabin VARCHAR(255),
+      fee VARCHAR(100),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).then(async () => {
+    console.log('Successfully checked/patched doctor_schedules table.');
+    const checkEmpty = await pool.query('SELECT COUNT(*)::integer FROM doctor_schedules');
+    if (checkEmpty.rows[0].count === 0) {
+      console.log('Seeding doctor_schedules table with default doctor listings...');
+      const seedData = [
+        ['Dr. Sujit Ranjan Sahoo', 'M.D.S (Prosthodontics) — Prof. & HOD, Ex. Assoc. Prof. SUM Hospital, Bhubaneswar', 'Dentist', 'Daily', 'Mon–Sat: 9:00 AM & 1:00 PM; Sun: 10:30 AM till last patient', 'Cabin 9, 1st Floor', 'At Clinic', ''],
+        ['Dr. Sonia Aggarwal', 'M.D.S (Endodontics) — Dental Surgeon, DHH Baripada', 'Dentist', 'Daily', 'Daily 4:00 PM (Sat & Thu till 7:00 PM)', 'Cabin 9, 1st Floor', 'At Clinic', ''],
+        ['Dr. A.K. Das', 'B.D.S (Indore); D.Ortho (Calicut) — Orthodontics Specialist. Advance booking recommended.', 'Dentist (Orthodontist)', 'Weekly', '2nd & 4th Saturday: 8:00 AM – 3:00 PM (2x Monthly)', 'Cabin 5, 1st Floor', 'At Clinic', ''],
+        ['Dr. J.B. Kanwar', 'M.D (Medicine); DM Endocrinology — Professor, SUM Hospital BBSR & SGPGI Lucknow', 'Diabetic & Thyroid Specialist', 'Monthly', '2nd Saturday of month: 10:00 AM – 2:00 PM', '2nd Floor', '₹600', ''],
+        ['Dr. Mamta Sahoo', 'M.S (E.N.T) — Professor & HOD, PRM Medical College, Baripada', 'E.N.T Specialist', 'Daily', 'Mon – Fri: 9:00 AM – 12:00 PM', 'Cabin 7, 1st Floor', '₹300', ''],
+        ['Dr. Rajesh Kar', 'MBBS, MS, DNB; ENT & Head-Neck Surgery — Grant College & JJ Hospital, Mumbai', 'E.N.T & Head-Neck Surgeon', 'Monthly', 'Once a month — by appointment only', 'Cabin 6, 1st Floor', 'At Clinic', ''],
+        ['Dr. Suchitra Panigrahi', 'MBBS, MS Ophthalmology; Phaco & Laser – RIO Hyderabad; Cornea Transplant – AIIMS New Delhi', 'Eye Specialist (Ophthalmologist)', 'Weekly', 'Tue, Thu, Sat: 7:00 PM; Sun: 10:30 AM till last patient', 'Cabin 6, 1st Floor', 'At Clinic', ''],
+        ['Dr. Sudhanshu S. Nath', 'M.S. (Obstetrics & Gynaecology) — Asst. Professor, PRM Medical College, Baripada', 'Gynaecologist', 'Daily', 'Mon – Fri: 9:00 AM – 12:00 PM', 'Cabin 7, 1st Floor', '₹300', ''],
+        ['Dr. Giridhari Jena', 'MD, DM, FSCAI, FAHA — Interventional Cardiologist, Care Hospital, BBSR. Appointment required.', 'Cardiologist', 'Monthly', 'Every 3rd Sunday: 10:00 AM – 2:00 PM', '2nd Floor', '₹600', ''],
+        ['Dr. Bibekananda Panda', 'MD, DNB (Nephrology) — Clinical Director & HOD, Nephrology & Kidney Transplant, Care Hospital, BBSR', 'Nephrologist (Kidney Specialist)', 'Monthly', 'Every 1st Sunday: 10:00 AM – 2:00 PM', '2nd Floor', '₹700', ''],
+        ['Dr. Madhumita Nayak', 'MD (Pulmonary Medicine) — Asst. Professor, PRM Medical College, Baripada', 'Pulmonologist (Lung Specialist)', 'Daily', 'Mon – Sat: 9:00 AM, 1:00 PM & 5:00 PM', 'Cabin 8, 1st Floor', '₹400', ''],
+        ['Dr. Pradyut Ranjan Bhuyan', 'MBBS, MD (Medicine), DNB (Neurology) — Sr. Consultant Neurologist, Manipal Hospitals, BBSR', 'Neurologist', 'Weekly', '2nd & 4th Sunday: 10:00 AM – 2:00 PM (2x Monthly)', '2nd Floor', '₹600', ''],
+        ['Dr. Rashmi Ranjan Mohanty', 'MS (Orthopaedics), Utkal University — Asst. Professor, PRM Medical College, Baripada', 'Orthopaedic Surgeon', 'Daily', 'Tue – Fri: 1:00 PM onwards & 5:00–7:00 PM', 'Cabin 1, 1st Floor', '₹400', ''],
+        ['Dr. Thakura Soren', 'MBBS (General Medicine) — General Physician, Bharat Health Care, Baripada', 'Medicine Specialist', 'Daily', 'Mon – Sat: Morning & Evening (confirm at reception)', 'Cabin 2, 1st Floor', '₹300', ''],
+        ['Dr. Satya Ranjan Panda', 'MBBS, DNB (General Medicine) — PRM MCH Baripada; ex-Apollo Hospitals, Bhubaneswar', 'Medicine Specialist', 'Daily', 'Mon – Sat: 9:00 AM, 1:00 PM & 5:00 PM', 'Cabin (confirm at reception)', '₹300', ''],
+        ['Dr. Chandan Kumar Satpathy', 'MBBS, MD (Skin & Venereology) — Dermatologist, PRM Medical College, Baripada', 'Skin & V.D. Specialist', 'Daily', 'Mon – Sat: 9:30 AM, 1:00 PM & 6:00 PM till last patient (SUN: HOLIDAY)', 'Cabin 3, 1st Floor', '₹300', ''],
+        ['Dr. Kashinath Bisoi', 'MS (General Surgery) — Senior Consultant Surgeon, Bharat Health Care, Baripada', 'Senior Consultant Surgeon', 'Daily', 'Mon – Sat: 12:00 PM – 2:00 PM', 'Cabin 4, 1st Floor', 'At Clinic', ''],
+        ['Dr. Uma Prasad Biswal', 'MBBS, MD (Psychiatry & Neurology) — Consultant Neuropsychiatrist. Book in advance for video link.', 'Neuropsychiatrist', 'Weekly', '2nd & 4th Sunday: 10:00 AM – 12:00 PM (Video Consultation - ONLINE ONLY)', 'Telemedicine', '₹400', ''],
+        ['Dr. Manjit Kanumgo', 'MBBS, MD (Gastroenterology) — Associate Professor, IMS & SUM Hospital, Bhubaneswar', 'Gastroenterologist', 'Monthly', '1st Saturday of month: 8:00 AM – 2:00 PM', '2nd Floor', '₹500', '']
+      ];
+      for (const row of seedData) {
+        await pool.query(
+          'INSERT INTO doctor_schedules (name, qualification, department, schedule_type, timing, cabin, fee, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          row
+        );
+      }
+      console.log('Doctor Schedules seeding completed.');
+    }
+  }).catch(err => console.error('Error creating doctor_schedules table:', err.message));
 });

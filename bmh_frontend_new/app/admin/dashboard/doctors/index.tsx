@@ -10,8 +10,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
+import DoctorSchedulesEditor from '../../../../components/DoctorSchedulesEditor';
 
-const TABS = ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens', 'Revenue'];
+const TABS = ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens', 'Revenue', 'Doctor Schedules'];
 
 const TIME_SLOTS: string[] = [];
 for (let h = 8; h <= 20; h++) {
@@ -1307,6 +1308,10 @@ const fetchData = async () => {
                 ))}
                 {revenue.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No revenue data found.</Text>}
               </View>
+            )}
+
+            {activeTab === 'Doctor Schedules' && (
+              <DoctorSchedulesEditor />
             )}
           </View>
         </ScrollView>

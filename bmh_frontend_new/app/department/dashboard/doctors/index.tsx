@@ -10,6 +10,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
+import DoctorSchedulesEditor from '../../../../components/DoctorSchedulesEditor';
+
 const TABS = ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens']; // No Revenue tab
 
 const TIME_SLOTS: string[] = [];
@@ -109,6 +111,9 @@ export default function DepartmentDoctorManagement() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [hasGlobalDoctorAccess, setHasGlobalDoctorAccess] = useState(false);
+  const displayTabs = hasGlobalDoctorAccess 
+    ? ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens', 'Doctor Schedules']
+    : ['Doctors', 'Slots', 'Bookings', 'Cancelled Tokens'];
   const [departments, setDepartments] = useState<any[]>([]);
 
   // Add Doctor Form State
@@ -806,7 +811,7 @@ const fetchData = async () => {
       ) : (
         <>
           <View style={styles.tabContainer}>
-        {TABS.map(tab => (
+        {displayTabs.map(tab => (
           <TouchableOpacity 
             key={tab} 
             style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -1305,6 +1310,10 @@ const fetchData = async () => {
                 ))}
                 {bookings.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No bookings found in your department.</Text>}
               </View>
+            )}
+
+            {activeTab === 'Doctor Schedules' && (
+              <DoctorSchedulesEditor />
             )}
             </View>
           </ScrollView>
