@@ -9,6 +9,8 @@ import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
 import { ActivityIndicator } from 'react-native';
+import { registerForPushNotificationsAsync } from '../../../utils/pushNotifications';
+import axios from 'axios';
 
 export default function EmployeeLayout() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -52,6 +54,29 @@ export default function EmployeeLayout() {
           } else {
             setUser(u);
             setLoading(false);
+
+            // Refresh push token in background on mobile devices
+            if (Platform.OS !== 'web') {
+              registerForPushNotificationsAsync().then((token) => {
+                if (token && token !== u.push_token) {
+                  axios.post('https://napi.bharatmedicalhallplus.com/employees/update-push-token', {
+                    employee_id: u.id,
+                    pushToken: token,
+                    user_type: 'employee'
+                  }).then(() => {
+                    console.log("Refreshed employee push token on server:", token);
+                    u.push_token = token;
+                    AsyncStorage.setItem('employeeUser', JSON.stringify(u)).catch((err: any) => {
+                      console.log("Error saving updated user data:", err);
+                    });
+                  }).catch((err: any) => {
+                    console.log("Error updating employee push token on server:", err?.response?.data || err.message);
+                  });
+                }
+              }).catch((err: any) => {
+                console.log("Error during employee push token auto-refresh:", err);
+              });
+            }
           }
         }
       } catch (e) {

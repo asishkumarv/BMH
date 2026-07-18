@@ -8,6 +8,8 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAttendanceReminder } from '../../../hooks/useAttendanceReminder';
+import axios from 'axios';
+import { registerForPushNotificationsAsync } from '../../../utils/pushNotifications';
 
 export default function SubAdminLayout() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -43,8 +45,32 @@ export default function SubAdminLayout() {
             router.replace('/department/login');
           }, 0);
         } else {
-          setUser(JSON.parse(userStr));
+          const u = JSON.parse(userStr);
+          setUser(u);
           setLoading(false);
+
+          // Refresh push token in background on mobile devices
+          if (Platform.OS !== 'web') {
+            registerForPushNotificationsAsync().then((token) => {
+              if (token && token !== u.push_token) {
+                axios.post('https://napi.bharatmedicalhallplus.com/employees/update-push-token', {
+                  employee_id: u.id,
+                  pushToken: token,
+                  user_type: 'sub_admin'
+                }).then(() => {
+                  console.log("Refreshed sub-admin push token on server:", token);
+                  u.push_token = token;
+                  AsyncStorage.setItem('subAdminUser', JSON.stringify(u)).catch((err: any) => {
+                    console.log("Error saving updated user data:", err);
+                  });
+                }).catch((err: any) => {
+                  console.log("Error updating sub-admin push token on server:", err?.response?.data || err.message);
+                });
+              }
+            }).catch((err: any) => {
+              console.log("Error during sub-admin push token auto-refresh:", err);
+            });
+          }
         }
       } catch (e) {
         setTimeout(() => {

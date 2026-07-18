@@ -1080,7 +1080,7 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
                           <Text style={{ fontSize: 9, color: '#15803d', fontWeight: 'bold' }}>⭐ Recommended (Nearest)</Text>
                         </View>
                       )}
-                      {(() => {
+                      {!(deliveryType === 'Store' || deliveryType === 'Counter') ? (() => {
                         const pendingOrders = boy.pending_orders_count !== undefined ? boy.pending_orders_count : boy.pending_count;
                         const pendingTasks = boy.pending_tasks_count || 0;
                         return (
@@ -1088,7 +1088,7 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
                             ({pendingOrders || 0} orders, {pendingTasks} tasks)
                           </Text>
                         );
-                      })()}
+                      })() : null}
                     </View>
                     {selectedRiderId?.toString() === boy.id.toString() && <CheckCircle size={14} color="#4338ca" />}
                   </TouchableOpacity>

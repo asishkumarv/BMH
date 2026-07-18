@@ -621,12 +621,16 @@ exports.bulkSavePurchaseOrders = async (req, res) => {
 };
 
 exports.updatePushToken = async (req, res) => {
-  const { employee_id, pushToken } = req.body;
+  const { employee_id, pushToken, user_type } = req.body;
   if (!employee_id) {
     return res.status(400).json({ success: false, message: 'employee_id is required' });
   }
   try {
-    await pool.query('UPDATE employees SET push_token = $1 WHERE id = $2', [pushToken || null, employee_id]);
+    if (user_type === 'sub_admin') {
+      await pool.query('UPDATE department_admins SET push_token = $1 WHERE id = $2', [pushToken || null, employee_id]);
+    } else {
+      await pool.query('UPDATE employees SET push_token = $1 WHERE id = $2', [pushToken || null, employee_id]);
+    }
     res.json({ success: true, message: 'Push token updated successfully' });
   } catch (err) {
     console.error('Update push token error:', err.message);
