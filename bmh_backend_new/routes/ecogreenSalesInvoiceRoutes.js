@@ -269,8 +269,12 @@ router.put('/:id/assign-delivery', async (req, res) => {
           let title = 'New Sales Invoice Assigned';
           let body = `Sales Invoice #${updatedInvoice.id} has been assigned to you.`;
           
+          const isStore = updatedInvoice.delivery_type === 'Store' || updatedInvoice.delivery_type === 'Counter';
           const isBus = updatedInvoice.delivery_type === 'Bus';
-          if (isBus) {
+          if (isStore) {
+            title = 'New Store/Counter Order Assigned';
+            body = `Sales Invoice #${updatedInvoice.invoice_id || updatedInvoice.id} has been assigned for Store/Counter delivery.`;
+          } else if (isBus) {
             title = 'New Bus Delivery Assigned';
             const bDate = updatedInvoice.bus_date ? (typeof updatedInvoice.bus_date === 'string' ? updatedInvoice.bus_date.split('T')[0] : updatedInvoice.bus_date.toISOString().split('T')[0]) : '';
             body = `Bus invoice #${updatedInvoice.id} has been assigned. Bus Date: ${bDate}`;

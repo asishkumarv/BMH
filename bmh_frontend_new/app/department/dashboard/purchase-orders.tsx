@@ -29,7 +29,27 @@ export default function PurchaseOrdersScreen() {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [deliveryBoys, setDeliveryBoys] = useState<any[]>([]);
+  const [storeDeliveryFleet, setStoreDeliveryFleet] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const getAssigneeName = (boyId: any, assignedUserType: any) => {
+    const stringId = boyId?.toString();
+    if (!stringId) return 'Unassigned';
+    
+    const storeBoy = storeDeliveryFleet?.find(b => {
+      const bId = b.id?.toString();
+      if (assignedUserType === 'sub_admin') {
+        return bId === `SA-${stringId}` || bId === stringId;
+      }
+      return bId === stringId;
+    });
+    if (storeBoy) return storeBoy.full_name || storeBoy.name;
+
+    const stdBoy = deliveryBoys?.find(b => b.id?.toString() === stringId);
+    if (stdBoy) return stdBoy.full_name || stdBoy.name;
+    
+    return 'Unassigned';
+  };
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,10 +152,22 @@ export default function PurchaseOrdersScreen() {
     }
   };
 
+  const fetchStoreDeliveryFleet = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/store-delivery-fleet');
+      if (res.data && res.data.success) {
+        setStoreDeliveryFleet(res.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchPurchaseOrders();
     fetchBuses();
     fetchDeliveryBoys();
+    fetchStoreDeliveryFleet();
     const interval = setInterval(() => {
       fetchPurchaseOrders(true);
     }, 10000);
@@ -264,9 +296,18 @@ export default function PurchaseOrdersScreen() {
 
       const targetOrder = assignOrder || orders.find(o => o.id === orderId);
 
+      let riderIdVal = boyId;
+      let userType = 'employee';
+      if (typeof riderIdVal === 'string' && riderIdVal.startsWith('SA-')) {
+        riderIdVal = riderIdVal.replace('SA-', '');
+        userType = 'sub_admin';
+      }
+      const riderIdInt = riderIdVal && riderIdVal !== 'null' ? parseInt(riderIdVal, 10) : null;
+
       const payload = {
         delivery_type: deliveryType,
-        delivery_boy_id: isUnassign ? null : boyId,
+        delivery_boy_id: riderIdInt,
+        delivery_assigned_user_type: userType,
         address: deliveryType === 'Local' ? address : null,
         gps_location: deliveryType === 'Local' ? gpsLocation : null,
         bus_details: deliveryType === 'Bus' ? busDetails : null,
@@ -548,7 +589,7 @@ export default function PurchaseOrdersScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <User size={16} color="#94a3b8" style={{ marginRight: 4 }}/>
               <Text style={styles.cellText} numberOfLines={1}>
-                {deliveryBoys.find(b => b.id?.toString() === item.delivery_boy_id?.toString())?.full_name || 'Unassigned'}
+                {getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type)}
               </Text>
             </View>
           ) : (
@@ -558,7 +599,7 @@ export default function PurchaseOrdersScreen() {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
-                  {deliveryBoys.find(b => b.id?.toString() === item.delivery_boy_id?.toString())?.full_name || 'Assign To'}
+                  {item.delivery_boy_id ? getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type) : 'Assign To'}
                 </Text>
                 <ChevronDown size={12} color="#64748b" style={{ marginLeft: 4 }} />
               </View>
@@ -629,7 +670,7 @@ export default function PurchaseOrdersScreen() {
               onPress={() => setRiderDropdownOpen(!riderDropdownOpen)}
             >
               <Text style={{ fontSize: 13, color: '#334155' }} numberOfLines={1}>
-                Rider: {deliveryBoys.find(b => b.id?.toString() === selectedBoyId.toString())?.full_name || 'All Riders'}
+                Rider: {getAssigneeName(selectedBoyId, selectedOrder?.delivery_assigned_user_type)}
               </Text>
               <ChevronDown size={14} color="#64748b" />
             </TouchableOpacity>
@@ -776,7 +817,7 @@ export default function PurchaseOrdersScreen() {
           <Text style={[styles.headerText, { flex: 0.8 }]}>Status</Text>
           <Text style={[styles.headerText, { flex: 1.5 }]}>Customer / Wholesaler</Text>
           <Text style={[styles.headerText, { flex: 1 }]}>Order No</Text>
-          <Text style={[styles.headerText, { flex: 1.5 }]}>Delivery Boy</Text>
+          <Text style={[styles.headerText, { flex: 1.5 }]}>Submitted To</Text>
           <Text style={[styles.headerText, { flex: 1 }]}>Amount</Text>
           <Text style={[styles.headerText, { flex: 1 }]}>Date / Time</Text>
           <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
@@ -1239,8 +1280,8 @@ export default function PurchaseOrdersScreen() {
                   <Text style={{ fontSize: 13, color: '#ef4444', fontWeight: '600', textAlign: 'center' }}>Unassign Rider</Text>
                 </TouchableOpacity>
 
-                {deliveryBoys?.filter(boy => 
-                  boy.full_name?.toLowerCase().includes(assignSearchQuery.toLowerCase())
+                {((deliveryType === 'Store' || deliveryType === 'Counter') ? (storeDeliveryFleet || []) : (deliveryBoys || []))?.filter(boy => 
+                  (boy.full_name || boy.name)?.toLowerCase().includes(assignSearchQuery.toLowerCase())
                 ).map((boy) => (
                   <TouchableOpacity 
                     key={boy.id}
@@ -1256,7 +1297,7 @@ export default function PurchaseOrdersScreen() {
                     onPress={() => setSelectedRiderId(boy.id)}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e293b' }}>{boy.full_name}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e293b' }}>{boy.full_name || boy.name}</Text>
                       {boy.recommended && (
                         <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                           <Text style={{ fontSize: 9, color: '#15803d', fontWeight: 'bold' }}>⭐ Recommended (Nearest)</Text>

@@ -2928,8 +2928,13 @@ router.put('/sales-orders/assign/:id', async (req, res) => {
         const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
         if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
           const { sendExpoPushNotification } = require('../utils/pushNotification');
-          const title = 'New Sales Order Assigned';
-          const body = `Sales Order #${result.rows[0].id} has been assigned to you.`;
+          let title = 'New Sales Order Assigned';
+          let body = `Sales Order #${result.rows[0].id} has been assigned to you.`;
+          const isStore = result.rows[0].delivery_type === 'Store' || result.rows[0].delivery_type === 'Counter';
+          if (isStore) {
+            title = 'New Store/Counter Order Assigned';
+            body = `Sales Order #${result.rows[0].order_no || result.rows[0].id} has been assigned for Store/Counter delivery.`;
+          }
           sendExpoPushNotification(empRes.rows[0].push_token, title, body);
         }
       } catch (e) {

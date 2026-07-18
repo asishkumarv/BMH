@@ -96,8 +96,12 @@ router.post('/assign/:id', async (req, res) => {
                     let title = 'New Purchase Order Assigned';
                     let body = `Purchase Order #${updatedPO.id} has been assigned to you.`;
                     
+                    const isStore = updatedPO.delivery_type === 'Store' || updatedPO.delivery_type === 'Counter';
                     const isBus = updatedPO.delivery_type === 'Bus';
-                    if (isBus) {
+                    if (isStore) {
+                        title = 'New Store/Counter Pickup Assigned';
+                        body = `Purchase Order #${updatedPO.prefix || ''}${updatedPO.year || ''}${updatedPO.srno || ''} has been assigned for Store/Counter pickup.`;
+                    } else if (isBus) {
                         title = 'New Bus Delivery Assigned';
                         const bDate = updatedPO.bus_date ? (typeof updatedPO.bus_date === 'string' ? updatedPO.bus_date.split('T')[0] : updatedPO.bus_date.toISOString().split('T')[0]) : '';
                         body = `Bus purchase order #${updatedPO.id} has been assigned. Bus Date: ${bDate}`;

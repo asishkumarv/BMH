@@ -496,8 +496,12 @@ exports.updateOrder = async (req, res) => {
                let title = 'New Order Assigned';
                let body = `Order #${updatedOrder.order_no || updatedOrder.id} has been assigned to you.`;
                
+               const isStore = updatedOrder.delivery_type === 'Store' || updatedOrder.mode_of_delivery === 'Store' || updatedOrder.delivery_type === 'Counter' || updatedOrder.mode_of_delivery === 'Counter';
                const isBus = updatedOrder.delivery_type === 'Bus' || updatedOrder.mode_of_delivery === 'Bus';
-               if (isBus) {
+               if (isStore) {
+                 title = 'New Store/Counter Order Assigned';
+                 body = `Order #${updatedOrder.order_no || updatedOrder.id} has been assigned for Store/Counter delivery.`;
+               } else if (isBus) {
                  title = 'New Bus Delivery Assigned';
                  const bDate = updatedOrder.bus_date ? (typeof updatedOrder.bus_date === 'string' ? updatedOrder.bus_date.split('T')[0] : updatedOrder.bus_date.toISOString().split('T')[0]) : '';
                  body = `Bus order #${updatedOrder.order_no || updatedOrder.id} has been assigned. Bus Date: ${bDate}, Time: ${updatedOrder.scheduled_time || ''}`;

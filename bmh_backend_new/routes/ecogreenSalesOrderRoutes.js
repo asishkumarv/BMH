@@ -200,8 +200,12 @@ router.put('/:id/assign-delivery', async (req, res) => {
           let title = 'New Sales Order Assigned';
           let body = `Sales Order #${updatedOrder.id} has been assigned to you.`;
           
+          const isStore = updatedOrder.delivery_type === 'Store' || updatedOrder.delivery_type === 'Counter';
           const isBus = updatedOrder.delivery_type === 'Bus';
-          if (isBus) {
+          if (isStore) {
+            title = 'New Store/Counter Order Assigned';
+            body = `Sales Order #${updatedOrder.order_no || updatedOrder.id} has been assigned for Store/Counter delivery.`;
+          } else if (isBus) {
             title = 'New Bus Delivery Assigned';
             const bDate = updatedOrder.bus_date ? (typeof updatedOrder.bus_date === 'string' ? updatedOrder.bus_date.split('T')[0] : updatedOrder.bus_date.toISOString().split('T')[0]) : '';
             body = `Bus order #${updatedOrder.id} has been assigned. Bus Date: ${bDate}`;

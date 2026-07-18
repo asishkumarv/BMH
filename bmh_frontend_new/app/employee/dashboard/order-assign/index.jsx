@@ -314,11 +314,11 @@ export default function OrderAssignScreen() {
       </View>
 
       {activeTab === 'Manual Orders' ? (
-        <ManualOrders deliveryBoys={deliveryBoys} onStartAssignment={openAssignModal} />
+        <ManualOrders deliveryBoys={deliveryBoys} storeDeliveryFleet={storeDeliveryFleet} onStartAssignment={openAssignModal} />
       ) : activeTab === 'Sales Orders' ? (
-        <SalesOrders deliveryBoys={deliveryBoys} onStartAssignment={openAssignModal} />
+        <SalesOrders deliveryBoys={deliveryBoys} storeDeliveryFleet={storeDeliveryFleet} onStartAssignment={openAssignModal} />
       ) : activeTab === 'Purchase Orders' ? (
-        <PurchaseOrders deliveryBoys={deliveryBoys} onStartAssignment={openAssignModal} />
+        <PurchaseOrders deliveryBoys={deliveryBoys} storeDeliveryFleet={storeDeliveryFleet} onStartAssignment={openAssignModal} />
       ) : (
       <>
         {/* Header */}
