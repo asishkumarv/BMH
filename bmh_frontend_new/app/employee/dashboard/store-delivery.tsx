@@ -19,6 +19,15 @@ export default function StoreDeliveryScreen() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [otpValue, setOtpValue] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | null>(null);
+  const [transactionId, setTransactionId] = useState('');
+
+  const openOtpModal = (order: any) => {
+    setSelectedOrder(order);
+    setOtpValue('');
+    setPaymentMethod(null);
+    setTransactionId('');
+  };
 
   // PO Received / Submission Modal
   const [selectedPO, setSelectedPO] = useState<any>(null);
@@ -61,10 +70,26 @@ export default function StoreDeliveryScreen() {
       return;
     }
 
+    const isPOD = selectedOrder.payment_mode?.toUpperCase() === 'POD';
+    if (isPOD) {
+      if (!paymentMethod) {
+        alert('Please select a payment method (Cash or Online)');
+        return;
+      }
+      if (paymentMethod === 'Online' && !transactionId.trim()) {
+        alert('Please enter transaction ID');
+        return;
+      }
+    }
+
     setVerifying(true);
     try {
       let url = '';
-      let payload = { status: 'Delivered', delivery_otp: otpValue };
+      let payload: any = { status: 'Delivered', delivery_otp: otpValue };
+      if (isPOD) {
+        payload.pod_payment_mode = paymentMethod;
+        payload.payment_txn_id = paymentMethod === 'Online' ? transactionId.trim() : null;
+      }
 
       if (selectedOrder.type === 'online_order') {
         url = `https://napi.bharatmedicalhallplus.com/online-orders/${selectedOrder.id}/status`;
@@ -80,6 +105,8 @@ export default function StoreDeliveryScreen() {
       alert('Order delivered successfully!');
       setSelectedOrder(null);
       setOtpValue('');
+      setPaymentMethod(null);
+      setTransactionId('');
       fetchOrders();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.error || err.message;
@@ -257,7 +284,7 @@ export default function StoreDeliveryScreen() {
             {activeTab === 'pending' && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: item.type === 'purchase_order' ? '#8b5cf6' : '#0ea5e9' }]}
-                onPress={() => item.type === 'purchase_order' ? openPOModal(item) : setSelectedOrder(item)}
+                onPress={() => item.type === 'purchase_order' ? openPOModal(item) : openOtpModal(item)}
               >
                 {item.type === 'purchase_order' ? (
                   <ClipboardList size={18} color="#fff" style={{ marginRight: 6 }} />
@@ -286,12 +313,69 @@ export default function StoreDeliveryScreen() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Confirm Store Delivery</Text>
-                <TouchableOpacity onPress={() => { setSelectedOrder(null); setOtpValue(''); }}>
+                <TouchableOpacity onPress={() => { setSelectedOrder(null); setOtpValue(''); setPaymentMethod(null); setTransactionId(''); }}>
                   <X size={24} color="#64748b" />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.modalBody}>
+                {selectedOrder.payment_mode?.toUpperCase() === 'POD' && (
+                  <View style={{ width: '100%', marginBottom: 20 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, textAlign: 'center' }}>
+                      POD Payment Collected:
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: paymentMethod === 'Cash' ? Colors.light.primary : '#cbd5e1',
+                          backgroundColor: paymentMethod === 'Cash' ? `${Colors.light.primary}10` : '#fff',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setPaymentMethod('Cash')}
+                      >
+                        <Text style={{ fontWeight: 'bold', color: paymentMethod === 'Cash' ? Colors.light.primary : '#64748b' }}>Cash</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: paymentMethod === 'Online' ? Colors.light.primary : '#cbd5e1',
+                          backgroundColor: paymentMethod === 'Online' ? `${Colors.light.primary}10` : '#fff',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setPaymentMethod('Online')}
+                      >
+                        <Text style={{ fontWeight: 'bold', color: paymentMethod === 'Online' ? Colors.light.primary : '#64748b' }}>Online</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {paymentMethod === 'Online' && (
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#cbd5e1',
+                          borderRadius: 10,
+                          paddingHorizontal: 12,
+                          height: 40,
+                          fontSize: 14,
+                          color: '#1e293b',
+                          marginTop: 6,
+                          outlineStyle: 'none' as any
+                        }}
+                        placeholder="Enter Transaction ID"
+                        placeholderTextColor="#94a3b8"
+                        value={transactionId}
+                        onChangeText={setTransactionId}
+                      />
+                    )}
+                  </View>
+                )}
+
                 <Text style={styles.modalDesc}>
                   Enter the 4-digit OTP generated when this order was assigned to you to confirm delivery.
                 </Text>

@@ -717,7 +717,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
     const boyIdInt = parseInt(delivery_boy_id, 10);
 
     const onlineOrdersRes = await pool.query(
-      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp 
+      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp, payment_mode 
        FROM online_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2 
@@ -726,7 +726,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
     );
 
     const ecogreenSalesOrdersRes = await pool.query(
-      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp
+      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp, payment_mode
        FROM ecogreensales_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2
@@ -735,7 +735,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
     );
 
     const ecogreenSalesInvoicesRes = await pool.query(
-      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link, delivery_otp
+      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link, delivery_otp, payment_mode
        FROM ecogreensales_invoices 
        WHERE delivered_by_id = $1 
          AND delivery_assigned_user_type = $2
@@ -753,7 +753,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
     );
 
     const purchaseOrdersRes = await pool.query(
-      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no
+      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no, 'Prepaid'::varchar as payment_mode
        FROM ecogreenpurchase_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2

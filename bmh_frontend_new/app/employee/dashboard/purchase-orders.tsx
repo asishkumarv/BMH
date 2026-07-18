@@ -585,26 +585,33 @@ export default function PurchaseOrdersScreen() {
 
         {/* Delivery Boy selection dropdown */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {item.status === 'Delivered' || item.status === 'Completed' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <User size={16} color="#94a3b8" style={{ marginRight: 4 }}/>
-              <Text style={styles.cellText} numberOfLines={1}>
-                {getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type)}
-              </Text>
-            </View>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
-              onPress={() => openAssignModal(item)}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
-                  {item.delivery_boy_id ? getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type) : 'Assign To'}
+          <View style={{ flexDirection: 'column' }}>
+            {item.status === 'Delivered' || item.status === 'Completed' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <User size={16} color="#94a3b8" style={{ marginRight: 4 }}/>
+                <Text style={styles.cellText} numberOfLines={1}>
+                  {getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type)}
                 </Text>
-                <ChevronDown size={12} color="#64748b" style={{ marginLeft: 4 }} />
               </View>
-            </TouchableOpacity>
-          )}
+            ) : (
+              <TouchableOpacity 
+                style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
+                onPress={() => openAssignModal(item)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
+                    {item.delivery_boy_id ? getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type) : 'Assign To'}
+                  </Text>
+                  <ChevronDown size={12} color="#64748b" style={{ marginLeft: 4 }} />
+                </View>
+              </TouchableOpacity>
+            )}
+            {item.submitted_to_name && (
+              <Text style={{ fontSize: 10, color: '#059669', marginTop: 2, fontWeight: 'bold' }} numberOfLines={2}>
+                Sub: {item.submitted_to_name} ({item.submitted_to_role || ''} - {item.submitted_to_dept || ''})
+              </Text>
+            )}
+          </View>
         </View>
 
         {/* Amount */}

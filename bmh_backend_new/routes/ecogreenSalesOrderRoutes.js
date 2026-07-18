@@ -431,7 +431,7 @@ router.put('/:id/update-bus-details', async (req, res) => {
 router.put('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, delivery_otp } = req.body;
+    const { status, delivery_otp, pod_payment_mode, payment_txn_id } = req.body;
     
     let targetTable = 'ecogreen_sales_orders';
     let checkRes = await pool.query('SELECT delivery_otp FROM ecogreen_sales_orders WHERE id = $1', [id]);
@@ -453,17 +453,68 @@ router.put('/:id/status', async (req, res) => {
     const result = await pool.query(
       `UPDATE ${targetTable} 
        SET status = $1,
+           pod_payment_mode = COALESCE($2, pod_payment_mode),
+           payment_txn_id = COALESCE($3, payment_txn_id),
            delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
-       WHERE id = $2 
+       WHERE id = $4 
        RETURNING *`,
-      [status, id]
+      [status, pod_payment_mode || null, payment_txn_id || null, id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    res.json({ success: true, message: 'Order status updated successfully' });
+    const updatedOrder = result.rows[0];
+    if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && updatedOrder.payment_mode === 'POD' && updatedOrder.delivery_boy_id) {
+      let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
+      if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
+        targetEmployeeId = 'SA-' + targetEmployeeId;
+      }
+      
+      const amt = parseFloat(updatedOrder.total_amount || updatedOrder.total_price || 0);
+      const isCash = pod_payment_mode === 'Cash';
+
+      await pool.query(
+        `INSERT INTO wallet_transactions (
+          employee_id, type, amount, note, status, payment_mode, payment_txn_id,
+          order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+          cash_amount, online_amount
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT DO NOTHING`, 
+        [
+          targetEmployeeId, 
+          isCash ? 'cash_collection' : 'online_collection', 
+          amt, 
+          `Sales Order ${updatedOrder.order_no || updatedOrder.id} Delivered (POD ${isCash ? 'Cash' : 'Online'})`, 
+          'completed', 
+          isCash ? 'Cash' : 'Online',
+          isCash ? null : (payment_txn_id || null),
+          updatedOrder.order_no || updatedOrder.id,
+          '',
+          updatedOrder.patient_name || '',
+          updatedOrder.patient_contact_no || '',
+          updatedOrder.delivery_type || '',
+          isCash ? amt : 0,
+          isCash ? 0 : amt
+        ]
+      );
+
+      const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
+      if (wCheck.rowCount === 0) {
+        await pool.query(
+          'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, $2, $3, 0)',
+          [targetEmployeeId, isCash ? amt : 0, isCash ? 0 : amt]
+        );
+      } else {
+        if (isCash) {
+          await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [amt, targetEmployeeId]);
+        } else {
+          await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [amt, targetEmployeeId]);
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Order status updated successfully', data: updatedOrder });
   } catch (err) {
     console.error('Error updating order status:', err);
     res.status(500).json({ success: false, error: 'Server error' });
