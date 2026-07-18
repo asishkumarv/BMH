@@ -633,3 +633,176 @@ exports.updatePushToken = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+exports.getStoreDeliveryFleet = async (req, res) => {
+  try {
+    const settingsRes = await pool.query("SELECT value FROM settings WHERE key = 'store_delivery_access'");
+    let access = {};
+    if (settingsRes.rowCount > 0) {
+      let val = settingsRes.rows[0].value;
+      if (typeof val === 'string') {
+        try { access = JSON.parse(val); } catch(e){}
+      } else {
+        access = val || {};
+      }
+    }
+
+    const empResult = await pool.query(
+      "SELECT id, full_name, email, mobile as phone, role, department, 'employee' as type FROM employees WHERE status = 'approved'"
+    );
+
+    const adminResult = await pool.query(
+      `SELECT da.id, da.full_name, da.email, da.mobile as phone, 'Sub Admin' as role, d.name as department, 'sub_admin' as type
+       FROM department_admins da
+       LEFT JOIN departments d ON da.department_id = d.id
+       WHERE da.status = 'approved'`
+    );
+
+    const fleet = [];
+
+    empResult.rows.forEach(emp => {
+      const stringId = emp.id.toString();
+      if (access[stringId] === true) {
+        fleet.push({
+          id: stringId,
+          full_name: emp.full_name,
+          phone: emp.phone,
+          role: emp.role,
+          department: emp.department,
+          type: 'employee'
+        });
+      }
+    });
+
+    adminResult.rows.forEach(sa => {
+      const saStringId = `SA-${sa.id}`;
+      if (access[saStringId] === true) {
+        fleet.push({
+          id: saStringId,
+          full_name: sa.full_name,
+          phone: sa.phone,
+          role: sa.role,
+          department: sa.department,
+          type: 'sub_admin'
+        });
+      }
+    });
+
+    res.json({ success: true, data: fleet });
+  } catch (error) {
+    console.error('Error fetching store delivery fleet:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getStoreDeliveryAssignedOrders = async (req, res) => {
+  try {
+    let { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required' });
+    }
+
+    let delivery_boy_id = userId;
+    let delivery_assigned_user_type = 'employee';
+
+    if (typeof userId === 'string' && userId.startsWith('SA-')) {
+      delivery_boy_id = userId.replace('SA-', '');
+      delivery_assigned_user_type = 'sub_admin';
+    }
+
+    const boyIdInt = parseInt(delivery_boy_id, 10);
+
+    const onlineOrdersRes = await pool.query(
+      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp 
+       FROM online_orders 
+       WHERE delivery_boy_id = $1 
+         AND delivery_assigned_user_type = $2 
+         AND delivery_type = 'Store'
+       ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
+    );
+
+    const ecogreenSalesOrdersRes = await pool.query(
+      `SELECT id, 'sales_order' as type, status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_id as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, delivery_otp
+       FROM ecogreensales_orders 
+       WHERE delivery_boy_id = $1 
+         AND delivery_assigned_user_type = $2
+         AND delivery_type = 'Store'
+       ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
+    );
+
+    const ecogreenSalesInvoicesRes = await pool.query(
+      `SELECT id, 'sales_invoice' as type, status, order_total as total_amount, patient_name, mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, ref_no as invoice_no, NULL::varchar as location_link, delivery_otp
+       FROM ecogreensales_invoices 
+       WHERE delivered_by_id = $1 
+         AND delivery_assigned_user_type = $2
+         AND delivery_type = 'Store'
+       ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
+    );
+
+    const manualOrdersRes = await pool.query(
+      `SELECT id, 'manual_order' as type, status, amount as total_amount, COALESCE(ship_to_name, customer_name) as patient_name, COALESCE(ship_to_phone, customer_phone) as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, location_link, created_at, mode_of_delivery as delivery_type, json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', est_reach_time::text) as bus_details, delivery_otp, payment_mode, order_no, invoice_no
+       FROM manual_orders 
+       WHERE delivery_boy_id = $1 
+         AND delivery_assigned_user_type = $2
+         AND mode_of_delivery = 'Store'
+       ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
+    );
+
+    const purchaseOrdersRes = await pool.query(
+      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no
+       FROM ecogreenpurchase_orders 
+       WHERE delivery_boy_id = $1 
+         AND delivery_assigned_user_type = $2
+         AND delivery_type = 'Store'
+       ORDER BY created_at DESC`, [boyIdInt, delivery_assigned_user_type]
+    );
+
+    const parseLocation = (row) => {
+      let address = row.address;
+      let map_lat = row.map_lat;
+      let map_lng = row.map_lng;
+      let location_link = row.location_link;
+
+      if (address) {
+        if (typeof address === 'object') {
+          map_lat = address.latitude || address.lat || map_lat;
+          map_lng = address.longitude || address.lng || map_lng;
+          location_link = address.location_link || address.url || location_link;
+          address = address.address || address.locality || JSON.stringify(address);
+        } else {
+          try {
+            const parsed = JSON.parse(address);
+            if (parsed && typeof parsed === 'object') {
+              map_lat = parsed.latitude || parsed.lat || map_lat;
+              map_lng = parsed.longitude || parsed.lng || map_lng;
+              location_link = parsed.location_link || parsed.url || location_link;
+              address = parsed.address || parsed.locality || address;
+            }
+          } catch (e) {}
+        }
+      }
+      return {
+        ...row,
+        address,
+        map_lat,
+        map_lng,
+        location_link
+      };
+    };
+
+    const orders = [
+      ...onlineOrdersRes.rows.map(parseLocation),
+      ...ecogreenSalesOrdersRes.rows.map(parseLocation),
+      ...ecogreenSalesInvoicesRes.rows.map(parseLocation),
+      ...manualOrdersRes.rows.map(parseLocation),
+      ...purchaseOrdersRes.rows.map(parseLocation)
+    ];
+
+    orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ success: true, data: orders });
+  } catch (err) {
+    console.error('Error fetching store delivery orders:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

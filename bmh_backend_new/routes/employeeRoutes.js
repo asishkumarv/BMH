@@ -33,6 +33,12 @@ router.post('/purchase-orders/bulk-save', employeeController.bulkSavePurchaseOrd
 // GET /employees/delivery-fleet
 router.get('/delivery-fleet', employeeController.getDeliveryFleet);
 
+// GET /employees/store-delivery-fleet
+router.get('/store-delivery-fleet', employeeController.getStoreDeliveryFleet);
+
+// GET /employees/store-delivery/assigned
+router.get('/store-delivery/assigned', employeeController.getStoreDeliveryAssignedOrders);
+
 // PUT /employees/:id/location
 router.put('/:id/location', employeeController.updateEmployeeLocation);
 

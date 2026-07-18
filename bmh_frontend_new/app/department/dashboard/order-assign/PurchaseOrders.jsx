@@ -361,21 +361,24 @@ export default function PurchaseOrders({ deliveryBoys, onStartAssignment }) {
   };
 
   const openAssignModal = (order) => {
-    if (onStartAssignment) onStartAssignment(order);
-    setAssignOrder(order);
-    setDeliveryType(order.delivery_type || 'Store');
-    setSelectedRiderId(order.delivery_boy_id?.toString() || '');
-    setAddress(order.address || '');
-    setGpsLocation(order.gps_location || '');
-    
-    let parsedBus = { bus_travels_name: '', bus_driver_name: '', bus_driver_number: '', bus_number: '', bus_date: '', scheduled_time: '' };
-    if (order.bus_details) {
-      try {
-        parsedBus = typeof order.bus_details === 'string' ? JSON.parse(order.bus_details) : order.bus_details;
-      } catch (e) {}
+    if (onStartAssignment) {
+      onStartAssignment({ ...order, type: 'purchase_order' });
+    } else {
+      setAssignOrder(order);
+      setDeliveryType(order.delivery_type || 'Store');
+      setSelectedRiderId(order.delivery_boy_id?.toString() || '');
+      setAddress(order.address || '');
+      setGpsLocation(order.gps_location || '');
+      
+      let parsedBus = { bus_travels_name: '', bus_driver_name: '', bus_driver_number: '', bus_number: '', bus_date: '', scheduled_time: '' };
+      if (order.bus_details) {
+        try {
+          parsedBus = typeof order.bus_details === 'string' ? JSON.parse(order.bus_details) : order.bus_details;
+        } catch (e) {}
+      }
+      setBusDetails(parsedBus);
+      setAssignModalVisible(true);
     }
-    setBusDetails(parsedBus);
-    setAssignModalVisible(true);
   };
 
   // Filtering purchase orders

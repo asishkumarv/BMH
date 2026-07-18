@@ -2,7 +2,12 @@ const pool = require('../db');
 
 exports.getAdmins = async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM department_admins ORDER BY created_at DESC');
+    const result = await pool.query(`
+      SELECT da.*, d.name AS department 
+      FROM department_admins da
+      LEFT JOIN departments d ON da.department_id = d.id
+      ORDER BY da.created_at DESC
+    `);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching admins:', error);

@@ -164,6 +164,7 @@ export default function AdminAttendanceScreen() {
   const [summaryModalData, setSummaryModalData] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [attStats, setAttStats] = useState<any>(null);
   
   // Config state
   const [deptName, setDeptName] = useState('');
@@ -314,14 +315,21 @@ export default function AdminAttendanceScreen() {
   const fetchData = async (userTypeStr = selectedUserType) => {
     try {
       setLoading(true);
-      const sumRes = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/summary?userType=${userTypeStr}`);
+      const [sumRes, attStatsRes, deptRes] = await Promise.all([
+        axios.get(`https://napi.bharatmedicalhallplus.com/attendance/summary?userType=${userTypeStr}`),
+        axios.get('https://napi.bharatmedicalhallplus.com/attendance/dashboard-stats'),
+        axios.get('https://napi.bharatmedicalhallplus.com/department')
+      ]);
+
       if (sumRes.data.success) {
         setSummary(sumRes.data.summary);
+      }
+      if (attStatsRes.data.success) {
+        setAttStats(attStatsRes.data.stats);
       }
 
       await fetchReports(selectedReportDept, userTypeStr);
 
-      const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
       if (deptRes.data.success) {
         setDepartments([{ id: 'all_depts', name: 'All Departments' }, ...deptRes.data.data]);
       }
@@ -516,32 +524,44 @@ export default function AdminAttendanceScreen() {
       </View>
       
       {/* Summary Cards */}
-      <View style={[styles.summaryGrid, {flexWrap: 'wrap'}]}>
-        <TouchableOpacity style={[styles.card, {backgroundColor: '#E3F2FD', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Total Employees', summary?.total_employees_list || [])}>
-          <Text style={styles.cardValue}>{summary?.total_employees || 0}</Text>
-          <Text style={styles.cardLabel}>Total Employees</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.card, {backgroundColor: '#E8F5E9', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Present Today', summary?.present_list || [])}>
-          <Text style={styles.cardValue}>{summary?.total_present || 0}</Text>
-          <Text style={styles.cardLabel}>Present Today</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFEBEE', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Absent Today', summary?.absent_list || [])}>
-          <Text style={styles.cardValue}>{summary?.total_absent || 0}</Text>
-          <Text style={styles.cardLabel}>Absent Today</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFF3E0', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Currently on Break', summary?.break_list || [])}>
-          <Text style={styles.cardValue}>{summary?.employees_on_break || 0}</Text>
-          <Text style={styles.cardLabel}>Currently on Break</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFF9C4', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Late Check-ins', summary?.late_checkins_list || [])}>
-          <Text style={styles.cardValue}>{summary?.late_checkins_count || 0}</Text>
-          <Text style={styles.cardLabel}>Late Check-ins</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.card, {backgroundColor: '#FFCDD2', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Early Check-outs', summary?.early_checkouts_list || [])}>
-          <Text style={styles.cardValue}>{summary?.early_checkouts_count || 0}</Text>
-          <Text style={styles.cardLabel}>Early Check-outs</Text>
-        </TouchableOpacity>
-      </View>
+      {(() => {
+        const listType = selectedUserType === 'employee' ? 'employees' : 'sub_admins';
+        const totalCheckinList = attStats?.total_checkin?.[listType] || [];
+        const onLeaveList = attStats?.on_leave?.[listType] || [];
+        const yetToCheckinList = attStats?.yet_to_check_in?.[listType] || [];
+        const absentList = attStats?.absent?.[listType] || [];
+        const lateCheckinList = attStats?.late_checkin?.[listType] || [];
+        const earlyCheckinList = attStats?.early_checkin?.[listType] || [];
+
+        return (
+          <View style={[styles.summaryGrid, {flexWrap: 'wrap'}]}>
+            <TouchableOpacity style={[styles.card, {backgroundColor: '#E8F5E9', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Total Check-in Today', totalCheckinList)}>
+              <Text style={styles.cardValue}>{totalCheckinList.length}</Text>
+              <Text style={styles.cardLabel}>Total Check-in Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.card, {backgroundColor: '#E3F2FD', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('On Leave Today', onLeaveList)}>
+              <Text style={styles.cardValue}>{onLeaveList.length}</Text>
+              <Text style={styles.cardLabel}>On Leave Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.card, {backgroundColor: '#FFF3E0', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Yet to Check-in', yetToCheckinList)}>
+              <Text style={styles.cardValue}>{yetToCheckinList.length}</Text>
+              <Text style={styles.cardLabel}>Yet to Check-in</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.card, {backgroundColor: '#FFEBEE', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Absent Today', absentList)}>
+              <Text style={styles.cardValue}>{absentList.length}</Text>
+              <Text style={styles.cardLabel}>Absent Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.card, {backgroundColor: '#FFF9C4', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Late Check-ins', lateCheckinList)}>
+              <Text style={styles.cardValue}>{lateCheckinList.length}</Text>
+              <Text style={styles.cardLabel}>Late Check-ins</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.card, {backgroundColor: '#E8F8F5', minWidth: '30%', marginBottom: 15}]} onPress={() => handleSummaryClick('Early Check-ins', earlyCheckinList)}>
+              <Text style={styles.cardValue}>{earlyCheckinList.length}</Text>
+              <Text style={styles.cardLabel}>Early Check-ins</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })()}
 
       {/* Config Section */}
       {showConfig && (
@@ -898,36 +918,76 @@ export default function AdminAttendanceScreen() {
                 </TouchableOpacity>
               </View>
               <ScrollView>
-                <View style={[styles.tableRowHeader, {backgroundColor: '#f3f4f6'}]}>
-                  <Text style={[styles.tableCellHeader, {flex: 2}]}>NAME</Text>
-                  <Text style={[styles.tableCellHeader, {flex: 2}]}>DEPARTMENT</Text>
-                  {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Present Today') && <Text style={[styles.tableCellHeader, {flex: 2}]}>CHECK IN</Text>}
-                  {(summaryModalType === 'Early Check-outs' || summaryModalType === 'Present Today') && <Text style={[styles.tableCellHeader, {flex: 2}]}>CHECK OUT</Text>}
-                  {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Early Check-outs') && <Text style={[styles.tableCellHeader, {flex: 2}]}>DEVIATION</Text>}
-                </View>
-                {summaryModalData.map((emp: any, i: number) => (
-                  <View key={i} style={[styles.tableRow, {paddingVertical: 12}]}>
-                    <View style={{flex: 2, flexDirection: 'row', alignItems: 'center', paddingLeft: 16}}>
-                      <View style={[styles.thumbPlaceholder, {marginRight: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: '#d1d5db', justifyContent: 'center', alignItems: 'center'}]}>
-                        <Text style={{color: 'white', fontWeight: 'bold'}}>{(emp.name || '?').charAt(0).toUpperCase()}</Text>
-                      </View>
-                      <View>
-                        <Text style={{fontWeight: '600', color: '#111827'}}>{emp.name}</Text>
-                        <Text style={{fontSize: 12, color: '#6b7280'}}>{emp.mobile}</Text>
-                      </View>
+                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                  <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, overflow: 'hidden', minWidth: 800 }}>
+                    <View style={[styles.tableRowHeader, {backgroundColor: '#f3f4f6'}]}>
+                      <Text style={[styles.tableCellHeader, {width: 220}]}>Name / Contact</Text>
+                      <Text style={[styles.tableCellHeader, {width: 140}]}>Department</Text>
+                      <Text style={[styles.tableCellHeader, {width: 130}]}>Shift</Text>
+                      <Text style={[styles.tableCellHeader, {width: 100}]}>Check In</Text>
+                      <Text style={[styles.tableCellHeader, {width: 100}]}>Check Out</Text>
+                      <Text style={[styles.tableCellHeader, {width: 110}]}>Status/Deviation</Text>
                     </View>
-                    <Text style={{flex: 2, color: '#374151', padding: 16}}>{emp.department || '-'}</Text>
-                    {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Present Today') && (
-                      <Text style={{flex: 2, color: '#374151', padding: 16}}>{emp.check_in ? new Date(emp.check_in).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '-'}</Text>
-                    )}
-                    {(summaryModalType === 'Early Check-outs' || summaryModalType === 'Present Today') && (
-                      <Text style={{flex: 2, color: '#374151', padding: 16}}>{emp.check_out ? new Date(emp.check_out).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '-'}</Text>
-                    )}
-                    {(summaryModalType === 'Late Check-ins' || summaryModalType === 'Early Check-outs') && (
-                      <Text style={{flex: 2, color: '#ef4444', fontWeight: '500', padding: 16}}>{emp.deviation}</Text>
-                    )}
+                    {summaryModalData.map((emp: any, i: number) => {
+                      const formatModalTime = (isoStr: string | null) => {
+                        if (!isoStr) return '-';
+                        const d = new Date(isoStr);
+                        if (isNaN(d.getTime())) return '-';
+                        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      };
+                      return (
+                        <View key={i} style={[styles.tableRow, {paddingVertical: 8}]}>
+                          <View style={[styles.tableCellView, {width: 220, flexDirection: 'row', alignItems: 'center'}]}>
+                            {emp.image ? (
+                              <Image source={{uri: emp.image}} style={[styles.thumb, {marginRight: 10}]} />
+                            ) : (
+                              <View style={[styles.thumbPlaceholder, {marginRight: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: '#d1d5db', justifyContent: 'center', alignItems: 'center'}]}>
+                                <Text style={{color: 'white', fontWeight: 'bold'}}>{(emp.name || '?').charAt(0).toUpperCase()}</Text>
+                              </View>
+                            )}
+                            <View>
+                              <Text style={{fontWeight: '700', color: Colors.light.text, fontSize: 14}}>{emp.name}</Text>
+                              <Text style={{fontSize: 12, color: '#64748b', marginTop: 2}}>{emp.mobile}</Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.tableCell, {width: 140}]}>{emp.department || '-'}</Text>
+                          <Text style={[styles.tableCell, {width: 130}]}>{emp.shift || '-'}</Text>
+                          <Text style={[styles.tableCell, {width: 100}]}>{formatModalTime(emp.check_in)}</Text>
+                          <Text style={[styles.tableCell, {width: 100}]}>{formatModalTime(emp.check_out)}</Text>
+                          <View style={[styles.tableCellView, {width: 110}]}>
+                            {emp.deviation ? (
+                              <Text style={{ 
+                                fontSize: 12, 
+                                fontWeight: '700', 
+                                color: emp.deviation.includes('Late') ? '#D97706' : '#059669',
+                                backgroundColor: emp.deviation.includes('Late') ? '#FFF3E0' : '#E8F5E9',
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                alignSelf: 'flex-start'
+                              }}>
+                                {emp.deviation}
+                              </Text>
+                            ) : (
+                              <Text style={{ 
+                                fontSize: 12, 
+                                fontWeight: '700', 
+                                color: emp.status === 'Absent' ? '#EF4444' : (emp.status === 'On Leave' ? '#3B82F6' : '#10B981'),
+                                backgroundColor: emp.status === 'Absent' ? '#FFEBEE' : (emp.status === 'On Leave' ? '#E3F2FD' : '#E8F5E9'),
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                alignSelf: 'flex-start'
+                              }}>
+                                {emp.status || 'On Time'}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
                   </View>
-                ))}
+                </ScrollView>
                 {summaryModalData.length === 0 && (
                   <Text style={{textAlign: 'center', padding: 20, color: '#6b7280'}}>No records found.</Text>
                 )}

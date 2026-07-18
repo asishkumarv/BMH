@@ -132,25 +132,38 @@ exports.getOrdersByPatient = async (req, res) => {
 exports.assignDelivery = async (req, res) => {
     try {
         const { id } = req.params;
-        const { delivery_boy_id, assigned_by } = req.body;
+        const { delivery_boy_id, delivery_type = 'Local', delivery_assigned_user_type = 'employee', assigned_by } = req.body;
         
         // Generate 4-digit OTP
         const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
         
+        let boyId = delivery_boy_id;
+        let userType = delivery_assigned_user_type;
+        if (typeof boyId === 'string' && boyId.startsWith('SA-')) {
+          boyId = boyId.replace('SA-', '');
+          userType = 'sub_admin';
+        }
+        const boyIdInt = boyId ? parseInt(boyId, 10) : null;
+
         const queryText = `
             UPDATE online_orders 
             SET delivery_boy_id = $1, 
                 delivery_otp = $2, 
-                assigned_by = COALESCE($3::integer, assigned_by),
+                delivery_type = $3,
+                delivery_assigned_user_type = $4,
+                assigned_by = COALESCE($5::integer, assigned_by),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $4
+            WHERE id = $6
             RETURNING *;
         `;
-        const { rows } = await pool.query(queryText, [delivery_boy_id, delivery_otp, assigned_by || null, id]);
+        const { rows } = await pool.query(queryText, [boyIdInt, delivery_otp, delivery_type, userType, assigned_by || null, id]);
         if (rows.length === 0) return res.status(404).json({ success: false, message: 'Order not found' });
         
         try {
-            const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+            const tokenQuery = userType === 'sub_admin' 
+              ? 'SELECT push_token FROM department_admins WHERE id = $1' 
+              : 'SELECT push_token FROM employees WHERE id = $1';
+            const empRes = await pool.query(tokenQuery, [boyIdInt]);
             if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
                 const { sendExpoPushNotification } = require('../utils/pushNotification');
                 const ord = rows[0];

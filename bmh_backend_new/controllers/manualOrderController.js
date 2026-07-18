@@ -358,7 +358,8 @@ exports.updateOrder = async (req, res) => {
       scheduled_time, scheduled_date,
       customer_name, customer_phone, amount, order_no, location_link, mode_of_delivery,
       modified_by_id, modified_by_type, modified_by_name,
-      invoice_no, ship_to_name, ship_to_phone
+      invoice_no, ship_to_name, ship_to_phone,
+      delivery_assigned_user_type // Accept this
     } = req.body;
     
     const payment_attachment = req.files && req.files.payment_attachment ? `/uploads/orders/${req.files.payment_attachment[0].filename}` : null;
@@ -375,8 +376,19 @@ exports.updateOrder = async (req, res) => {
       }
     };
 
+    let boyId = delivery_boy_id;
+    let userType = delivery_assigned_user_type || 'employee';
+    if (typeof boyId === 'string' && boyId.startsWith('SA-')) {
+      boyId = boyId.replace('SA-', '');
+      userType = 'sub_admin';
+    }
+    const boyIdInt = boyId ? parseInt(boyId, 10) : null;
+
     addField('status', status);
-    addField('delivery_boy_id', delivery_boy_id);
+    if (delivery_boy_id !== undefined) {
+      addField('delivery_boy_id', boyIdInt);
+      addField('delivery_assigned_user_type', userType);
+    }
     addField('payment_mode', payment_mode);
     addField('paid_amount', paid_amount);
     addField('payment_txn_id', payment_txn_id);
@@ -413,13 +425,23 @@ exports.updateOrder = async (req, res) => {
     if (payment_attachment) addField('payment_attachment', payment_attachment);
     if (bus_front_image) addField('bus_front_image', bus_front_image);
 
-    // Get current order to validate OTP if status is being changed to Delivered for a Local order
+    // Get current order to validate OTP if status is being changed to Delivered
     const currentOrder = await pool.query('SELECT * FROM manual_orders WHERE id = $1', [id]);
     if (currentOrder.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    if (status === 'Delivered' && (currentOrder.rows[0].mode_of_delivery === 'Local' || currentOrder.rows[0].mode_of_delivery === 'Schedule Delivery')) {
+    // Auto-generate delivery_otp if a boy is assigned and it has none
+    if (delivery_boy_id && currentOrder.rows[0].delivery_boy_id != boyIdInt) {
+      const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      addField('delivery_otp', generatedOtp);
+    }
+
+    if (status === 'Delivered' && (
+      currentOrder.rows[0].mode_of_delivery === 'Local' || 
+      currentOrder.rows[0].mode_of_delivery === 'Schedule Delivery' ||
+      currentOrder.rows[0].mode_of_delivery === 'Store'
+    )) {
       if (currentOrder.rows[0].delivery_otp && currentOrder.rows[0].delivery_otp !== delivery_otp) {
         return res.status(400).json({ success: false, message: 'Invalid OTP' });
       }
@@ -462,9 +484,12 @@ exports.updateOrder = async (req, res) => {
     
     const updatedOrder = result.rows[0];
     
-    if (delivery_boy_id && currentOrder.rows[0].delivery_boy_id != delivery_boy_id) {
+    if (boyIdInt && currentOrder.rows[0].delivery_boy_id != boyIdInt) {
         try {
-            const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+            const tokenQuery = userType === 'sub_admin' 
+              ? 'SELECT push_token FROM department_admins WHERE id = $1' 
+              : 'SELECT push_token FROM employees WHERE id = $1';
+            const empRes = await pool.query(tokenQuery, [boyIdInt]);
             if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
                const { sendExpoPushNotification } = require('../utils/pushNotification');
                

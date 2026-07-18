@@ -268,6 +268,25 @@ app.listen(PORT, () => {
       .catch(err => console.error(`Error adding column ${col} to wallet_transactions:`, err.message));
   });
 
+  // Add Store Delivery & Store Pickup columns to tables
+  const storeDeliveryCols = [
+    { table: 'online_orders', col: 'delivery_type VARCHAR(50) DEFAULT \'Local\'' },
+    { table: 'online_orders', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' },
+    { table: 'ecogreensales_orders', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' },
+    { table: 'ecogreen_sales_orders', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' },
+    { table: 'ecogreensales_invoices', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' },
+    { table: 'ecogreen_sales_invoices', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' },
+    { table: 'ecogreensales_invoices', col: 'delivery_otp VARCHAR(20)' },
+    { table: 'ecogreen_sales_invoices', col: 'delivery_otp VARCHAR(20)' },
+    { table: 'ecogreenpurchase_orders', col: 'delivery_otp VARCHAR(20)' },
+    { table: 'ecogreenpurchase_orders', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' },
+    { table: 'manual_orders', col: 'delivery_assigned_user_type VARCHAR(50) DEFAULT \'employee\'' }
+  ];
+  storeDeliveryCols.forEach(item => {
+    pool.query(`ALTER TABLE ${item.table} ADD COLUMN IF NOT EXISTS ${item.col}`)
+      .catch(err => console.error(`Error adding column ${item.col} to ${item.table}:`, err.message));
+  });
+
   // Add order/customer metadata columns to cash_handovers
   const handoverCols = [
     'order_no VARCHAR(100)',

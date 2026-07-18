@@ -11,6 +11,7 @@ export default function AdminSettings() {
   const [orderAssignAccess, setOrderAssignAccess] = useState<Record<string, boolean>>({});
   const [peonAssignmentAccess, setPeonAssignmentAccess] = useState<Record<string, boolean>>({});
   const [crmAccess, setCrmAccess] = useState<Record<string, boolean>>({});
+  const [storeDeliveryAccess, setStoreDeliveryAccess] = useState<Record<string, boolean>>({});
   
   const [doubleTickApiKey, setDoubleTickApiKey] = useState('');
   const [doubleTickWaba, setDoubleTickWaba] = useState('');
@@ -41,7 +42,7 @@ export default function AdminSettings() {
       
       const combinedUsers = [
         ...(Array.isArray(emps) ? emps : []),
-        ...(Array.isArray(subAdmins) ? subAdmins.map(sa => ({ ...sa, role: 'Sub Admin' })) : [])
+        ...(Array.isArray(subAdmins) ? subAdmins.map(sa => ({ ...sa, id: `SA-${sa.id}`, role: 'Sub Admin' })) : [])
       ];
       setEmployees(combinedUsers);
 
@@ -61,6 +62,7 @@ export default function AdminSettings() {
       setOrderAssignAccess(parseSetting('order_assign_access'));
       setPeonAssignmentAccess(parseSetting('peon_assignment_access'));
       setCrmAccess(parseSetting('crm_access'));
+      setStoreDeliveryAccess(parseSetting('store_delivery_access'));
       
       const configVal = parseSetting('doubletick_config');
       setDoubleTickApiKey(configVal.apiKey || '');
@@ -202,6 +204,7 @@ export default function AdminSettings() {
         {renderCard('Purchase Order Access', 'Control which employees have access to view and assign EcoGreen Purchase Orders.', 'Purchase Order Access')}
         {renderCard('Order Assign Access', 'Control which employees have access to view and assign deliveries for all orders on the Order Assign page.', 'Order Assign Access')}
         {renderCard('Granular CRM & Bulk Messaging Access', 'Control which Employees and Sub-Admins can access the WhatsApp CRM and send customer notifications.', 'CRM Access')}
+        {renderCard('Store Delivery Access', 'Control which Employees and Sub-Admins can pick up and deliver store orders on the Store Delivery page.', 'Store Delivery Access')}
 
         {/* DoubleTick Configuration Section */}
         <View style={styles.card}>
@@ -255,6 +258,7 @@ export default function AdminSettings() {
       {renderAccessList('Purchase Order Access', 'purchase_order_access', purchaseOrderAccess, setPurchaseOrderAccess)}
       {renderAccessList('Order Assign Access', 'order_assign_access', orderAssignAccess, setOrderAssignAccess)}
       {renderAccessList('CRM Access', 'crm_access', crmAccess, setCrmAccess)}
+      {renderAccessList('Store Delivery Access', 'store_delivery_access', storeDeliveryAccess, setStoreDeliveryAccess)}
     </View>
   );
 }

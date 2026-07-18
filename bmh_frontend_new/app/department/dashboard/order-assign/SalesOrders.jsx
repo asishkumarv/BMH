@@ -456,10 +456,13 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
             <TouchableOpacity 
               style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#f8fafc' }]}
               onPress={() => {
-                if (onStartAssignment) onStartAssignment(item);
-                setAssignOrder(item);
-                setAssignSearchQuery('');
-                setAssignModalVisible(true);
+                if (onStartAssignment) {
+                  onStartAssignment({ ...item, type: 'sales_order' });
+                } else {
+                  setAssignOrder(item);
+                  setAssignSearchQuery('');
+                  setAssignModalVisible(true);
+                }
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

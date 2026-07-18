@@ -36,8 +36,19 @@ router.get('/delivery/:boyId', async (req, res) => {
 // Assign delivery
 router.post('/assign/:id', async (req, res) => {
     try {
-        const { delivery_type, delivery_boy_id, bus_details, gps_location, address, assigned_by } = req.body;
+        const { delivery_type, delivery_boy_id, bus_details, gps_location, address, delivery_assigned_user_type = 'employee', assigned_by } = req.body;
         const id = req.params.id;
+
+        // Generate 4-digit OTP
+        const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+        let boyId = delivery_boy_id;
+        let userType = delivery_assigned_user_type;
+        if (typeof boyId === 'string' && boyId.startsWith('SA-')) {
+          boyId = boyId.replace('SA-', '');
+          userType = 'sub_admin';
+        }
+        const boyIdInt = boyId ? parseInt(boyId, 10) : null;
 
         const query = `
             UPDATE ecogreenpurchase_orders 
@@ -48,17 +59,21 @@ router.post('/assign/:id', async (req, res) => {
                 bus_details = $3,
                 gps_location = $4,
                 address = $5,
-                assigned_by = COALESCE($6::integer, assigned_by)
-            WHERE id = $7
+                delivery_otp = $6,
+                delivery_assigned_user_type = $7,
+                assigned_by = COALESCE($8::integer, assigned_by)
+            WHERE id = $9
             RETURNING *
         `;
         
         const values = [
             delivery_type,
-            delivery_boy_id || null,
+            boyIdInt,
             bus_details ? JSON.stringify(bus_details) : null,
             gps_location || null,
             address || null,
+            delivery_otp,
+            userType,
             assigned_by || null,
             id
         ];
@@ -70,9 +85,12 @@ router.post('/assign/:id', async (req, res) => {
         }
 
         const updatedPO = result.rows[0];
-        if (delivery_boy_id) {
+        if (boyIdInt) {
             try {
-                const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+                const tokenQuery = userType === 'sub_admin'
+                  ? 'SELECT push_token FROM department_admins WHERE id = $1'
+                  : 'SELECT push_token FROM employees WHERE id = $1';
+                const empRes = await pool.query(tokenQuery, [boyIdInt]);
                 if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
                     const { sendExpoPushNotification } = require('../utils/pushNotification');
                     let title = 'New Purchase Order Assigned';

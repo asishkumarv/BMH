@@ -213,15 +213,44 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PUT /:id/assign-delivery
 router.put('/:id/assign-delivery', async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_boy_id, delivery_type, bus_details } = req.body;
+    const { delivery_boy_id, delivery_type, bus_details, delivery_assigned_user_type = 'employee' } = req.body;
     
+    // Generate 4-digit OTP
+    const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
+    
+    let boyId = delivery_boy_id;
+    let userType = delivery_assigned_user_type;
+    if (typeof boyId === 'string' && boyId.startsWith('SA-')) {
+      boyId = boyId.replace('SA-', '');
+      userType = 'sub_admin';
+    }
+    const boyIdInt = boyId ? parseInt(boyId, 10) : null;
+
     const result = await pool.query(
-      'UPDATE ecogreen_sales_invoices SET delivery_boy_id = $1, delivery_type = $2, bus_details = $3 WHERE id = $4 RETURNING *',
-      [delivery_boy_id, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, id]
+      `UPDATE ecogreen_sales_invoices 
+       SET delivery_boy_id = $1, 
+           delivery_type = $2, 
+           bus_details = $3,
+           delivery_otp = $4,
+           delivery_assigned_user_type = $5
+       WHERE id = $6 
+       RETURNING *`,
+      [boyIdInt, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, userType, id]
+    );
+
+    // Also update ecogreensales_invoices keeping in sync (column is delivered_by_id)
+    await pool.query(
+      `UPDATE ecogreensales_invoices 
+       SET delivered_by_id = $1, 
+           delivery_type = $2, 
+           bus_details = $3,
+           delivery_otp = $4,
+           delivery_assigned_user_type = $5
+       WHERE id = $6`,
+      [boyIdInt, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, userType, id]
     );
 
     if (result.rows.length === 0) {
@@ -229,9 +258,12 @@ router.put('/:id/assign-delivery', async (req, res) => {
     }
 
     const updatedInvoice = result.rows[0];
-    if (delivery_boy_id) {
+    if (boyIdInt) {
       try {
-        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+        const tokenQuery = userType === 'sub_admin'
+          ? 'SELECT push_token FROM department_admins WHERE id = $1'
+          : 'SELECT push_token FROM employees WHERE id = $1';
+        const empRes = await pool.query(tokenQuery, [boyIdInt]);
         if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
           const { sendExpoPushNotification } = require('../utils/pushNotification');
           let title = 'New Sales Invoice Assigned';
@@ -276,6 +308,48 @@ router.put('/:id/update-bus-details', async (req, res) => {
     res.json({ success: true, message: 'Bus details updated successfully' });
   } catch (err) {
     console.error('Error updating bus details:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// PUT /:id/status
+router.put('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, delivery_otp } = req.body;
+    
+    const checkRes = await pool.query('SELECT delivery_otp FROM ecogreen_sales_invoices WHERE id = $1', [id]);
+    if (checkRes.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+    
+    if (status === 'DELIVERED' || status === 'Delivered') {
+      if (checkRes.rows[0].delivery_otp && checkRes.rows[0].delivery_otp !== delivery_otp) {
+        return res.status(400).json({ success: false, message: 'Invalid OTP' });
+      }
+    }
+    
+    const result = await pool.query(
+      `UPDATE ecogreen_sales_invoices 
+       SET status = $1,
+           delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
+       WHERE id = $2 
+       RETURNING *`,
+      [status, id]
+    );
+
+    // Also update ecogreensales_invoices keeping in sync
+    await pool.query(
+      `UPDATE ecogreensales_invoices 
+       SET status = $1,
+           delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
+       WHERE id = $2`,
+      [status, id]
+    );
+
+    res.json({ success: true, message: 'Invoice status updated successfully', data: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating sales invoice status:', err);
     res.status(500).json({ success: false, error: 'Server error' });
   }
 });

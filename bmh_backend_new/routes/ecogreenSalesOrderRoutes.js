@@ -145,21 +145,43 @@ router.get('/', async (req, res) => {
 router.put('/:id/assign-delivery', async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_boy_id, delivery_type, bus_details, assigned_by } = req.body;
+    const { delivery_boy_id, delivery_type, bus_details, delivery_assigned_user_type = 'employee', assigned_by } = req.body;
     
     // Generate 4-digit OTP
     const delivery_otp = Math.floor(1000 + Math.random() * 9000).toString();
     
+    let boyId = delivery_boy_id;
+    let userType = delivery_assigned_user_type;
+    if (typeof boyId === 'string' && boyId.startsWith('SA-')) {
+      boyId = boyId.replace('SA-', '');
+      userType = 'sub_admin';
+    }
+    const boyIdInt = boyId ? parseInt(boyId, 10) : null;
+
     const result = await pool.query(
       `UPDATE ecogreen_sales_orders 
        SET delivery_boy_id = $1, 
            delivery_type = $2, 
            bus_details = $3, 
            delivery_otp = $4,
-           assigned_by = COALESCE($5::integer, assigned_by)
-       WHERE id = $6 
+           delivery_assigned_user_type = $5,
+           assigned_by = COALESCE($6::integer, assigned_by)
+       WHERE id = $7 
        RETURNING *`,
-      [delivery_boy_id, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, assigned_by || null, id]
+      [boyIdInt, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, userType, assigned_by || null, id]
+    );
+
+    // Also update ecogreensales_orders to keep in sync
+    await pool.query(
+      `UPDATE ecogreensales_orders 
+       SET delivery_boy_id = $1, 
+           delivery_type = $2, 
+           bus_details = $3, 
+           delivery_otp = $4,
+           delivery_assigned_user_type = $5,
+           assigned_by = COALESCE($6::integer, assigned_by)
+       WHERE id = $7`,
+      [boyIdInt, delivery_type || 'Local', bus_details ? JSON.stringify(bus_details) : null, delivery_otp, userType, assigned_by || null, id]
     );
 
     if (result.rows.length === 0) {
@@ -167,9 +189,12 @@ router.put('/:id/assign-delivery', async (req, res) => {
     }
 
     const updatedOrder = result.rows[0];
-    if (delivery_boy_id) {
+    if (boyIdInt) {
       try {
-        const empRes = await pool.query('SELECT push_token FROM employees WHERE id = $1', [delivery_boy_id]);
+        const tokenQuery = userType === 'sub_admin'
+          ? 'SELECT push_token FROM department_admins WHERE id = $1'
+          : 'SELECT push_token FROM employees WHERE id = $1';
+        const empRes = await pool.query(tokenQuery, [boyIdInt]);
         if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
           const { sendExpoPushNotification } = require('../utils/pushNotification');
           let title = 'New Sales Order Assigned';

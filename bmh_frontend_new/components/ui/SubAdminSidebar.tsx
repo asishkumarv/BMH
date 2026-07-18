@@ -110,6 +110,15 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'CRM', icon: MessageSquare, route: '/department/dashboard/crm' });
             }
           }
+
+          if (res.data.success && res.data.settings.store_delivery_access) {
+            let value = res.data.settings.store_delivery_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const saId = `SA-${userId}`;
+            if (userId && value[saId] === true) {
+              dynamicNavItems.push({ name: 'Store Delivery', icon: Package, route: '/department/dashboard/store-delivery' });
+            }
+          }
         }
         
         // Build dynamic pharmacy items

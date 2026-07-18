@@ -20,6 +20,7 @@ export default function OrderAssignScreen() {
 
   const [orders, setOrders] = useState([]);
   const [deliveryBoys, setDeliveryBoys] = useState([]);
+  const [storeDeliveryFleet, setStoreDeliveryFleet] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Orders');
   
@@ -57,15 +58,19 @@ export default function OrderAssignScreen() {
       if (selectedDate) {
         url += `?fromDate=${selectedDate}&toDate=${selectedDate}`;
       }
-      const [ordRes, empRes] = await Promise.all([
+      const [ordRes, empRes, storeRes] = await Promise.all([
         axios.get(url),
-        axios.get('https://napi.bharatmedicalhallplus.com/employees/delivery-fleet')
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/delivery-fleet'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/store-delivery-fleet')
       ]);
       if (ordRes.data && ordRes.data.success) {
         setOrders(ordRes.data.data);
       }
       if (empRes.data && empRes.data.success) {
         setDeliveryBoys(empRes.data.data);
+      }
+      if (storeRes.data && storeRes.data.success) {
+        setStoreDeliveryFleet(storeRes.data.data);
       }
     } catch (err) {
       console.error('Error fetching data:', err.message || err);
@@ -124,15 +129,20 @@ export default function OrderAssignScreen() {
   }
 
   const handleAssignV2 = async () => {
-    if (deliveryType !== 'Store' && !selectedBoyId) {
-      alert("Please select a delivery boy");
+    if (!selectedBoyId) {
+      alert("Please select an assignee");
       return;
     }
     
     try {
+      const chosen = storeDeliveryFleet.find(f => f.id.toString() === selectedBoyId.toString()) ||
+                     deliveryBoys.find(b => b.id.toString() === selectedBoyId.toString());
+      const userType = chosen ? (chosen.type || 'employee') : 'employee';
+
       const payload = {
         delivery_type: deliveryType,
-        delivery_boy_id: deliveryType === 'Store' ? null : selectedBoyId,
+        delivery_boy_id: selectedBoyId || null,
+        delivery_assigned_user_type: userType,
         address: deliveryType === 'Local' ? address : null,
         gps_location: deliveryType === 'Local' ? gpsLocation : null,
         bus_details: deliveryType === 'Bus' ? busDetails : null
@@ -301,11 +311,11 @@ export default function OrderAssignScreen() {
       </View>
 
       {activeTab === 'Manual Orders' ? (
-        <ManualOrders deliveryBoys={deliveryBoys} onStartAssignment={onStartAssignment} />
+        <ManualOrders deliveryBoys={deliveryBoys} onStartAssignment={openAssignModal} />
       ) : activeTab === 'Sales Orders' ? (
-        <SalesOrders deliveryBoys={deliveryBoys} onStartAssignment={onStartAssignment} />
+        <SalesOrders deliveryBoys={deliveryBoys} onStartAssignment={openAssignModal} />
       ) : activeTab === 'Purchase Orders' ? (
-        <PurchaseOrders deliveryBoys={deliveryBoys} onStartAssignment={onStartAssignment} />
+        <PurchaseOrders deliveryBoys={deliveryBoys} onStartAssignment={openAssignModal} />
       ) : (
       <>
         {/* Header */}
@@ -454,7 +464,19 @@ export default function OrderAssignScreen() {
                     ))}
                   </View>
 
-                  {deliveryType !== 'Store' && (
+                  {deliveryType === 'Store' ? (
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Select Store Delivery Person</Text>
+                      <View style={styles.dropdownWrapper}>
+                        <Picker selectedValue={selectedBoyId} onValueChange={(val) => setSelectedBoyId(val)} style={styles.picker}>
+                          <Picker.Item label="Select Store Delivery Person" value="" />
+                          {storeDeliveryFleet?.map(boy => (
+                            <Picker.Item key={boy.id} label={`${boy.full_name || boy.name} (${boy.role || 'N/A'})`} value={boy.id} />
+                          ))}
+                        </Picker>
+                      </View>
+                    </View>
+                  ) : (
                     <View style={styles.inputGroup}>
                       <Text style={styles.label}>Select Delivery Boy</Text>
                       <View style={styles.dropdownWrapper}>
