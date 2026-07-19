@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
-import { Sun, Moon, PhoneCall, Clock, RotateCcw, RotateCw } from 'lucide-react-native';
+import { Sun, Moon, PhoneCall, Clock, RotateCcw, RotateCw, ArrowLeft } from 'lucide-react-native';
 import axios from 'axios';
+import { useRouter } from 'expo-router';
 
 interface Slide {
   type: 'Daily' | 'Weekly' | 'Monthly';
@@ -11,6 +12,7 @@ interface Slide {
 }
 
 export default function DoctorScheduleTV() {
+  const router = useRouter();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [slides, setSlides] = useState<Slide[]>([]);
@@ -233,11 +235,18 @@ export default function DoctorScheduleTV() {
         <View style={[styles.header, { backgroundColor: theme.headerBg, borderColor: theme.border }]}>
           {/* Controls Bar (Left) - Icon only to save space in Portrait */}
           <View style={styles.controlsBar}>
+            {/* Back Button */}
+            <TouchableOpacity 
+              style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
+              onPress={() => router.replace('/')}
+            >
+              <ArrowLeft color={isDarkMode ? '#F8FAFC' : '#1E293B'} size={16} />
+            </TouchableOpacity>
+
             {/* Theme Toggle */}
             <TouchableOpacity 
               style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
               onPress={() => setIsDarkMode(!isDarkMode)}
-              title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
             >
               {isDarkMode ? <Sun color="#F59E0B" size={16} /> : <Moon color="#94A3B8" size={16} />}
             </TouchableOpacity>
@@ -246,7 +255,6 @@ export default function DoctorScheduleTV() {
             <TouchableOpacity 
               style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
               onPress={handleRotateLeft}
-              title="Rotate 90° Left"
             >
               <RotateCcw color={screenRotation === '90L' ? '#10B981' : '#E11D48'} size={16} />
             </TouchableOpacity>
@@ -255,7 +263,6 @@ export default function DoctorScheduleTV() {
             <TouchableOpacity 
               style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
               onPress={handleRotateRight}
-              title="Rotate 90° Right"
             >
               <RotateCw color={screenRotation === '90R' ? '#10B981' : '#E11D48'} size={16} />
             </TouchableOpacity>

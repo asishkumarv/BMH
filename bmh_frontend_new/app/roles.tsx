@@ -109,7 +109,7 @@ export default function RolesScreen() {
       <View style={[styles.card, isMobile && styles.cardMobile]}>
         
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={() => router.replace('/')}>
             <ArrowLeft color="#64748B" size={20} />
           </Pressable>
           
