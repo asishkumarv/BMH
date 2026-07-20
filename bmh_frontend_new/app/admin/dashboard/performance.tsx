@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, TextInput, Pressable, Alert, Modal, useWindowDimensions } from 'react-native';
 import axios from 'axios';
 import { ArrowUpDown, Calendar, Award, MapPin, TrendingUp, Clock, ShieldCheck, DollarSign, Star, AlertCircle, RefreshCw, User, Info } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
@@ -42,6 +42,8 @@ const getTrendLabel = (label: string, period: string) => {
 };
 
 export default function AdminPerformance() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const [dashboardType, setDashboardType] = useState<'delivery' | 'doctor' | 'employee'>('delivery');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -66,6 +68,88 @@ export default function AdminPerformance() {
   const [appraisalRating, setAppraisalRating] = useState('');
   const [appraisalFeedback, setAppraisalFeedback] = useState('');
   
+  const [pickerModalVisible, setPickerModalVisible] = useState(false);
+  const [pickerType, setPickerType] = useState<'rider' | 'area' | 'shift' | 'payment'>('rider');
+  const [pickerTitle, setPickerTitle] = useState('');
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [allRiders, setAllRiders] = useState<any[]>([]);
+
+  const getPickerLabel = (type: 'rider' | 'area' | 'shift' | 'payment') => {
+    if (type === 'rider') {
+      if (!filterRiderId) {
+        return dashboardType === 'doctor' ? 'All Doctors' :
+               dashboardType === 'employee' ? 'All Employees' : 'All Executives';
+      }
+      const found = allRiders.find(r => {
+        const rId = dashboardType === 'delivery' ? r.riderId : r.id;
+        return String(rId) === String(filterRiderId);
+      });
+      return found ? found.name : `ID: ${filterRiderId}`;
+    }
+    if (type === 'area') {
+      return filterArea || (dashboardType === 'doctor' ? 'All Specializations' :
+                            dashboardType === 'employee' ? 'All Departments' : 'All Areas');
+    }
+    if (type === 'shift') {
+      return filterShift || 'All Shifts';
+    }
+    if (type === 'payment') {
+      return filterPaymentMode || 'All Payments';
+    }
+    return '';
+  };
+
+  const getPickerOptions = () => {
+    const searchLower = pickerSearch.toLowerCase();
+    if (pickerType === 'rider') {
+      const allLabel = dashboardType === 'doctor' ? 'All Doctors' :
+                       dashboardType === 'employee' ? 'All Employees' : 'All Executives';
+      const list = allRiders
+        .map(r => {
+          const rId = dashboardType === 'delivery' ? r.riderId : r.id;
+          return { label: `${r.name} (ID: ${rId})`, value: String(rId), searchValue: `${r.name} ${rId}` };
+        });
+      return [{ label: allLabel, value: '', searchValue: 'all' }, ...list]
+        .filter(opt => !pickerSearch || opt.searchValue.toLowerCase().includes(searchLower) || opt.value === '');
+    }
+    if (pickerType === 'area') {
+      const defaultLabel = dashboardType === 'doctor' ? 'All Specializations' :
+                           dashboardType === 'employee' ? 'All Departments' : 'All Areas';
+      const list = areasList.map(a => ({ label: a, value: a, searchValue: a }));
+      return [{ label: defaultLabel, value: '', searchValue: '' }, ...list]
+        .filter(opt => !pickerSearch || opt.searchValue.toLowerCase().includes(searchLower));
+    }
+    if (pickerType === 'shift') {
+      const list = [
+        { label: 'Morning Shift (09:00)', value: 'Morning', searchValue: 'morning' },
+        { label: 'Evening Shift (18:00)', value: 'Evening', searchValue: 'evening' },
+        ...shiftsList.map(s => ({ label: s, value: s, searchValue: s }))
+      ];
+      return [{ label: 'All Shifts', value: '', searchValue: '' }, ...list]
+        .filter(opt => !pickerSearch || opt.searchValue.toLowerCase().includes(searchLower));
+    }
+    if (pickerType === 'payment') {
+      const list = paymentModesList.map(pm => ({ label: pm, value: pm, searchValue: pm }));
+      return [{ label: 'All Payments', value: '', searchValue: '' }, ...list]
+        .filter(opt => !pickerSearch || opt.searchValue.toLowerCase().includes(searchLower));
+    }
+    return [];
+  };
+
+  const handlePickerSelect = (val: string) => {
+    if (pickerType === 'rider') {
+      setFilterRiderId(val);
+    } else if (pickerType === 'area') {
+      setFilterArea(val);
+    } else if (pickerType === 'shift') {
+      setFilterShift(val);
+    } else if (pickerType === 'payment') {
+      setFilterPaymentMode(val);
+    }
+    setPickerModalVisible(false);
+    setPickerSearch('');
+  };
+  
   useEffect(() => {
     // Set initial filter value based on current month/date
     const today = new Date();
@@ -79,6 +163,7 @@ export default function AdminPerformance() {
     setFilterArea('');
     setFilterShift('');
     setFilterPaymentMode('');
+    setAllRiders([]);
   };
 
   useEffect(() => {
@@ -120,7 +205,11 @@ export default function AdminPerformance() {
       if (res.data && res.data.success) {
         if (dashboardType === 'doctor') {
           setStats(res.data.data);
-          setRiders(res.data.data.doctorsList || []);
+          const list = res.data.data.doctorsList || [];
+          setRiders(list);
+          if (!filterRiderId) {
+            setAllRiders(list);
+          }
           if (res.data.data.filters) {
             if (res.data.data.filters.departments) setAreasList(res.data.data.filters.departments);
             setShiftsList([]);
@@ -128,7 +217,11 @@ export default function AdminPerformance() {
           }
         } else if (dashboardType === 'employee') {
           setStats(res.data);
-          setRiders(res.data.employees || []);
+          const list = res.data.employees || [];
+          setRiders(list);
+          if (!filterRiderId) {
+            setAllRiders(list);
+          }
           if (res.data.employees) {
             const depts = [...new Set(res.data.employees.map((e: any) => e.department).filter(Boolean))] as string[];
             setAreasList(depts);
@@ -137,7 +230,11 @@ export default function AdminPerformance() {
           setPaymentModesList([]);
         } else {
           setStats(res.data.executiveDashboard);
-          setRiders(res.data.riders || []);
+          const list = res.data.riders || [];
+          setRiders(list);
+          if (!filterRiderId) {
+            setAllRiders(list);
+          }
           if (res.data.executiveDashboard) {
             if (res.data.executiveDashboard.uniqueAreas) setAreasList(res.data.executiveDashboard.uniqueAreas);
             if (res.data.executiveDashboard.uniqueShifts) setShiftsList(res.data.executiveDashboard.uniqueShifts);
@@ -380,24 +477,24 @@ export default function AdminPerformance() {
       </View>
 
       {/* Page Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>
+      <View style={[styles.header, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 16 }]}>
+        <View style={isMobile ? { width: '100%' } : { flex: 1, flexShrink: 1, marginRight: 24 }}>
+          <Text style={[styles.title, { flexShrink: 1 }]}>
             {dashboardType === 'doctor' ? 'Doctors Performance KPI & KRI Dashboard' :
              dashboardType === 'employee' ? 'Employees Performance KPI & KRI Dashboard' : 'Delivery Performance KPI & KRI  Dashboard'}
           </Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { flexShrink: 1 }]}>
             {dashboardType === 'doctor' ? 'Measure booking loads, consultant payouts, and department statistics' :
              dashboardType === 'employee' ? 'Measure task completion times, attendance hours, and patient bookings' :
              'Measure productivity, quality, and service levels of delivery executives'}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-          <TouchableOpacity style={[styles.refreshBtn, { backgroundColor: '#10B981' }]} onPress={downloadCSVReport}>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end', flexShrink: 0 }}>
+          <TouchableOpacity style={[styles.refreshBtn, { backgroundColor: '#10B981', flex: isMobile ? 1 : 0, justifyContent: 'center', flexShrink: 0, minWidth: 155 }]} onPress={downloadCSVReport}>
             <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Download Report</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.refreshBtn} onPress={fetchPerformanceData}>
-            <RefreshCw size={16} color="#fff" />
+          <TouchableOpacity style={[styles.refreshBtn, { flex: isMobile ? 1 : 0, justifyContent: 'center', flexShrink: 0, minWidth: 105 }]} onPress={fetchPerformanceData}>
+            <RefreshCw size={16} color="#fff" style={{ flexShrink: 0 }} />
             <Text style={styles.refreshText}>Refresh</Text>
           </TouchableOpacity>
         </View>
@@ -407,45 +504,24 @@ export default function AdminPerformance() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Reporting Filters</Text>
         <View style={styles.filtersRow}>
+          {/* Executive/Doctor/Employee Selection */}
           <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
             <Text style={styles.filterLabel}>
-              {dashboardType === 'doctor' ? 'Doctor ID (Optional)' :
-               dashboardType === 'employee' ? 'Employee ID (Optional)' : 'Rider ID (Optional)'}
+              {dashboardType === 'doctor' ? 'Doctor (Optional)' :
+               dashboardType === 'employee' ? 'Employee (Optional)' : 'Rider (Optional)'}
             </Text>
-            {Platform.OS === 'web' ? (
-              <select
-                value={filterRiderId}
-                onChange={(e) => setFilterRiderId(e.target.value)}
-                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
-              >
-                {dashboardType === 'doctor' ? (
-                  <>
-                    <option value="">All Doctors</option>
-                    {riders.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </>
-                ) : dashboardType === 'employee' ? (
-                  <>
-                    <option value="">All Employees</option>
-                    {riders.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </>
-                ) : (
-                  <>
-                    <option value="">All Executives</option>
-                    {riders.map(r => <option key={r.riderId} value={r.riderId}>{r.name}</option>)}
-                  </>
-                )}
-              </select>
-            ) : (
-              <TextInput
-                style={[styles.input, { height: 36, fontSize: 13 }]}
-                placeholder={
-                  dashboardType === 'doctor' ? 'Doctor ID' :
-                  dashboardType === 'employee' ? 'Employee ID' : 'Rider ID'
-                }
-                value={filterRiderId}
-                onChangeText={setFilterRiderId}
-              />
-            )}
+            <TouchableOpacity
+              onPress={() => {
+                setPickerType('rider');
+                setPickerTitle(dashboardType === 'doctor' ? 'Select Doctor' : dashboardType === 'employee' ? 'Select Employee' : 'Select Executive');
+                setPickerModalVisible(true);
+              }}
+              style={styles.pickerSelector}
+            >
+              <Text style={styles.pickerSelectorText} numberOfLines={1}>
+                {getPickerLabel('rider')}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={[styles.filterGroup, { minWidth: 170, maxWidth: 200 }]}>
@@ -486,53 +562,61 @@ export default function AdminPerformance() {
             />
           </View>
 
-          {Platform.OS === 'web' && (
-            <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
-              <Text style={styles.filterLabel}>
-                {dashboardType === 'doctor' ? 'Department' :
-                 dashboardType === 'employee' ? 'Department' : 'Area'}
+          {/* Area / Specialization / Department Selection */}
+          <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
+            <Text style={styles.filterLabel}>
+              {dashboardType === 'doctor' ? 'Department' :
+               dashboardType === 'employee' ? 'Department' : 'Area'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setPickerType('area');
+                setPickerTitle(dashboardType === 'doctor' ? 'Select Specialization' : dashboardType === 'employee' ? 'Select Department' : 'Select Area');
+                setPickerModalVisible(true);
+              }}
+              style={styles.pickerSelector}
+            >
+              <Text style={styles.pickerSelectorText} numberOfLines={1}>
+                {getPickerLabel('area')}
               </Text>
-              <select
-                value={filterArea}
-                onChange={(e) => setFilterArea(e.target.value)}
-                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
-              >
-                <option value="">
-                  {dashboardType === 'doctor' ? 'All Specializations' :
-                   dashboardType === 'employee' ? 'All Departments' : 'All Areas'}
-                </option>
-                {areasList.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </View>
-          )}
+            </TouchableOpacity>
+          </View>
 
-          {dashboardType === 'delivery' && Platform.OS === 'web' && (
+          {/* Shift (Delivery executives only) */}
+          {dashboardType === 'delivery' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Shift</Text>
-              <select
-                value={filterShift}
-                onChange={(e) => setFilterShift(e.target.value)}
-                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
+              <TouchableOpacity
+                onPress={() => {
+                  setPickerType('shift');
+                  setPickerTitle('Select Shift');
+                  setPickerModalVisible(true);
+                }}
+                style={styles.pickerSelector}
               >
-                <option value="">All Shifts</option>
-                <option value="Morning">Morning Shift (09:00)</option>
-                <option value="Evening">Evening Shift (18:00)</option>
-                {shiftsList.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+                <Text style={styles.pickerSelectorText} numberOfLines={1}>
+                  {getPickerLabel('shift')}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          {dashboardType !== 'employee' && Platform.OS === 'web' && (
+          {/* Payment Mode (All except Employee) */}
+          {dashboardType !== 'employee' && (
             <View style={[styles.filterGroup, { minWidth: 140, maxWidth: 170 }]}>
               <Text style={styles.filterLabel}>Payment Mode</Text>
-              <select
-                value={filterPaymentMode}
-                onChange={(e) => setFilterPaymentMode(e.target.value)}
-                style={StyleSheet.flatten([styles.webSelect, { height: 36, fontSize: 13 }]) as any}
+              <TouchableOpacity
+                onPress={() => {
+                  setPickerType('payment');
+                  setPickerTitle('Select Payment Mode');
+                  setPickerModalVisible(true);
+                }}
+                style={styles.pickerSelector}
               >
-                <option value="">All Payments</option>
-                {paymentModesList.map(pm => <option key={pm} value={pm}>{pm}</option>)}
-              </select>
+                <Text style={styles.pickerSelectorText} numberOfLines={1}>
+                  {getPickerLabel('payment')}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -1800,6 +1884,61 @@ export default function AdminPerformance() {
         )}
       </View>
 
+      {/* Searchable Picker Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={pickerModalVisible}
+        onRequestClose={() => { setPickerModalVisible(false); setPickerSearch(''); }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: 350, maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{pickerTitle}</Text>
+              <TouchableOpacity onPress={() => { setPickerModalVisible(false); setPickerSearch(''); }} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={[styles.input, { marginBottom: 12, height: 40, paddingHorizontal: 12 }]}
+              placeholder="Search option..."
+              value={pickerSearch}
+              onChangeText={setPickerSearch}
+              autoFocus
+            />
+
+            <ScrollView style={{ flex: 1 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+              {getPickerOptions().map((opt) => {
+                const isSelected = pickerType === 'rider' ? String(opt.value) === String(filterRiderId) :
+                                   pickerType === 'area' ? String(opt.value) === String(filterArea) :
+                                   pickerType === 'shift' ? String(opt.value) === String(filterShift) :
+                                   String(opt.value) === String(filterPaymentMode);
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#f1f5f9',
+                      backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
+                      borderRadius: 8,
+                      marginBottom: 4
+                    }}
+                    onPress={() => handlePickerSelect(opt.value)}
+                  >
+                    <Text style={{ fontWeight: isSelected ? '700' : 'normal', color: isSelected ? '#4F46E5' : '#374151', fontSize: 14 }}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Custom Customized Info Popup Modal */}
       <Modal
         animationType="fade"
@@ -1854,6 +1993,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+    flexWrap: 'wrap',
+    gap: 16,
   },
   title: {
     fontSize: 24,
@@ -1872,6 +2013,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
+    flexShrink: 0,
   },
   refreshText: {
     color: '#fff',
@@ -1917,6 +2059,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 14,
     color: '#111827',
+  },
+  pickerSelector: {
+    width: '100%',
+    height: 42,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+  },
+  pickerSelectorText: {
+    fontSize: 13,
+    color: '#334155',
   },
   input: {
     width: '100%',
