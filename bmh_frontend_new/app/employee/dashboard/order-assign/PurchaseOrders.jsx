@@ -978,6 +978,30 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
                   <X size={20} color="#64748b" />
                 </TouchableOpacity>
               </View>
+              
+              {/* Items Ordered List */}
+              <View style={{ maxHeight: 110, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 8, marginBottom: 8 }}>
+                <Text style={{ fontWeight: 'bold', color: '#4338ca', fontSize: 13, marginBottom: 4 }}>Items in Order:</Text>
+                <ScrollView nestedScrollEnabled style={{ flexGrow: 0 }}>
+                  {(() => {
+                    let items = [];
+                    try {
+                      items = typeof assignOrder.details === 'string' ? JSON.parse(assignOrder.details) : assignOrder.details;
+                    } catch (e) {}
+
+                    if (!Array.isArray(items) || items.length === 0) {
+                      return <Text style={{ fontSize: 12, color: '#64748b' }}>No items listed.</Text>;
+                    }
+
+                    return items.map((itm, index) => (
+                      <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottomWidth: index < items.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+                        <Text style={{ fontSize: 12, color: '#1e293b', flex: 1, fontWeight: '500' }} numberOfLines={1}>{itm.itemName || itm.name}</Text>
+                        <Text style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>Qty: {itm.Qty || itm.quantity} | Rate: ₹{itm.rate}</Text>
+                      </View>
+                    ));
+                  })()}
+                </ScrollView>
+              </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 8, paddingHorizontal: 10, height: 32, marginBottom: 12 }}>
                 <Search size={16} color="#94a3b8" style={{ marginRight: 6 }} />

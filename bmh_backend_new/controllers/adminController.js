@@ -409,7 +409,7 @@ exports.getAllOrdersForAssignment = async (req, res) => {
             queryParams
         );
         const purchaseOrders = await pool.query(
-            `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL as map_lat, gps_location as map_lng, delivery_boy_id, created_at, delivery_type FROM ecogreenpurchase_orders ${dateFilter} ORDER BY created_at DESC`,
+            `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL as map_lat, gps_location as map_lng, delivery_boy_id, created_at, delivery_type, bus_details, details, submitted_to_name, submitted_to_role, submitted_to_dept, submitted_at FROM ecogreenpurchase_orders ${dateFilter} ORDER BY created_at DESC`,
             queryParams
         );
         const allOrders = [...onlineOrders.rows, ...salesOrders.rows, ...purchaseOrders.rows];

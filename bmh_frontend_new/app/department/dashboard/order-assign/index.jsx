@@ -437,7 +437,32 @@ export default function OrderAssignScreen() {
           <Modal transparent animationType="slide" visible={!!selectedOrder} onRequestClose={() => setSelectedOrder(null)}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Assign Delivery (Order #{selectedOrder.id})</Text>
+                 <Text style={styles.modalTitle}>Assign Delivery (Order #{selectedOrder.id})</Text>
+                 
+                 {selectedOrder.type === 'purchase_order' && (
+                   <View style={{ maxHeight: 110, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 8, marginBottom: 8, width: '100%' }}>
+                     <Text style={{ fontWeight: 'bold', color: '#4338ca', fontSize: 13, marginBottom: 4 }}>Items in Order:</Text>
+                     <ScrollView nestedScrollEnabled style={{ flexGrow: 0 }}>
+                       {(() => {
+                         let items = [];
+                         try {
+                           items = typeof selectedOrder.details === 'string' ? JSON.parse(selectedOrder.details) : selectedOrder.details;
+                         } catch (e) {}
+
+                         if (!Array.isArray(items) || items.length === 0) {
+                           return <Text style={{ fontSize: 12, color: '#64748b' }}>No items listed.</Text>;
+                         }
+
+                         return items.map((itm, index) => (
+                           <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottomWidth: index < items.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+                             <Text style={{ fontSize: 12, color: '#1e293b', flex: 1, fontWeight: '500' }} numberOfLines={1}>{itm.itemName || itm.name}</Text>
+                             <Text style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>Qty: {itm.Qty || itm.quantity} | Rate: ₹{itm.rate}</Text>
+                           </View>
+                         ));
+                       })()}
+                     </ScrollView>
+                   </View>
+                 )}
                 
                 <ScrollView style={styles.modalScroll}>
                   {!(deliveryType === 'Store' || deliveryType === 'Counter') ? (

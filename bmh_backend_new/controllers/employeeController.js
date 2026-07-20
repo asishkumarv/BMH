@@ -254,7 +254,7 @@ exports.getAssignedOrders = async (req, res) => {
     ];
     // Fetch from ecogreenpurchase_orders
     const purchaseOrdersRes = await pool.query(
-      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no
+      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no, details, submitted_to_name, submitted_to_role, submitted_to_dept, submitted_at
        FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
     orders.push(...purchaseOrdersRes.rows.map(parseLocation));
@@ -753,7 +753,7 @@ exports.getStoreDeliveryAssignedOrders = async (req, res) => {
     );
 
     const purchaseOrdersRes = await pool.query(
-      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no, 'Prepaid'::varchar as payment_mode
+      `SELECT id, 'purchase_order' as type, status, total as total_amount, custname as patient_name, NULL as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, gps_location as location_link, created_at, delivery_type, bus_details, COALESCE(prefix || year || srno, '') as order_no, NULL::varchar as invoice_no, 'Prepaid'::varchar as payment_mode, details, submitted_to_name, submitted_to_role, submitted_to_dept, submitted_at
        FROM ecogreenpurchase_orders 
        WHERE delivery_boy_id = $1 
          AND delivery_assigned_user_type = $2

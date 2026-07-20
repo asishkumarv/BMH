@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Image, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { Sun, Moon, PhoneCall, Clock, RotateCcw, RotateCw, ArrowLeft } from 'lucide-react-native';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Slide {
   type: 'Daily' | 'Weekly' | 'Monthly';
@@ -18,12 +19,12 @@ export default function DoctorScheduleTV() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Layout states
   const [screenRotation, setScreenRotation] = useState<'0' | '90R' | '90L'>('0'); // CSS Rotation
 
-  const { width, height } = useWindowDimensions();
+  const { width, height, isMobile, isTablet } = useResponsive();
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -184,14 +185,17 @@ export default function DoctorScheduleTV() {
     outputRange: ['0%', '100%'],
   });
 
-  // Calculate card layout styling dynamically based on Portrait/Landscape
+  // Calculate card layout styling dynamically based on screen size / Portrait / Landscape
   const getCardWidth = () => {
+    if (isMobile) return '100%';
+    if (isTablet) return '48%';
     if (Platform.OS !== 'web') return '100%';
     return activeIsPortrait ? '48%' : '31%'; // 2 columns in portrait, 3 columns in landscape
   };
 
   // Compact card height to fit content perfectly and remove empty space
   const getCardHeight = () => {
+    if (isMobile) return 'auto';
     if (Platform.OS !== 'web') return 'auto';
     return activeIsPortrait ? 220 : 270; // 220px in Portrait, 270px in Landscape
   };
@@ -232,7 +236,11 @@ export default function DoctorScheduleTV() {
         </View>
 
         {/* Premium blue header based on theme color definition */}
-        <View style={[styles.header, { backgroundColor: theme.headerBg, borderColor: theme.border }]}>
+        <View style={[
+          styles.header, 
+          { backgroundColor: theme.headerBg, borderColor: theme.border },
+          isMobile && styles.headerMobile
+        ]}>
           {/* Controls Bar (Left) - Icon only to save space in Portrait */}
           <View style={styles.controlsBar}>
             {/* Back Button */}
@@ -252,26 +260,30 @@ export default function DoctorScheduleTV() {
             </TouchableOpacity>
 
             {/* Rotate Left Button */}
-            <TouchableOpacity 
-              style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
-              onPress={handleRotateLeft}
-            >
-              <RotateCcw color={screenRotation === '90L' ? '#10B981' : '#E11D48'} size={16} />
-            </TouchableOpacity>
+            {!isMobile && (
+              <TouchableOpacity 
+                style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
+                onPress={handleRotateLeft}
+              >
+                <RotateCcw color={screenRotation === '90L' ? '#10B981' : '#E11D48'} size={16} />
+              </TouchableOpacity>
+            )}
 
             {/* Rotate Right Button */}
-            <TouchableOpacity 
-              style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
-              onPress={handleRotateRight}
-            >
-              <RotateCw color={screenRotation === '90R' ? '#10B981' : '#E11D48'} size={16} />
-            </TouchableOpacity>
+            {!isMobile && (
+              <TouchableOpacity 
+                style={[styles.controlButton, { backgroundColor: theme.toggleBg, borderColor: theme.border }]} 
+                onPress={handleRotateRight}
+              >
+                <RotateCw color={screenRotation === '90R' ? '#10B981' : '#E11D48'} size={16} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Centered Logo & Brand Name */}
           <View style={styles.brandContainer}>
             <Image source={require('../assets/CompanyLogo.jpg')} style={styles.logo} resizeMode="contain" />
-            <Text style={[styles.brandText, { color: theme.brandText }]}>BHARAT HEALTH CARE</Text>
+            {!isMobile && <Text style={[styles.brandText, { color: theme.brandText }]}>BHARAT HEALTH CARE</Text>}
           </View>
 
           {/* Right: Active Tab Indicator & Live Clock */}
@@ -285,11 +297,14 @@ export default function DoctorScheduleTV() {
               </View>
             )}
 
-            <View style={styles.verticalDivider} />
-
-            <View style={styles.clockBox}>
-              <Text style={[styles.clockTime, { color: theme.text }]}>{currentTime}</Text>
-            </View>
+            {!isMobile && (
+              <>
+                <View style={styles.verticalDivider} />
+                <View style={styles.clockBox}>
+                  <Text style={[styles.clockTime, { color: theme.text }]}>{currentTime}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -307,79 +322,89 @@ export default function DoctorScheduleTV() {
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No schedules available for this view.</Text>
                 </View>
               ) : (
-                <View style={styles.grid}>
-                  {currentSlide.items.map((doc, idx) => {
-                    // Assign visual accents dynamically by rotating through color array
-                    const accent = cardAccentColors[idx % cardAccentColors.length];
-                    const badgeBg = isDarkMode ? accent.darkBg : accent.bg;
-                    const badgeText = isDarkMode ? accent.darkText : accent.text;
-                    const borderAccentColor = isDarkMode ? accent.darkBorder : accent.border;
+                <ScrollView 
+                  style={{ flex: 1 }} 
+                  contentContainerStyle={styles.scrollGridContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.grid}>
+                    {currentSlide.items.map((doc, idx) => {
+                      // Assign visual accents dynamically by rotating through color array
+                      const accent = cardAccentColors[idx % cardAccentColors.length];
+                      const badgeBg = isDarkMode ? accent.darkBg : accent.bg;
+                      const badgeText = isDarkMode ? accent.darkText : accent.text;
+                      const borderAccentColor = isDarkMode ? accent.darkBorder : accent.border;
 
-                    return (
-                      <View 
-                        key={doc.id} 
-                        style={[
-                          styles.card, 
-                          { 
-                            backgroundColor: theme.cardBg, 
-                            borderColor: theme.cardBorder,
-                            borderTopColor: borderAccentColor,
-                            borderTopWidth: 6,
-                            width: getCardWidth(),
-                            height: getCardHeight(),
-                          }
-                        ]}
-                      >
-                        {/* Upper Section */}
-                        <View style={styles.cardUpper}>
-                          <View style={styles.cardHeader}>
-                            <View style={[styles.deptBadge, { backgroundColor: badgeBg }]}>
-                              <Text style={[styles.deptBadgeText, { color: badgeText }]}>
-                                {doc.department || 'Specialist'}
+                      return (
+                        <View 
+                          key={doc.id} 
+                          style={[
+                            styles.card, 
+                            { 
+                              backgroundColor: theme.cardBg, 
+                              borderColor: theme.cardBorder,
+                              borderTopColor: borderAccentColor,
+                              borderTopWidth: 6,
+                              width: getCardWidth(),
+                              height: getCardHeight(),
+                            }
+                          ]}
+                        >
+                          {/* Upper Section */}
+                          <View style={styles.cardUpper}>
+                            <View style={styles.cardHeader}>
+                              <View style={[styles.deptBadge, { backgroundColor: badgeBg }]}>
+                                <Text style={[styles.deptBadgeText, { color: badgeText }]}>
+                                  {doc.department || 'Specialist'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Highlight doctor name in card color accent */}
+                            <Text style={[styles.docName, { color: borderAccentColor }]} numberOfLines={1}>
+                              {doc.name}
+                            </Text>
+                            <Text style={[styles.qualification, { color: theme.textSecondary }]} numberOfLines={2}>
+                              {doc.qualification}
+                            </Text>
+                          </View>
+
+                          {/* Timing Block (Shaded callout box at bottom of card) */}
+                          <View style={[styles.timingBlock, { backgroundColor: theme.toggleBg }]}>
+                            <Clock color={isDarkMode ? '#60A5FA' : '#1E40AF'} size={16} style={styles.timingIcon} />
+                            <View style={styles.timingContent}>
+                              <Text style={styles.timingLabel}>CONSULTING HOURS</Text>
+                              <Text style={[styles.timingValue, { color: theme.text }]} numberOfLines={2}>
+                                {doc.timing || 'By appointment only'}
                               </Text>
                             </View>
                           </View>
-
-                          {/* Highlight doctor name in card color accent */}
-                          <Text style={[styles.docName, { color: borderAccentColor }]} numberOfLines={1}>
-                            {doc.name}
-                          </Text>
-                          <Text style={[styles.qualification, { color: theme.textSecondary }]} numberOfLines={2}>
-                            {doc.qualification}
-                          </Text>
                         </View>
-
-                        {/* Timing Block (Shaded callout box at bottom of card) */}
-                        <View style={[styles.timingBlock, { backgroundColor: theme.toggleBg }]}>
-                          <Clock color={isDarkMode ? '#60A5FA' : '#1E40AF'} size={16} style={styles.timingIcon} />
-                          <View style={styles.timingContent}>
-                            <Text style={styles.timingLabel}>CONSULTING HOURS</Text>
-                            <Text style={[styles.timingValue, { color: theme.text }]} numberOfLines={2}>
-                              {doc.timing || 'By appointment only'}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
               )}
             </Animated.View>
           )}
         </View>
 
         {/* Premium blue footer based on theme color definition */}
-        <View style={[styles.footer, { backgroundColor: theme.headerBg, borderColor: theme.border }]}>
-          <View style={styles.footerCalloutContainer}>
-            <PhoneCall color={theme.brandColor} size={20} style={{ marginRight: 8 }} />
-            <Text style={[styles.footerText, { color: theme.footerTextAccent }]}>
+        <View style={[
+          styles.footer, 
+          { backgroundColor: theme.headerBg, borderColor: theme.border },
+          isMobile && styles.footerMobile
+        ]}>
+          <View style={[styles.footerCalloutContainer, isMobile && styles.footerCalloutContainerMobile]}>
+            <PhoneCall color={theme.brandColor} size={isMobile ? 16 : 20} style={{ marginRight: 8 }} />
+            <Text style={[styles.footerText, { color: theme.footerTextAccent }, isMobile && styles.footerTextMobile]}>
               FOR APPOINTMENTS & ENQUIRIES — CALL OR WHATSAPP:{' '}
-              <Text style={[styles.footerPhoneHighlight, { color: theme.brandColor }]}>
+              <Text style={[styles.footerPhoneHighlight, { color: theme.brandColor }, isMobile && styles.footerPhoneHighlightMobile]}>
                 8093110888
               </Text>
             </Text>
           </View>
-          <Text style={[styles.footerNote, { color: theme.footerTextAccent }]}>
+          <Text style={[styles.footerNote, { color: theme.footerTextAccent }, isMobile && styles.footerNoteMobile]}>
             Please share: Name • Age • Gender • Mobile • Doctor • Preferred Date
           </Text>
         </View>
@@ -519,7 +544,6 @@ const styles: any = StyleSheet.create({
     fontWeight: '600',
   },
   grid: {
-    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
@@ -616,5 +640,34 @@ const styles: any = StyleSheet.create({
   footerNote: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  headerMobile: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  scrollGridContent: {
+    paddingBottom: 24,
+  },
+  footerMobile: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 6,
+  },
+  footerCalloutContainerMobile: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+  },
+  footerTextMobile: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  footerPhoneHighlightMobile: {
+    fontSize: 18,
+  },
+  footerNoteMobile: {
+    fontSize: 10,
+    textAlign: 'center',
   },
 });

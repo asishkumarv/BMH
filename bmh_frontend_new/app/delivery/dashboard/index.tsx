@@ -910,6 +910,42 @@ export default function DeliveryDashboard() {
           </View>
         )}
         <Text style={styles.totalText}>Total: ₹{parseFloat(item.total_amount || item.amount || 0).toFixed(2)}</Text>
+        
+        {item.type === 'purchase_order' && (
+          <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#8b5cf6', marginBottom: 4 }}>Items Ordered:</Text>
+            {(() => {
+              let items = [];
+              try {
+                items = typeof item.details === 'string' ? JSON.parse(item.details) : item.details;
+              } catch (e) {}
+              if (!Array.isArray(items) || items.length === 0) {
+                return <Text style={{ fontSize: 11, color: '#64748b' }}>No items listed.</Text>;
+              }
+              return items.map((itm: any, index: number) => (
+                <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, borderBottomWidth: index < items.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+                  <Text style={{ fontSize: 11, color: '#1e293b', flex: 1 }} numberOfLines={1}>{itm.itemName || itm.name}</Text>
+                  <Text style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>Qty: {itm.Qty || itm.quantity} | Rate: ₹{itm.rate}</Text>
+                </View>
+              ));
+            })()}
+          </View>
+        )}
+
+        {item.type === 'purchase_order' && item.submitted_to_name && (
+          <View style={{ marginTop: 6, padding: 8, backgroundColor: '#ecfdf5', borderRadius: 8, borderWidth: 1, borderColor: '#a7f3d0' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#047857' }}>Submitted To:</Text>
+            <Text style={{ fontSize: 12, color: '#065f46', marginTop: 2, fontWeight: '600' }}>
+              {item.submitted_to_name} ({item.submitted_to_role || ''} - {item.submitted_to_dept || ''})
+            </Text>
+            {item.submitted_at && (
+              <Text style={{ fontSize: 10, color: '#047857', marginTop: 2 }}>
+                Submitted At: {new Date(item.submitted_at).toLocaleString('en-IN')}
+              </Text>
+            )}
+          </View>
+        )}
+
         {item.notes ? (
           <View style={{marginTop: 10, backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
             <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
