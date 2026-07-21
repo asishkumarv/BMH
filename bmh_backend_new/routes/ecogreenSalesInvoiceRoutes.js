@@ -95,7 +95,12 @@ router.post('/', async (req, res) => {
 // GET / (Mounted at /sales-invoice-list)
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM ecogreen_sales_invoices ORDER BY id DESC');
+    let sqlQuery = 'SELECT * FROM ecogreen_sales_invoices ORDER BY id DESC';
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    if (limit && !isNaN(limit)) {
+      sqlQuery += ` LIMIT ${limit}`;
+    }
+    const result = await pool.query(sqlQuery);
     
     // Transform keys to camelCase to match frontend expectations
     const invoices = result.rows.map(r => ({

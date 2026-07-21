@@ -3,6 +3,7 @@ const pool = require('../db');
 const { fetchToken, cache } = require('../controllers/pharmacyController');
 
 let isSyncing = false;
+let lastSyncTime = null;
 
 async function syncSalesInvoices() {
     if (isSyncing) return;
@@ -10,14 +11,20 @@ async function syncSalesInvoices() {
     console.log(`🔄 Syncing sales invoices...`);
     try {
         const token = cache.get("default_token") || (await fetchToken()).apiKey;
+        const now = new Date();
         
-        // Fetch data from the last 7 days to capture updates as well
-        const syncDate = new Date();
-        syncDate.setDate(syncDate.getDate() - 7);
+        let syncDate = new Date();
+        if (!lastSyncTime) {
+            // Initial run - fetch data from the last 7 days to seed the DB
+            syncDate.setDate(syncDate.getDate() - 7);
+        } else {
+            // Subsequent run - fetch from the last 15 minutes to capture recent modifications/new invoices
+            syncDate.setMinutes(syncDate.getMinutes() - 15);
+        }
 
         const pad = (n) => n.toString().padStart(2, '0');
         const padMs = (n) => n.toString().padStart(3, '0');
-        const inputDateTimeStr = `${syncDate.getFullYear()}-${pad(syncDate.getMonth() + 1)}-${pad(syncDate.getDate())} 00:00:00.000`;
+        const inputDateTimeStr = `${syncDate.getFullYear()}-${pad(syncDate.getMonth() + 1)}-${pad(syncDate.getDate())} ${pad(syncDate.getHours())}:${pad(syncDate.getMinutes())}:${pad(syncDate.getSeconds())}.${padMs(syncDate.getMilliseconds())}`;
 
         const payload = {
             "c2Code": "P00000",
@@ -30,6 +37,7 @@ async function syncSalesInvoices() {
         console.log(`Sending sales invoice sync payload with inputDateTime: ${inputDateTimeStr}`);
         
         const apiRes = await axios.post("http://117.211.64.158:21000/ws_c2_services_get_sales_data", payload, { timeout: 30000 });
+        lastSyncTime = now;
         
         let responseData = apiRes.data;
         if (typeof responseData === 'string') {

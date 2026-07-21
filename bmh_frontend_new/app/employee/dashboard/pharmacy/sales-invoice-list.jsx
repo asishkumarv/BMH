@@ -3,54 +3,97 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import axios from 'axios';
 import { Colors } from '../../../../constants/Colors';
 import { Search, Eye, X } from 'lucide-react-native';
+import { Picker } from '@react-native-picker/picker';
+
+const webDatePickerStyle = {
+  height: '38px',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: '#e2e8f0',
+  borderRadius: '8px',
+  paddingLeft: '12px',
+  paddingRight: '12px',
+  fontSize: '13px',
+  backgroundColor: '#fff',
+  color: '#334155',
+  outlineStyle: 'none',
+  fontFamily: 'inherit',
+  minWidth: '140px',
+  boxSizing: 'border-box'
+};
 
 export default function SalesInvoiceList() {
   const { width } = useWindowDimensions();
   const isDesktop = width > 1024;
 
   const [invoices, setInvoices] = useState([]);
-  const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [invoiceItems, setInvoiceItems] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Filters state
+  const [searchInvoiceNo, setSearchInvoiceNo] = useState('');
+  const [searchCustomer, setSearchCustomer] = useState('');
+  const [filterUser, setFilterUser] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const rowsPerPage = 50;
+
   useEffect(() => {
-    fetchInvoices();
-    const interval = setInterval(() => {
-      fetchInvoices(true);
+    // 1. Initial run: Fetch first 50 invoices instantly
+    fetchInvoices(50, false);
+
+    // 2. Poll for the first 50 invoices every 5 seconds to keep it real-time
+    const pollInterval = setInterval(() => {
+      fetchInvoices(50, true);
     }, 5000);
-    return () => clearInterval(interval);
+
+    // 3. Lazy background loading: fetch all remaining records in the background silently
+    setTimeout(() => {
+      fetchInvoices(null, true);
+    }, 1500);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
+  // Reset pagination on filter change
   useEffect(() => {
-    if (!search) {
-      setFilteredInvoices(invoices);
-    } else {
-      const lower = search.toLowerCase();
-      setFilteredInvoices(invoices.filter(o => 
-        o.patientName?.toLowerCase().includes(lower) || 
-        o.ipNo?.toLowerCase().includes(lower) || 
-        o.actCode?.toLowerCase().includes(lower) ||
-        o.userId?.toLowerCase().includes(lower)
-      ));
-    }
-  }, [search, invoices]);
+    setPage(1);
+  }, [searchInvoiceNo, searchCustomer, filterUser, startDate, endDate]);
 
-  const fetchInvoices = async (isSilent = false) => {
+  const fetchInvoices = async (limit = null, isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const res = await axios.get('https://napi.bharatmedicalhallplus.com/sales-invoice-list');
+      const url = limit 
+        ? `https://napi.bharatmedicalhallplus.com/sales-invoice-list?limit=${limit}` 
+        : `https://napi.bharatmedicalhallplus.com/sales-invoice-list`;
+      
+      const res = await axios.get(url);
       if (res.data && res.data.success) {
-        setInvoices(res.data.data);
-      } else {
-        setInvoices([]);
+        if (limit) {
+          // Update list only if we haven't loaded the full background list yet,
+          // or just merge if we are doing active polling.
+          setInvoices((prev) => {
+            // If the current list length is larger than the limit, it means background load already finished.
+            // In that case, we can update or prepend any newly polled items.
+            if (prev.length > limit) {
+              const newItems = res.data.data.filter(item => !prev.some(p => p.id === item.id));
+              return [...newItems, ...prev];
+            }
+            return res.data.data;
+          });
+        } else {
+          // Background load of all historical invoices
+          setInvoices(res.data.data);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch invoices:', err);
-      setInvoices([]);
     } finally {
       if (!isSilent) setLoading(false);
     }
@@ -73,6 +116,72 @@ export default function SalesInvoiceList() {
     }
   };
 
+  const formatDateTime = (ordDate, ordTime) => {
+    if (!ordDate) return 'N/A';
+    try {
+      const datePart = typeof ordDate === 'string' && ordDate.includes('T')
+        ? ordDate.substring(0, 10)
+        : ordDate;
+      const cleanTime = ordTime || '00:00:00';
+      const parsed = new Date(`${datePart}T${cleanTime}`);
+      if (isNaN(parsed.getTime())) {
+        const fallback = new Date(ordDate);
+        if (!isNaN(fallback.getTime())) {
+          return fallback.toLocaleDateString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric'
+          }) + (ordTime ? ' ' + ordTime : '');
+        }
+        return `${ordDate} ${ordTime || ''}`;
+      }
+      return parsed.toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    } catch (e) {
+      return `${ordDate} ${ordTime || ''}`;
+    }
+  };
+
+  // Get list of unique created users dynamically for dropdown
+  const uniqueUsers = Array.from(new Set(invoices.map(inv => inv.userId).filter(Boolean)));
+
+  // Client-side filtering
+  const filteredInvoices = invoices.filter(item => {
+    let matchesInvoiceNo = true;
+    if (searchInvoiceNo) {
+      matchesInvoiceNo = item.ipNo?.toLowerCase().includes(searchInvoiceNo.toLowerCase());
+    }
+
+    let matchesCustomer = true;
+    if (searchCustomer) {
+      matchesCustomer = item.patientName?.toLowerCase().includes(searchCustomer.toLowerCase());
+    }
+
+    let matchesCreatedBy = true;
+    if (filterUser !== 'All') {
+      matchesCreatedBy = item.userId?.toLowerCase() === filterUser.toLowerCase();
+    }
+
+    let matchesDate = true;
+    if (startDate || endDate) {
+      const itemDateStr = item.ordDate 
+        ? (typeof item.ordDate === 'string' && item.ordDate.includes('T') ? item.ordDate.substring(0,10) : item.ordDate)
+        : '';
+      
+      if (startDate && itemDateStr) {
+        matchesDate = itemDateStr >= startDate;
+      }
+      if (endDate && matchesDate && itemDateStr) {
+        matchesDate = itemDateStr <= endDate;
+      }
+    }
+
+    return matchesInvoiceNo && matchesCustomer && matchesCreatedBy && matchesDate;
+  });
+
+  // Client-side pagination
+  const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage) || 1;
+  const paginatedInvoices = filteredInvoices.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
   const renderTableHeader = () => (
     <View style={styles.tableHeader}>
       <Text style={[styles.headerText, { flex: 1.5 }]}>Invoice ID</Text>
@@ -86,11 +195,7 @@ export default function SalesInvoiceList() {
   );
 
   const renderInvoiceRow = ({ item, index }) => {
-    const formattedDate = item.ordDate 
-      ? new Date(`${item.ordDate}T${item.ordTime || '00:00:00'}`).toLocaleDateString('en-IN', {
-          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        })
-      : `${item.ordDate || ''} ${item.ordTime || ''}`;
+    const formattedDate = formatDateTime(item.ordDate, item.ordTime);
 
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
@@ -123,38 +228,137 @@ export default function SalesInvoiceList() {
 
   return (
     <View style={styles.container}>
+      {/* Title Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Sales Invoices</Text>
-        <View style={styles.searchContainer}>
-          <Search size={18} color="#64748b" style={styles.searchIcon} />
-          <TextInput 
-            style={styles.searchInput}
-            placeholder="Search invoice, customer, order..."
-            value={search}
-            onChangeText={setSearch}
-          />
+      </View>
+
+      {/* Modern Filter Row */}
+      <View style={styles.filterRow}>
+        <View style={styles.filterCol}>
+          <Text style={styles.filterLabel}>Invoice No</Text>
+          <View style={styles.inputWrapper}>
+            <Search size={14} color="#64748b" style={{ marginRight: 6 }} />
+            <TextInput 
+              style={styles.filterInput}
+              placeholder="Search Invoice ID..."
+              value={searchInvoiceNo}
+              onChangeText={setSearchInvoiceNo}
+            />
+          </View>
+        </View>
+
+        <View style={styles.filterCol}>
+          <Text style={styles.filterLabel}>Customer Name</Text>
+          <View style={styles.inputWrapper}>
+            <Search size={14} color="#64748b" style={{ marginRight: 6 }} />
+            <TextInput 
+              style={styles.filterInput}
+              placeholder="Search Customer..."
+              value={searchCustomer}
+              onChangeText={setSearchCustomer}
+            />
+          </View>
+        </View>
+
+        <View style={styles.filterCol}>
+          <Text style={styles.filterLabel}>Created By</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker
+              selectedValue={filterUser}
+              onValueChange={setFilterUser}
+              style={styles.filterPicker}
+            >
+              <Picker.Item label="All Users" value="All" />
+              {uniqueUsers.map(u => (
+                <Picker.Item key={u} label={u} value={u} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.filterCol}>
+          <Text style={styles.filterLabel}>Start Date</Text>
+          {Platform.OS === 'web' ? (
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={webDatePickerStyle}
+            />
+          ) : (
+            <TextInput
+              style={styles.mobileDateInput}
+              value={startDate}
+              onChangeText={setStartDate}
+              placeholder="YYYY-MM-DD"
+            />
+          )}
+        </View>
+
+        <View style={styles.filterCol}>
+          <Text style={styles.filterLabel}>End Date</Text>
+          {Platform.OS === 'web' ? (
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={webDatePickerStyle}
+            />
+          ) : (
+            <TextInput
+              style={styles.mobileDateInput}
+              value={endDate}
+              onChangeText={setEndDate}
+              placeholder="YYYY-MM-DD"
+            />
+          )}
         </View>
       </View>
 
+      {/* Grid Table Container */}
       <View style={styles.tableContainer}>
-        {loading ? (
+        {loading && invoices.length === 0 ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#4338ca" />
           </View>
         ) : (
-          <FlatList 
-            data={filteredInvoices}
-            keyExtractor={(item) => item.id.toString()}
-            ListHeaderComponent={renderTableHeader}
-            stickyHeaderIndices={[0]}
-            renderItem={renderInvoiceRow}
-            contentContainerStyle={{ flexGrow: 1 }}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No sales invoices found.</Text>
-              </View>
-            }
-          />
+          <>
+            <FlatList 
+              data={paginatedInvoices}
+              keyExtractor={(item) => item.id.toString()}
+              ListHeaderComponent={renderTableHeader}
+              stickyHeaderIndices={[0]}
+              renderItem={renderInvoiceRow}
+              contentContainerStyle={{ flexGrow: 1 }}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No sales invoices found.</Text>
+                </View>
+              }
+            />
+            
+            {/* Pagination Panel */}
+            <View style={styles.paginationContainer}>
+              <TouchableOpacity 
+                disabled={page === 1} 
+                onPress={() => setPage(page - 1)} 
+                style={[styles.pageButton, page === 1 && styles.pageButtonDisabled]}
+              >
+                <Text style={[styles.pageButtonText, page === 1 && styles.pageButtonTextDisabled]}>Previous</Text>
+              </TouchableOpacity>
+              <Text style={styles.pageInfoText}>
+                Page {page} of {totalPages} (Total Invoices: {filteredInvoices.length})
+              </Text>
+              <TouchableOpacity 
+                disabled={page === totalPages} 
+                onPress={() => setPage(page + 1)} 
+                style={[styles.pageButton, page === totalPages && styles.pageButtonDisabled]}
+              >
+                <Text style={[styles.pageButtonText, page === totalPages && styles.pageButtonTextDisabled]}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
       </View>
 
@@ -181,6 +385,7 @@ export default function SalesInvoiceList() {
                   <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Order No:</Text> {selectedInvoice.actCode || 'N/A'}</Text>
                   <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Created By:</Text> {selectedInvoice.userId || 'Walk-in'}</Text>
                   <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Payment Mode:</Text> {selectedInvoice.counterSale || 'N/A'}</Text>
+                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Date/Time:</Text> {formatDateTime(selectedInvoice.ordDate, selectedInvoice.ordTime)}</Text>
                 </View>
 
                 {/* Items Ordered Block */}
@@ -243,11 +448,19 @@ export default function SalesInvoiceList() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc', padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 },
+  header: { marginBottom: 12 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, height: 38, width: 300 },
-  searchIcon: { marginRight: 6 },
-  searchInput: { flex: 1, height: '100%', outlineStyle: 'none', fontSize: 13, color: '#334155' },
+  
+  // Filter row styling
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'flex-end', backgroundColor: '#fff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  filterCol: { flexDirection: 'column', gap: 4, minWidth: 140 },
+  filterLabel: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 38, width: 200 },
+  filterInput: { flex: 1, height: '100%', outlineStyle: 'none', fontSize: 13, color: '#334155' },
+  pickerWrapper: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#fff', height: 38, justifyContent: 'center', minWidth: 150 },
+  filterPicker: { height: 38, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, fontSize: 13, color: '#334155', ...Platform.select({ web: { outlineStyle: 'none' } }) },
+  mobileDateInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 38, fontSize: 13, backgroundColor: '#fff', color: '#334155', minWidth: 140 },
+
   tableContainer: { flex: 1, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff' },
   tableHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#f1f5f9', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerText: { fontSize: 12, fontWeight: '700', color: '#475569' },
@@ -256,9 +469,18 @@ const styles = StyleSheet.create({
   cellText: { fontSize: 13, color: '#334155' },
   cellTextBold: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
   actionBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#eef2ff' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   emptyText: { color: '#64748b', fontSize: 14 },
+  
+  // Pagination styling
+  paginationContainer: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  pageButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#4338ca', justifyContent: 'center', alignItems: 'center' },
+  pageButtonDisabled: { backgroundColor: '#e2e8f0' },
+  pageButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
+  pageButtonTextDisabled: { color: '#94a3b8' },
+  pageInfoText: { fontSize: 12, color: '#64748b', fontWeight: '500', marginHorizontal: 4 },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
