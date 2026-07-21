@@ -152,6 +152,11 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched modified_by_name in ecogreenpurchase_orders.'))
     .catch(err => console.error('Error patching ecogreenpurchase_orders (modified_by_name):', err.message));
 
+  pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT \'[]\'::jsonb')
+    .then(() => console.log('Successfully checked/patched notes in ecogreenpurchase_orders.'))
+    .catch(err => console.error('Error patching ecogreenpurchase_orders (notes):', err.message));
+
+
   // online_orders modifications
   pool.query('ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP')
     .then(() => console.log('Successfully checked/patched delivered_at in online_orders.'))

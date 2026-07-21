@@ -149,6 +149,62 @@ export default function AdminPerformance() {
     setPickerModalVisible(false);
     setPickerSearch('');
   };
+
+  const safeFormatDate = (dateVal: any, includeTime: boolean = false) => {
+    if (!dateVal) return 'N/A';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return 'N/A';
+      
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      
+      if (!includeTime) {
+        return `${day}/${month}/${year}`;
+      }
+      
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const strTime = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+      
+      return `${day}/${month}/${year}, ${strTime}`;
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  const safeFormatTime = (timeVal: any) => {
+    if (!timeVal) return 'N/A';
+    try {
+      const d = new Date(timeVal);
+      if (isNaN(d.getTime())) return 'N/A';
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  const safeFormatCurrency = (val: any) => {
+    if (val === null || val === undefined) return '0';
+    try {
+      const num = Number(val);
+      if (isNaN(num)) return '0';
+      const parts = num.toFixed(0).split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return parts.join('.');
+    } catch (e) {
+      return '0';
+    }
+  };
   
   useEffect(() => {
     // Set initial filter value based on current month/date
@@ -689,7 +745,7 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>Total Revenue</Text>
-              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{(executive.overview?.totalRevenue || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{safeFormatCurrency(executive.overview?.totalRevenue)}</Text>
               <Text style={styles.kpiSub}>Fee from active bookings</Text>
             </View>
           </View>
@@ -700,7 +756,7 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>Doctors Share</Text>
-              <Text style={[styles.kpiValue, { color: '#0284C7' }]}>₹{(executive.overview?.totalDoctorShare || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.kpiValue, { color: '#0284C7' }]}>₹{safeFormatCurrency(executive.overview?.totalDoctorShare)}</Text>
               <Text style={styles.kpiSub}>Commission payout</Text>
             </View>
           </View>
@@ -711,7 +767,7 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>BMH Net Share</Text>
-              <Text style={[styles.kpiValue, { color: '#4F46E5' }]}>₹{(executive.overview?.totalBMHShare || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.kpiValue, { color: '#4F46E5' }]}>₹{safeFormatCurrency(executive.overview?.totalBMHShare)}</Text>
               <Text style={styles.kpiSub}>Hospital revenue share</Text>
             </View>
           </View>
@@ -781,7 +837,7 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>Booking Revenue</Text>
-              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{(executive.overview?.totalBookingRevenue || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{safeFormatCurrency(executive.overview?.totalBookingRevenue)}</Text>
               <Text style={styles.kpiSub}>Staff Bookings: {executive.overview?.totalBookingsMade || 0}</Text>
             </View>
           </View>
@@ -897,7 +953,7 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>Total Revenue</Text>
-              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{((executive.totalCashCollected || 0) + (executive.totalOnlinePayments || 0))?.toLocaleString('en-IN')}</Text>
+              <Text style={[styles.kpiValue, { color: '#059669' }]}>₹{safeFormatCurrency((executive.totalCashCollected || 0) + (executive.totalOnlinePayments || 0))}</Text>
               <Text style={styles.kpiSub}>From delivered orders</Text>
             </View>
           </View>
@@ -908,7 +964,7 @@ export default function AdminPerformance() {
             </View>
             <View>
               <Text style={styles.kpiLabel}>Total Delivery Charges</Text>
-              <Text style={styles.kpiValue}>₹{executive.totalDeliveryCharges?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={styles.kpiValue}>₹{safeFormatCurrency(executive.totalDeliveryCharges)}</Text>
               <Text style={styles.kpiSub}>Dynamic charges billed</Text>
             </View>
           </View>
@@ -927,19 +983,19 @@ export default function AdminPerformance() {
           <View style={styles.paymentsSummary}>
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>Total Billing Value</Text>
-              <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{(executive.financials?.totalRevenue || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{safeFormatCurrency(executive.financials?.totalRevenue)}</Text>
             </View>
             <View style={styles.paymentDivider} />
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>Cash Billed (Counter)</Text>
-              <Text style={[styles.paymentValue, { color: '#059669' }]}>₹{(executive.financials?.cashCollected || 0).toLocaleString('en-IN')}</Text>
-              <Text style={styles.paymentSub}>Doctor Share: ₹{(executive.financials?.cashDoctorShare || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.paymentValue, { color: '#059669' }]}>₹{safeFormatCurrency(executive.financials?.cashCollected)}</Text>
+              <Text style={styles.paymentSub}>Doctor Share: ₹{safeFormatCurrency(executive.financials?.cashDoctorShare)}</Text>
             </View>
             <View style={styles.paymentDivider} />
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>Online Received</Text>
-              <Text style={[styles.paymentValue, { color: '#0284C7' }]}>₹{(executive.financials?.onlineCollected || 0).toLocaleString('en-IN')}</Text>
-              <Text style={styles.paymentSub}>Doctor Share: ₹{(executive.financials?.onlineDoctorShare || 0).toLocaleString('en-IN')}</Text>
+              <Text style={[styles.paymentValue, { color: '#0284C7' }]}>₹{safeFormatCurrency(executive.financials?.onlineCollected)}</Text>
+              <Text style={styles.paymentSub}>Doctor Share: ₹{safeFormatCurrency(executive.financials?.onlineDoctorShare)}</Text>
             </View>
           </View>
         </View>
@@ -960,7 +1016,7 @@ export default function AdminPerformance() {
               <View style={styles.paymentDivider} />
               <View style={styles.paymentCol}>
                 <Text style={styles.paymentLabel}>Total Booking Revenue</Text>
-                <Text style={[styles.paymentValue, { color: '#059669' }]}>₹{(executive.overview?.totalBookingRevenue || 0).toLocaleString('en-IN')}</Text>
+                <Text style={[styles.paymentValue, { color: '#059669' }]}>₹{safeFormatCurrency(executive.overview?.totalBookingRevenue)}</Text>
               </View>
             </View>
           </View>
@@ -976,22 +1032,22 @@ export default function AdminPerformance() {
           <View style={styles.paymentsSummary}>
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>Total Order Value</Text>
-              <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{executive.totalOrderValue?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={[styles.paymentValue, { color: '#4F46E5' }]}>₹{safeFormatCurrency(executive.totalOrderValue)}</Text>
             </View>
             <View style={styles.paymentDivider} />
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>COD Collected (Cash)</Text>
-              <Text style={styles.paymentValue}>₹{executive.totalCashCollected?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={styles.paymentValue}>₹{safeFormatCurrency(executive.totalCashCollected)}</Text>
             </View>
             <View style={styles.paymentDivider} />
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>Online Payments</Text>
-              <Text style={styles.paymentValue}>₹{executive.totalOnlinePayments?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={styles.paymentValue}>₹{safeFormatCurrency(executive.totalOnlinePayments)}</Text>
             </View>
             <View style={styles.paymentDivider} />
             <View style={styles.paymentCol}>
               <Text style={styles.paymentLabel}>Pending Cash Collection</Text>
-              <Text style={[styles.paymentValue, { color: '#D97706' }]}>₹{executive.pendingCashCollection?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={[styles.paymentValue, { color: '#D97706' }]}>₹{safeFormatCurrency(executive.pendingCashCollection)}</Text>
             </View>
           </View>
 
@@ -1002,7 +1058,7 @@ export default function AdminPerformance() {
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
                 {executive.busOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
               </Text>
-              <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.busOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600', marginTop: 2 }}>Value: ₹{safeFormatCurrency(executive.busOrdersValue)}</Text>
             </View>
             
             <View style={{ flex: 1, minWidth: 200, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8 }}>
@@ -1010,7 +1066,7 @@ export default function AdminPerformance() {
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 4 }}>
                 {executive.scheduledOrdersCount || 0} <Text style={{ fontSize: 13, fontWeight: '400', color: '#64748B' }}>orders</Text>
               </Text>
-              <Text style={{ fontSize: 13, color: '#0284C7', fontWeight: '600', marginTop: 2 }}>Value: ₹{executive.scheduledOrdersValue?.toLocaleString('en-IN') || 0}</Text>
+              <Text style={{ fontSize: 13, color: '#0284C7', fontWeight: '600', marginTop: 2 }}>Value: ₹{safeFormatCurrency(executive.scheduledOrdersValue)}</Text>
             </View>
           </View>
         </View>
@@ -1177,7 +1233,7 @@ export default function AdminPerformance() {
           <View style={[styles.card, { flex: 1 }]}>
             <Text style={styles.sectionTitle}>Needs Attention (Issues & Failures)</Text>
             {(executive.bottomExecutives || []).map((exec: any, index: number) => (
-              <View key={exec.riderId} style={styles.rankItem}>
+              <View key={exec.riderId || index} style={styles.rankItem}>
                 <View style={[styles.rankBadge, { backgroundColor: '#FEE2E2' }]}>
                   <Text style={[styles.rankText, { color: '#EF4444' }]}>!</Text>
                 </View>
@@ -1198,7 +1254,7 @@ export default function AdminPerformance() {
           <View style={[styles.card, { flex: 1 }]}>
             <Text style={styles.sectionTitle}>Top Performers</Text>
             {topEmployees.slice(0, 5).map((e: any, index: number) => (
-              <View key={e.id} style={styles.rankItem}>
+              <View key={e.id || index} style={styles.rankItem}>
                 <View style={[styles.rankBadge, { backgroundColor: '#ECFDF5' }]}>
                   <Text style={[styles.rankText, { color: '#10B981' }]}>#{index + 1}</Text>
                 </View>
@@ -1217,7 +1273,7 @@ export default function AdminPerformance() {
           <View style={[styles.card, { flex: 1 }]}>
             <Text style={styles.sectionTitle}>Employees Requiring Improvement</Text>
             {bottomEmployees.slice(0, 5).map((e: any, index: number) => (
-              <View key={e.id} style={styles.rankItem}>
+              <View key={e.id || index} style={styles.rankItem}>
                 <View style={[styles.rankBadge, { backgroundColor: '#FEE2E2' }]}>
                   <Text style={[styles.rankText, { color: '#EF4444' }]}>!</Text>
                 </View>
@@ -1272,9 +1328,9 @@ export default function AdminPerformance() {
                       {d.totalBookings} ({d.completedConsultations} / {d.cancelledBookings})
                     </Text>
                     <Text style={[styles.td, { width: 80 }]}>{d.feePercent}%</Text>
-                    <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{d.revenue?.toLocaleString('en-IN')}</Text>
-                    <Text style={[styles.td, { width: 100, color: '#0284C7', fontWeight: '600' }]}>₹{d.doctorShare?.toLocaleString('en-IN')}</Text>
-                    <Text style={[styles.td, { width: 100, color: '#4F46E5', fontWeight: '600' }]}>₹{d.bmhShare?.toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{safeFormatCurrency(d.revenue)}</Text>
+                    <Text style={[styles.td, { width: 100, color: '#0284C7', fontWeight: '600' }]}>₹{safeFormatCurrency(d.doctorShare)}</Text>
+                    <Text style={[styles.td, { width: 100, color: '#4F46E5', fontWeight: '600' }]}>₹{safeFormatCurrency(d.bmhShare)}</Text>
                   </View>
                 ))}
               </>
@@ -1325,7 +1381,7 @@ export default function AdminPerformance() {
                       </Text>
                     </View>
                     <Text style={[styles.td, { width: 100 }]}>{e.bookings?.total > 0 ? e.bookings.total : 'N/A'}</Text>
-                    <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{e.bookings?.total > 0 ? `₹${e.bookings.revenue}` : 'N/A'}</Text>
+                    <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>{e.bookings?.total > 0 ? `₹${safeFormatCurrency(e.bookings.revenue)}` : 'N/A'}</Text>
                   </View>
                 ))}
               </>
@@ -1417,7 +1473,7 @@ export default function AdminPerformance() {
                     filteredBookings.map((b: any, idx: number) => (
                       <View key={b.id || idx} style={styles.tableRow}>
                         <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>#{b.id}</Text>
-                        <Text style={[styles.td, { width: 120 }]}>{new Date(b.date).toLocaleDateString('en-IN')}</Text>
+                        <Text style={[styles.td, { width: 120 }]}>{safeFormatDate(b.date)}</Text>
                         <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{b.patientName}</Text>
                         <Text style={[styles.td, { width: 130 }]}>{b.patientPhone}</Text>
                         <View style={[styles.td, { width: 120 }]}>
@@ -1592,8 +1648,8 @@ export default function AdminPerformance() {
                               {t.status}
                             </Text>
                           </View>
-                          <Text style={[styles.td, { width: 120 }]}>{t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : 'N/A'}</Text>
-                          <Text style={[styles.td, { width: 120 }]}>{t.completedAt ? new Date(t.completedAt).toLocaleDateString('en-IN') : 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 120 }]}>{safeFormatDate(t.dueDate)}</Text>
+                          <Text style={[styles.td, { width: 120 }]}>{safeFormatDate(t.completedAt)}</Text>
                           <Text style={[styles.td, { width: 100 }]}>{t.durationHours != null ? `${t.durationHours} hrs` : 'N/A'}</Text>
                         </View>
                       ))
@@ -1622,9 +1678,9 @@ export default function AdminPerformance() {
                     ) : (
                       filteredAtt.map((a: any) => (
                         <View key={a.id} style={styles.tableRow}>
-                          <Text style={[styles.td, { width: 120, fontWeight: '600' }]}>{new Date(a.date).toLocaleDateString('en-IN')}</Text>
-                          <Text style={[styles.td, { width: 150 }]}>{a.checkin ? new Date(a.checkin).toLocaleTimeString('en-US', { hour12: true }) : 'N/A'}</Text>
-                          <Text style={[styles.td, { width: 150 }]}>{a.checkout ? new Date(a.checkout).toLocaleTimeString('en-US', { hour12: true }) : 'N/A'}</Text>
+                          <Text style={[styles.td, { width: 120, fontWeight: '600' }]}>{safeFormatDate(a.date)}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{safeFormatTime(a.checkin)}</Text>
+                          <Text style={[styles.td, { width: 150 }]}>{safeFormatTime(a.checkout)}</Text>
                           <Text style={[styles.td, { width: 120 }]}>{a.sessionHours || 'N/A'}</Text>
                           <Text style={[styles.td, { width: 100 }]}>{a.breakTime || '0 mins'}</Text>
                           <View style={[styles.td, { width: 100 }]}>
@@ -1661,7 +1717,7 @@ export default function AdminPerformance() {
                       {filteredBookings.map((b: any) => (
                         <View key={b.id} style={styles.tableRow}>
                           <Text style={[styles.td, { width: 100, fontWeight: '700' }]}>#{b.id}</Text>
-                          <Text style={[styles.td, { width: 120 }]}>{new Date(b.createdAt).toLocaleDateString('en-IN')}</Text>
+                          <Text style={[styles.td, { width: 120 }]}>{safeFormatDate(b.createdAt)}</Text>
                           <Text style={[styles.td, { width: 180, fontWeight: '600' }]}>{b.patientName}</Text>
                           <Text style={[styles.td, { width: 150 }]}>{b.doctorName}</Text>
                           <Text style={[styles.td, { width: 100, fontWeight: '600' }]}>₹{b.fee}</Text>
@@ -1777,8 +1833,7 @@ export default function AdminPerformance() {
                   ) : (
                     sortedOrders.map((order: any, idx: number) => {
                       const formatTime = (ts: string) => {
-                        if (!ts) return 'N/A';
-                        return new Date(ts).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+                        return safeFormatDate(ts, true);
                       };
                       const formatDuration = (mins: number) => {
                         if (mins === null || mins === undefined) return 'N/A';
@@ -1892,7 +1947,7 @@ export default function AdminPerformance() {
         onRequestClose={() => { setPickerModalVisible(false); setPickerSearch(''); }}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: 350, maxHeight: '80%' }]}>
+          <View style={[styles.modalContent, { width: isMobile ? '90%' : 350, height: 420, padding: 16 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{pickerTitle}</Text>
               <TouchableOpacity onPress={() => { setPickerModalVisible(false); setPickerSearch(''); }} style={styles.modalCloseBtn}>
@@ -1908,7 +1963,7 @@ export default function AdminPerformance() {
               autoFocus
             />
 
-            <ScrollView style={{ flex: 1 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
               {getPickerOptions().map((opt) => {
                 const isSelected = pickerType === 'rider' ? String(opt.value) === String(filterRiderId) :
                                    pickerType === 'area' ? String(opt.value) === String(filterArea) :

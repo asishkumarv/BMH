@@ -413,21 +413,24 @@ export default function PurchaseOrdersScreen() {
         }
       }
 
+      const targetAddress = selectedOrder.delivery_type === 'Local' ? editAddress : null;
       const res = await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/address/${selectedOrder.id}`, {
-        address: editAddress,
+        address: targetAddress,
+        delivery_type: selectedOrder.delivery_type,
         modified_by_id: modifiedById,
         modified_by_type: modifiedByType,
         modified_by_name: authName
       });
 
       if (res.data.success) {
-        alert('Address updated successfully!');
-        const updatedOrd = { ...selectedOrder, address: editAddress, modified_by_name: authName };
+        alert('Details updated successfully!');
+        const updatedOrd = { ...selectedOrder, address: targetAddress, delivery_type: selectedOrder.delivery_type, modified_by_name: authName };
         setSelectedOrder(updatedOrd);
         setOrders(orders.map(o => o.id === selectedOrder.id ? updatedOrd : o));
+        fetchPurchaseOrders(true);
       }
     } catch (err) {
-      alert('Failed to update address');
+      alert('Failed to update details');
     }
   };
 
@@ -554,10 +557,12 @@ export default function PurchaseOrdersScreen() {
         })
       : '-';
 
-    let statusColor = '#ef4444'; 
+    let statusColor = '#94a3b8'; 
     if (item.status === 'Pending') statusColor = '#3b82f6';
     else if (item.status === 'Assigned') statusColor = '#f59e0b';
     else if (item.status === 'Delivered' || item.status === 'Completed') statusColor = '#10b981';
+    else if (item.status === 'Not Available') statusColor = '#ef4444';
+    else if (item.status === 'Cancelled') statusColor = '#ef4444';
 
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
@@ -1064,9 +1069,19 @@ export default function PurchaseOrdersScreen() {
                       <Text style={styles.detailLabel}>Total Amount:</Text>
                       <Text style={[styles.detailValue, { fontWeight: '700', color: '#10b981' }]}>₹{selectedOrder.total}</Text>
                     </View>
-                    <View style={styles.detailRow}>
+                    <View style={{ marginVertical: 6 }}>
                       <Text style={styles.detailLabel}>Delivery Mode:</Text>
-                      <Text style={styles.detailValue}>{selectedOrder.delivery_type || 'Local'}</Text>
+                      <View style={[styles.dropdownWrapper, { marginTop: 4, height: 35, width: '100%', justifyContent: 'center' }]}>
+                        <Picker
+                          selectedValue={selectedOrder.delivery_type || 'Local'}
+                          onValueChange={(val) => setSelectedOrder({ ...selectedOrder, delivery_type: val })}
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="Store Pickup" value="Store" />
+                          <Picker.Item label="Local Pickup/Delivery" value="Local" />
+                          <Picker.Item label="Bus Transport" value="Bus" />
+                        </Picker>
+                      </View>
                     </View>
 
                     {selectedOrder.delivery_type === 'Local' && (
@@ -1078,9 +1093,6 @@ export default function PurchaseOrdersScreen() {
                           onChangeText={setEditAddress}
                           placeholder="Edit Pickup/Delivery Address"
                         />
-                        <TouchableOpacity style={[styles.saveBtn, { paddingVertical: 8, marginTop: 4 }]} onPress={handleSaveAddress}>
-                          <Text style={{ fontSize: 13, color: '#fff', fontWeight: 'bold' }}>Update Address</Text>
-                        </TouchableOpacity>
                         
                         {selectedOrder.gps_location ? (
                           <TouchableOpacity 
@@ -1114,6 +1126,10 @@ export default function PurchaseOrdersScreen() {
                         })()}
                       </View>
                     )}
+
+                    <TouchableOpacity style={[styles.saveBtn, { paddingVertical: 8, marginTop: 12 }]} onPress={handleSaveAddress}>
+                      <Text style={{ fontSize: 13, color: '#fff', fontWeight: 'bold' }}>Save Updates</Text>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Right Column: Items and Notes */}

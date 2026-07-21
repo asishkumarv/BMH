@@ -261,7 +261,11 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
   };
 
   const handleAddNote = async () => {
-    if (!newNote.trim()) return;
+    const originalOrder = orders.find(o => o.id === selectedOrder.id);
+    const isDeliveryTypeChanged = selectedOrder.delivery_type !== originalOrder?.delivery_type;
+    const isAddressChanged = editAddress !== (originalOrder?.address || '');
+    
+    if (!newNote.trim() && !isDeliveryTypeChanged && !isAddressChanged) return;
     try {
       let author = 'Employee';
       let modifiedById = null;
@@ -288,19 +292,25 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
 
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/update/${selectedOrder.id}`, {
         address: editAddress || null,
-        new_note: newNote,
+        new_note: newNote.trim() ? newNote : null,
         note_author: author,
         modified_by_id: modifiedById,
         modified_by_type: modifiedByType,
-        modified_by_name: authName
+        modified_by_name: authName,
+        delivery_type: selectedOrder.delivery_type
       });
       if (res.data.success) {
-        setSelectedOrder(res.data.data);
+        let updatedNotes = [];
+        try {
+          updatedNotes = typeof res.data.data.notes === 'string' ? JSON.parse(res.data.data.notes) : (res.data.data.notes || []);
+        } catch(e) {}
+        setSelectedOrder({ ...res.data.data, notes: updatedNotes });
         setNewNote('');
+        alert('Updates saved successfully!');
         fetchPurchaseOrders(true);
       }
     } catch (err) {
-      alert('Failed to add note');
+      alert('Failed to save updates');
     }
   };
 
@@ -384,7 +394,13 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
   };
 
   const handleSelectOrderForView = (order) => {
-    setSelectedOrder(order);
+    let parsedNotes = [];
+    try {
+      parsedNotes = typeof order.notes === 'string' ? JSON.parse(order.notes) : (order.notes || []);
+    } catch(e) {}
+    if (!Array.isArray(parsedNotes)) parsedNotes = [];
+
+    setSelectedOrder({ ...order, notes: parsedNotes });
     setEditAddress(order.address || '');
   };
 
@@ -476,6 +492,7 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
     let statusColor = '#3b82f6';
     if (item.status === 'Assigned') statusColor = '#f59e0b';
     else if (item.status === 'Delivered' || item.status === 'Completed') statusColor = '#10b981';
+    else if (item.status === 'Not Available') statusColor = '#ef4444';
 
     const formattedDate = item.created_at || item.createdatetime 
       ? new Date(item.created_at || item.createdatetime).toLocaleDateString('en-IN', {
@@ -1162,7 +1179,19 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
 
                 <View style={styles.detailsGroup}>
                   <Text style={styles.detailsTitle}>Delivery Details</Text>
-                  <Text style={styles.detailsText}>Type: {selectedOrder.delivery_type}</Text>
+                  
+                  <Text style={styles.label}>Delivery Mode</Text>
+                  <View style={[styles.dropdownWrapper, { marginBottom: 12 }]}>
+                    <Picker
+                      selectedValue={selectedOrder.delivery_type || 'Local'}
+                      onValueChange={(val) => setSelectedOrder({ ...selectedOrder, delivery_type: val })}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Store Pickup" value="Store" />
+                      <Picker.Item label="Local Pickup/Delivery" value="Local" />
+                      <Picker.Item label="Bus Transport" value="Bus" />
+                    </Picker>
+                  </View>
                   
                   <Text style={styles.label}>Pickup Address</Text>
                   <TextInput 

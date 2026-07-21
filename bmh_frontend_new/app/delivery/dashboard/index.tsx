@@ -12,7 +12,7 @@ import CrossPlatformMap from './CrossPlatformMap';
 
 const formatDateTime = (dateStr: string, timeStr?: string) => {
   if (!dateStr) return 'N/A';
-  
+
   let dateObj: Date;
   if (dateStr.includes('T') && !timeStr) {
     // It's a full ISO string
@@ -52,7 +52,7 @@ const formatDateTime = (dateStr: string, timeStr?: string) => {
 
 const formatTime12h = (timeStr: string) => {
   if (!timeStr) return '';
-  
+
   // If it's a full ISO string
   if (timeStr.includes('T')) {
     const dateObj = new Date(timeStr);
@@ -68,7 +68,7 @@ const formatTime12h = (timeStr: string) => {
   // If it's a standard HH:MM:SS or HH:MM string
   const parts = timeStr.split(':');
   if (parts.length < 2) return timeStr; // fallback
-  
+
   let hour = parseInt(parts[0], 10);
   const min = parts[1];
   if (isNaN(hour)) return timeStr;
@@ -112,7 +112,7 @@ export default function DeliveryDashboard() {
 
   // New State
   const [filterState, setFilterState] = useState('All');
-  const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [routeModalVisible, setRouteModalVisible] = useState(false);
   const [routeToggle, setRouteToggle] = useState<'All' | 'Assigned' | 'PickedUp'>('All');
   const [summary, setSummary] = useState<any>(null);
@@ -132,7 +132,7 @@ export default function DeliveryDashboard() {
       const lng = parseFloat(order.map_lng);
       if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
     }
-    
+
     // Check location_link or address for raw coordinate string "lat,lng"
     const link = order.location_link || '';
     if (link && link.includes(',')) {
@@ -141,13 +141,13 @@ export default function DeliveryDashboard() {
       const lng = parseFloat(parts[1].trim());
       if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
     }
-    
+
     const url = order.location_link || order.address || '';
     if (url && (url.includes('maps.google.com') || url.includes('maps.app.goo.gl') || url.includes('google.com/maps'))) {
-      const match = url.match(/query=([-\d.]+),([-\d.]+)/) || 
-                    url.match(/q=([-\d.]+),([-\d.]+)/) ||
-                    url.match(/place\/([-\d.]+),([-\d.]+)/) ||
-                    url.match(/@([-\d.]+),([-\d.]+)/);
+      const match = url.match(/query=([-\d.]+),([-\d.]+)/) ||
+        url.match(/q=([-\d.]+),([-\d.]+)/) ||
+        url.match(/place\/([-\d.]+),([-\d.]+)/) ||
+        url.match(/@([-\d.]+),([-\d.]+)/);
       if (match) {
         const lat = parseFloat(match[1]);
         const lng = parseFloat(match[2]);
@@ -157,10 +157,10 @@ export default function DeliveryDashboard() {
     return null;
   };
 
-  const calculateShortestRoute = (startLoc: {lat: number, lng: number}, points: any[]) => {
+  const calculateShortestRoute = (startLoc: { lat: number, lng: number }, points: any[]) => {
     if (points.length === 0) return [];
-    
-    const getDist = (p1: {lat: number, lng: number}, p2: {lat: number, lng: number}) => {
+
+    const getDist = (p1: { lat: number, lng: number }, p2: { lat: number, lng: number }) => {
       const dy = p1.lat - p2.lat;
       const dx = p1.lng - p2.lng;
       return Math.sqrt(dx * dx + dy * dy);
@@ -207,10 +207,10 @@ export default function DeliveryDashboard() {
       const statusLower = o.status?.toLowerCase() || '';
       const isCompleted = ['delivered', 'completed', 'received', 'cancelled'].includes(statusLower);
       if (isCompleted) return false;
-      
+
       const isBus = o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus';
       if (isBus) return false;
-      
+
       if (routeToggle === 'All') {
         return true;
       } else if (routeToggle === 'Assigned') {
@@ -244,13 +244,13 @@ export default function DeliveryDashboard() {
     setSubmissionSearchQuery('');
     setSubmissionModalVisible(true);
     setSubmissionLoading(true);
-    
+
     try {
       const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
       if (res.data && res.data.success) {
-        const filtered = res.data.data.filter((u: any) => 
-          u.type === 'employee' || 
-          u.role?.toLowerCase() === 'subadmin' || 
+        const filtered = res.data.data.filter((u: any) =>
+          u.type === 'employee' ||
+          u.role?.toLowerCase() === 'subadmin' ||
           u.role?.toLowerCase() === 'sub_admin'
         );
         setUsersList(filtered);
@@ -267,9 +267,9 @@ export default function DeliveryDashboard() {
 
   const handleSelectEmployee = (emp: any) => {
     if (!selectedPO) return;
-    
+
     const confirmMsg = `Confirm submitting Purchase Order #${selectedPO.id} to ${emp.full_name} (${emp.role}, ${emp.department})?`;
-    
+
     const proceedSubmit = async () => {
       setSubmissionLoading(true);
       try {
@@ -280,7 +280,7 @@ export default function DeliveryDashboard() {
           submitted_to_role: emp.role,
           submitted_to_dept: emp.department
         });
-        
+
         alert("Purchase Order submitted successfully!");
         setSubmissionModalVisible(false);
         if (user) fetchOrders(user.id);
@@ -321,14 +321,14 @@ export default function DeliveryDashboard() {
     }
     setRefreshing(false);
   };
-  
+
   const fetchSummary = async (empId: number) => {
     try {
       const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-dashboard/${empId}`);
       if (res.data.success) setSummary(res.data.data);
-    } catch (error) {}
+    } catch (error) { }
   };
-  
+
   const handleAction = async (type: string) => {
     if (!permission?.granted) {
       const { status } = await requestPermission();
@@ -336,12 +336,12 @@ export default function DeliveryDashboard() {
     }
     let { status: locStatus } = await Location.requestForegroundPermissionsAsync();
     if (locStatus !== 'granted') return Alert.alert('Location permission required.');
-    
+
     setActionType(type);
     setCameraMessage({ text: '', type: '' });
     setCameraVisible(true);
   };
-  
+
   const handleCapture = async () => {
     if (!cameraRef.current) return;
     setLoadingAction(true);
@@ -357,11 +357,11 @@ export default function DeliveryDashboard() {
       });
 
       const isLocationVerified = locRes.data.success && locRes.data.locationVerified;
-      
+
       if (!isLocationVerified && (actionType === 'login' || actionType === 'logout')) {
-         setCameraMessage({ text: locRes.data.message || "Outside allowed area.", type: 'error' });
-         setLoadingAction(false);
-         return;
+        setCameraMessage({ text: locRes.data.message || "Outside allowed area.", type: 'error' });
+        setLoadingAction(false);
+        return;
       }
 
       const payload: any = {
@@ -383,10 +383,10 @@ export default function DeliveryDashboard() {
         payload.breakType = actionType === 'break_in' ? 'Break In' : 'Break Out';
         const breakRes = await axios.post('https://napi.bharatmedicalhallplus.com/attendance/break', payload);
         if (breakRes.data.success) {
-           setCameraMessage({ text: breakRes.data.message, type: 'success' });
-           setTimeout(() => setCameraVisible(false), 2000);
+          setCameraMessage({ text: breakRes.data.message, type: 'success' });
+          setTimeout(() => setCameraVisible(false), 2000);
         } else {
-           setCameraMessage({ text: breakRes.data.message, type: 'error' });
+          setCameraMessage({ text: breakRes.data.message, type: 'error' });
         }
       }
       fetchSummary(user.id);
@@ -422,10 +422,10 @@ export default function DeliveryDashboard() {
           fetchOrders(storedUser.id);
           fetchSummary(storedUser.id);
           startLocationTracking(storedUser.id);
-          
+
           Location.getCurrentPositionAsync({}).then(loc => {
             setCurrentLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-          }).catch(() => {});
+          }).catch(() => { });
         }
       } catch (err) {
         console.error(err);
@@ -440,51 +440,51 @@ export default function DeliveryDashboard() {
       if (res.data && res.data.success) {
         // If we have more orders now than before, it means a new order was assigned
         if (ordersRef.current.length > 0 && res.data.data.length > ordersRef.current.length) {
-           try {
-             const { sound } = await Audio.Sound.createAsync(
-                { uri: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' },
-                { isLooping: true, shouldPlay: true }
-             );
-             setAlarmSound(sound);
-             alert("🔔 New Delivery Assigned!");
-           } catch (e) { console.log("Audio play failed:", e); }
+          try {
+            const { sound } = await Audio.Sound.createAsync(
+              { uri: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' },
+              { isLooping: true, shouldPlay: true }
+            );
+            setAlarmSound(sound);
+            alert("🔔 New Delivery Assigned!");
+          } catch (e) { console.log("Audio play failed:", e); }
         }
         setOrders(res.data.data);
-          if (Platform.OS !== 'web') {
-            try {
-              await Notifications.cancelAllScheduledNotificationsAsync();
-              res.data.data.forEach((order: any) => {
-                const isScheduled = order.is_scheduled && order.scheduled_date && order.scheduled_time;
-                const isBus = (order.delivery_type === 'Bus' || order.mode_of_delivery === 'Bus') && (order.bus_date || order.scheduled_date) && order.scheduled_time;
-                
-                if ((isScheduled || isBus) && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Cancelled') {
-                  const dateStr = (order.bus_date || order.scheduled_date).split('T')[0];
-                  const timeStr = order.scheduled_time;
-                  // Construct date string and parse
-                  const scheduledDateTime = new Date(`${dateStr}T${timeStr.includes(':') && timeStr.split(':').length === 2 ? timeStr + ':00' : timeStr}`);
-                  const alarmTime = new Date(scheduledDateTime.getTime() - 30 * 60000); // 30 mins prior
-                  
-                  if (alarmTime > new Date()) {
-                    Notifications.scheduleNotificationAsync({
-                      content: {
-                        title: isBus ? 'Bus Delivery Alert' : 'Scheduled Delivery Alert',
-                        body: isBus 
-                          ? `Bus delivery scheduled at ${order.scheduled_time}! (Order #${order.id})`
-                          : `You have a scheduled delivery for ${order.patient_name} at ${order.scheduled_time}! (Order #${order.id})`,
-                        sound: true,
-                      },
-                      trigger: {
-                        seconds: Math.max(1, Math.floor((alarmTime.getTime() - Date.now()) / 1000)),
-                        channelId: 'alarm-channel-v4'
-                      } as any,
-                    });
-                  }
+        if (Platform.OS !== 'web') {
+          try {
+            await Notifications.cancelAllScheduledNotificationsAsync();
+            res.data.data.forEach((order: any) => {
+              const isScheduled = order.is_scheduled && order.scheduled_date && order.scheduled_time;
+              const isBus = (order.delivery_type === 'Bus' || order.mode_of_delivery === 'Bus') && (order.bus_date || order.scheduled_date) && order.scheduled_time;
+
+              if ((isScheduled || isBus) && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Cancelled') {
+                const dateStr = (order.bus_date || order.scheduled_date).split('T')[0];
+                const timeStr = order.scheduled_time;
+                // Construct date string and parse
+                const scheduledDateTime = new Date(`${dateStr}T${timeStr.includes(':') && timeStr.split(':').length === 2 ? timeStr + ':00' : timeStr}`);
+                const alarmTime = new Date(scheduledDateTime.getTime() - 30 * 60000); // 30 mins prior
+
+                if (alarmTime > new Date()) {
+                  Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: isBus ? 'Bus Delivery Alert' : 'Scheduled Delivery Alert',
+                      body: isBus
+                        ? `Bus delivery scheduled at ${order.scheduled_time}! (Order #${order.id})`
+                        : `You have a scheduled delivery for ${order.patient_name} at ${order.scheduled_time}! (Order #${order.id})`,
+                      sound: true,
+                    },
+                    trigger: {
+                      seconds: Math.max(1, Math.floor((alarmTime.getTime() - Date.now()) / 1000)),
+                      channelId: 'alarm-channel-v4'
+                    } as any,
+                  });
                 }
-              });
-            } catch (e) {
-              console.log("Error scheduling notifications:", e);
-            }
+              }
+            });
+          } catch (e) {
+            console.log("Error scheduling notifications:", e);
           }
+        }
       }
     } catch (err) {
       console.error(err);
@@ -595,7 +595,7 @@ export default function DeliveryDashboard() {
       alert('Note added successfully');
       setUpdateModalVisible(false);
       if (user) fetchOrders(user.id);
-    } catch(err) { alert('Failed to add note'); }
+    } catch (err) { alert('Failed to add note'); }
   };
 
   const submitCancel = async () => {
@@ -611,7 +611,7 @@ export default function DeliveryDashboard() {
       }
       setUpdateModalVisible(false);
       if (user) fetchOrders(user.id);
-    } catch(err: any) {
+    } catch (err: any) {
       alert("Error: " + (err.response?.data?.message || err.message));
     }
   };
@@ -624,11 +624,24 @@ export default function DeliveryDashboard() {
         });
         alert('Order marked as Customer Not Available');
       } else {
-         alert('No Show not supported for this type yet');
+        alert('No Show not supported for this type yet');
       }
       setUpdateModalVisible(false);
       if (user) fetchOrders(user.id);
-    } catch(err) {
+    } catch (err) {
+      alert('Failed to update status');
+    }
+  };
+
+  const submitNotAvailable = async () => {
+    try {
+      await axios.post(`https://napi.bharatmedicalhallplus.com/ecogreen-purchase-orders/status/${updateOrder.id}`, {
+        status: 'Not Available'
+      });
+      alert('Order marked as Not Available');
+      setUpdateModalVisible(false);
+      if (user) fetchOrders(user.id);
+    } catch (err) {
       alert('Failed to update status');
     }
   };
@@ -671,10 +684,10 @@ export default function DeliveryDashboard() {
     try {
       if (type === 'online_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, {
-            status: 'DELIVERED',
-            delivery_otp: otp,
-            pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null
-          });
+          status: 'DELIVERED',
+          delivery_otp: otp,
+          pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null
+        });
       } else if (type === 'sales_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/status`, {
           status: 'DELIVERED',
@@ -684,9 +697,9 @@ export default function DeliveryDashboard() {
         const payload: any = {
           status: 'Delivered',
           delivery_otp: otp,
-            pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null,
-            paid_amount: paidAmount,
-            payment_txn_id: paymentTxnId
+          pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null,
+          paid_amount: paidAmount,
+          payment_txn_id: paymentTxnId
         };
         // For image upload, if we want to use form data we should implement it, but for now we send raw json without image since it's complex via put in this generic function.
         await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, payload);
@@ -695,7 +708,7 @@ export default function DeliveryDashboard() {
       }
       setOtpModalVisible(false);
       if (user) fetchOrders(user.id);
-      
+
       // Open patient GPS coordinates popup
       setGpsTargetOrder({ id: orderId, type });
       setGpsModalVisible(true);
@@ -709,7 +722,7 @@ export default function DeliveryDashboard() {
     if (order.bus_details) {
       let parsed = order.bus_details;
       if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch(e) {}
+        try { parsed = JSON.parse(parsed); } catch (e) { }
       }
       const formattedDetails = parsed ? {
         ...parsed,
@@ -733,7 +746,7 @@ export default function DeliveryDashboard() {
         url = `https://napi.bharatmedicalhallplus.com/manual-orders/${selectedBusOrder.id}`;
         payload = {
           bus_number: busDetails.bus_number,
-            bus_date: busDetails.bus_date,
+          bus_date: busDetails.bus_date,
           bus_driver_name: busDetails.driver_name,
           bus_driver_number: busDetails.driver_number,
           est_reach_time: busDetails.arrival_time,
@@ -747,7 +760,7 @@ export default function DeliveryDashboard() {
         alert("Cannot update bus details for this order type");
         return;
       }
-      
+
       const res = await axios.put(url, payload);
       if (res.data) {
         alert("Bus Details Saved!");
@@ -761,17 +774,17 @@ export default function DeliveryDashboard() {
 
   const openMap = (lat: any, lng: any, address: string, locationLink?: string) => {
     let url = '';
-    
+
     let parsedLat = parseFloat(lat);
     let parsedLng = parseFloat(lng);
-    
+
     if (isNaN(parsedLat) || isNaN(parsedLng) || String(lat).toLowerCase() === 'null' || String(lng).toLowerCase() === 'null') {
       parsedLat = NaN;
       parsedLng = NaN;
     }
-    
+
     let cleanLink = locationLink ? String(locationLink).trim() : '';
-    
+
     // Parse coordinates from link if they exist
     if (cleanLink && (isNaN(parsedLat) || isNaN(parsedLng))) {
       const parts = cleanLink.split(',');
@@ -783,17 +796,17 @@ export default function DeliveryDashboard() {
           parsedLng = lngVal;
         }
       } else {
-        const match = cleanLink.match(/query=([-\d.]+),([-\d.]+)/) || 
-                      cleanLink.match(/q=([-\d.]+),([-\d.]+)/) ||
-                      cleanLink.match(/place\/([-\d.]+),([-\d.]+)/) ||
-                      cleanLink.match(/@([-\d.]+),([-\d.]+)/);
+        const match = cleanLink.match(/query=([-\d.]+),([-\d.]+)/) ||
+          cleanLink.match(/q=([-\d.]+),([-\d.]+)/) ||
+          cleanLink.match(/place\/([-\d.]+),([-\d.]+)/) ||
+          cleanLink.match(/@([-\d.]+),([-\d.]+)/);
         if (match) {
           parsedLat = parseFloat(match[1]);
           parsedLng = parseFloat(match[2]);
         }
       }
     }
-    
+
     if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
       url = `https://www.google.com/maps/search/?api=1&query=${parsedLat},${parsedLng}`;
     } else if (cleanLink) {
@@ -806,7 +819,7 @@ export default function DeliveryDashboard() {
         url = 'https://' + cleanLink;
       }
     }
-    
+
     if (!url) {
       const cleanAddress = address ? String(address).trim() : '';
       if (cleanAddress.startsWith('http://') || cleanAddress.startsWith('https://')) {
@@ -837,31 +850,31 @@ export default function DeliveryDashboard() {
   const renderOrder = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-          <View>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-              <Text style={styles.orderTypeBadge}>
-                {item.type === 'online_order' ? 'Online App Order' : item.type === 'sales_order' ? 'Ecogreen Sales Order' : item.type === 'purchase_order' ? 'Ecogreen Purchase Order' : 'Ecogreen Invoice'}
-              </Text>
-              
-                {item.delivery_type === 'Bus' && (
-                  <View style={[styles.orderTypeBadge, {backgroundColor: '#FEF3C7'}]}>
-                    <Text style={{fontSize: 10, fontWeight: 'bold', color: '#B45309'}}>BUS DELIVERY</Text>
-                  </View>
-                )}
-                {item.is_scheduled && (
-                  <View style={[styles.orderTypeBadge, {backgroundColor: '#E0E7FF'}]}>
-                    <Text style={{fontSize: 10, fontWeight: 'bold', color: '#4338CA'}}>SCHEDULED</Text>
-                  </View>
-                )}
-            </View>
-            <Text style={styles.orderId}>Order #{item.id}</Text>
-            {item.order_no ? (
-              <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 2 }}>Order No: {item.order_no}</Text>
-            ) : null}
-            {item.invoice_no ? (
-              <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 2 }}>Invoice No: {item.invoice_no}</Text>
-            ) : null}
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.orderTypeBadge}>
+              {item.type === 'online_order' ? 'Online App Order' : item.type === 'sales_order' ? 'Ecogreen Sales Order' : item.type === 'purchase_order' ? 'Ecogreen Purchase Order' : 'Ecogreen Invoice'}
+            </Text>
+
+            {item.delivery_type === 'Bus' && (
+              <View style={[styles.orderTypeBadge, { backgroundColor: '#FEF3C7' }]}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#B45309' }}>BUS DELIVERY</Text>
+              </View>
+            )}
+            {item.is_scheduled && (
+              <View style={[styles.orderTypeBadge, { backgroundColor: '#E0E7FF' }]}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#4338CA' }}>SCHEDULED</Text>
+              </View>
+            )}
           </View>
+          <Text style={styles.orderId}>Order #{item.id}</Text>
+          {item.order_no ? (
+            <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 2 }}>Order No: {item.order_no}</Text>
+          ) : null}
+          {item.invoice_no ? (
+            <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600', marginTop: 2 }}>Invoice No: {item.invoice_no}</Text>
+          ) : null}
+        </View>
         <View style={[styles.statusBadge, ['delivered', 'completed', 'received'].includes(item.status?.toLowerCase()) ? styles.statusDelivered : styles.statusPending]}>
           <Text style={styles.statusText}>{item.status}</Text>
         </View>
@@ -887,11 +900,11 @@ export default function DeliveryDashboard() {
           <Clock size={16} color="#64748B" style={styles.icon} />
           <Text style={styles.infoText}>{new Date(item.created_at).toLocaleString()}</Text>
         </View>
-        
+
         {item.is_scheduled && (
           <View style={styles.infoRow}>
             <Clock size={16} color="#4338CA" style={styles.icon} />
-            <Text style={[styles.infoText, {color: '#4338CA', fontWeight: 'bold'}]}>
+            <Text style={[styles.infoText, { color: '#4338CA', fontWeight: 'bold' }]}>
               Scheduled: {formatDateTime(item.scheduled_date, item.scheduled_time)}
             </Text>
           </View>
@@ -900,17 +913,17 @@ export default function DeliveryDashboard() {
         {(item.delivery_type === 'Bus' || item.mode_of_delivery === 'Bus' || (item.type === 'manual_order' && item.bus_number)) && (
           <View style={styles.infoRow}>
             <Clock size={16} color="#D97706" style={styles.icon} />
-            <Text style={[styles.infoText, {color: '#D97706', fontWeight: 'bold'}]}>
+            <Text style={[styles.infoText, { color: '#D97706', fontWeight: 'bold' }]}>
               Bus Arrival: {
-                item.bus_details 
-                  ? formatDateTime(typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || '') : (item.bus_details.arrival_time || '')) 
+                item.bus_details
+                  ? formatDateTime(typeof item.bus_details === 'string' ? (JSON.parse(item.bus_details).arrival_time || '') : (item.bus_details.arrival_time || ''))
                   : (item.bus_date ? formatDateTime(item.bus_date, item.est_reach_time || item.scheduled_time) : 'N/A')
               }
             </Text>
           </View>
         )}
         <Text style={styles.totalText}>Total: ₹{parseFloat(item.total_amount || item.amount || 0).toFixed(2)}</Text>
-        
+
         {item.type === 'purchase_order' && (
           <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#8b5cf6', marginBottom: 4 }}>Items Ordered:</Text>
@@ -918,7 +931,7 @@ export default function DeliveryDashboard() {
               let items = [];
               try {
                 items = typeof item.details === 'string' ? JSON.parse(item.details) : item.details;
-              } catch (e) {}
+              } catch (e) { }
               if (!Array.isArray(items) || items.length === 0) {
                 return <Text style={{ fontSize: 11, color: '#64748b' }}>No items listed.</Text>;
               }
@@ -940,147 +953,154 @@ export default function DeliveryDashboard() {
             </Text>
             {item.submitted_at && (
               <Text style={{ fontSize: 10, color: '#047857', marginTop: 2 }}>
-                Submitted At: {new Date(item.submitted_at).toLocaleString('en-IN')}
+                Submitted At: {(() => {
+                  try {
+                    const d = new Date(item.submitted_at);
+                    return isNaN(d.getTime()) ? 'N/A' : d.toLocaleString().replace(',', '');
+                  } catch (e) {
+                    return 'N/A';
+                  }
+                })()}
               </Text>
             )}
           </View>
         )}
 
         {item.notes ? (
-          <View style={{marginTop: 10, backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8}}>
-            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
-              <FileText size={14} color="#64748B" style={{marginRight: 4}} />
-              <Text style={{fontSize: 12, fontWeight: 'bold', color: '#475569'}}>Notes</Text>
+          <View style={{ marginTop: 10, backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <FileText size={14} color="#64748B" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569' }}>Notes</Text>
             </View>
             {Array.isArray(item.notes) ? (
               item.notes.map((n: any, i: number) => (
-                <Text key={i} style={{fontSize: 13, color: '#334155', marginTop: 2}}>
-                  • {n.text} <Text style={{fontSize: 10, color: '#94a3b8'}}>({n.author})</Text>
+                <Text key={i} style={{ fontSize: 13, color: '#334155', marginTop: 2 }}>
+                  • {n.text} <Text style={{ fontSize: 10, color: '#94a3b8' }}>({n.author})</Text>
                 </Text>
               ))
             ) : typeof item.notes === 'string' && item.notes.startsWith('[') ? (
               JSON.parse(item.notes).map((n: any, i: number) => (
-                <Text key={i} style={{fontSize: 13, color: '#334155', marginTop: 2}}>
-                  • {n.text} <Text style={{fontSize: 10, color: '#94a3b8'}}>({n.author})</Text>
+                <Text key={i} style={{ fontSize: 13, color: '#334155', marginTop: 2 }}>
+                  • {n.text} <Text style={{ fontSize: 10, color: '#94a3b8' }}>({n.author})</Text>
                 </Text>
               ))
             ) : typeof item.notes === 'object' && item.notes !== null ? (
-              <Text style={{fontSize: 13, color: '#334155'}}>
-                • {item.notes.text || JSON.stringify(item.notes)} 
-                {item.notes.author && <Text style={{fontSize: 10, color: '#94a3b8'}}> ({item.notes.author})</Text>}
+              <Text style={{ fontSize: 13, color: '#334155' }}>
+                • {item.notes.text || JSON.stringify(item.notes)}
+                {item.notes.author && <Text style={{ fontSize: 10, color: '#94a3b8' }}> ({item.notes.author})</Text>}
               </Text>
             ) : (
-              <Text style={{fontSize: 13, color: '#334155'}}>{String(item.notes)}</Text>
+              <Text style={{ fontSize: 13, color: '#334155' }}>{String(item.notes)}</Text>
             )}
           </View>
         ) : null}
       </View>
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity 
-          style={[styles.footerBtn, { backgroundColor: '#EFF6FF' }]} 
+        <TouchableOpacity
+          style={[styles.footerBtn, { backgroundColor: '#EFF6FF' }]}
           onPress={() => openMap(item.map_lat, item.map_lng, item.address, item.location_link)}
         >
-          <MapPin color="#3B82F6" size={16} style={{marginRight: 6}} />
+          <MapPin color="#3B82F6" size={16} style={{ marginRight: 6 }} />
           <Text style={[styles.footerBtnText, { color: '#3B82F6' }]}>Navigate</Text>
         </TouchableOpacity>
 
         {item.delivery_type === 'Bus' && item.type !== 'purchase_order' && (
-             <TouchableOpacity 
-               style={[styles.footerBtn, {backgroundColor: '#FFFBEB'}]} 
-               onPress={() => handleOpenBusDetails(item)}
-             >
-               <Package color="#D97706" size={16} style={{marginRight: 6}} />
-               <Text style={[styles.footerBtnText, {color: '#D97706'}]}>Bus Info</Text>
-             </TouchableOpacity>
-          )}
-          {item.delivery_type === 'Bus' && item.type === 'purchase_order' && (
-             <TouchableOpacity 
-               style={[styles.footerBtn, {backgroundColor: '#F0FDF4'}]} 
-               onPress={() => handleOpenBusDetails(item)}
-             >
-               <Package color="#16A34A" size={16} style={{marginRight: 6}} />
-               <Text style={[styles.footerBtnText, {color: '#16A34A'}]}>View Bus</Text>
-             </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.footerBtn, { backgroundColor: '#FFFBEB' }]}
+            onPress={() => handleOpenBusDetails(item)}
+          >
+            <Package color="#D97706" size={16} style={{ marginRight: 6 }} />
+            <Text style={[styles.footerBtnText, { color: '#D97706' }]}>Bus Info</Text>
+          </TouchableOpacity>
+        )}
+        {item.delivery_type === 'Bus' && item.type === 'purchase_order' && (
+          <TouchableOpacity
+            style={[styles.footerBtn, { backgroundColor: '#F0FDF4' }]}
+            onPress={() => handleOpenBusDetails(item)}
+          >
+            <Package color="#16A34A" size={16} style={{ marginRight: 6 }} />
+            <Text style={[styles.footerBtnText, { color: '#16A34A' }]}>View Bus</Text>
+          </TouchableOpacity>
+        )}
 
-          {/* Manual, Online, Sales Orders */}
-          {(item.type === 'manual_order' || item.type === 'online_order' || item.type === 'sales_order') && 
-           item.status?.toLowerCase() !== 'delivered' && item.status?.toLowerCase() !== 'completed' && item.status?.toLowerCase() !== 'cancelled' && (
+        {/* Manual, Online, Sales Orders */}
+        {(item.type === 'manual_order' || item.type === 'online_order' || item.type === 'sales_order') &&
+          item.status?.toLowerCase() !== 'delivered' && item.status?.toLowerCase() !== 'completed' && item.status?.toLowerCase() !== 'cancelled' && (
             <>
               {isAssigned(item.status) && (
-                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#F59E0B'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
-                  <Package color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Pickup</Text>
+                <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#F59E0B' }]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
+                  <Package color="#fff" size={14} style={{ marginRight: 4 }} />
+                  <Text style={[styles.footerBtnText, { color: '#fff' }]}>Pickup</Text>
                 </TouchableOpacity>
               )}
               {item.status?.toLowerCase() === 'picked up' && (
-                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#3B82F6'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}>
-                  <Navigation color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Start</Text>
+                <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus(item.id, item.type, 'Out for Delivery')}>
+                  <Navigation color="#fff" size={14} style={{ marginRight: 4 }} />
+                  <Text style={[styles.footerBtnText, { color: '#fff' }]}>Start</Text>
                 </TouchableOpacity>
               )}
             </>
           )}
 
-          {/* Purchase Orders */}
-          {item.type === 'purchase_order' && 
-           item.status?.toLowerCase() !== 'delivered' && item.status?.toLowerCase() !== 'completed' && item.status?.toLowerCase() !== 'received' && (
+        {/* Purchase Orders */}
+        {item.type === 'purchase_order' &&
+          item.status?.toLowerCase() !== 'delivered' && item.status?.toLowerCase() !== 'completed' && item.status?.toLowerCase() !== 'received' && (
             <>
               {isAssigned(item.status) && (
-                <TouchableOpacity 
-                  style={[styles.footerBtn, {backgroundColor: '#F59E0B'}]} 
+                <TouchableOpacity
+                  style={[styles.footerBtn, { backgroundColor: '#F59E0B' }]}
                   onPress={() => {
-                    const nextStatus = item.delivery_type === 'Bus' ? 'Starts to Bus Stand' : 
-                                       item.delivery_type === 'Store' ? 'Starts to Store' : 
-                                       'Starts to Wholesaler';
+                    const nextStatus = item.delivery_type === 'Bus' ? 'Starts to Bus Stand' :
+                      item.delivery_type === 'Store' ? 'Starts to Store' :
+                        'Starts to Wholesaler';
                     handleUpdateStatus(item.id, item.type, nextStatus);
                   }}
                 >
-                  <Navigation color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.footerBtnText, {color: '#fff', fontSize: 10, textAlign: 'center', flexShrink: 1}]}>
-                    {item.delivery_type === 'Bus' ? 'Start to Bus Stand' : 
-                     item.delivery_type === 'Store' ? 'Start to Store' : 
-                     'Start to Wholesaler'}
+                  <Navigation color="#fff" size={14} style={{ marginRight: 4 }} />
+                  <Text style={[styles.footerBtnText, { color: '#fff', fontSize: 10, textAlign: 'center', flexShrink: 1 }]}>
+                    {item.delivery_type === 'Bus' ? 'Start to Bus Stand' :
+                      item.delivery_type === 'Store' ? 'Start to Store' :
+                        'Start to Wholesaler'}
                   </Text>
                 </TouchableOpacity>
               )}
               {['starts to wholesaler', 'starts to bus stand', 'starts to store'].includes(item.status?.toLowerCase()) && (
-                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#3B82F6'}]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
-                  <Package color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Pickup</Text>
+                <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#3B82F6' }]} onPress={() => handleUpdateStatus(item.id, item.type, 'Picked Up')}>
+                  <Package color="#fff" size={14} style={{ marginRight: 4 }} />
+                  <Text style={[styles.footerBtnText, { color: '#fff' }]}>Pickup</Text>
                 </TouchableOpacity>
               )}
               {item.status?.toLowerCase() === 'picked up' && (
-                <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#10B981'}]} onPress={() => openSubmissionModal(item)}>
-                  <CheckCircle color="#fff" size={14} style={{marginRight: 4}} />
-                  <Text style={[styles.footerBtnText, {color: '#fff'}]}>Submitted To</Text>
+                <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#10B981' }]} onPress={() => openSubmissionModal(item)}>
+                  <CheckCircle color="#fff" size={14} style={{ marginRight: 4 }} />
+                  <Text style={[styles.footerBtnText, { color: '#fff' }]}>Submitted To</Text>
                 </TouchableOpacity>
               )}
             </>
           )}
 
-          {!['delivered', 'completed', 'cancelled', 'received'].includes(item.status?.toLowerCase()) && (
-              <TouchableOpacity style={[styles.footerBtn, {backgroundColor: '#6366F1'}]} onPress={() => openUpdateModal(item)}>
-                <Text style={[styles.footerBtnText, {color: '#fff'}]}>Update</Text>
-              </TouchableOpacity>
-          )}
+        {!['delivered', 'completed', 'cancelled', 'received'].includes(item.status?.toLowerCase()) && (
+          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#6366F1' }]} onPress={() => openUpdateModal(item)}>
+            <Text style={[styles.footerBtnText, { color: '#fff' }]}>Update</Text>
+          </TouchableOpacity>
+        )}
 
-          {((item.type === 'manual_order' || item.type === 'online_order' || item.type === 'sales_order') && 
-            item.status?.toLowerCase() === 'out for delivery') && (
-            <TouchableOpacity 
-            style={[styles.footerBtn, {backgroundColor: '#10B981'}]} 
-            onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode)}
+        {((item.type === 'manual_order' || item.type === 'online_order' || item.type === 'sales_order') &&
+          item.status?.toLowerCase() === 'out for delivery') && (
+            <TouchableOpacity
+              style={[styles.footerBtn, { backgroundColor: '#10B981' }]}
+              onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode)}
             >
-              <CheckCircle color="#fff" size={16} style={{marginRight: 6}} />
-              <Text style={[styles.footerBtnText, {color: '#fff'}]}>Delivered</Text>
+              <CheckCircle color="#fff" size={16} style={{ marginRight: 6 }} />
+              <Text style={[styles.footerBtnText, { color: '#fff' }]}>Delivered</Text>
             </TouchableOpacity>
           )}
       </View>
     </View>
   );
 
-    return (
+  return (
     <View style={styles.container}>
       {cameraVisible && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, justifyContent: 'center', alignItems: 'center' }}>
@@ -1109,7 +1129,7 @@ export default function DeliveryDashboard() {
           <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">Welcome, {user?.full_name}</Text>
           <Text style={styles.subtitle}>GPS: {locationStatus}</Text>
         </View>
-        
+
         {/* Creative Attendance Widget */}
         <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
           {(!summary || summary.can_check_in) && (
@@ -1170,27 +1190,27 @@ export default function DeliveryDashboard() {
         <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b', marginBottom: 10 }}>🗺️ Route Planner (Shortest Path)</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 3, flex: 1 }}>
-            <TouchableOpacity 
-              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'All' ? '#fff' : 'transparent', alignItems: 'center' }} 
+            <TouchableOpacity
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'All' ? '#fff' : 'transparent', alignItems: 'center' }}
               onPress={() => setRouteToggle('All')}
             >
               <Text style={{ fontSize: 12, fontWeight: 'bold', color: routeToggle === 'All' ? '#1e293b' : '#64748b' }}>All</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'Assigned' ? '#fff' : 'transparent', alignItems: 'center' }} 
+            <TouchableOpacity
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'Assigned' ? '#fff' : 'transparent', alignItems: 'center' }}
               onPress={() => setRouteToggle('Assigned')}
             >
               <Text style={{ fontSize: 12, fontWeight: 'bold', color: routeToggle === 'Assigned' ? '#1e293b' : '#64748b' }}>Assigned</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'PickedUp' ? '#fff' : 'transparent', alignItems: 'center' }} 
+            <TouchableOpacity
+              style={{ flex: 1, paddingVertical: 6, borderRadius: 6, backgroundColor: routeToggle === 'PickedUp' ? '#fff' : 'transparent', alignItems: 'center' }}
               onPress={() => setRouteToggle('PickedUp')}
             >
               <Text style={{ fontSize: 12, fontWeight: 'bold', color: routeToggle === 'PickedUp' ? '#1e293b' : '#64748b' }}>Picked Up</Text>
             </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={{ backgroundColor: '#6366f1', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
             onPress={() => setRouteModalVisible(true)}
           >
@@ -1199,10 +1219,10 @@ export default function DeliveryDashboard() {
         </View>
       </View>
 
-      <View style={{flexDirection:'row', gap: 10, paddingHorizontal: 15, marginBottom: 15}}>
+      <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 15, marginBottom: 15 }}>
         {alarmSound && (
-          <TouchableOpacity style={[styles.refreshBtn, {backgroundColor: '#ef4444'}]} onPress={stopAlarm}>
-            <Text style={[styles.refreshBtnText, {color: '#fff'}]}>Stop Alarm</Text>
+          <TouchableOpacity style={[styles.refreshBtn, { backgroundColor: '#ef4444' }]} onPress={stopAlarm}>
+            <Text style={[styles.refreshBtnText, { color: '#fff' }]}>Stop Alarm</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.refreshBtn} onPress={() => user && fetchOrders(user.id)}>
@@ -1214,27 +1234,27 @@ export default function DeliveryDashboard() {
         <ActivityIndicator size="large" color="#3B82F6" style={{ marginTop: 50 }} />
       ) : (
         <FlatList
-          data={orders.filter(o => { 
+          data={orders.filter(o => {
             const isCompleted = ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase());
-            if (filterState === 'Completed') return isCompleted; 
-            if (filterState === 'Pending') return !isCompleted; 
-            return true; 
+            if (filterState === 'Completed') return isCompleted;
+            if (filterState === 'Pending') return !isCompleted;
+            return true;
           }).sort((a, b) => {
             const aComp = ['delivered', 'completed', 'received'].includes(a.status?.toLowerCase());
             const bComp = ['delivered', 'completed', 'received'].includes(b.status?.toLowerCase());
             if (aComp && !bComp) return 1;
             if (!aComp && bComp) return -1;
-            
+
             const aBus = a.delivery_type?.toLowerCase() === 'bus' || a.mode_of_delivery?.toLowerCase() === 'bus';
             const bBus = b.delivery_type?.toLowerCase() === 'bus' || b.mode_of_delivery?.toLowerCase() === 'bus';
             if (aBus && !bBus) return -1;
             if (!aBus && bBus) return 1;
-            
+
             return 0;
           })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}
-          contentContainerStyle={[styles.listContainer, orders.length === 0 && {flex: 1, justifyContent: 'center'}]}
+          contentContainerStyle={[styles.listContainer, orders.length === 0 && { flex: 1, justifyContent: 'center' }]}
           ListEmptyComponent={
             <View style={styles.noDataContainer}>
               <Package size={48} color="#CBD5E1" />
@@ -1264,40 +1284,40 @@ export default function DeliveryDashboard() {
             <Text style={styles.modalTitle}>
               {selectedBusOrder?.type === 'purchase_order' ? 'Bus Pickup Details' : 'Enter Bus Delivery Details'}
             </Text>
-            
-            <ScrollView style={{width: '100%', maxHeight: '70%'}}>
-              
-                <Text style={styles.label}>Bus Number</Text>
-                <TextInput style={styles.input} value={busDetails.bus_number} onChangeText={t => setBusDetails(p => ({...p, bus_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
-                
-                <Text style={styles.label}>Bus Date</Text>
-                {Platform.OS === 'web' ? (
-                  <input 
-                    type="date" 
-                    value={busDetails.bus_date || ''} 
-                    onChange={(e) => setBusDetails(p => ({...p, bus_date: e.target.value}))}
-                    style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 15 }}
-                    disabled={selectedBusOrder?.type === 'purchase_order'}
-                  />
-                ) : (
-                  <TextInput style={styles.input} value={busDetails.bus_date || ''} onChangeText={t => setBusDetails(p => ({...p, bus_date: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} placeholder="YYYY-MM-DD" />
-                )}
 
-              
+            <ScrollView style={{ width: '100%', maxHeight: '70%' }}>
+
+              <Text style={styles.label}>Bus Number</Text>
+              <TextInput style={styles.input} value={busDetails.bus_number} onChangeText={t => setBusDetails(p => ({ ...p, bus_number: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+
+              <Text style={styles.label}>Bus Date</Text>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={busDetails.bus_date || ''}
+                  onChange={(e) => setBusDetails(p => ({ ...p, bus_date: e.target.value }))}
+                  style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit', marginBottom: 15 }}
+                  disabled={selectedBusOrder?.type === 'purchase_order'}
+                />
+              ) : (
+                <TextInput style={styles.input} value={busDetails.bus_date || ''} onChangeText={t => setBusDetails(p => ({ ...p, bus_date: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} placeholder="YYYY-MM-DD" />
+              )}
+
+
               <Text style={styles.label}>Reach Time / Incoming Time</Text>
-              <TextInput style={styles.input} value={busDetails.arrival_time} onChangeText={t => setBusDetails(p => ({...p, arrival_time: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
-              
+              <TextInput style={styles.input} value={busDetails.arrival_time} onChangeText={t => setBusDetails(p => ({ ...p, arrival_time: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+
               <Text style={styles.label}>Driver Name</Text>
-              <TextInput style={styles.input} value={busDetails.driver_name} onChangeText={t => setBusDetails(p => ({...p, driver_name: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
-              
+              <TextInput style={styles.input} value={busDetails.driver_name} onChangeText={t => setBusDetails(p => ({ ...p, driver_name: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+
               <Text style={styles.label}>Driver Number</Text>
-              <TextInput style={styles.input} value={busDetails.driver_number} onChangeText={t => setBusDetails(p => ({...p, driver_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
-              
+              <TextInput style={styles.input} value={busDetails.driver_number} onChangeText={t => setBusDetails(p => ({ ...p, driver_number: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+
               <Text style={styles.label}>Waybill Number</Text>
-              <TextInput style={styles.input} value={busDetails.waybill_number} onChangeText={t => setBusDetails(p => ({...p, waybill_number: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
-              
+              <TextInput style={styles.input} value={busDetails.waybill_number} onChangeText={t => setBusDetails(p => ({ ...p, waybill_number: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+
               <Text style={styles.label}>Drop Location</Text>
-              <TextInput style={styles.input} value={busDetails.drop_location} onChangeText={t => setBusDetails(p => ({...p, drop_location: t}))} editable={selectedBusOrder?.type !== 'purchase_order'} />
+              <TextInput style={styles.input} value={busDetails.drop_location} onChangeText={t => setBusDetails(p => ({ ...p, drop_location: t }))} editable={selectedBusOrder?.type !== 'purchase_order'} />
             </ScrollView>
 
             <View style={styles.modalActions}>
@@ -1323,13 +1343,13 @@ export default function DeliveryDashboard() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Delivery Verification</Text>
-            
+
             <ScrollView>
               <Text style={styles.label}>Ask the customer for the 4-digit delivery OTP</Text>
-              <TextInput 
-                style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
-                value={deliveryOtp} 
-                onChangeText={setDeliveryOtp} 
+              <TextInput
+                style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]}
+                value={deliveryOtp}
+                onChangeText={setDeliveryOtp}
                 keyboardType="number-pad"
                 maxLength={4}
                 placeholder="0000"
@@ -1337,20 +1357,20 @@ export default function DeliveryDashboard() {
 
               {currentOrder.type === 'manual_order' && currentOrder.payment_mode !== 'Prepaid' && (
                 <>
-                  <Text style={[styles.label, {marginTop: 20}]}>Payment Mode</Text>
-                  <View style={{flexDirection:'row', gap:10, marginBottom: 10}}>
-                     <TouchableOpacity 
-                        style={{flex:1, padding:10, borderWidth:1, borderColor: paymentMode==='Cash'?'#10B981':'#CBD5E1', borderRadius:8, backgroundColor: paymentMode==='Cash'?'#D1FAE5':'#fff'}}
-                        onPress={()=>setPaymentMode('Cash')}
-                     >
-                       <Text style={{textAlign:'center', fontWeight:'bold', color: paymentMode==='Cash'?'#065F46':'#475569'}}>Cash</Text>
-                     </TouchableOpacity>
-                     <TouchableOpacity 
-                        style={{flex:1, padding:10, borderWidth:1, borderColor: paymentMode==='Online'?'#3B82F6':'#CBD5E1', borderRadius:8, backgroundColor: paymentMode==='Online'?'#DBEAFE':'#fff'}}
-                        onPress={()=>setPaymentMode('Online')}
-                     >
-                       <Text style={{textAlign:'center', fontWeight:'bold', color: paymentMode==='Online'?'#1E40AF':'#475569'}}>Online / UPI</Text>
-                     </TouchableOpacity>
+                  <Text style={[styles.label, { marginTop: 20 }]}>Payment Mode</Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, padding: 10, borderWidth: 1, borderColor: paymentMode === 'Cash' ? '#10B981' : '#CBD5E1', borderRadius: 8, backgroundColor: paymentMode === 'Cash' ? '#D1FAE5' : '#fff' }}
+                      onPress={() => setPaymentMode('Cash')}
+                    >
+                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Cash' ? '#065F46' : '#475569' }}>Cash</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, padding: 10, borderWidth: 1, borderColor: paymentMode === 'Online' ? '#3B82F6' : '#CBD5E1', borderRadius: 8, backgroundColor: paymentMode === 'Online' ? '#DBEAFE' : '#fff' }}
+                      onPress={() => setPaymentMode('Online')}
+                    >
+                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Online' ? '#1E40AF' : '#475569' }}>Online / UPI</Text>
+                    </TouchableOpacity>
                   </View>
 
                   <Text style={styles.label}>Paid Amount (₹)</Text>
@@ -1370,8 +1390,8 @@ export default function DeliveryDashboard() {
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setOtpModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.saveBtn, deliveryOtp.length !== 4 && { opacity: 0.5 }]} 
+              <TouchableOpacity
+                style={[styles.saveBtn, deliveryOtp.length !== 4 && { opacity: 0.5 }]}
                 onPress={() => processDelivery(currentOrder.id, currentOrder.type, deliveryOtp)}
                 disabled={deliveryOtp.length !== 4}
               >
@@ -1392,27 +1412,35 @@ export default function DeliveryDashboard() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Update Order #{updateOrder?.id}</Text>
-            
+
             {updateActionType === 'menu' && (
               <View style={{ gap: 12, marginTop: 10 }}>
                 <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#3B82F6' }]} onPress={() => setUpdateActionType('note')}>
-                  <FileText color="#fff" size={16} style={{marginRight: 8}} />
+                  <FileText color="#fff" size={16} style={{ marginRight: 8 }} />
                   <Text style={styles.saveBtnText}>Add Note</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#F59E0B' }]} onPress={submitNoShow}>
-                  <Text style={styles.saveBtnText}>Mark as No Show</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#EF4444' }]} onPress={() => setUpdateActionType('cancel')}>
-                  <Text style={styles.saveBtnText}>Cancel Delivery</Text>
-                </TouchableOpacity>
+                {updateOrder?.type === 'purchase_order' ? (
+                  <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#EF4444' }]} onPress={submitNotAvailable}>
+                    <Text style={styles.saveBtnText}>Not Available</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#F59E0B' }]} onPress={submitNoShow}>
+                      <Text style={styles.saveBtnText}>Mark as No Show</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#EF4444' }]} onPress={() => setUpdateActionType('cancel')}>
+                      <Text style={styles.saveBtnText}>Cancel Delivery</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
 
             {updateActionType === 'note' && (
               <View>
                 <Text style={styles.label}>Enter your note</Text>
-                <TextInput 
-                  style={[styles.input, { height: 100, textAlignVertical: 'top' }]} 
+                <TextInput
+                  style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
                   multiline
                   value={updateNote}
                   onChangeText={setUpdateNote}
@@ -1424,10 +1452,10 @@ export default function DeliveryDashboard() {
             {updateActionType === 'cancel' && (
               <View>
                 <Text style={styles.label}>Ask the customer for the 4-digit Delivery OTP to cancel</Text>
-                <TextInput 
-                  style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]} 
-                  value={cancelOtp} 
-                  onChangeText={setCancelOtp} 
+                <TextInput
+                  style={[styles.input, { fontSize: 24, letterSpacing: 5, textAlign: 'center', paddingVertical: 15 }]}
+                  value={cancelOtp}
+                  onChangeText={setCancelOtp}
                   keyboardType="number-pad"
                   maxLength={4}
                   placeholder="0000"
@@ -1437,21 +1465,21 @@ export default function DeliveryDashboard() {
 
             <View style={styles.modalActions}>
               {updateActionType !== 'menu' && (
-                <TouchableOpacity style={[styles.cancelBtn, {marginRight: 'auto'}]} onPress={() => setUpdateActionType('menu')}>
+                <TouchableOpacity style={[styles.cancelBtn, { marginRight: 'auto' }]} onPress={() => setUpdateActionType('menu')}>
                   <Text style={styles.cancelBtnText}>Back</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setUpdateModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Close</Text>
               </TouchableOpacity>
-              
+
               {updateActionType === 'note' && (
-                <TouchableOpacity style={[styles.saveBtn, !updateNote && {opacity: 0.5}]} onPress={submitUpdateNote} disabled={!updateNote}>
+                <TouchableOpacity style={[styles.saveBtn, !updateNote && { opacity: 0.5 }]} onPress={submitUpdateNote} disabled={!updateNote}>
                   <Text style={styles.saveBtnText}>Save Note</Text>
                 </TouchableOpacity>
               )}
               {updateActionType === 'cancel' && (
-                <TouchableOpacity style={[styles.saveBtn, {backgroundColor: '#EF4444'}, cancelOtp.length !== 4 && {opacity: 0.5}]} onPress={submitCancel} disabled={cancelOtp.length !== 4}>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#EF4444' }, cancelOtp.length !== 4 && { opacity: 0.5 }]} onPress={submitCancel} disabled={cancelOtp.length !== 4}>
                   <Text style={styles.saveBtnText}>Confirm Cancel</Text>
                 </TouchableOpacity>
               )}
@@ -1459,7 +1487,7 @@ export default function DeliveryDashboard() {
           </View>
         </View>
       </Modal>
-      
+
       {/* GPS Location Update Confirmation Modal */}
       <Modal
         animationType="fade"
@@ -1470,7 +1498,7 @@ export default function DeliveryDashboard() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxWidth: 450 }]}>
             <Text style={styles.modalTitle}>Confirm Patient Location</Text>
-            
+
             <View style={{ marginVertical: 15 }}>
               <Text style={[styles.infoText, { textAlign: 'center', fontSize: 15, lineHeight: 22, color: '#475569' }]}>
                 Would you like to capture your current Google Maps GPS coordinates and update the patient's master address profile?
@@ -1481,15 +1509,15 @@ export default function DeliveryDashboard() {
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.cancelBtn} 
+              <TouchableOpacity
+                style={styles.cancelBtn}
                 onPress={() => setGpsModalVisible(false)}
                 disabled={gpsLoading}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.saveBtn, { backgroundColor: '#10B981' }]} 
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: '#10B981' }]}
                 onPress={handleUpdateGPSLocation}
                 disabled={gpsLoading}
               >
@@ -1506,7 +1534,7 @@ export default function DeliveryDashboard() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { width: '90%', maxWidth: 500, height: 450 }]}>
               <Text style={styles.modalTitle}>Submit Purchase Order #{selectedPO?.id}</Text>
-              
+
               <View style={{ marginBottom: 15 }}>
                 <TextInput
                   style={{
@@ -1608,7 +1636,7 @@ export default function DeliveryDashboard() {
 
             {/* Map Container */}
             <View style={{ height: 350, backgroundColor: '#e2e8f0' }}>
-              <CrossPlatformMap 
+              <CrossPlatformMap
                 mapPoints={optimizedRoute.filter(o => o.coords && o.delivery_type?.toLowerCase() !== 'bus').map(o => ({
                   id: o.id,
                   lat: o.coords.lat,
@@ -1621,7 +1649,7 @@ export default function DeliveryDashboard() {
                   [currentLocation?.lat || 17.385044, currentLocation?.lng || 78.486671],
                   ...optimizedRoute.filter(o => o.coords && o.delivery_type?.toLowerCase() !== 'bus').map(o => [o.coords.lat, o.coords.lng])
                 ] as any}
-                onMarkerPress={() => {}}
+                onMarkerPress={() => { }}
               />
             </View>
 
@@ -1648,8 +1676,8 @@ export default function DeliveryDashboard() {
                           {order.invoice_no && <Text style={{ fontSize: 11, color: '#475569' }}>• Invoice No: {order.invoice_no}</Text>}
                         </View>
                       </View>
-                      <TouchableOpacity 
-                        style={{ padding: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 
+                      <TouchableOpacity
+                        style={{ padding: 8, backgroundColor: '#eff6ff', borderRadius: 8 }}
                         onPress={() => openMap(order.coords?.lat, order.coords?.lng, order.address, order.location_link)}
                       >
                         <Navigation size={16} color="#2563eb" />

@@ -164,47 +164,51 @@ router.post('/status/:id', async (req, res) => {
     }
 });
 
-// Update details (address, notes, modified_by metadata)
+// Update details (address, notes, modified_by metadata, delivery_type)
 router.put('/update/:id', async (req, res) => {
     try {
-        const { address, new_note, note_author, modified_by_id, modified_by_type, modified_by_name } = req.body;
+        const { address, new_note, note_author, modified_by_id, modified_by_type, modified_by_name, delivery_type } = req.body;
         const id = req.params.id;
 
-        // Fetch current details to append notes
-        const currentPO = await pool.query('SELECT details FROM ecogreenpurchase_orders WHERE id = $1', [id]);
+        // Fetch current notes to append notes
+        const currentPO = await pool.query('SELECT notes FROM ecogreenpurchase_orders WHERE id = $1', [id]);
         if (currentPO.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Purchase order not found' });
         }
 
-        let updatedNotes = currentPO.rows[0].details || '[]';
+        let updatedNotes = currentPO.rows[0].notes || '[]';
         if (new_note) {
             let notesArr = [];
             try {
-                notesArr = JSON.parse(updatedNotes);
+                notesArr = typeof updatedNotes === 'string' ? JSON.parse(updatedNotes) : (updatedNotes || []);
                 if (!Array.isArray(notesArr)) notesArr = [];
             } catch (e) {
                 notesArr = [];
             }
             notesArr.push({
+                id: Date.now().toString(),
                 text: new_note,
                 author: note_author || 'System',
-                timestamp: new Date().toISOString()
+                date: new Date().toISOString()
             });
             updatedNotes = JSON.stringify(notesArr);
+        } else if (typeof updatedNotes !== 'string') {
+            updatedNotes = JSON.stringify(updatedNotes);
         }
 
         const query = `
             UPDATE ecogreenpurchase_orders
             SET 
                 address = COALESCE($1, address),
-                details = $2,
-                modified_by_id = $3,
-                modified_by_type = $4,
-                modified_by_name = $5
-            WHERE id = $6
+                notes = $2,
+                modified_by_id = COALESCE($3, modified_by_id),
+                modified_by_type = COALESCE($4, modified_by_type),
+                modified_by_name = COALESCE($5, modified_by_name),
+                delivery_type = COALESCE($6, delivery_type)
+            WHERE id = $7
             RETURNING *
         `;
-        const values = [address || null, updatedNotes, modified_by_id || null, modified_by_type || null, modified_by_name || null, id];
+        const values = [address || null, updatedNotes, modified_by_id || null, modified_by_type || null, modified_by_name || null, delivery_type || null, id];
         const result = await pool.query(query, values);
 
         res.json({ success: true, data: result.rows[0] });
@@ -213,6 +217,64 @@ router.put('/update/:id', async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
+
+// Update notes specifically
+router.post('/notes/:id', async (req, res) => {
+    try {
+        const { notes, modified_by_id, modified_by_type, modified_by_name } = req.body;
+        const id = req.params.id;
+
+        const query = `
+            UPDATE ecogreenpurchase_orders
+            SET 
+                notes = $1,
+                modified_by_id = COALESCE($2, modified_by_id),
+                modified_by_type = COALESCE($3, modified_by_type),
+                modified_by_name = COALESCE($4, modified_by_name)
+            WHERE id = $5
+            RETURNING *
+        `;
+        const result = await pool.query(query, [notes, modified_by_id || null, modified_by_type || null, modified_by_name || null, id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Purchase order not found' });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        console.error("Error updating Purchase Order notes:", err.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Update address & delivery_type specifically
+router.post('/address/:id', async (req, res) => {
+    try {
+        const { address, delivery_type, modified_by_id, modified_by_type, modified_by_name } = req.body;
+        const id = req.params.id;
+
+        const query = `
+            UPDATE ecogreenpurchase_orders
+            SET 
+                address = $1,
+                delivery_type = COALESCE($2, delivery_type),
+                modified_by_id = COALESCE($3, modified_by_id),
+                modified_by_type = COALESCE($4, modified_by_type),
+                modified_by_name = COALESCE($5, modified_by_name)
+            WHERE id = $6
+            RETURNING *
+        `;
+        const result = await pool.query(query, [address || null, delivery_type || null, modified_by_id || null, modified_by_type || null, modified_by_name || null, id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Purchase order not found' });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        console.error("Error updating Purchase Order address:", err.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 
 // Create manual purchase order
 router.post('/add', async (req, res) => {

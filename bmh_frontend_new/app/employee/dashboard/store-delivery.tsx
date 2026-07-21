@@ -287,7 +287,7 @@ export default function StoreDeliveryScreen() {
                     let items = [];
                     try {
                       items = typeof item.details === 'string' ? JSON.parse(item.details) : item.details;
-                    } catch (e) {}
+                    } catch (e) { }
                     if (!Array.isArray(items) || items.length === 0) {
                       return <Text style={{ fontSize: 11, color: '#64748b' }}>No items listed.</Text>;
                     }
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: 24 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 6 },
   subtitle: { fontSize: 15, color: '#64748b' },
-  
+
   tabContainer: { flexDirection: 'row', gap: 12, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#cbd5e1' },
   tabBtn: { paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabBtnActive: { borderBottomColor: Colors.light.primary },
