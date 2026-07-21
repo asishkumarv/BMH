@@ -377,16 +377,47 @@ export default function SalesInvoiceList() {
               <ScrollView style={styles.modalBody}>
                 {/* Customer Details Block */}
                 <View style={styles.detailsGroup}>
-                  <Text style={styles.detailsTitle}>Customer Details</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Name:</Text> {selectedInvoice.patientName || 'Walk-in'}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Phone:</Text> {selectedInvoice.mobileNo || 'N/A'}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Address:</Text> {selectedInvoice.patientAddress || 'Walk-in Customer'}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Invoice ID:</Text> {selectedInvoice.ipNo}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Order No:</Text> {selectedInvoice.actCode || 'N/A'}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Created By:</Text> {selectedInvoice.userId || 'Walk-in'}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Payment Mode:</Text> {selectedInvoice.counterSale || 'N/A'}</Text>
-                  <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Date/Time:</Text> {formatDateTime(selectedInvoice.ordDate, selectedInvoice.ordTime)}</Text>
+                  <Text style={styles.detailsTitle}>Customer & Order Specifications</Text>
+                  <View style={{ flexDirection: isDesktop ? 'row' : 'column', flexWrap: 'wrap', gap: 16 }}>
+                    <View style={{ flex: 1, minWidth: 250 }}>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Name:</Text> {selectedInvoice.patientName || 'Walk-in'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Phone:</Text> {selectedInvoice.mobileNo || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Address:</Text> {selectedInvoice.patientAddress || 'Walk-in Customer'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Invoice ID:</Text> {selectedInvoice.ipNo}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Order No:</Text> {selectedInvoice.orderNo || selectedInvoice.actCode || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Created By:</Text> {selectedInvoice.userId || 'Walk-in'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Date/Time:</Text> {formatDateTime(selectedInvoice.ordDate, selectedInvoice.ordTime)}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 250 }}>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Reminder Date:</Text> {selectedInvoice.reminderDate || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Order Type:</Text> {selectedInvoice.orderType || selectedInvoice.counterSale || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Payment Status:</Text> {selectedInvoice.paymentStatus || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Order For:</Text> {selectedInvoice.orderFor || selectedInvoice.actName || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Delivered By:</Text> {selectedInvoice.deliveredBy || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Shipping Charge:</Text> ₹{parseFloat(selectedInvoice.shippingCharge || 0).toFixed(2)}</Text>
+                    </View>
+                  </View>
                 </View>
+
+                {/* Pharmacy Details Block */}
+                {(() => {
+                  let pharm = null;
+                  try {
+                    pharm = typeof selectedInvoice.pharmacyDetails === 'string'
+                      ? JSON.parse(selectedInvoice.pharmacyDetails)
+                      : selectedInvoice.pharmacyDetails;
+                  } catch(e) {}
+                  if (!pharm) return null;
+                  return (
+                    <View style={styles.detailsGroup}>
+                      <Text style={styles.detailsTitle}>Pharmacy Information</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Name:</Text> {pharm.pharmacy_name || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Address:</Text> {pharm.address || 'N/A'}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>Locality/City:</Text> {`${pharm.locality || ''} ${pharm.city || ''} (${pharm.pincode || ''})`}</Text>
+                      <Text style={styles.detailsText}><Text style={{ fontWeight: 'bold' }}>State:</Text> {pharm.state || 'N/A'}</Text>
+                    </View>
+                  );
+                })()}
 
                 {/* Items Ordered Block */}
                 <View style={styles.detailsGroup}>
@@ -394,24 +425,31 @@ export default function SalesInvoiceList() {
                   {loadingDetails ? (
                     <ActivityIndicator size="small" color="#4338ca" style={{ marginVertical: 20 }} />
                   ) : (
-                    <View style={styles.itemsTable}>
-                      <View style={styles.itemsTableHeader}>
-                        <Text style={[styles.itemTh, { flex: 2 }]}>Medicine Name</Text>
-                        <Text style={[styles.itemTh, { flex: 1, textAlign: 'center' }]}>Qty</Text>
-                        <Text style={[styles.itemTh, { flex: 1, textAlign: 'right' }]}>Rate</Text>
-                        <Text style={[styles.itemTh, { flex: 1, textAlign: 'right' }]}>Total</Text>
-                      </View>
+                    <View style={{ borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
                       {invoiceItems && invoiceItems.length > 0 ? (
                         invoiceItems.map((item, idx) => {
-                          const rate = parseFloat(item.saleRate || 0);
-                          const qty = parseInt(item.totalLooseQty || 0, 10);
-                          const subTotal = rate * qty;
+                          const rate = parseFloat(item.maxmrp || item.saleRate || 0);
+                          const qty = parseInt(item.quantity || item.totalLooseQty || 0, 10);
+                          const subTotal = item.sub_total ? parseFloat(item.sub_total) : (rate * qty);
+                          const discount = item.discount ? parseFloat(item.discount) : 0;
+                          const sellingPrice = item.selling_price ? parseFloat(item.selling_price) : subTotal;
+                          
                           return (
-                            <View key={idx} style={styles.itemsTableRow}>
-                              <Text style={[styles.itemTd, { flex: 2, fontWeight: '500' }]}>{item.itemName}</Text>
-                              <Text style={[styles.itemTd, { flex: 1, textAlign: 'center' }]}>{qty}</Text>
-                              <Text style={[styles.itemTd, { flex: 1, textAlign: 'right' }]}>₹{rate.toFixed(2)}</Text>
-                              <Text style={[styles.itemTd, { flex: 1, textAlign: 'right', fontWeight: 'bold' }]}>₹{subTotal.toFixed(2)}</Text>
+                            <View key={idx} style={{ padding: 12, borderBottomWidth: idx === invoiceItems.length - 1 ? 0 : 1, borderBottomColor: '#f1f5f9', backgroundColor: '#fff' }}>
+                              <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#1e293b' }}>
+                                {item.medicine_name || item.itemName || 'N/A'}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                                Code: {item.item_code || item.itemcode || 'N/A'}
+                              </Text>
+                              
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, flexWrap: 'wrap', gap: 12 }}>
+                                <Text style={{ fontSize: 13, color: '#475569' }}>Qty: <Text style={{ fontWeight: '600' }}>{qty}</Text></Text>
+                                <Text style={{ fontSize: 13, color: '#475569' }}>MRP: <Text style={{ fontWeight: '600' }}>₹{rate.toFixed(2)}</Text></Text>
+                                <Text style={{ fontSize: 13, color: '#475569' }}>Selling Price: <Text style={{ fontWeight: '600' }}>₹{sellingPrice.toFixed(2)}</Text></Text>
+                                <Text style={{ fontSize: 13, color: '#475569' }}>Discount: <Text style={{ fontWeight: '600', color: '#ef4444' }}>₹{discount.toFixed(2)}</Text></Text>
+                                <Text style={{ fontSize: 13, color: '#0f172a', fontWeight: 'bold' }}>Subtotal: ₹{subTotal.toFixed(2)}</Text>
+                              </View>
                             </View>
                           );
                         })

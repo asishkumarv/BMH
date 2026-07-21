@@ -138,7 +138,17 @@ router.get('/', async (req, res) => {
       deliveryBoyId: r.delivery_boy_id,
       deliveryType: r.delivery_type,
       busDetails: r.bus_details,
-      createdAt: r.created_at
+      createdAt: r.created_at,
+      reminderDate: r.reminder_date,
+      orderType: r.order_type,
+      invoiceId: r.invoice_id,
+      paymentStatus: r.payment_status,
+      orderFor: r.order_for,
+      deliveredBy: r.delivered_by,
+      shippingCharge: r.shipping_charge,
+      patientAddressDetails: r.patient_address_details,
+      pharmacyDetails: r.pharmacy_details,
+      orderNo: r.order_no
     }));
 
     res.json({ success: true, data: invoices });
@@ -197,6 +207,16 @@ router.get('/:id', async (req, res) => {
       deliveryType: invoice.delivery_type,
       busDetails: invoice.bus_details,
       createdAt: invoice.created_at,
+      reminderDate: invoice.reminder_date,
+      orderType: invoice.order_type,
+      invoiceId: invoice.invoice_id,
+      paymentStatus: invoice.payment_status,
+      orderFor: invoice.order_for,
+      deliveredBy: invoice.delivered_by,
+      shippingCharge: invoice.shipping_charge,
+      patientAddressDetails: invoice.patient_address_details,
+      pharmacyDetails: invoice.pharmacy_details,
+      orderNo: invoice.order_no,
       materialInfo: itemsResult.rows.map(item => ({
         id: item.id,
         itemSeq: item.item_seq,
@@ -207,7 +227,14 @@ router.get('/:id', async (req, res) => {
         serviceQty: item.service_qty,
         saleRate: item.sale_rate,
         discPer: item.disc_per,
-        schDiscPer: item.sch_disc_per
+        schDiscPer: item.sch_disc_per,
+        item_code: item.item_code,
+        medicine_name: item.medicine_name,
+        quantity: item.quantity,
+        discount: item.discount,
+        maxmrp: item.maxmrp,
+        selling_price: item.selling_price,
+        sub_total: item.sub_total
       }))
     };
 
