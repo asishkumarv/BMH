@@ -414,6 +414,14 @@ app.listen(PORT, () => {
     console.error("Failed to start sales order sync cron:", err.message);
   }
 
+  // Initialize Sales Invoices Background Sync
+  try {
+    const { startSalesInvoiceCron } = require('./cron/salesInvoiceSync');
+    startSalesInvoiceCron();
+  } catch (err) {
+    console.error("Failed to start sales invoice sync cron:", err.message);
+  }
+
   // Initialize and Seed Doctor Schedules DB Table
   pool.query(`
     CREATE TABLE IF NOT EXISTS doctor_schedules (
