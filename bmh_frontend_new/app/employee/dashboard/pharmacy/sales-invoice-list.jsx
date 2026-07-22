@@ -6,19 +6,20 @@ import { Search, Eye, X } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 
 const webDatePickerStyle = {
-  height: '38px',
+  height: '32px',
   borderWidth: '1px',
   borderStyle: 'solid',
   borderColor: '#e2e8f0',
   borderRadius: '8px',
-  paddingLeft: '12px',
-  paddingRight: '12px',
+  paddingLeft: '8px',
+  paddingRight: '8px',
   fontSize: '13px',
   backgroundColor: '#fff',
   color: '#334155',
   outlineStyle: 'none',
   fontFamily: 'inherit',
-  minWidth: '140px',
+  width: '125px',
+  maxWidth: '125px',
   boxSizing: 'border-box'
 };
 
@@ -182,20 +183,51 @@ export default function SalesInvoiceList() {
   const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage) || 1;
   const paginatedInvoices = filteredInvoices.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
-  const renderTableHeader = () => (
-    <View style={styles.tableHeader}>
-      <Text style={[styles.headerText, { flex: 1.5 }]}>Invoice ID</Text>
-      <Text style={[styles.headerText, { flex: 1.5 }]}>Order No</Text>
-      <Text style={[styles.headerText, { flex: 2 }]}>Customer</Text>
-      <Text style={[styles.headerText, { flex: 1.2 }]}>Total Amount</Text>
-      <Text style={[styles.headerText, { flex: 1.8 }]}>Date / Time</Text>
-      <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
-      <Text style={[styles.headerText, { flex: 0.8, textAlign: 'center' }]}>Actions</Text>
-    </View>
-  );
+  const renderTableHeader = () => {
+    if (!isDesktop) return null;
+    return (
+      <View style={styles.tableHeader}>
+        <Text style={[styles.headerText, { flex: 1.5 }]}>Invoice ID</Text>
+        <Text style={[styles.headerText, { flex: 1.5 }]}>Order No</Text>
+        <Text style={[styles.headerText, { flex: 2 }]}>Customer</Text>
+        <Text style={[styles.headerText, { flex: 1.2 }]}>Total Amount</Text>
+        <Text style={[styles.headerText, { flex: 1.8 }]}>Date / Time</Text>
+        <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
+        <Text style={[styles.headerText, { flex: 0.8, textAlign: 'center' }]}>Actions</Text>
+      </View>
+    );
+  };
 
   const renderInvoiceRow = ({ item, index }) => {
     const formattedDate = formatDateTime(item.ordDate, item.ordTime);
+
+    if (!isDesktop) {
+      return (
+        <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 8, marginBottom: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, borderWidth: 1, borderColor: '#e2e8f0' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#4338ca' }}>
+              Inv #{item.ipNo || 'N/A'}
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#10b981' }}>
+              ₹{parseFloat(item.orderTotal || 0).toFixed(2)}
+            </Text>
+          </View>
+
+          <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 2 }}>{item.patientName || 'Walk-in'}</Text>
+          {item.actCode ? <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Order No: {item.actCode}</Text> : null}
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: '#64748b' }}>Date: {formattedDate}</Text>
+              <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>User: {item.userId || 'Walk-in'}</Text>
+            </View>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => openInvoiceDetails(item)}>
+              <Eye size={16} color="#4338ca" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
@@ -317,7 +349,7 @@ export default function SalesInvoiceList() {
       </View>
 
       {/* Grid Table Container */}
-      <View style={styles.tableContainer}>
+      <View style={isDesktop ? styles.tableContainer : { flex: 1, minHeight: 400 }}>
         {loading && invoices.length === 0 ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#4338ca" />

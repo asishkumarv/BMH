@@ -418,6 +418,81 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
     const dboy = deliveryBoys.find(b => b.id.toString() === String(item.delivery_boy_id));
 
+    if (!isDesktop) {
+      return (
+        <View style={{ borderLeftColor: statusColor, borderLeftWidth: 4, backgroundColor: '#fff', padding: 12, borderRadius: 8, marginBottom: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {item.delivery_type === 'Bus' ? <Bus size={14} color="#64748b" /> : 
+               item.delivery_type === 'Local' ? <MapPin size={14} color="#64748b" /> :
+               <Package size={14} color="#64748b" />}
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1e293b' }}>
+                {item.order_no}
+              </Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: statusColor }]}>
+              <Text style={styles.badgeText}>{item.status || 'Pending'}</Text>
+            </View>
+          </View>
+
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a', marginBottom: 4 }}>{item.patient_name || 'Walk-in'}</Text>
+          {item.patient_contact_no ? <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Phone: {item.patient_contact_no}</Text> : null}
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: '#64748b' }}>Date: {item.created_at ? item.created_at.substring(0,10) : ''}</Text>
+              <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Creator: {item.createduser || 'System'}</Text>
+            </View>
+            <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0f172a' }}>₹{item.total_price || 0}</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 }}>
+            <View style={{ flex: 1 }}>
+              {item.status === 'Delivered' ? (
+                 <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                   <User size={14} color="#64748b" style={{marginRight: 4}}/>
+                   <Text style={{ fontSize: 12, color: '#334155', flex: 1 }} numberOfLines={1}>{dboy?.full_name || item.delivered_by || 'Unassigned'}</Text>
+                 </View>
+              ) : (
+                <TouchableOpacity 
+                  style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#fff', width: 140 }]}
+                  onPress={() => {
+                    const isStoreOrCounter = item.mode_of_delivery === 'Store' || item.delivery_type === 'Store' || item.mode_of_delivery === 'Counter' || item.delivery_type === 'Counter';
+                    if (isStoreOrCounter && onStartAssignment) {
+                      onStartAssignment({ ...item, type: 'sales_order' });
+                    } else {
+                      setAssignOrder(item);
+                      setAssignSearchQuery('');
+                      setAssignModalVisible(true);
+                    }
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
+                      {dboy?.full_name || 'Assign To'}
+                    </Text>
+                    <ChevronDown size={12} color="#64748b" style={{ marginLeft: 4 }} />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity onPress={() => handleSelectOrderForView(item)} style={[styles.actionBtn, {backgroundColor: '#e0e7ff'}]}>
+                 <Eye size={14} color="#4338ca" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleShareOrder(item)} style={[styles.actionBtn, {backgroundColor: '#fef3c7'}]}>
+                 <Share2 size={14} color="#b45309" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDeleteOrder(item)} style={[styles.actionBtn, {backgroundColor: '#fee2e2'}]}>
+                 <Trash2 size={14} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
         {/* Status */}
@@ -609,7 +684,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                 type="date" 
                 value={startDate} 
                 onChange={(e) => setStartDate(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', backgroundColor: '#fff', outlineStyle: 'none' }}
+                style={{ padding: '4px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', backgroundColor: '#fff', outlineStyle: 'none', width: '125px', maxWidth: '125px', boxSizing: 'border-box' }}
               />
             ) : null}
             <Text style={{ fontSize: 13, color: '#64748b' }}>to</Text>
@@ -618,7 +693,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                 type="date" 
                 value={endDate} 
                 onChange={(e) => setEndDate(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', backgroundColor: '#fff', outlineStyle: 'none' }}
+                style={{ padding: '4px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', backgroundColor: '#fff', outlineStyle: 'none', width: '125px', maxWidth: '125px', boxSizing: 'border-box' }}
               />
             ) : null}
             {(startDate || endDate) && (
@@ -638,18 +713,20 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
         </View>
       </View>
 
-      <View style={styles.tableContainer}>
+      <View style={isDesktop ? styles.tableContainer : { flex: 1, minHeight: 400 }}>
         {/* Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerText, { flex: 0.8 }]}>Status</Text>
-          <Text style={[styles.headerText, { flex: 1.5 }]}>Customer</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Order No</Text>
-          <Text style={[styles.headerText, { flex: 1.5 }]}>Delivery Boy</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Amount</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Date / Time</Text>
-          <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
-          <Text style={[styles.headerText, { flex: 1.2, textAlign: 'center' }]}>Actions</Text>
-        </View>
+        {isDesktop && (
+          <View style={styles.tableHeader}>
+            <Text style={[styles.headerText, { flex: 0.8 }]}>Status</Text>
+            <Text style={[styles.headerText, { flex: 1.5 }]}>Customer</Text>
+            <Text style={[styles.headerText, { flex: 1 }]}>Order No</Text>
+            <Text style={[styles.headerText, { flex: 1.5 }]}>Delivery Boy</Text>
+            <Text style={[styles.headerText, { flex: 1 }]}>Amount</Text>
+            <Text style={[styles.headerText, { flex: 1 }]}>Date / Time</Text>
+            <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
+            <Text style={[styles.headerText, { flex: 1.2, textAlign: 'center' }]}>Actions</Text>
+          </View>
+        )}
         
         {loading ? (
           <ActivityIndicator size="large" color="#4338ca" style={{marginTop: 50}} />
@@ -688,7 +765,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
       {assignModalVisible && assignOrder && (
         <Modal visible={assignModalVisible} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { width: 450, height: 500 }]}>
+            <View style={[styles.modalContent, { width: isDesktop ? 450 : '90%', height: isDesktop ? 500 : 450, maxHeight: '85%' }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Assign Rider to Order</Text>
                 <TouchableOpacity onPress={() => { setAssignModalVisible(false); setAssignOrder(null); }}>
@@ -772,9 +849,9 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
       {viewModalVisible && selectedOrder && (
         <Modal visible={viewModalVisible} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { width: 600, height: 600 }]}>
+            <View style={[styles.modalContent, { width: isDesktop ? 600 : '95%', height: isDesktop ? 600 : 540, maxHeight: '90%' }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Order Details #{selectedOrder.id}</Text>
+                <Text style={[styles.modalTitle, { fontSize: isDesktop ? 20 : 17, flex: 1 }]} numberOfLines={1}>Order Details #{selectedOrder.id}</Text>
                 <TouchableOpacity onPress={() => setViewModalVisible(false)}><X size={24} color="#64748b" /></TouchableOpacity>
               </View>
 
@@ -1189,8 +1266,8 @@ const styles = StyleSheet.create({
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, height: 32, width: 210 },
   searchIcon: { marginRight: 6 },
   searchInput: { flex: 1, height: '100%', outlineStyle: 'none', fontSize: 13 },
-  dropdownWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140 },
-  picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13 },
+  dropdownWrapper: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140, maxWidth: '100%', overflow: 'hidden' },
+  picker: { height: 32, width: '100%', maxWidth: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13 },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
   tableContainer: { height: 540, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },

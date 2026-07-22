@@ -6,18 +6,20 @@ import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileTex
 import { Share } from 'react-native';
 
 const webDatePickerStyle: any = {
-  height: '40px',
+  height: '32px',
   borderWidth: '1px',
   borderStyle: 'solid',
   borderColor: '#cbd5e1',
   borderRadius: '8px',
-  paddingHorizontal: '12px',
-  fontSize: '14px',
+  paddingHorizontal: '8px',
+  fontSize: '13px',
   backgroundColor: '#fff',
   color: '#334155',
   outlineStyle: 'none',
-  padding: '6px 12px',
-  fontFamily: 'inherit'
+  padding: '4px 6px',
+  fontFamily: 'inherit',
+  width: '125px',
+  maxWidth: '125px'
 };
 
 const webFilterInputStyle = webDatePickerStyle;
@@ -502,11 +504,13 @@ export default function PurchaseOrdersScreen() {
     // Status Assignment filter
     let matchesAssignment = true;
     if (assignmentFilter === 'Pending') {
-      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Completed';
+      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Not Available';
     } else if (assignmentFilter === 'Assigned') {
       matchesAssignment = order.status === 'Assigned';
     } else if (assignmentFilter === 'Delivered') {
       matchesAssignment = order.status === 'Delivered' || order.status === 'Completed';
+    } else if (assignmentFilter === 'Not Available') {
+      matchesAssignment = order.status === 'Not Available';
     }
 
     // Date range filter
@@ -563,6 +567,78 @@ export default function PurchaseOrdersScreen() {
     else if (item.status === 'Delivered' || item.status === 'Completed') statusColor = '#10b981';
     else if (item.status === 'Not Available') statusColor = '#ef4444';
     else if (item.status === 'Cancelled') statusColor = '#ef4444';
+
+    if (!isDesktop) {
+      return (
+        <View style={{ borderLeftColor: statusColor, borderLeftWidth: 4, backgroundColor: '#fff', padding: 12, borderRadius: 8, marginBottom: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {item.delivery_type === 'Bus' ? <Bus size={14} color="#64748b" /> : 
+               item.delivery_type === 'Local' ? <MapPin size={14} color="#64748b" /> :
+               <Package size={14} color="#64748b" />}
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1e293b' }}>
+                {item.prefix || 'PO'}{item.year || ''}{item.srno || ''}
+              </Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: statusColor }]}>
+              <Text style={styles.badgeText}>{item.status || 'Pending'}</Text>
+            </View>
+          </View>
+
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a', marginBottom: 4 }}>{item.custname}</Text>
+          {item.refname ? <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Ref: {item.refname}</Text> : null}
+          {item.address ? <Text style={{ fontSize: 12, color: '#4338ca', marginBottom: 4 }}>Addr: {item.address}</Text> : null}
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: '#64748b' }}>Date: {formattedDate}</Text>
+              <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Creator: {item.createuser || 'SYSTEM'}</Text>
+            </View>
+            <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0f172a' }}>₹{item.total}</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 }}>
+            <View style={{ flex: 1 }}>
+              {item.status === 'Delivered' || item.status === 'Completed' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <User size={14} color="#64748b" style={{ marginRight: 4 }}/>
+                  <Text style={{ fontSize: 12, color: '#334155', flex: 1 }} numberOfLines={1}>
+                    {getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type)}
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={[styles.pickerWrapper, { paddingHorizontal: 8, height: 28, justifyContent: 'center', backgroundColor: '#fff', width: 140 }]}
+                  onPress={() => openAssignModal(item)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
+                      {item.delivery_boy_id ? getAssigneeName(item.delivery_boy_id, item.delivery_assigned_user_type) : 'Assign To'}
+                    </Text>
+                    <ChevronDown size={12} color="#64748b" style={{ marginLeft: 4 }} />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: '#e0e7ff' }]} 
+                onPress={() => handleSelectOrderForView(item)}
+              >
+                <Eye size={14} color="#4338ca" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: '#fef3c7' }]} 
+                onPress={() => handleShareOrder(item)}
+              >
+                <Share2 size={14} color="#b45309" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <View style={[styles.tableRow, { backgroundColor: index % 2 === 0 ? '#f8fafc' : '#ffffff' }]}>
@@ -802,9 +878,9 @@ export default function PurchaseOrdersScreen() {
         </ScrollView>
       </View>
 
-      {/* Assignment Filters (All, Pending, Assigned, Delivered) */}
+      {/* Assignment Filters (All, Pending, Assigned, Delivered, Not Available) */}
       <View style={styles.statusChipsRow}>
-        {['All', 'Pending', 'Assigned', 'Delivered'].map((status) => (
+        {['All', 'Pending', 'Assigned', 'Delivered', 'Not Available'].map((status) => (
           <TouchableOpacity
             key={status}
             onPress={() => setAssignmentFilter(status)}
@@ -823,18 +899,20 @@ export default function PurchaseOrdersScreen() {
         ))}
       </View>
 
-      <View style={styles.tableContainer}>
+      <View style={isDesktop ? styles.tableContainer : { flex: 1, minHeight: 400 }}>
         {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerText, { flex: 0.8 }]}>Status</Text>
-          <Text style={[styles.headerText, { flex: 1.5 }]}>Customer / Wholesaler</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Order No</Text>
-          <Text style={[styles.headerText, { flex: 1.5 }]}>Submitted To</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Amount</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Date / Time</Text>
-          <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
-          <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>Actions</Text>
-        </View>
+        {isDesktop && (
+          <View style={styles.tableHeader}>
+            <Text style={[styles.headerText, { flex: 0.8 }]}>Status</Text>
+            <Text style={[styles.headerText, { flex: 1.5 }]}>Customer / Wholesaler</Text>
+            <Text style={[styles.headerText, { flex: 1 }]}>Order No</Text>
+            <Text style={[styles.headerText, { flex: 1.5 }]}>Submitted To</Text>
+            <Text style={[styles.headerText, { flex: 1 }]}>Amount</Text>
+            <Text style={[styles.headerText, { flex: 1 }]}>Date / Time</Text>
+            <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
+            <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>Actions</Text>
+          </View>
+        )}
 
         {loading ? (
           <ActivityIndicator size="large" color="#4338ca" style={{ marginTop: 50 }} />
@@ -1210,9 +1288,9 @@ export default function PurchaseOrdersScreen() {
       {assignOrder && (
         <Modal visible={assignModalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { width: isDesktop ? 500 : '90%', maxHeight: '80%' }]}>
+            <View style={[styles.modalContent, { width: isDesktop ? 500 : '90%', height: isDesktop ? undefined : 520, maxHeight: '90%' }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Assign Rider (PO #{assignOrder.prefix || ''}{assignOrder.year || ''}{assignOrder.srno || ''})</Text>
+                <Text style={[styles.modalTitle, { fontSize: isDesktop ? 20 : 16, flex: 1 }]} numberOfLines={1}>Assign Rider (PO #{assignOrder.prefix || ''}{assignOrder.year || ''}{assignOrder.srno || ''})</Text>
                 <TouchableOpacity onPress={() => { setAssignModalVisible(false); setAssignOrder(null); }}>
                   <X size={20} color="#64748b" />
                 </TouchableOpacity>
@@ -1232,7 +1310,7 @@ export default function PurchaseOrdersScreen() {
               <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true}>
                 {/* Delivery Type Select inside assignment */}
                 <Text style={styles.label}>Delivery Mode</Text>
-                <View style={[styles.dropdownWrapper, { marginBottom: 12, minWidth: '100%' }]}>
+                <View style={[styles.dropdownWrapper, { marginBottom: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }]}>
                   <Picker
                     selectedValue={deliveryType}
                     onValueChange={(val) => setDeliveryType(val)}
@@ -1364,8 +1442,8 @@ const styles = StyleSheet.create({
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 32, width: 210 },
   searchIcon: { marginRight: 6 },
   searchInput: { flex: 1, height: '100%', outlineStyle: 'none' as any, fontSize: 13, color: '#334155' },
-  dropdownWrapper: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140 },
-  picker: { height: 32, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }) as any, fontSize: 13, color: '#334155' },
+  dropdownWrapper: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#fff', height: 32, justifyContent: 'center', minWidth: 140, maxWidth: '100%', overflow: 'hidden' },
+  picker: { height: 32, width: '100%', maxWidth: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }) as any, fontSize: 13, color: '#334155' },
   riderSelectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 32, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', minWidth: 160, gap: 6 },
   riderDropdown: { position: 'absolute', top: 36, left: 0, right: 0, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 5, padding: 8, zIndex: 999, minWidth: 200 },
   riderSearchInput: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, padding: 6, fontSize: 13, marginBottom: 8 },

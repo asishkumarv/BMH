@@ -287,19 +287,21 @@ export default function OrderAssignScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={{flexDirection: 'row', gap: 20, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#e2e8f0'}}>
-        <TouchableOpacity onPress={() => setActiveTab('All Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'All Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-          <Text style={{fontWeight: activeTab === 'All Orders' ? 'bold' : 'normal', color: activeTab === 'All Orders' ? '#4338ca' : '#64748b'}}>All Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('Manual Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Manual Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-          <Text style={{fontWeight: activeTab === 'Manual Orders' ? 'bold' : 'normal', color: activeTab === 'Manual Orders' ? '#4338ca' : '#64748b'}}>Manual Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('Sales Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Sales Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-          <Text style={{fontWeight: activeTab === 'Sales Orders' ? 'bold' : 'normal', color: activeTab === 'Sales Orders' ? '#4338ca' : '#64748b'}}>Sales Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('Purchase Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Purchase Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-          <Text style={{fontWeight: activeTab === 'Purchase Orders' ? 'bold' : 'normal', color: activeTab === 'Purchase Orders' ? '#4338ca' : '#64748b'}}>Purchase Orders</Text>
-        </TouchableOpacity>
+      <View style={{ marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 16 }}>
+          <TouchableOpacity onPress={() => setActiveTab('All Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'All Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+            <Text style={{fontWeight: activeTab === 'All Orders' ? 'bold' : 'normal', color: activeTab === 'All Orders' ? '#4338ca' : '#64748b'}}>All Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveTab('Manual Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Manual Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+            <Text style={{fontWeight: activeTab === 'Manual Orders' ? 'bold' : 'normal', color: activeTab === 'Manual Orders' ? '#4338ca' : '#64748b'}}>Manual Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveTab('Sales Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Sales Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+            <Text style={{fontWeight: activeTab === 'Sales Orders' ? 'bold' : 'normal', color: activeTab === 'Sales Orders' ? '#4338ca' : '#64748b'}}>Sales Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveTab('Purchase Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Purchase Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+            <Text style={{fontWeight: activeTab === 'Purchase Orders' ? 'bold' : 'normal', color: activeTab === 'Purchase Orders' ? '#4338ca' : '#64748b'}}>Purchase Orders</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {activeTab === 'Manual Orders' ? (
