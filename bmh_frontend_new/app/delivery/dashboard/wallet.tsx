@@ -516,7 +516,7 @@ export default function EmployeeWalletScreen() {
                 <Text style={styles.filterLabel}>Start Date</Text>
                 {Platform.OS === 'web' ? (
                   <View style={styles.webDateInputContainer}>
-                    <Calendar size={16} color="#64748b" style={styles.webCalendarIcon} />
+                    <Calendar size={16} color="#64748b" style={{ marginRight: 8 }} />
                     <input
                       type="date"
                       value={startDate}
@@ -553,7 +553,7 @@ export default function EmployeeWalletScreen() {
                 <Text style={styles.filterLabel}>End Date</Text>
                 {Platform.OS === 'web' ? (
                   <View style={styles.webDateInputContainer}>
-                    <Calendar size={16} color="#64748b" style={styles.webCalendarIcon} />
+                    <Calendar size={16} color="#64748b" style={{ marginRight: 8 }} />
                     <input
                       type="date"
                       value={endDate}
@@ -793,7 +793,7 @@ export default function EmployeeWalletScreen() {
               {isBookingsExpanded && collectedTransactions.map(tx => (
                 <View key={tx.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
                       <View style={[
                         styles.txIconWrapper, 
                         { 
@@ -1233,11 +1233,11 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.7 },
   filterCard: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
-  filterCol: { flex: 1, minWidth: 200 },
+  filterCol: { flex: 1, minWidth: 200, maxWidth: Platform.OS === 'web' ? 240 : undefined },
   filterLabel: { fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  webDateInputContainer: { position: 'relative', flexDirection: 'row', alignItems: 'center' },
-  webCalendarIcon: { position: 'absolute', left: 12, zIndex: 10, pointerEvents: 'none' },
-  webDateInput: { paddingVertical: 10, paddingLeft: 36, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#F8FAFC', fontSize: 14, width: '100%', outlineWidth: 0, color: '#334155' },
+  webDateInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#F8FAFC', paddingHorizontal: 12, paddingVertical: 10, width: '100%' },
+  webCalendarIcon: { marginRight: 8 },
+  webDateInput: { borderWidth: 0, backgroundColor: 'transparent', fontSize: 14, color: '#334155', width: '100%', outlineWidth: 0, padding: 0 },
   mobileDateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#F8FAFC' },
   mobileDateBtnText: { fontSize: 14, color: '#334155' },
   clearFilterBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fca5a5', justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-end', height: 42 },

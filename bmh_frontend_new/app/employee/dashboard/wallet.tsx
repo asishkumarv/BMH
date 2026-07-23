@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
-import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins, ChevronDown, ChevronUp, Calendar } from 'lucide-react-native';
+import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins, ChevronDown, ChevronUp, Calendar, ShieldCheck } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
@@ -10,7 +10,7 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; payment_mode?: string; payment_txn_id?: string; };
+type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; payment_mode?: string; payment_txn_id?: string; order_no?: string; invoice_no?: string; customer_name?: string; customer_phone?: string; delivery_method?: string; cash_amount?: string; online_amount?: string; credit_amount?: string; };
 type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; note?: string; credit_amount?: string; };
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
 type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
@@ -22,6 +22,7 @@ export default function EmployeeWalletScreen() {
   // Accordion Expand/Collapse States
   const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
   const [isHandoversExpanded, setIsHandoversExpanded] = useState(true);
+  const [isOrdersExpanded, setIsOrdersExpanded] = useState(false);
 
   // User
   const [user, setUser] = useState<any>(null);
@@ -358,6 +359,14 @@ export default function EmployeeWalletScreen() {
     return true;
   });
 
+  const allowanceTransactions = filteredTransactions.filter(tx => 
+    tx.type !== 'cash_collection' && tx.type !== 'online_collection' && tx.type !== 'split_collection'
+  );
+
+  const collectedTransactions = filteredTransactions.filter(tx => 
+    tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection'
+  );
+
   const filteredBookings = bookings.filter(b => {
     if (!b.date) return true;
     const bDate = new Date(b.date).toISOString().split('T')[0];
@@ -408,7 +417,7 @@ export default function EmployeeWalletScreen() {
                 <Text style={styles.filterLabel}>Start Date</Text>
                 {Platform.OS === 'web' ? (
                   <View style={styles.webDateInputContainer}>
-                    <Calendar size={16} color="#64748b" style={styles.webCalendarIcon} />
+                    <Calendar size={16} color="#64748b" style={{ marginRight: 8 }} />
                     <input
                       type="date"
                       value={startDate}
@@ -445,7 +454,7 @@ export default function EmployeeWalletScreen() {
                 <Text style={styles.filterLabel}>End Date</Text>
                 {Platform.OS === 'web' ? (
                   <View style={styles.webDateInputContainer}>
-                    <Calendar size={16} color="#64748b" style={styles.webCalendarIcon} />
+                    <Calendar size={16} color="#64748b" style={{ marginRight: 8 }} />
                     <input
                       type="date"
                       value={endDate}
@@ -553,7 +562,7 @@ export default function EmployeeWalletScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Transaction History</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredTransactions, 'Allowance_History', ['Date', 'Type', 'Amount', 'Note', 'Status'], (tx) => [
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(allowanceTransactions, 'Allowance_History', ['Date', 'Type', 'Amount', 'Note', 'Status'], (tx) => [
                     formatDateDMY(tx.created_at, true),
                     tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
                     `₹${tx.amount}`,
@@ -562,7 +571,7 @@ export default function EmployeeWalletScreen() {
                   ])}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Allowance Transaction History', ['Date', 'Type', 'Amount', 'Note', 'Status'], filteredTransactions, (tx) => [
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Allowance Transaction History', ['Date', 'Type', 'Amount', 'Note', 'Status'], allowanceTransactions, (tx) => [
                     formatDateDMY(tx.created_at, true),
                     tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
                     `₹${tx.amount}`,
@@ -573,7 +582,7 @@ export default function EmployeeWalletScreen() {
                   </Pressable>
                 </View>
               </View>
-              {filteredTransactions.map(tx => (
+              {allowanceTransactions.map(tx => (
                 <View key={tx.id} style={styles.txCard}>
                   <View style={[styles.txIconWrapper, { backgroundColor: tx.type === 'usage' ? '#fee2e2' : '#dcfce7' }]}>
                     {tx.type === 'usage' ? <ArrowUpRight size={20} color="#ef4444" /> : <ArrowDownRight size={20} color="#22c55e" />}
@@ -625,6 +634,117 @@ export default function EmployeeWalletScreen() {
                   <Text style={[styles.statsValue, { color: Colors.light.primary }]}>₹{totalOnlineBooked}</Text>
                 </View>
               </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }} onPress={() => setIsOrdersExpanded(!isOrdersExpanded)}>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>My Order Collections</Text>
+                  {isOrdersExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
+                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(collectedTransactions, 'Order_Collections', ['Date', 'Order No', 'Invoice No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Total'], (tx) => [
+                    formatDateDMY(tx.created_at, true),
+                    tx.order_no || '--',
+                    tx.invoice_no || '--',
+                    tx.customer_name || '--',
+                    tx.customer_phone || '--',
+                    tx.delivery_method || '--',
+                    `₹${tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount).toFixed(2) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || '0').toFixed(2) : '0.00')}`,
+                    `₹${tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount).toFixed(2) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || '0').toFixed(2) : '0.00')}`,
+                    `₹${tx.credit_amount !== undefined && tx.credit_amount !== null ? parseFloat(tx.credit_amount).toFixed(2) : '0.00'}`,
+                    `₹${parseFloat(tx.amount || '0').toFixed(2)}`
+                  ])}>
+                    <Text style={styles.actionIconText}>CSV</Text>
+                  </Pressable>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('My Order Collections', ['Date', 'Order No', 'Invoice No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Total'], collectedTransactions, (tx) => [
+                    formatDateDMY(tx.created_at, true),
+                    tx.order_no || '--',
+                    tx.invoice_no || '--',
+                    tx.customer_name || '--',
+                    tx.customer_phone || '--',
+                    tx.delivery_method || '--',
+                    `₹${tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount).toFixed(2) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || '0').toFixed(2) : '0.00')}`,
+                    `₹${tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount).toFixed(2) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || '0').toFixed(2) : '0.00')}`,
+                    `₹${tx.credit_amount !== undefined && tx.credit_amount !== null ? parseFloat(tx.credit_amount).toFixed(2) : '0.00'}`,
+                    `₹${parseFloat(tx.amount || '0').toFixed(2)}`
+                  ])}>
+                    <Text style={styles.actionIconText}>Print</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {isOrdersExpanded && collectedTransactions.map(tx => (
+                <View key={tx.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                      <View style={[
+                        styles.txIconWrapper, 
+                        { 
+                          backgroundColor: tx.payment_mode === 'Cash' ? '#dcfce7' : (tx.payment_mode === 'Online' ? '#e0f2fe' : '#f3e8ff') 
+                        }
+                      ]}>
+                        {tx.payment_mode === 'Cash' ? (
+                          <Banknote size={20} color="#16a34a" />
+                        ) : tx.payment_mode === 'Online' ? (
+                          <RefreshCcw size={20} color={Colors.light.primary} />
+                        ) : (
+                          <ShieldCheck size={20} color="#8b5cf6" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.txType, { fontWeight: '700' }]} numberOfLines={1}>{tx.note || 'Order Collection'}</Text>
+                        <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.txAmountSection}>
+                      <Text style={[
+                        styles.txAmount, 
+                        { 
+                          color: tx.payment_mode === 'Cash' ? '#16a34a' : (tx.payment_mode === 'Online' ? Colors.light.primary : '#7c3aed') 
+                        }
+                      ]}>
+                        +₹{tx.amount || 0}
+                      </Text>
+                      <Text style={[
+                        styles.txStatus, 
+                        { 
+                          color: tx.payment_mode === 'Cash' ? '#166534' : (tx.payment_mode === 'Online' ? '#075985' : '#5b21b6'), 
+                          backgroundColor: tx.payment_mode === 'Cash' ? '#dcfce7' : (tx.payment_mode === 'Online' ? '#e0f2fe' : '#f3e8ff') 
+                        }
+                      ]}>
+                        {tx.payment_mode || 'Cash'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 12, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Order No:</Text> {tx.order_no || '--'}</Text>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Invoice No:</Text> {tx.invoice_no || '--'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Customer:</Text> {tx.customer_name || '--'}</Text>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Phone:</Text> {tx.customer_phone || '--'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Method:</Text> {tx.delivery_method || '--'}</Text>
+                      <Text style={{ fontSize: 13, color: '#475569' }}>
+                        <Text style={{ fontWeight: '600' }}>Cash:</Text> {tx.cash_amount !== undefined && tx.cash_amount !== null ? `₹${parseFloat(tx.cash_amount).toFixed(2)}` : (tx.payment_mode === 'Cash' ? `₹${parseFloat(tx.amount || '0').toFixed(2)}` : '₹0.00')} | <Text style={{ fontWeight: '600' }}>Online:</Text> {tx.online_amount !== undefined && tx.online_amount !== null ? `₹${parseFloat(tx.online_amount).toFixed(2)}` : (tx.payment_mode === 'Online' ? `₹${parseFloat(tx.amount || '0').toFixed(2)}` : '₹0.00')}
+                      </Text>
+                    </View>
+                    {tx.credit_amount !== undefined && tx.credit_amount !== null && parseFloat(tx.credit_amount) > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 }}>
+                        <Text style={{ fontSize: 13, color: '#b45309', fontWeight: '600' }}>
+                          Credit (Unpaid): ₹{parseFloat(tx.credit_amount).toFixed(2)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+              {!isOrdersExpanded && collectedTransactions.length > 0 && (
+                <Pressable onPress={() => setIsOrdersExpanded(true)} style={{ padding: 12, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Show {collectedTransactions.length} Order Collections</Text>
+                </Pressable>
+              )}
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
                 <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }} onPress={() => setIsBookingsExpanded(!isBookingsExpanded)}>
@@ -923,11 +1043,11 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.7 },
   filterCard: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
-  filterCol: { flex: 1, minWidth: 200 },
+  filterCol: { flex: 1, minWidth: 200, maxWidth: Platform.OS === 'web' ? 240 : undefined },
   filterLabel: { fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  webDateInputContainer: { position: 'relative', flexDirection: 'row', alignItems: 'center' },
-  webCalendarIcon: { position: 'absolute', left: 12, zIndex: 10, pointerEvents: 'none' },
-  webDateInput: { paddingVertical: 10, paddingLeft: 36, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#F8FAFC', fontSize: 14, width: '100%', outlineWidth: 0, color: '#334155' },
+  webDateInputContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#F8FAFC', paddingHorizontal: 12, paddingVertical: 10, width: '100%' },
+  webCalendarIcon: { marginRight: 8 },
+  webDateInput: { borderWidth: 0, backgroundColor: 'transparent', fontSize: 14, color: '#334155', width: '100%', outlineWidth: 0, padding: 0 },
   mobileDateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#F8FAFC' },
   mobileDateBtnText: { fontSize: 14, color: '#334155' },
   clearFilterBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fca5a5', justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-end', height: 42 },

@@ -603,7 +603,28 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
               <Text style={{ fontSize: 11, color: '#64748b' }}>Date: {item.order_date ? item.order_date.substring(0,10) : ''}</Text>
               <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Creator: {item.admin_creator_name || item.creator_name}</Text>
             </View>
-            <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0f172a' }}>₹{item.amount || 0}</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0f172a' }}>₹{item.amount || 0}</Text>
+              {['completed', 'delivered', 'received'].includes(item.status?.toLowerCase()) && (
+                <View style={{ alignItems: 'flex-end', marginTop: 2 }}>
+                  {item.pod_payment_mode && (
+                    <Text style={{ fontSize: 10, color: '#4f46e5', fontWeight: 'bold' }}>
+                      {item.pod_payment_mode}
+                    </Text>
+                  )}
+                  {(parseFloat(item.cash_amount) > 0 || parseFloat(item.online_amount) > 0) && (
+                    <Text style={{ fontSize: 9, color: '#475569' }}>
+                      C: ₹{parseFloat(item.cash_amount || 0)} | O: ₹{parseFloat(item.online_amount || 0)}
+                    </Text>
+                  )}
+                  {parseFloat(item.credit_amount) > 0 && (
+                    <Text style={{ fontSize: 9, color: '#b45309', fontWeight: 'bold' }}>
+                      Cr: ₹{parseFloat(item.credit_amount)}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 }}>
@@ -639,7 +660,16 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
 
             <View style={{ flexDirection: 'row', gap: 6 }}>
               <TouchableOpacity onPress={() => { 
-                  setSelectedOrder(item); 
+                  const cAmt = parseFloat(item.cash_amount || 0);
+                  const oAmt = parseFloat(item.online_amount || 0);
+                  const totalPaid = cAmt + oAmt;
+                  const initializedOrder = {
+                    ...item,
+                    paid_amount: (item.paid_amount !== undefined && item.paid_amount !== null && parseFloat(item.paid_amount) > 0)
+                      ? item.paid_amount.toString()
+                      : (totalPaid > 0 ? totalPaid.toString() : '')
+                  };
+                  setSelectedOrder(initializedOrder); 
                   setEditAddress(item.address || '');
                   setNewNote('');
                   setViewModalVisible(true); 
@@ -730,6 +760,25 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
         <View style={[styles.cell, { flex: 1 }]}>
           <Text style={styles.cellText}>₹{item.delivery_charge || 0}</Text>
           <Text style={styles.cellTextBold}>₹{item.amount || 0}</Text>
+          {['completed', 'delivered', 'received'].includes(item.status?.toLowerCase()) && (
+            <View style={{ marginTop: 2 }}>
+              {item.pod_payment_mode && (
+                <Text style={{ fontSize: 10, color: '#4f46e5', fontWeight: 'bold' }}>
+                  {item.pod_payment_mode}
+                </Text>
+              )}
+              {(parseFloat(item.cash_amount) > 0 || parseFloat(item.online_amount) > 0) && (
+                <Text style={{ fontSize: 9, color: '#475569' }}>
+                  C: ₹{parseFloat(item.cash_amount || 0)} | O: ₹{parseFloat(item.online_amount || 0)}
+                </Text>
+              )}
+              {parseFloat(item.credit_amount) > 0 && (
+                <Text style={{ fontSize: 9, color: '#b45309', fontWeight: 'bold' }}>
+                  Cr: ₹{parseFloat(item.credit_amount)}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
         
         {/* Date/Time */}
@@ -757,7 +806,16 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
         {/* Actions */}
         <View style={[styles.cell, { flex: 1.2, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
           <TouchableOpacity onPress={() => { 
-              setSelectedOrder(item); 
+              const cAmt = parseFloat(item.cash_amount || 0);
+              const oAmt = parseFloat(item.online_amount || 0);
+              const totalPaid = cAmt + oAmt;
+              const initializedOrder = {
+                ...item,
+                paid_amount: (item.paid_amount !== undefined && item.paid_amount !== null && parseFloat(item.paid_amount) > 0)
+                  ? item.paid_amount.toString()
+                  : (totalPaid > 0 ? totalPaid.toString() : '')
+              };
+              setSelectedOrder(initializedOrder); 
               setEditAddress(item.address || '');
               setNewNote('');
               setViewModalVisible(true); 
@@ -1490,10 +1548,10 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
                       ) : (
                         <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Bus Timing (HH:MM)" value={selectedOrder.scheduled_time || ''} onChangeText={t => setSelectedOrder({...selectedOrder, scheduled_time: t})} />
                       )}
-                 </View>
-               )}
+                  </View>
+                )}
 
-               <View style={{marginTop: 20, backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8}}>
+                <View style={{marginTop: 20, backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8}}>
                   <Text style={{fontWeight:'bold', marginBottom: 10}}>Payment Info</Text>
                   <View style={styles.dropdownWrapper}>
                     <Picker
@@ -1509,6 +1567,26 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
                   </View>
                   <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Paid Amount" value={selectedOrder.paid_amount || ''} onChangeText={t => setSelectedOrder({...selectedOrder, paid_amount: t})} />
                   <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Txn ID" value={selectedOrder.payment_txn_id || ''} onChangeText={t => setSelectedOrder({...selectedOrder, payment_txn_id: t})} />
+                  {selectedOrder.pod_payment_mode && (
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e3a8a', marginTop: 8 }}>
+                      POD Mode: {selectedOrder.pod_payment_mode}
+                    </Text>
+                  )}
+                  {selectedOrder.cash_amount !== undefined && selectedOrder.cash_amount !== null && (
+                    <Text style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>
+                      Cash Portion: ₹{selectedOrder.cash_amount}
+                    </Text>
+                  )}
+                  {selectedOrder.online_amount !== undefined && selectedOrder.online_amount !== null && (
+                    <Text style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>
+                      Online Portion: ₹{selectedOrder.online_amount}
+                    </Text>
+                  )}
+                  {selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null && (
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#b45309', marginTop: 4 }}>
+                      Credit Portion (Unpaid): ₹{selectedOrder.credit_amount}
+                    </Text>
+                  )}
                   {selectedOrder.payment_attachment && <Image source={{uri: `https://napi.bharatmedicalhallplus.com${selectedOrder.payment_attachment}`}} style={{width: 100, height: 100, marginTop: 10}}/>}
                </View>
 

@@ -444,7 +444,28 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
               <Text style={{ fontSize: 11, color: '#64748b' }}>Date: {item.created_at ? item.created_at.substring(0,10) : ''}</Text>
               <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Creator: {item.createduser || 'System'}</Text>
             </View>
-            <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0f172a' }}>₹{item.total_price || 0}</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#0f172a' }}>₹{item.total_price || 0}</Text>
+              {['completed', 'delivered', 'received'].includes(item.status?.toLowerCase()) && (
+                <View style={{ alignItems: 'flex-end', marginTop: 2 }}>
+                  {item.pod_payment_mode && (
+                    <Text style={{ fontSize: 10, color: '#4f46e5', fontWeight: 'bold' }}>
+                      {item.pod_payment_mode}
+                    </Text>
+                  )}
+                  {(parseFloat(item.cash_amount) > 0 || parseFloat(item.online_amount) > 0) && (
+                    <Text style={{ fontSize: 9, color: '#475569' }}>
+                      C: ₹{parseFloat(item.cash_amount || 0)} | O: ₹{parseFloat(item.online_amount || 0)}
+                    </Text>
+                  )}
+                  {parseFloat(item.credit_amount) > 0 && (
+                    <Text style={{ fontSize: 9, color: '#b45309', fontWeight: 'bold' }}>
+                      Cr: ₹{parseFloat(item.credit_amount)}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 }}>
@@ -556,6 +577,25 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
         <View style={[styles.cell, { flex: 1 }]}>
           <Text style={styles.cellTextBold}>₹{item.total_price || 0}</Text>
           <Text style={styles.cellSubText}>Disc: {item.total_discount || 0}%</Text>
+          {['completed', 'delivered', 'received'].includes(item.status?.toLowerCase()) && (
+            <View style={{ marginTop: 2 }}>
+              {item.pod_payment_mode && (
+                <Text style={{ fontSize: 10, color: '#4f46e5', fontWeight: 'bold' }}>
+                  {item.pod_payment_mode}
+                </Text>
+              )}
+              {(parseFloat(item.cash_amount) > 0 || parseFloat(item.online_amount) > 0) && (
+                <Text style={{ fontSize: 9, color: '#475569' }}>
+                  C: ₹{parseFloat(item.cash_amount || 0)} | O: ₹{parseFloat(item.online_amount || 0)}
+                </Text>
+              )}
+              {parseFloat(item.credit_amount) > 0 && (
+                <Text style={{ fontSize: 9, color: '#b45309', fontWeight: 'bold' }}>
+                  Cr: ₹{parseFloat(item.credit_amount)}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Date/Time */}
@@ -1084,6 +1124,30 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                   <Text style={styles.detailsText}>Total Price: ₹{selectedOrder.total_price}</Text>
                   <Text style={styles.detailsText}>Total Discount: {selectedOrder.total_discount}%</Text>
                   <Text style={styles.detailsText}>Payment Status: {selectedOrder.payment_status}</Text>
+                  {selectedOrder.pod_payment_mode && (
+                    <Text style={[styles.detailsText, { fontWeight: '600', color: '#1e3a8a', marginTop: 4 }]}>
+                      POD Mode: {selectedOrder.pod_payment_mode}
+                    </Text>
+                  )}
+                  {selectedOrder.cash_amount !== undefined && selectedOrder.cash_amount !== null && (
+                    <Text style={styles.detailsText}>Cash Portion: ₹{selectedOrder.cash_amount}</Text>
+                  )}
+                  {selectedOrder.online_amount !== undefined && selectedOrder.online_amount !== null && (
+                    <Text style={styles.detailsText}>Online Portion: ₹{selectedOrder.online_amount}</Text>
+                  )}
+                  {selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null && (
+                    <Text style={[styles.detailsText, { fontWeight: 'bold', color: '#b45309' }]}>
+                      Credit Portion (Unpaid): ₹{selectedOrder.credit_amount}
+                    </Text>
+                  )}
+                  {parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0) > 0 && (
+                    <Text style={styles.detailsText}>
+                      Paid Amount: ₹{parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0)}
+                    </Text>
+                  )}
+                  {selectedOrder.payment_txn_id ? (
+                    <Text style={styles.detailsText}>Transaction ID: {selectedOrder.payment_txn_id}</Text>
+                  ) : null}
                 </View>
 
                 {/* Items */}
