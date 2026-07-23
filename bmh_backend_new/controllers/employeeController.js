@@ -288,13 +288,15 @@ exports.getDeliveryFleet = async (req, res) => {
       boy.recommended = false;
       boy.min_distance = Infinity;
 
-      // Get pending orders count for each boy
-      const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-      const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-      const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-      const o4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status != 'DELIVERED'`, [boy.id]);
-      const o5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed')`, [boy.id]);
+      // Get pending orders count for each boy (excluding delivered, completed, cancelled, returned, failed, and not available)
+      const o1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available', 'delivered', 'completed', 'cancelled', 'returned', 'failed')`, [boy.id]);
+      const o2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed')`, [boy.id]);
+      const o3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed')`, [boy.id]);
+      const o4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Received', 'Returned', 'Failed', 'fail', 'not available', 'Not Available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed')`, [boy.id]);
+      const o5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1::text AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed')`, [boy.id]);
+      
       boy.pending_orders_count = parseInt(o1.rows[0].count) + parseInt(o2.rows[0].count) + parseInt(o3.rows[0].count) + parseInt(o4.rows[0].count) + parseInt(o5.rows[0].count);
+      boy.total_pending_count = boy.pending_orders_count;
 
       // Get pending tasks count for each boy
       const tasksRes = await pool.query(`
@@ -317,20 +319,40 @@ exports.getDeliveryFleet = async (req, res) => {
       boy.pending_tasks_count = parseInt(tasksRes.rows[0].count);
 
       // Get delivered today count
-      const d1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND updated_at::date = CURRENT_DATE`, [boy.id]);
-      const d2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND created_at::date = CURRENT_DATE`, [boy.id]);
-      const d3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status = 'DELIVERED' AND created_at::date = CURRENT_DATE`, [boy.id]);
-      const d4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status = 'DELIVERED' AND created_at::date = CURRENT_DATE`, [boy.id]);
-      const d5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND status = 'Delivered' AND updated_at::date = CURRENT_DATE`, [boy.id]);
+      const d1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status IN ('DELIVERED', 'COMPLETED', 'delivered', 'completed') AND updated_at::date = CURRENT_DATE`, [boy.id]);
+      const d2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status IN ('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed') AND created_at::date = CURRENT_DATE`, [boy.id]);
+      const d3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status IN ('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed') AND created_at::date = CURRENT_DATE`, [boy.id]);
+      const d4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status IN ('Delivered', 'Completed', 'Received', 'DELIVERED', 'COMPLETED', 'delivered', 'completed', 'received') AND created_at::date = CURRENT_DATE`, [boy.id]);
+      const d5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1::text AND status IN ('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed') AND updated_at::date = CURRENT_DATE`, [boy.id]);
+      
       boy.delivered_today_count = parseInt(d1.rows[0].count) + parseInt(d2.rows[0].count) + parseInt(d3.rows[0].count) + parseInt(d4.rows[0].count) + parseInt(d5.rows[0].count);
+      boy.today_delivered_count = boy.delivered_today_count;
 
       // Get assigned today count
       const a1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND updated_at::date = CURRENT_DATE`, [boy.id]);
       const a2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND created_at::date = CURRENT_DATE`, [boy.id]);
       const a3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND created_at::date = CURRENT_DATE`, [boy.id]);
       const a4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND created_at::date = CURRENT_DATE`, [boy.id]);
-      const a5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1 AND updated_at::date = CURRENT_DATE`, [boy.id]);
+      const a5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1::text AND updated_at::date = CURRENT_DATE`, [boy.id]);
+      
       boy.assigned_today_count = parseInt(a1.rows[0].count) + parseInt(a2.rows[0].count) + parseInt(a3.rows[0].count) + parseInt(a4.rows[0].count) + parseInt(a5.rows[0].count);
+      boy.today_assigned_count = boy.assigned_today_count;
+
+      // Get total assigned count (ever)
+      const ta1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1`, [boy.id]);
+      const ta2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1`, [boy.id]);
+      const ta3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1`, [boy.id]);
+      const ta4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1`, [boy.id]);
+      const ta5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1::text`, [boy.id]);
+      boy.total_assigned_count = parseInt(ta1.rows[0].count) + parseInt(ta2.rows[0].count) + parseInt(ta3.rows[0].count) + parseInt(ta4.rows[0].count) + parseInt(ta5.rows[0].count);
+
+      // Get total delivered count (ever)
+      const td1 = await pool.query(`SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = $1 AND status IN ('DELIVERED', 'COMPLETED', 'delivered', 'completed')`, [boy.id]);
+      const td2 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = $1 AND status IN ('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed')`, [boy.id]);
+      const td3 = await pool.query(`SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = $1 AND status IN ('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed')`, [boy.id]);
+      const td4 = await pool.query(`SELECT COUNT(*) FROM ecogreenpurchase_orders WHERE delivery_boy_id = $1 AND status IN ('Delivered', 'Completed', 'Received', 'DELIVERED', 'COMPLETED', 'delivered', 'completed', 'received')`, [boy.id]);
+      const td5 = await pool.query(`SELECT COUNT(*) FROM manual_orders WHERE delivery_boy_id = $1::text AND status IN ('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed')`, [boy.id]);
+      boy.total_delivered_count = parseInt(td1.rows[0].count) + parseInt(td2.rows[0].count) + parseInt(td3.rows[0].count) + parseInt(td4.rows[0].count) + parseInt(td5.rows[0].count);
 
       // Calculate nearest order recommendation if lat/lng are provided
       if (!isNaN(targetLat) && !isNaN(targetLng)) {

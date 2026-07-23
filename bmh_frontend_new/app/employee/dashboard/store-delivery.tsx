@@ -154,7 +154,7 @@ export default function StoreDeliveryScreen() {
   };
 
   const filteredOrders = orders.filter(o => {
-    const isCompleted = ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase());
+    const isCompleted = ['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase());
     const matchesTab = activeTab === 'delivered' ? isCompleted : !isCompleted;
 
     if (!matchesTab) return false;

@@ -442,7 +442,7 @@ router.put('/:id/status', async (req, res) => {
       }
     }
 
-    if (status === 'DELIVERED' || status === 'Delivered') {
+    if (status === 'DELIVERED' || status === 'Delivered' || status === 'CANCELLED' || status === 'Cancelled') {
       if (checkRes.rowCount > 0 && checkRes.rows[0].delivery_otp) {
           if (checkRes.rows[0].delivery_otp !== delivery_otp) {
                return res.status(400).json({ success: false, message: 'Invalid OTP' });

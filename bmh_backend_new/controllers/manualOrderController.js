@@ -437,7 +437,7 @@ exports.updateOrder = async (req, res) => {
       addField('delivery_otp', generatedOtp);
     }
 
-    if (status === 'Delivered' && (
+    if ((status === 'Delivered' || status === 'Cancelled') && (
       currentOrder.rows[0].mode_of_delivery === 'Local' || 
       currentOrder.rows[0].mode_of_delivery === 'Schedule Delivery' ||
       currentOrder.rows[0].mode_of_delivery === 'Store'

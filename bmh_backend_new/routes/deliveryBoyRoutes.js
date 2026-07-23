@@ -334,7 +334,8 @@ router.get("/available", async (req, res) => {
           COALESCE((SELECT COUNT(*)::integer FROM online_orders WHERE delivery_boy_id = e.id AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available')), 0) +
           COALESCE((SELECT COUNT(*)::integer FROM manual_orders WHERE delivery_boy_id = e.id::varchar AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
           COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
-          COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_invoices WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0)
+          COALESCE((SELECT COUNT(*)::integer FROM ecogreensales_invoices WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available')), 0) +
+          COALESCE((SELECT COUNT(*)::integer FROM ecogreenpurchase_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Received', 'Returned', 'Failed', 'fail', 'not available', 'Not Available')), 0)
         ) AS pending_count,
         (
           SELECT COUNT(*)::integer FROM tasks t

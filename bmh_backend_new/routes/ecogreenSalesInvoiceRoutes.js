@@ -359,7 +359,7 @@ router.put('/:id/status', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Invoice not found' });
     }
     
-    if (status === 'DELIVERED' || status === 'Delivered') {
+    if (status === 'DELIVERED' || status === 'Delivered' || status === 'CANCELLED' || status === 'Cancelled') {
       if (checkRes.rows[0].delivery_otp && checkRes.rows[0].delivery_otp !== delivery_otp) {
         return res.status(400).json({ success: false, message: 'Invalid OTP' });
       }

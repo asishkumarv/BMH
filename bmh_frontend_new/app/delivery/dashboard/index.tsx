@@ -205,7 +205,7 @@ export default function DeliveryDashboard() {
   const getRouteOrders = () => {
     return orders.filter(o => {
       const statusLower = o.status?.toLowerCase() || '';
-      const isCompleted = ['delivered', 'completed', 'received', 'cancelled'].includes(statusLower);
+      const isCompleted = ['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(statusLower);
       if (isCompleted) return false;
 
       const isBus = o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus';
@@ -602,6 +602,18 @@ export default function DeliveryDashboard() {
     try {
       if (updateOrder.type === 'manual_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${updateOrder.id}`, {
+          status: 'Cancelled',
+          delivery_otp: cancelOtp
+        });
+        alert('Order Cancelled');
+      } else if (updateOrder.type === 'sales_order') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${updateOrder.id}/status`, {
+          status: 'Cancelled',
+          delivery_otp: cancelOtp
+        });
+        alert('Order Cancelled');
+      } else if (updateOrder.type === 'sales_invoice') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-invoice/${updateOrder.id}/status`, {
           status: 'Cancelled',
           delivery_otp: cancelOtp
         });
@@ -1170,18 +1182,22 @@ export default function DeliveryDashboard() {
       </View>
 
       {/* Stats Widget */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 15, marginBottom: 15, gap: 10 }}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'All' ? '#3b82f6' : '#e0e7ff', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('All')}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'All' ? '#fff' : '#1e40af' }}>{orders.length}</Text>
-          <Text style={{ fontSize: 12, color: filterState === 'All' ? '#fff' : '#1e40af' }}>Total</Text>
+      <View style={{ flexDirection: 'row', paddingHorizontal: 15, marginBottom: 15, gap: 8, flexWrap: 'wrap' }}>
+        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'All' ? '#3b82f6' : '#e0e7ff', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('All')}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'All' ? '#fff' : '#1e40af' }}>{orders.length}</Text>
+          <Text style={{ fontSize: 10, color: filterState === 'All' ? '#fff' : '#1e40af' }}>Total</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'Pending' ? '#f59e0b' : '#fef3c7', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Pending')}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => !['delivered', 'completed', 'received'].includes(o.status?.toLowerCase())).length}</Text>
-          <Text style={{ fontSize: 12, color: filterState === 'Pending' ? '#fff' : '#b45309' }}>Pending</Text>
+        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Pending' ? '#f59e0b' : '#fef3c7', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Pending')}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase())).length}</Text>
+          <Text style={{ fontSize: 10, color: filterState === 'Pending' ? '#fff' : '#b45309' }}>Pending</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: filterState === 'Completed' ? '#10b981' : '#d1fae5', padding: 15, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Completed')}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: filterState === 'Completed' ? '#fff' : '#047857' }}>{orders.filter(o => ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase())).length}</Text>
-          <Text style={{ fontSize: 12, color: filterState === 'Completed' ? '#fff' : '#047857' }}>Completed</Text>
+        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Completed' ? '#10b981' : '#d1fae5', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Completed')}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Completed' ? '#fff' : '#047857' }}>{orders.filter(o => ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase())).length}</Text>
+          <Text style={{ fontSize: 10, color: filterState === 'Completed' ? '#fff' : '#047857' }}>Completed</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Cancelled' ? '#ef4444' : '#fee2e2', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Cancelled')}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Cancelled' ? '#fff' : '#b91c1c' }}>{orders.filter(o => ['cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase())).length}</Text>
+          <Text style={{ fontSize: 10, color: filterState === 'Cancelled' ? '#fff' : '#b91c1c' }} numberOfLines={1}>Cancelled</Text>
         </TouchableOpacity>
       </View>
 
@@ -1236,14 +1252,18 @@ export default function DeliveryDashboard() {
         <FlatList
           data={orders.filter(o => {
             const isCompleted = ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase());
+            const isCancelled = ['cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase());
             if (filterState === 'Completed') return isCompleted;
-            if (filterState === 'Pending') return !isCompleted;
+            if (filterState === 'Cancelled') return isCancelled;
+            if (filterState === 'Pending') return !isCompleted && !isCancelled;
             return true;
           }).sort((a, b) => {
             const aComp = ['delivered', 'completed', 'received'].includes(a.status?.toLowerCase());
             const bComp = ['delivered', 'completed', 'received'].includes(b.status?.toLowerCase());
-            if (aComp && !bComp) return 1;
-            if (!aComp && bComp) return -1;
+            const aCanc = ['cancelled', 'not available', 'not_available'].includes(a.status?.toLowerCase());
+            const bCanc = ['cancelled', 'not available', 'not_available'].includes(b.status?.toLowerCase());
+            if ((aComp || aCanc) && !(bComp || bCanc)) return 1;
+            if (!(aComp || aCanc) && (bComp || bCanc)) return -1;
 
             const aBus = a.delivery_type?.toLowerCase() === 'bus' || a.mode_of_delivery?.toLowerCase() === 'bus';
             const bBus = b.delivery_type?.toLowerCase() === 'bus' || b.mode_of_delivery?.toLowerCase() === 'bus';

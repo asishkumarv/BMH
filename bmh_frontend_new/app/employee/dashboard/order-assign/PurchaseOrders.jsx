@@ -438,13 +438,13 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
     // Assignment filter
     let matchesAssignment = true;
     if (assignmentFilter === 'Pending') {
-      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Not Available';
+      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Not Available' && order.status !== 'Cancelled';
     } else if (assignmentFilter === 'Assigned') {
       matchesAssignment = order.status === 'Assigned';
     } else if (assignmentFilter === 'Delivered') {
-      matchesAssignment = order.status === 'Delivered';
+      matchesAssignment = order.status === 'Delivered' || order.status === 'Completed';
     } else if (assignmentFilter === 'Not Available') {
-      matchesAssignment = order.status === 'Not Available';
+      matchesAssignment = order.status === 'Not Available' || order.status === 'Cancelled';
     }
 
     // Selected boy filter

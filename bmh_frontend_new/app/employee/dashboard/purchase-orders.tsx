@@ -504,13 +504,13 @@ export default function PurchaseOrdersScreen() {
     // Status Assignment filter
     let matchesAssignment = true;
     if (assignmentFilter === 'Pending') {
-      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Not Available';
+      matchesAssignment = order.status !== 'Assigned' && order.status !== 'Delivered' && order.status !== 'Completed' && order.status !== 'Not Available' && order.status !== 'Cancelled';
     } else if (assignmentFilter === 'Assigned') {
       matchesAssignment = order.status === 'Assigned';
     } else if (assignmentFilter === 'Delivered') {
       matchesAssignment = order.status === 'Delivered' || order.status === 'Completed';
     } else if (assignmentFilter === 'Not Available') {
-      matchesAssignment = order.status === 'Not Available';
+      matchesAssignment = order.status === 'Not Available' || order.status === 'Cancelled';
     }
 
     // Date range filter

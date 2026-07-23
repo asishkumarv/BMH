@@ -38,8 +38,14 @@ export default function DeliveryHistoryScreen() {
       setLoading(true);
       const res = await axios.get(`https://napi.bharatmedicalhallplus.com/employees/${userId}/assigned-orders`);
       if (res.data && res.data.success) {
-        // Only keep delivered/completed
-        const completed = res.data.data.filter((o: any) => o.status?.toUpperCase() === 'DELIVERED' || o.status?.toUpperCase() === 'COMPLETED');
+        // Only keep completed / delivered / cancelled / not available cycles
+        const completed = res.data.data.filter((o: any) => 
+          o.status?.toUpperCase() === 'DELIVERED' || 
+          o.status?.toUpperCase() === 'COMPLETED' || 
+          o.status?.toUpperCase() === 'RECEIVED' ||
+          o.status?.toUpperCase() === 'CANCELLED' || 
+          o.status?.toUpperCase() === 'NOT AVAILABLE'
+        );
         setHistory(completed);
       }
     } catch (err) {

@@ -321,19 +321,38 @@ export default function DeliveryFleetScreen() {
         </TouchableOpacity>
       </View>
       
-      <View style={styles.statsContainer}>
-         <View style={styles.statBox}>
-            <Text style={styles.statValue}>{item.assigned_today_count || 0}</Text>
-            <Text style={styles.statLabel}>Assigned</Text>
-         </View>
-         <View style={styles.statBox}>
-            <Text style={styles.statValue}>{item.pending_orders_count || 0}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-         </View>
-         <View style={styles.statBox}>
-            <Text style={[styles.statValue, {color:'#10B981'}]}>{item.delivered_today_count || 0}</Text>
-            <Text style={styles.statLabel}>Delivered</Text>
-         </View>
+      <View style={styles.statsGrid}>
+        <View style={styles.statSection}>
+          <Text style={styles.sectionHeader}>Today</Text>
+          <View style={styles.statRow}>
+            <View style={styles.statBoxMini}>
+              <Text style={styles.statValueMini}>{item.today_assigned_count || item.assigned_today_count || 0}</Text>
+              <Text style={styles.statLabelMini}>Assigned</Text>
+            </View>
+            <View style={styles.statBoxMini}>
+              <Text style={[styles.statValueMini, {color:'#10B981'}]}>{item.today_delivered_count || item.delivered_today_count || 0}</Text>
+              <Text style={styles.statLabelMini}>Delivered</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.statSection}>
+          <Text style={styles.sectionHeader}>Overall</Text>
+          <View style={styles.statRow}>
+            <View style={styles.statBoxMini}>
+              <Text style={styles.statValueMini}>{item.total_assigned_count || 0}</Text>
+              <Text style={styles.statLabelMini}>Assigned</Text>
+            </View>
+            <View style={styles.statBoxMini}>
+              <Text style={[styles.statValueMini, {color:'#F59E0B'}]}>{item.total_pending_count || item.pending_orders_count || 0}</Text>
+              <Text style={styles.statLabelMini}>Pending</Text>
+            </View>
+            <View style={styles.statBoxMini}>
+              <Text style={[styles.statValueMini, {color:'#10B981'}]}>{item.total_delivered_count || 0}</Text>
+              <Text style={styles.statLabelMini}>Delivered</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       <View style={styles.cardBody}>
@@ -578,10 +597,13 @@ const styles = StyleSheet.create({
   phone: { fontSize: 14, color: '#64748B', marginTop: 2 },
   viewOrdersBtn: { backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   viewOrdersText: { color: '#4F46E5', fontWeight: '600', fontSize: 12 },
-  statsContainer: { flexDirection: 'row', gap: 10, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  statBox: { flex: 1, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
-  statLabel: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  statsGrid: { flexDirection: 'column', gap: 10, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  statSection: { gap: 4 },
+  sectionHeader: { fontSize: 10, fontWeight: 'bold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statRow: { flexDirection: 'row', gap: 8 },
+  statBoxMini: { flex: 1, backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
+  statValueMini: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },
+  statLabelMini: { fontSize: 10, color: '#64748B', marginTop: 1 },
   cardBody: { paddingTop: 4 },
   locationRow: { flexDirection: 'row', alignItems: 'center' },
   locationText: { fontSize: 14, color: '#475569' },
