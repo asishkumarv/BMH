@@ -396,6 +396,18 @@ exports.updateSlot = async (req, res) => {
     const slotRes = await pool.query('SELECT * FROM doctor_slots WHERE id = $1', [id]);
     if (slotRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Slot not found' });
     
+    const currentSlot = slotRes.rows[0];
+
+    // Check if slot has any bookings (non-cancelled)
+    const bookingsRes = await pool.query("SELECT COUNT(*) FROM patient_bookings WHERE slot_id = $1 AND status != 'Cancelled'", [id]);
+    const bookedCount = parseInt(bookingsRes.rows[0].count || 0);
+
+    if (fee !== undefined && fee !== null && parseFloat(fee) !== parseFloat(currentSlot.fee)) {
+      if (bookedCount > 0) {
+        return res.status(400).json({ success: false, message: 'Fee cannot be updated because tokens have already been booked for this slot.' });
+      }
+    }
+
     // Update the slot fields (if provided)
     await pool.query(
       `UPDATE doctor_slots 
@@ -412,7 +424,7 @@ exports.updateSlot = async (req, res) => {
         total_tokens || null, 
         fee || null, 
         doctor_status || null, 
-        doctor_available_time !== undefined ? doctor_available_time : slotRes.rows[0].doctor_available_time,
+        doctor_available_time !== undefined ? doctor_available_time : currentSlot.doctor_available_time,
         id
       ]
     );

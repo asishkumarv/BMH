@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, TextInput, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Search, UserCheck, Stethoscope, Activity, ChevronDown, ChevronUp, Clock, Calendar } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function CheckInPatientScreen() {
   const { isMobile } = useResponsive();
@@ -14,6 +15,9 @@ export default function CheckInPatientScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   // Track which slot accordion cards are expanded (Set of slot IDs)
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
+  const [activeDelayInputId, setActiveDelayInputId] = useState<number | null>(null);
+  const [delayTimeStr, setDelayTimeStr] = useState('');
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -72,6 +76,65 @@ export default function CheckInPatientScreen() {
       console.error(err);
       alert('Failed to mark patient as in-hospital');
     }
+  };
+
+  const updateDoctorStatus = async (slotId: number, status: string, delayTime: string | null) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${slotId}`, {
+        doctor_status: status,
+        doctor_available_time: status === 'Delayed' ? delayTime : null
+      });
+      if (res.data.success) {
+        Alert.alert('Success', `Doctor status updated to: ${status}`);
+        if (user) fetchQueues(user.id);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update status');
+    }
+  };
+
+  const confirmAction = (title: string, message: string, onConfirm: () => void) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) {
+        onConfirm();
+      }
+    } else {
+      Alert.alert(title, message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', onPress: onConfirm }
+      ]);
+    }
+  };
+
+  const handleMarkArrived = (slotId: number) => {
+    confirmAction(
+      'Confirm Arrival',
+      'Are you sure you want to mark the doctor as Arrived?',
+      () => updateDoctorStatus(slotId, 'Available', null)
+    );
+  };
+
+  const handleMarkAbsent = (slotId: number) => {
+    confirmAction(
+      'Confirm Absence',
+      'Are you sure the doctor is Absent today?',
+      () => updateDoctorStatus(slotId, 'Absent', null)
+    );
+  };
+
+  const confirmDelay = (slotId: number, delayTime: string) => {
+    if (!delayTime) {
+      Alert.alert('Error', 'Please select expected time.');
+      return;
+    }
+    confirmAction(
+      'Confirm Delay',
+      `Are you sure you want to mark the doctor as Delayed until ${delayTime}?`,
+      () => {
+        updateDoctorStatus(slotId, 'Delayed', delayTime);
+        setActiveDelayInputId(null);
+      }
+    );
   };
 
   const toggleSlotExpand = (slotId: number) => {
@@ -216,9 +279,122 @@ export default function CheckInPatientScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Slot Body — tokens */}
+             {/* Slot Body — tokens */}
             {isExpanded && (
               <View style={styles.slotBody}>
+                {/* Doctor Attendance / Status Marking Layer */}
+                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontWeight: '700', fontSize: 13, color: '#1e293b', marginBottom: 8 }}>Doctor Attendance Status:</Text>
+                  
+                  {(slot.doctor_status === 'Delayed' || !slot.doctor_status || slot.doctor_status === 'Not Marked' || slot.doctor_status === 'None') && (
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: slot.doctor_status === 'Available' ? '#22c55e' : '#cbd5e1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                        onPress={() => handleMarkArrived(slot.id)}
+                      >
+                        <Text style={{ color: slot.doctor_status === 'Available' ? 'white' : '#475569', fontWeight: '600', fontSize: 12 }}>Doctor Arrived</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: slot.doctor_status === 'Delayed' ? '#eab308' : '#cbd5e1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                        onPress={() => {
+                          setActiveDelayInputId(slot.id);
+                          setDelayTimeStr(slot.doctor_available_time || '');
+                        }}
+                      >
+                        <Text style={{ color: slot.doctor_status === 'Delayed' ? 'white' : '#475569', fontWeight: '600', fontSize: 12 }}>Delayed</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: slot.doctor_status === 'Absent' ? '#ef4444' : '#cbd5e1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                        onPress={() => handleMarkAbsent(slot.id)}
+                      >
+                        <Text style={{ color: slot.doctor_status === 'Absent' ? 'white' : '#475569', fontWeight: '600', fontSize: 12 }}>Absent</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  
+                  {activeDelayInputId === slot.id && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 8 }}>
+                      {Platform.OS === 'web' ? (
+                        <input 
+                          type="time" 
+                          value={delayTimeStr} 
+                          onChange={(e) => setDelayTimeStr(e.target.value)} 
+                          style={{
+                            borderWidth: 1, 
+                            borderColor: '#cbd5e1', 
+                            padding: 8, 
+                            borderRadius: 6, 
+                            flex: 1, 
+                            fontSize: 13, 
+                            backgroundColor: 'white'
+                          } as any}
+                        />
+                      ) : (
+                        <>
+                          <TouchableOpacity 
+                            onPress={() => setShowTimePicker(true)} 
+                            style={{ 
+                              flex: 1, 
+                              borderWidth: 1, 
+                              borderColor: '#cbd5e1', 
+                              padding: 10, 
+                              borderRadius: 6, 
+                              backgroundColor: 'white',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <Text style={{ fontSize: 13, color: delayTimeStr ? '#000' : '#64748b' }}>
+                              {delayTimeStr || 'Select Expected Time'}
+                            </Text>
+                          </TouchableOpacity>
+                          {showTimePicker && (
+                            <DateTimePicker
+                              mode="time"
+                              value={(() => {
+                                const d = new Date();
+                                if (delayTimeStr && delayTimeStr.includes(':')) {
+                                  const [h, m] = delayTimeStr.split(':');
+                                  d.setHours(parseInt(h) || 0);
+                                  d.setMinutes(parseInt(m) || 0);
+                                }
+                                return d;
+                              })()}
+                              display="default"
+                              onChange={(event, date) => {
+                                setShowTimePicker(false);
+                                if (date) {
+                                  const hours = date.getHours().toString().padStart(2, '0');
+                                  const minutes = date.getMinutes().toString().padStart(2, '0');
+                                  setDelayTimeStr(`${hours}:${minutes}`);
+                                }
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#3b82f6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}
+                        onPress={() => confirmDelay(slot.id, delayTimeStr)}
+                      >
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>Save</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#cbd5e1', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}
+                        onPress={() => setActiveDelayInputId(null)}
+                      >
+                        <Text style={{ color: '#334155', fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>
+                    Current status: <Text style={{ fontWeight: 'bold', color: slot.doctor_status === 'Available' ? '#16a34a' : slot.doctor_status === 'Delayed' ? '#ca8a04' : slot.doctor_status === 'Absent' ? '#dc2626' : '#64748b' }}>
+                      {slot.doctor_status === 'Available' ? 'Arrived' : (slot.doctor_status || 'Not Marked')} 
+                      {slot.doctor_status === 'Delayed' && slot.doctor_available_time ? ` (Expected from: ${slot.doctor_available_time})` : ''}
+                    </Text>
+                  </Text>
+                </View>
+
                 {bookedTokens.length > 0 ? (
                   <View style={[styles.tokenGrid, isMobile && { flexDirection: 'column' }]}>
                     {bookedTokens.map((token: any) => (

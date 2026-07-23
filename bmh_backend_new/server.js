@@ -321,11 +321,36 @@ app.listen(PORT, () => {
     'customer_phone VARCHAR(50)',
     'delivery_method VARCHAR(100)',
     'cash_amount NUMERIC(10, 2) DEFAULT 0',
-    'online_amount NUMERIC(10, 2) DEFAULT 0'
+    'online_amount NUMERIC(10, 2) DEFAULT 0',
+    'credit_amount NUMERIC(10, 2) DEFAULT 0'
   ];
   handoverCols.forEach(col => {
     pool.query(`ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS ${col}`)
       .catch(err => console.error(`Error adding column ${col} to cash_handovers:`, err.message));
+  });
+
+  // Add Cash, Online, and Credit amount columns for POD orders
+  const podAmountCols = [
+    { table: 'manual_orders', col: 'cash_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'manual_orders', col: 'online_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'manual_orders', col: 'credit_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'online_orders', col: 'cash_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'online_orders', col: 'online_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'online_orders', col: 'credit_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreen_sales_orders', col: 'cash_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreen_sales_orders', col: 'online_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreen_sales_orders', col: 'credit_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreensales_orders', col: 'cash_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreensales_orders', col: 'online_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreensales_orders', col: 'credit_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreensales_invoices', col: 'cash_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreensales_invoices', col: 'online_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'ecogreensales_invoices', col: 'credit_amount NUMERIC(10, 2) DEFAULT 0' },
+    { table: 'wallet_transactions', col: 'credit_amount NUMERIC(10, 2) DEFAULT 0' }
+  ];
+  podAmountCols.forEach(item => {
+    pool.query(`ALTER TABLE ${item.table} ADD COLUMN IF NOT EXISTS ${item.col}`)
+      .catch(err => console.error(`Error adding column ${item.col} to ${item.table}:`, err.message));
   });
 
   // Backfill existing records from manual_orders

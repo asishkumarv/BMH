@@ -213,7 +213,7 @@ exports.requestHandover = async (req, res) => {
     const { 
       from_employee_id, to_employee_id, amount, note,
       order_no, invoice_no, customer_name, customer_phone, delivery_method,
-      cash_amount, online_amount 
+      cash_amount, online_amount, credit_amount 
     } = req.body;
     
     // Check if sender has enough cash_in_hand
@@ -226,12 +226,12 @@ exports.requestHandover = async (req, res) => {
       `INSERT INTO cash_handovers (
         from_employee_id, to_employee_id, amount, note, status,
         order_no, invoice_no, customer_name, customer_phone, delivery_method,
-        cash_amount, online_amount
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+        cash_amount, online_amount, credit_amount
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
       [
         from_employee_id, to_employee_id, amount, note || null, 'Pending',
         order_no || '', invoice_no || '', customer_name || '', customer_phone || '', delivery_method || '',
-        parseFloat(cash_amount || 0), parseFloat(online_amount || 0)
+        parseFloat(cash_amount || 0), parseFloat(online_amount || 0), parseFloat(credit_amount || 0)
       ]
     );
 

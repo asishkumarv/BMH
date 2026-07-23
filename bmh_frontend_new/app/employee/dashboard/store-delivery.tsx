@@ -19,14 +19,21 @@ export default function StoreDeliveryScreen() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [otpValue, setOtpValue] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | 'Split' | null>(null);
   const [transactionId, setTransactionId] = useState('');
+  const [paidAmount, setPaidAmount] = useState('');
+  const [cashPortion, setCashPortion] = useState('');
+  const [onlinePortion, setOnlinePortion] = useState('');
 
   const openOtpModal = (order: any) => {
     setSelectedOrder(order);
     setOtpValue('');
-    setPaymentMethod(null);
+    setPaymentMethod('Cash');
     setTransactionId('');
+    const amt = order.total_amount || order.amount || '';
+    setPaidAmount(String(amt));
+    setCashPortion(String(amt));
+    setOnlinePortion('0');
   };
 
   // PO Received / Submission Modal
@@ -73,10 +80,10 @@ export default function StoreDeliveryScreen() {
     const isPOD = selectedOrder.payment_mode?.toUpperCase() === 'POD';
     if (isPOD) {
       if (!paymentMethod) {
-        alert('Please select a payment method (Cash or Online)');
+        alert('Please select a payment method');
         return;
       }
-      if (paymentMethod === 'Online' && !transactionId.trim()) {
+      if ((paymentMethod === 'Online' || paymentMethod === 'Split') && !transactionId.trim()) {
         alert('Please enter transaction ID');
         return;
       }
@@ -85,10 +92,20 @@ export default function StoreDeliveryScreen() {
     setVerifying(true);
     try {
       let url = '';
+      const totalAmt = parseFloat(selectedOrder.total_amount || selectedOrder.amount || 0);
+      const paidAmt = parseFloat(paidAmount || 0);
+      const cashAmt = paymentMethod === 'Cash' ? paidAmt : (paymentMethod === 'Split' ? parseFloat(cashPortion || 0) : 0);
+      const onlineAmt = paymentMethod === 'Online' ? paidAmt : (paymentMethod === 'Split' ? parseFloat(onlinePortion || 0) : 0);
+      const creditAmt = Math.max(0, totalAmt - paidAmt);
+
       let payload: any = { status: 'Delivered', delivery_otp: otpValue };
       if (isPOD) {
         payload.pod_payment_mode = paymentMethod;
-        payload.payment_txn_id = paymentMethod === 'Online' ? transactionId.trim() : null;
+        payload.paid_amount = paidAmt;
+        payload.cash_amount = cashAmt;
+        payload.online_amount = onlineAmt;
+        payload.credit_amount = creditAmt;
+        payload.payment_txn_id = paymentMethod !== 'Cash' ? transactionId.trim() : null;
       }
 
       if (selectedOrder.type === 'online_order') {
@@ -355,11 +372,11 @@ export default function StoreDeliveryScreen() {
 
               <View style={styles.modalBody}>
                 {selectedOrder.payment_mode?.toUpperCase() === 'POD' && (
-                  <View style={{ width: '100%', marginBottom: 20 }}>
+                  <View style={{ width: '100%', marginBottom: 16 }}>
                     <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, textAlign: 'center' }}>
-                      POD Payment Collected:
+                      POD Payment Mode:
                     </Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -370,7 +387,11 @@ export default function StoreDeliveryScreen() {
                           backgroundColor: paymentMethod === 'Cash' ? `${Colors.light.primary}10` : '#fff',
                           alignItems: 'center'
                         }}
-                        onPress={() => setPaymentMethod('Cash')}
+                        onPress={() => {
+                          setPaymentMethod('Cash');
+                          setCashPortion(paidAmount);
+                          setOnlinePortion('0');
+                        }}
                       >
                         <Text style={{ fontWeight: 'bold', color: paymentMethod === 'Cash' ? Colors.light.primary : '#64748b' }}>Cash</Text>
                       </TouchableOpacity>
@@ -384,12 +405,105 @@ export default function StoreDeliveryScreen() {
                           backgroundColor: paymentMethod === 'Online' ? `${Colors.light.primary}10` : '#fff',
                           alignItems: 'center'
                         }}
-                        onPress={() => setPaymentMethod('Online')}
+                        onPress={() => {
+                          setPaymentMethod('Online');
+                          setCashPortion('0');
+                          setOnlinePortion(paidAmount);
+                        }}
                       >
                         <Text style={{ fontWeight: 'bold', color: paymentMethod === 'Online' ? Colors.light.primary : '#64748b' }}>Online</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: paymentMethod === 'Split' ? Colors.light.primary : '#cbd5e1',
+                          backgroundColor: paymentMethod === 'Split' ? `${Colors.light.primary}10` : '#fff',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => {
+                          setPaymentMethod('Split');
+                          const pAmt = parseFloat(paidAmount || '0');
+                          const half = Math.floor(pAmt / 2);
+                          setCashPortion(String(half));
+                          setOnlinePortion(String(pAmt - half));
+                        }}
+                      >
+                        <Text style={{ fontWeight: 'bold', color: paymentMethod === 'Split' ? Colors.light.primary : '#64748b' }}>Split</Text>
+                      </TouchableOpacity>
                     </View>
-                    {paymentMethod === 'Online' && (
+
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Paid Amount (₹)</Text>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#cbd5e1',
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        height: 40,
+                        fontSize: 14,
+                        color: '#1e293b',
+                        marginBottom: 10,
+                        outlineStyle: 'none' as any
+                      }}
+                      value={paidAmount}
+                      onChangeText={(val) => {
+                        setPaidAmount(val);
+                        if (paymentMethod === 'Cash') {
+                          setCashPortion(val);
+                          setOnlinePortion('0');
+                        } else if (paymentMethod === 'Online') {
+                          setCashPortion('0');
+                          setOnlinePortion(val);
+                        } else if (paymentMethod === 'Split') {
+                          const pAmt = parseFloat(val || '0');
+                          const half = Math.floor(pAmt / 2);
+                          setCashPortion(String(half));
+                          setOnlinePortion(String(pAmt - half));
+                        }
+                      }}
+                      keyboardType="numeric"
+                    />
+
+                    {parseFloat(paidAmount || '0') < parseFloat(selectedOrder.total_amount || selectedOrder.amount || '0') && (
+                      <View style={{ backgroundColor: '#fffbeb', padding: 8, borderRadius: 8, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: '#f59e0b' }}>
+                        <Text style={{ color: '#b45309', fontSize: 11, fontWeight: '600' }}>
+                          ⚠️ Remaining ₹{(parseFloat(selectedOrder.total_amount || selectedOrder.amount || '0') - parseFloat(paidAmount || '0')).toFixed(2)} will be added to the customer's Credit (unpaid).
+                        </Text>
+                      </View>
+                    )}
+
+                    {paymentMethod === 'Split' && (
+                      <View style={{ padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 10 }}>
+                        <Text style={{ fontWeight: '700', fontSize: 12, marginBottom: 6, color: '#334155' }}>Split Breakdown</Text>
+                        
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#475569', marginBottom: 2 }}>Cash Portion (₹)</Text>
+                        <TextInput
+                          style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, height: 32, fontSize: 13, backgroundColor: '#fff', marginBottom: 6 }}
+                          value={cashPortion}
+                          onChangeText={setCashPortion}
+                          keyboardType="numeric"
+                        />
+
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#475569', marginBottom: 2 }}>Online Portion (₹)</Text>
+                        <TextInput
+                          style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, height: 32, fontSize: 13, backgroundColor: '#fff' }}
+                          value={onlinePortion}
+                          onChangeText={setOnlinePortion}
+                          keyboardType="numeric"
+                        />
+
+                        {Math.abs((parseFloat(cashPortion || '0') + parseFloat(onlinePortion || '0')) - parseFloat(paidAmount || '0')) > 0.01 && (
+                          <Text style={{ color: '#ef4444', fontSize: 10, marginTop: 4, fontWeight: '600' }}>
+                            ❌ Sum (₹{cashPortion || 0} + ₹{onlinePortion || 0}) must equal Paid Amount (₹{paidAmount || 0})!
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {(paymentMethod === 'Online' || paymentMethod === 'Split') && (
                       <TextInput
                         style={{
                           borderWidth: 1,
@@ -427,9 +541,19 @@ export default function StoreDeliveryScreen() {
                 />
 
                 <TouchableOpacity
-                  style={styles.submitBtn}
+                  style={[
+                    styles.submitBtn,
+                    (verifying || 
+                     otpValue.length !== 4 || 
+                     (paymentMethod === 'Split' && Math.abs((parseFloat(cashPortion || '0') + parseFloat(onlinePortion || '0')) - parseFloat(paidAmount || '0')) > 0.01)
+                    ) && { opacity: 0.5 }
+                  ]}
                   onPress={handleVerifyOtp}
-                  disabled={verifying}
+                  disabled={
+                    verifying || 
+                    otpValue.length !== 4 || 
+                    (paymentMethod === 'Split' && Math.abs((parseFloat(cashPortion || '0') + parseFloat(onlinePortion || '0')) - parseFloat(paidAmount || '0')) > 0.01)
+                  }
                 >
                   {verifying ? (
                     <ActivityIndicator size="small" color="#fff" />

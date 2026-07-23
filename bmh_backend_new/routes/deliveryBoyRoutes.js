@@ -721,7 +721,7 @@ router.post(
   ]),
   async (req, res) => {
     const { deliveryBoyId } = req.params;
-    const { date, total_cash, total_digital, cash_returned } = req.body;
+    const { date, total_cash, total_digital, cash_returned, credit_amount, total_credit } = req.body;
 
     try {
       // File paths
@@ -737,8 +737,8 @@ router.post(
       const result = await pool.query(
         `
         INSERT INTO cash_handovers
-        (deliveryboy_id, date, total_cash, total_digital, cash_returned, cashier_photo, signature)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        (deliveryboy_id, date, total_cash, total_digital, cash_returned, credit_amount, cashier_photo, signature)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id
         `,
         [
@@ -747,6 +747,7 @@ router.post(
           total_cash,
           total_digital,
           cash_returned,
+          parseFloat(credit_amount || total_credit || 0),
           cashierPhotoUrl,
           signatureUrl
         ]

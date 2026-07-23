@@ -857,7 +857,7 @@ export default function EmployeeWalletScreen() {
                   <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(
                     filteredHandovers, 
                     'Handover_History', 
-                    ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Status', 'Note'], 
+                    ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Status', 'Note'], 
                     (h) => {
                       const isOut = h.from_employee_id == employeeId;
                       return [
@@ -873,6 +873,7 @@ export default function EmployeeWalletScreen() {
                         h.delivery_method || '--',
                         `₹${h.amount}`,
                         `₹${h.online_amount || '0.00'}`,
+                        `₹${h.credit_amount || '0.00'}`,
                         h.status,
                         h.note || ''
                       ];
@@ -882,7 +883,7 @@ export default function EmployeeWalletScreen() {
                   </Pressable>
                   <Pressable style={styles.actionIconButton} onPress={() => handlePrint(
                     'Handover History', 
-                    ['Date', 'Type', 'Target Person', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Status', 'Note'], 
+                    ['Date', 'Type', 'Target Person', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Status', 'Note'], 
                     filteredHandovers, 
                     (h) => {
                       const isOut = h.from_employee_id == employeeId;
@@ -897,6 +898,7 @@ export default function EmployeeWalletScreen() {
                         h.delivery_method || '--',
                         `₹${h.amount}`,
                         `₹${h.online_amount || '0.00'}`,
+                        `₹${h.credit_amount || '0.00'}`,
                         h.status,
                         h.note || ''
                       ];

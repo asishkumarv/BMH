@@ -25,6 +25,16 @@ export default function DoctorManagement() {
   const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState('Doctors');
 
+  const formatDateDDMMYYYY = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
   // Cancelled Tokens State
   const [cancelledTokens, setCancelledTokens] = useState<any[]>([]);
   const [cDate, setCDate] = useState('');
@@ -440,8 +450,11 @@ const fetchData = async () => {
   const [editingSlot, setEditingSlot] = useState<any>(null);
   const [editSlotForm, setEditSlotForm] = useState({ start_time: '', end_time: '', total_tokens: '', fee: '' });
   const [savingSlot, setSavingSlot] = useState(false);
+  const [bookedCountForEdit, setBookedCountForEdit] = useState(0);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
-  const openEditSlotModal = (slot: any) => {
+  const openEditSlotModal = async (slot: any) => {
     setEditingSlot(slot);
     setEditSlotForm({
       start_time: slot.start_time || '',
@@ -449,6 +462,14 @@ const fetchData = async () => {
       total_tokens: String(slot.total_tokens || ''),
       fee: String(slot.fee || '')
     });
+    setBookedCountForEdit(0);
+    try {
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/bookings?slot_id=${slot.id}`);
+      const activeBookings = res.data.data.filter((b: any) => b.status !== 'Cancelled');
+      setBookedCountForEdit(activeBookings.length);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleUpdateSlot = async () => {
@@ -870,6 +891,13 @@ const fetchData = async () => {
                 <X color="#6b7280" size={24} />
               </TouchableOpacity>
             </View>
+            {manageTokenSlot?.doctor_status === 'Absent' && (
+              <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#fecaca' }}>
+                <Text style={{ color: '#b91c1c', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>
+                  Doctor is marked as ABSENT today.
+                </Text>
+              </View>
+            )}
             <Text style={{fontSize: 14, color: '#64748b', marginBottom: 15}}>
               Green: Available. Orange: Blocked (VIP). Purple: Completed Consultation. Blue: Checked In (In Waiting). Red: Booked (Not Attended). Selected tokens show a blue outline.
             </Text>
@@ -1079,7 +1107,7 @@ const fetchData = async () => {
                 </View>
                 {slots.map((s, i) => (
                   <View key={i} style={styles.tableRow}>
-                    <Text style={styles.tableCell}>{new Date(s.date).toLocaleDateString()}</Text>
+                    <Text style={styles.tableCell}>{formatDateDDMMYYYY(s.date)}</Text>
                     <Text style={styles.tableCell}>{s.doctor_name}</Text>
                     <Text style={styles.tableCell}>{s.start_time} - {s.end_time}</Text>
                     <Text style={styles.tableCell}>{s.total_tokens} tokens / ₹{s.fee}</Text>
@@ -1218,7 +1246,9 @@ const fetchData = async () => {
                     </View>
                     <View style={styles.tableCell}>
                       <Text>{b.doctor_name}</Text>
-                      <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.date).toLocaleDateString()}</Text>
+                      <Text style={{fontSize: 12, color: '#64748b'}}>
+                        {formatDateDDMMYYYY(b.date)} {b.start_time && b.end_time ? `(${b.start_time.substring(0, 5)} - ${b.end_time.substring(0, 5)})` : ''}
+                      </Text>
                     </View>
                     <Text style={styles.tableCell}>{b.payment_mode}</Text>
                     <Text style={styles.tableCell}>{b.booked_by_name || 'Self'}</Text>
@@ -1309,10 +1339,12 @@ const fetchData = async () => {
                         </View>
                         <View style={styles.tableCell}>
                           <Text>{b.doctor_name}</Text>
-                          <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.date).toLocaleDateString()}</Text>
+                          <Text style={{fontSize: 12, color: '#64748b'}}>
+                            {formatDateDDMMYYYY(b.date)} {b.start_time && b.end_time ? `(${b.start_time.substring(0, 5)} - ${b.end_time.substring(0, 5)})` : ''}
+                          </Text>
                         </View>
                         <View style={styles.tableCell}>
-                          <Text>{new Date(b.cancelled_at).toLocaleDateString()}</Text>
+                          <Text>{formatDateDDMMYYYY(b.cancelled_at)}</Text>
                           <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.cancelled_at).toLocaleTimeString()}</Text>
                         </View>
                         <View style={styles.tableCell}>
@@ -1514,24 +1546,125 @@ const fetchData = async () => {
                   <X color="#64748b" size={24} />
                 </TouchableOpacity>
               </View>
+              {editingSlot?.doctor_status === 'Absent' && (
+                <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#fecaca' }}>
+                  <Text style={{ color: '#b91c1c', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>
+                    Doctor is marked as ABSENT today.
+                  </Text>
+                </View>
+              )}
               <ScrollView style={styles.modalForm}>
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Start Time (e.g. 09:00:00)</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    value={editSlotForm.start_time} 
-                    onChangeText={(val) => setEditSlotForm({...editSlotForm, start_time: val})} 
-                    placeholder="HH:MM:SS" 
-                  />
+                  <Text style={styles.label}>Start Time</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time" 
+                      value={editSlotForm.start_time ? editSlotForm.start_time.substring(0, 5) : ''} 
+                      onChange={(e) => setEditSlotForm({...editSlotForm, start_time: e.target.value + ':00'})} 
+                      style={{
+                        borderWidth: 1, 
+                        borderColor: '#e2e8f0', 
+                        borderRadius: 8, 
+                        paddingHorizontal: 14, 
+                        fontSize: 14, 
+                        color: '#1e293b',
+                        backgroundColor: '#f8fafc',
+                        minHeight: 50,
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      } as any}
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity 
+                        onPress={() => setShowStartPicker(true)} 
+                        style={[styles.input, { justifyContent: 'center', minHeight: 50 }]}
+                      >
+                        <Text style={{ fontSize: 14, color: editSlotForm.start_time ? '#1e293b' : '#94a3b8' }}>
+                          {editSlotForm.start_time || 'Select Start Time'}
+                        </Text>
+                      </TouchableOpacity>
+                      {showStartPicker && (
+                        <DateTimePicker
+                          mode="time"
+                          value={(() => {
+                            const d = new Date();
+                            if (editSlotForm.start_time && editSlotForm.start_time.includes(':')) {
+                              const [h, m] = editSlotForm.start_time.split(':');
+                              d.setHours(parseInt(h) || 0);
+                              d.setMinutes(parseInt(m) || 0);
+                            }
+                            return d;
+                          })()}
+                          display="default"
+                          onChange={(event, date) => {
+                            setShowStartPicker(false);
+                            if (date) {
+                              const hours = date.getHours().toString().padStart(2, '0');
+                              const minutes = date.getMinutes().toString().padStart(2, '0');
+                              setEditSlotForm({...editSlotForm, start_time: `${hours}:${minutes}:00`});
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                 </View>
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>End Time (e.g. 13:00:00)</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    value={editSlotForm.end_time} 
-                    onChangeText={(val) => setEditSlotForm({...editSlotForm, end_time: val})} 
-                    placeholder="HH:MM:SS" 
-                  />
+                  <Text style={styles.label}>End Time</Text>
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time" 
+                      value={editSlotForm.end_time ? editSlotForm.end_time.substring(0, 5) : ''} 
+                      onChange={(e) => setEditSlotForm({...editSlotForm, end_time: e.target.value + ':00'})} 
+                      style={{
+                        borderWidth: 1, 
+                        borderColor: '#e2e8f0', 
+                        borderRadius: 8, 
+                        paddingHorizontal: 14, 
+                        fontSize: 14, 
+                        color: '#1e293b',
+                        backgroundColor: '#f8fafc',
+                        minHeight: 50,
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      } as any}
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity 
+                        onPress={() => setShowEndPicker(true)} 
+                        style={[styles.input, { justifyContent: 'center', minHeight: 50 }]}
+                      >
+                        <Text style={{ fontSize: 14, color: editSlotForm.end_time ? '#1e293b' : '#94a3b8' }}>
+                          {editSlotForm.end_time || 'Select End Time'}
+                        </Text>
+                      </TouchableOpacity>
+                      {showEndPicker && (
+                        <DateTimePicker
+                          mode="time"
+                          value={(() => {
+                            const d = new Date();
+                            if (editSlotForm.end_time && editSlotForm.end_time.includes(':')) {
+                              const [h, m] = editSlotForm.end_time.split(':');
+                              d.setHours(parseInt(h) || 0);
+                              d.setMinutes(parseInt(m) || 0);
+                            }
+                            return d;
+                          })()}
+                          display="default"
+                          onChange={(event, date) => {
+                            setShowEndPicker(false);
+                            if (date) {
+                              const hours = date.getHours().toString().padStart(2, '0');
+                              const minutes = date.getMinutes().toString().padStart(2, '0');
+                              setEditSlotForm({...editSlotForm, end_time: `${hours}:${minutes}:00`});
+                            }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                 </View>
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Total Tokens</Text>
@@ -1545,11 +1678,17 @@ const fetchData = async () => {
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Consultation Fee (₹)</Text>
                   <TextInput 
-                    style={styles.input} 
+                    style={[styles.input, bookedCountForEdit > 0 && { backgroundColor: '#f1f5f9', color: '#94a3b8' }]} 
                     value={editSlotForm.fee} 
                     onChangeText={(val) => setEditSlotForm({...editSlotForm, fee: val})} 
                     keyboardType="numeric" 
+                    editable={bookedCountForEdit === 0}
                   />
+                  {bookedCountForEdit > 0 && (
+                    <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>
+                      Fee cannot be edited because {bookedCountForEdit} token(s) are already booked.
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity style={styles.submitBtn} onPress={handleUpdateSlot} disabled={savingSlot}>
                   {savingSlot ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Save Changes</Text>}

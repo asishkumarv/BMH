@@ -704,7 +704,7 @@ export default function SubAdminWalletScreen() {
                   {isHandoversExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
                 </Pressable>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredHandovers, 'Handover_History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Status', 'Note'], (h) => {
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredHandovers, 'Handover_History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Credit Amt', 'Status', 'Note'], (h) => {
                     const isOut = h.from_employee_id == employeeId;
                     return [
                       formatDateDMY(h.created_at, true),
@@ -713,13 +713,14 @@ export default function SubAdminWalletScreen() {
                       isOut ? h.to_role || '' : h.from_role || '',
                       isOut ? h.to_department || '' : h.from_department || '',
                       `₹${h.amount}`,
+                      `₹${h.credit_amount || '0.00'}`,
                       h.status,
                       h.note || ''
                     ];
                   })}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Handover History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Status', 'Note'], filteredHandovers, (h) => {
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Handover History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Credit Amt', 'Status', 'Note'], filteredHandovers, (h) => {
                     const isOut = h.from_employee_id == employeeId;
                     return [
                       formatDateDMY(h.created_at, true),
@@ -728,6 +729,7 @@ export default function SubAdminWalletScreen() {
                       isOut ? h.to_role || '' : h.from_role || '',
                       isOut ? h.to_department || '' : h.from_department || '',
                       `₹${h.amount}`,
+                      `₹${h.credit_amount || '0.00'}`,
                       h.status,
                       h.note || ''
                     ];

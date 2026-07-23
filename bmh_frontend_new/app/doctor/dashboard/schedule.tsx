@@ -3,13 +3,22 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
-import { Calendar, Users, Clock, Edit2 } from 'lucide-react-native';
+import { Calendar, Users, Clock, Edit2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function DoctorSchedule() {
   const { isMobile } = useResponsive();
   const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Attendance self-marking states
+  const [activeDelaySlotId, setActiveDelaySlotId] = useState<number | null>(null);
+  const [delayTimeInput, setDelayTimeInput] = useState('');
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Booking list collapse state (Set of slot IDs)
+  const [expandedBookingsSlots, setExpandedBookingsSlots] = useState<Set<number>>(new Set());
 
   // Edit Slot Modal States
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -52,6 +61,58 @@ export default function DoctorSchedule() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const isSlotPast = (slotDateStr: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const slotDate = new Date(slotDateStr);
+    slotDate.setHours(0, 0, 0, 0);
+    return slotDate < today;
+  };
+
+  const isSlotToday = (slotDateStr: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const slotDate = new Date(slotDateStr);
+    slotDate.setHours(0, 0, 0, 0);
+    return slotDate.getTime() === today.getTime();
+  };
+
+  const formatDateDDMMYYYY = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  const updateAttendanceStatus = async (slotId: number, status: string, delayTime: string | null) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${slotId}`, {
+        doctor_status: status,
+        doctor_available_time: status === 'Delayed' ? delayTime : null
+      });
+      if (res.data.success) {
+        Alert.alert('Success', `Attendance updated successfully!`);
+        fetchSchedule();
+      } else {
+        Alert.alert('Error', res.data.message || 'Failed to update attendance');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update attendance');
+    }
+  };
+
+  const toggleBookingsExpand = (slotId: number) => {
+    setExpandedBookingsSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(slotId)) next.delete(slotId);
+      else next.add(slotId);
+      return next;
+    });
   };
 
   const openEditModal = (slot: any) => {
@@ -106,19 +167,21 @@ export default function DoctorSchedule() {
             <View style={styles.slotHeader}>
               <View style={styles.slotDateBox}>
                 <Calendar color="#3b82f6" size={20} />
-                <Text style={styles.slotDate}>{new Date(slot.date).toLocaleDateString()}</Text>
+                <Text style={styles.slotDate}>{formatDateDDMMYYYY(slot.date)}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={styles.slotTimeBox}>
                   <Clock color="#64748b" size={16} />
                   <Text style={styles.slotTime}>{slot.start_time} - {slot.end_time}</Text>
                 </View>
-                <TouchableOpacity 
-                  style={{ backgroundColor: '#eff6ff', padding: 6, borderRadius: 6 }} 
-                  onPress={() => openEditModal(slot)}
-                >
-                  <Edit2 size={16} color="#3b82f6" />
-                </TouchableOpacity>
+                {!isSlotPast(slot.date) && (
+                  <TouchableOpacity 
+                    style={{ backgroundColor: '#eff6ff', padding: 6, borderRadius: 6 }} 
+                    onPress={() => openEditModal(slot)}
+                  >
+                    <Edit2 size={16} color="#3b82f6" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
             
@@ -128,30 +191,173 @@ export default function DoctorSchedule() {
               <Text style={styles.statText}>Fee: ₹{slot.fee}</Text>
             </View>
 
-            {slot.doctor_status && slot.doctor_status !== 'Not Marked' && (
-              <View style={{ backgroundColor: slot.doctor_status === 'Available' ? '#dcfce7' : slot.doctor_status === 'Delayed' ? '#fef9c3' : '#fee2e2', padding: 10, borderRadius: 6, marginBottom: 12, borderWidth: 1, borderColor: slot.doctor_status === 'Available' ? '#bbf7d0' : slot.doctor_status === 'Delayed' ? '#fef08a' : '#fecaca' }}>
-                <Text style={{ fontSize: 13, fontWeight: 'bold', color: slot.doctor_status === 'Available' ? '#15803d' : slot.doctor_status === 'Delayed' ? '#a16207' : '#b91c1c' }}>
-                  Attendance Status: {slot.doctor_status === 'Available' ? 'Doctor Present / Arrived' : slot.doctor_status === 'Delayed' ? `Delayed (Expected at ${slot.doctor_available_time})` : 'Doctor Absent'}
+            {/* Attendance Self-Marking controls for Today's slot */}
+            {isSlotToday(slot.date) ? (
+              <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontWeight: '700', fontSize: 13, color: '#1e293b', marginBottom: 8 }}>My Attendance Status today:</Text>
+                
+                <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                  Current Status: <Text style={{ fontWeight: 'bold', color: slot.doctor_status === 'Available' ? '#16a34a' : slot.doctor_status === 'Delayed' ? '#ca8a04' : slot.doctor_status === 'Absent' ? '#dc2626' : '#64748b' }}>
+                    {slot.doctor_status === 'Available' ? 'Arrived / Present' : (slot.doctor_status || 'Not Marked')}
+                    {slot.doctor_status === 'Delayed' && slot.doctor_available_time ? ` (Expected: ${slot.doctor_available_time})` : ''}
+                  </Text>
                 </Text>
+
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <TouchableOpacity 
+                    style={{ backgroundColor: slot.doctor_status === 'Available' ? '#22c55e' : '#cbd5e1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                    onPress={() => updateAttendanceStatus(slot.id, 'Available', null)}
+                  >
+                    <Text style={{ color: slot.doctor_status === 'Available' ? 'white' : '#475569', fontWeight: '600', fontSize: 11 }}>Mark Arrived</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={{ backgroundColor: slot.doctor_status === 'Delayed' ? '#eab308' : '#cbd5e1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                    onPress={() => {
+                      setActiveDelaySlotId(slot.id);
+                      setDelayTimeInput(slot.doctor_available_time || '');
+                    }}
+                  >
+                    <Text style={{ color: slot.doctor_status === 'Delayed' ? 'white' : '#475569', fontWeight: '600', fontSize: 11 }}>Mark Delayed</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={{ backgroundColor: slot.doctor_status === 'Absent' ? '#ef4444' : '#cbd5e1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                    onPress={() => updateAttendanceStatus(slot.id, 'Absent', null)}
+                  >
+                    <Text style={{ color: slot.doctor_status === 'Absent' ? 'white' : '#475569', fontWeight: '600', fontSize: 11 }}>Mark Absent</Text>
+                  </TouchableOpacity>
+
+                  {slot.doctor_status && slot.doctor_status !== 'Not Marked' && slot.doctor_status !== 'None' && (
+                    <TouchableOpacity 
+                      style={{ backgroundColor: '#64748b', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                      onPress={() => updateAttendanceStatus(slot.id, 'Not Marked', null)}
+                    >
+                      <Text style={{ color: 'white', fontWeight: '600', fontSize: 11 }}>Revoke / Reset</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {activeDelaySlotId === slot.id && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                    {Platform.OS === 'web' ? (
+                      <input 
+                        type="time" 
+                        value={delayTimeInput} 
+                        onChange={(e) => setDelayTimeInput(e.target.value)} 
+                        style={{
+                          borderWidth: 1, 
+                          borderColor: '#cbd5e1', 
+                          padding: 8, 
+                          borderRadius: 6, 
+                          flex: 1, 
+                          fontSize: 13, 
+                          backgroundColor: 'white'
+                        } as any}
+                      />
+                    ) : (
+                      <>
+                        <TouchableOpacity 
+                          onPress={() => setShowTimePicker(true)} 
+                          style={{ 
+                            flex: 1, 
+                            borderWidth: 1, 
+                            borderColor: '#cbd5e1', 
+                            padding: 10, 
+                            borderRadius: 6, 
+                            backgroundColor: 'white',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, color: delayTimeInput ? '#000' : '#64748b' }}>
+                            {delayTimeInput || 'Select Expected Time'}
+                          </Text>
+                        </TouchableOpacity>
+                        {showTimePicker && (
+                          <DateTimePicker
+                            mode="time"
+                            value={(() => {
+                              const d = new Date();
+                              if (delayTimeInput && delayTimeInput.includes(':')) {
+                                const [h, m] = delayTimeInput.split(':');
+                                d.setHours(parseInt(h) || 0);
+                                d.setMinutes(parseInt(m) || 0);
+                              }
+                              return d;
+                            })()}
+                            display="default"
+                            onChange={(event, date) => {
+                              setShowTimePicker(false);
+                              if (date) {
+                                const hours = date.getHours().toString().padStart(2, '0');
+                                const minutes = date.getMinutes().toString().padStart(2, '0');
+                                setDelayTimeInput(`${hours}:${minutes}`);
+                              }
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+                    <TouchableOpacity 
+                      style={{ backgroundColor: '#3b82f6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}
+                      onPress={() => {
+                        updateAttendanceStatus(slot.id, 'Delayed', delayTimeInput);
+                        setActiveDelaySlotId(null);
+                      }}
+                    >
+                      <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={{ backgroundColor: '#cbd5e1', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}
+                      onPress={() => setActiveDelaySlotId(null)}
+                    >
+                      <Text style={{ color: '#334155', fontWeight: 'bold', fontSize: 12 }}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
+            ) : (
+              // Display simple status read-only banner for non-today slots
+              slot.doctor_status && slot.doctor_status !== 'Not Marked' && (
+                <View style={{ backgroundColor: slot.doctor_status === 'Available' ? '#dcfce7' : slot.doctor_status === 'Delayed' ? '#fef9c3' : '#fee2e2', padding: 10, borderRadius: 6, marginBottom: 12, borderWidth: 1, borderColor: slot.doctor_status === 'Available' ? '#bbf7d0' : slot.doctor_status === 'Delayed' ? '#fef08a' : '#fecaca' }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: slot.doctor_status === 'Available' ? '#15803d' : slot.doctor_status === 'Delayed' ? '#a16207' : '#b91c1c' }}>
+                    Attendance Status: {slot.doctor_status === 'Available' ? 'Doctor Present / Arrived' : slot.doctor_status === 'Delayed' ? `Delayed (Expected at ${slot.doctor_available_time})` : 'Doctor Absent'}
+                  </Text>
+                </View>
+              )
             )}
 
             <View style={styles.bookingsContainer}>
-              <Text style={styles.bookingsTitle}>Patient Bookings</Text>
-              {slot.bookings.length === 0 ? (
-                <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic' }}>No patients booked yet.</Text>
-              ) : (
-                slot.bookings.map((b: any, bIdx: number) => (
-                  <View key={bIdx} style={styles.bookingRow}>
-                    <View style={styles.tokenCircle}>
-                      <Text style={styles.tokenText}>{b.token_number}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.patientName}>{b.patient_name}</Text>
-                      <Text style={styles.bookingStatus}>{b.status}</Text>
-                    </View>
-                  </View>
-                ))
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                onPress={() => toggleBookingsExpand(slot.id)}
+              >
+                <Text style={styles.bookingsTitle}>Patient Bookings ({slot.bookings.length})</Text>
+                {expandedBookingsSlots.has(slot.id) ? (
+                  <ChevronUp size={18} color="#64748b" />
+                ) : (
+                  <ChevronDown size={18} color="#64748b" />
+                )}
+              </TouchableOpacity>
+              
+              {expandedBookingsSlots.has(slot.id) && (
+                <View style={{ marginTop: 10 }}>
+                  {slot.bookings.length === 0 ? (
+                    <Text style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic' }}>No patients booked yet.</Text>
+                  ) : (
+                    slot.bookings.map((b: any, bIdx: number) => (
+                      <View key={bIdx} style={styles.bookingRow}>
+                        <View style={styles.tokenCircle}>
+                          <Text style={styles.tokenText}>{b.token_number}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.patientName}>{b.patient_name}</Text>
+                          <Text style={styles.bookingStatus}>{b.status}</Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
               )}
             </View>
           </View>

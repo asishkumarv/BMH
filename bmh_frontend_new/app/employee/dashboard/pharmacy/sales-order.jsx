@@ -60,6 +60,11 @@ const printBill = (orderData, items) => {
           <div class="total">
             <p>Discount: ${orderData.orderDiscPer}%</p>
             <p>Total Payable: Rs. ${orderData.orderTotal}</p>
+            ${orderData.pod_payment_mode ? `<p>Payment Mode: ${orderData.pod_payment_mode}</p>` : ''}
+            ${orderData.paid_amount !== undefined && orderData.paid_amount !== null ? `<p>Paid Amount: Rs. ${parseFloat(orderData.paid_amount).toFixed(2)}</p>` : ''}
+            ${orderData.cash_amount !== undefined && orderData.cash_amount !== null && parseFloat(orderData.cash_amount) > 0 ? `<p>Cash Portion: Rs. ${parseFloat(orderData.cash_amount).toFixed(2)}</p>` : ''}
+            ${orderData.online_amount !== undefined && orderData.online_amount !== null && parseFloat(orderData.online_amount) > 0 ? `<p>Online Portion: Rs. ${parseFloat(orderData.online_amount).toFixed(2)}</p>` : ''}
+            ${orderData.credit_amount !== undefined && orderData.credit_amount !== null && parseFloat(orderData.credit_amount) > 0 ? `<p>Credit Amount: Rs. ${parseFloat(orderData.credit_amount).toFixed(2)}</p>` : ''}
           </div>
           <div style="text-align:center; margin-top: 20px; font-size: 12px;">
             <p>Thank you! Visit again.</p>

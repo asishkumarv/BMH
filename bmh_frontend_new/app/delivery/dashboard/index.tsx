@@ -94,6 +94,8 @@ export default function DeliveryDashboard() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentTxnId, setPaymentTxnId] = useState('');
+  const [cashPortion, setCashPortion] = useState('');
+  const [onlinePortion, setOnlinePortion] = useState('');
   const [paymentImage, setPaymentImage] = useState<any>(null);
   const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '', payment_mode: '' });
   const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
@@ -526,6 +528,8 @@ export default function DeliveryDashboard() {
       setDeliveryOtp('');
       setPaymentMode('Cash');
       setPaidAmount(String(amount));
+      setCashPortion(String(amount));
+      setOnlinePortion('');
       setPaymentTxnId('');
       setPaymentImage(null);
       setOtpModalVisible(true);
@@ -694,27 +698,31 @@ export default function DeliveryDashboard() {
 
   const processDelivery = async (orderId: string | number, type: string, otp?: string) => {
     try {
+      const totalAmt = parseFloat(currentOrder.amount || 0);
+      const paidAmt = parseFloat(paidAmount || 0);
+      const cashAmt = paymentMode === 'Cash' ? paidAmt : (paymentMode === 'Split' ? parseFloat(cashPortion || 0) : 0);
+      const onlineAmt = paymentMode === 'Online' ? paidAmt : (paymentMode === 'Split' ? parseFloat(onlinePortion || 0) : 0);
+      const creditAmt = Math.max(0, totalAmt - paidAmt);
+
+      const payload = {
+        status: (type === 'manual_order') ? 'Delivered' : 'DELIVERED',
+        delivery_otp: otp,
+        pod_payment_mode: paymentMode,
+        paid_amount: paidAmt,
+        cash_amount: cashAmt,
+        online_amount: onlineAmt,
+        credit_amount: creditAmt,
+        payment_txn_id: paymentMode !== 'Cash' ? paymentTxnId : null
+      };
+
       if (type === 'online_order') {
-        await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, {
-          status: 'DELIVERED',
-          delivery_otp: otp,
-          pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null
-        });
+        await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, payload);
       } else if (type === 'sales_order') {
-        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/status`, {
-          status: 'DELIVERED',
-          delivery_otp: otp
-        });
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${orderId}/status`, payload);
       } else if (type === 'manual_order') {
-        const payload: any = {
-          status: 'Delivered',
-          delivery_otp: otp,
-          pod_payment_mode: currentOrder.payment_mode === 'POD' ? paymentMode : null,
-          paid_amount: paidAmount,
-          payment_txn_id: paymentTxnId
-        };
-        // For image upload, if we want to use form data we should implement it, but for now we send raw json without image since it's complex via put in this generic function.
         await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${orderId}`, payload);
+      } else if (type === 'sales_invoice' || type === 'ecogreen_invoice') {
+        await axios.put(`https://napi.bharatmedicalhallplus.com/sales-invoice/${orderId}/status`, payload);
       } else {
         alert('Ecogreen Order Delivered (Status update pending backend implementation)');
       }
@@ -1375,30 +1383,95 @@ export default function DeliveryDashboard() {
                 placeholder="0000"
               />
 
-              {currentOrder.type === 'manual_order' && currentOrder.payment_mode !== 'Prepaid' && (
+              {currentOrder.payment_mode !== 'Prepaid' && (currentOrder.type === 'manual_order' || currentOrder.type === 'online_order' || currentOrder.type === 'sales_order') && (
                 <>
                   <Text style={[styles.label, { marginTop: 20 }]}>Payment Mode</Text>
-                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
                     <TouchableOpacity
                       style={{ flex: 1, padding: 10, borderWidth: 1, borderColor: paymentMode === 'Cash' ? '#10B981' : '#CBD5E1', borderRadius: 8, backgroundColor: paymentMode === 'Cash' ? '#D1FAE5' : '#fff' }}
-                      onPress={() => setPaymentMode('Cash')}
+                      onPress={() => {
+                        setPaymentMode('Cash');
+                        setCashPortion(paidAmount);
+                        setOnlinePortion('0');
+                      }}
                     >
-                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Cash' ? '#065F46' : '#475569' }}>Cash</Text>
+                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Cash' ? '#065F46' : '#475569', fontSize: 13 }}>Cash</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={{ flex: 1, padding: 10, borderWidth: 1, borderColor: paymentMode === 'Online' ? '#3B82F6' : '#CBD5E1', borderRadius: 8, backgroundColor: paymentMode === 'Online' ? '#DBEAFE' : '#fff' }}
-                      onPress={() => setPaymentMode('Online')}
+                      onPress={() => {
+                        setPaymentMode('Online');
+                        setCashPortion('0');
+                        setOnlinePortion(paidAmount);
+                      }}
                     >
-                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Online' ? '#1E40AF' : '#475569' }}>Online / UPI</Text>
+                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Online' ? '#1E40AF' : '#475569', fontSize: 13 }}>Online</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, padding: 10, borderWidth: 1, borderColor: paymentMode === 'Split' ? '#8B5CF6' : '#CBD5E1', borderRadius: 8, backgroundColor: paymentMode === 'Split' ? '#F3E8FF' : '#fff' }}
+                      onPress={() => {
+                        setPaymentMode('Split');
+                        const pAmt = parseFloat(paidAmount || '0');
+                        const half = Math.floor(pAmt / 2);
+                        setCashPortion(String(half));
+                        setOnlinePortion(String(pAmt - half));
+                      }}
+                    >
+                      <Text style={{ textAlign: 'center', fontWeight: 'bold', color: paymentMode === 'Split' ? '#6D28D9' : '#475569', fontSize: 13 }}>Split</Text>
                     </TouchableOpacity>
                   </View>
 
                   <Text style={styles.label}>Paid Amount (₹)</Text>
-                  <TextInput style={styles.input} value={paidAmount} onChangeText={setPaidAmount} keyboardType="numeric" />
+                  <TextInput
+                    style={styles.input}
+                    value={paidAmount}
+                    onChangeText={(val) => {
+                      setPaidAmount(val);
+                      if (paymentMode === 'Cash') {
+                        setCashPortion(val);
+                        setOnlinePortion('0');
+                      } else if (paymentMode === 'Online') {
+                        setCashPortion('0');
+                        setOnlinePortion(val);
+                      } else if (paymentMode === 'Split') {
+                        const pAmt = parseFloat(val || '0');
+                        const half = Math.floor(pAmt / 2);
+                        setCashPortion(String(half));
+                        setOnlinePortion(String(pAmt - half));
+                      }
+                    }}
+                    keyboardType="numeric"
+                  />
 
-                  {paymentMode === 'Online' && (
+                  {parseFloat(paidAmount || '0') < parseFloat(currentOrder.amount || '0') && (
+                    <View style={{ backgroundColor: '#FFFBEB', padding: 10, borderRadius: 8, marginVertical: 8, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
+                      <Text style={{ color: '#B45309', fontSize: 12, fontWeight: '600' }}>
+                        ⚠️ Remaining ₹{(parseFloat(currentOrder.amount || '0') - parseFloat(paidAmount || '0')).toFixed(2)} will be added to the customer's Credit (unpaid).
+                      </Text>
+                    </View>
+                  )}
+
+                  {paymentMode === 'Split' && (
+                    <View style={{ marginTop: 10, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <Text style={{ fontWeight: '700', fontSize: 13, marginBottom: 8, color: '#334155' }}>Split Breakdown</Text>
+                      
+                      <Text style={styles.label}>Cash Portion (₹)</Text>
+                      <TextInput style={styles.input} value={cashPortion} onChangeText={setCashPortion} keyboardType="numeric" />
+
+                      <Text style={[styles.label, { marginTop: 8 }]}>Online Portion (₹)</Text>
+                      <TextInput style={styles.input} value={onlinePortion} onChangeText={setOnlinePortion} keyboardType="numeric" />
+
+                      {Math.abs((parseFloat(cashPortion || '0') + parseFloat(onlinePortion || '0')) - parseFloat(paidAmount || '0')) > 0.01 && (
+                        <Text style={{ color: '#EF4444', fontSize: 11, marginTop: 6, fontWeight: '600' }}>
+                          ❌ Cash Portion (₹{cashPortion || 0}) + Online Portion (₹{onlinePortion || 0}) must equal Paid Amount (₹{paidAmount || 0})!
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {(paymentMode === 'Online' || paymentMode === 'Split') && (
                     <>
-                      <Text style={styles.label}>Transaction ID</Text>
+                      <Text style={[styles.label, { marginTop: 10 }]}>Transaction ID (UPI/Online)</Text>
                       <TextInput style={styles.input} value={paymentTxnId} onChangeText={setPaymentTxnId} placeholder="e.g. UTR / Ref No" />
                     </>
                   )}
@@ -1411,9 +1484,17 @@ export default function DeliveryDashboard() {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.saveBtn, deliveryOtp.length !== 4 && { opacity: 0.5 }]}
+                style={[
+                  styles.saveBtn, 
+                  (deliveryOtp.length !== 4 || 
+                   (paymentMode === 'Split' && Math.abs((parseFloat(cashPortion || '0') + parseFloat(onlinePortion || '0')) - parseFloat(paidAmount || '0')) > 0.01)
+                  ) && { opacity: 0.5 }
+                ]}
                 onPress={() => processDelivery(currentOrder.id, currentOrder.type, deliveryOtp)}
-                disabled={deliveryOtp.length !== 4}
+                disabled={
+                  deliveryOtp.length !== 4 || 
+                  (paymentMode === 'Split' && Math.abs((parseFloat(cashPortion || '0') + parseFloat(onlinePortion || '0')) - parseFloat(paidAmount || '0')) > 0.01)
+                }
               >
                 <Text style={styles.saveBtnText}>Verify & Mark Delivered</Text>
               </TouchableOpacity>

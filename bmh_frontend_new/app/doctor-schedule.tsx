@@ -402,6 +402,8 @@ export default function DoctorScheduleTV() {
   // Fetch Schedules
   useEffect(() => {
     fetchSchedules();
+    const interval = setInterval(fetchSchedules, 30000); // Auto refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   // Build slides whenever schedules, slots or active grid mode changes
@@ -762,7 +764,7 @@ export default function DoctorScheduleTV() {
                       const badgeText = isDarkMode ? accent.darkText : accent.text;
                       const borderAccentColor = isDarkMode ? accent.darkBorder : accent.border;
 
-                      // Helper functions for AM/PM formatting
+                       // Helper functions for AM/PM formatting
                       const formatTimeAMPM = (timeStr: string) => {
                         if (!timeStr) return '';
                         const parts = timeStr.split(':');
@@ -773,6 +775,14 @@ export default function DoctorScheduleTV() {
                         hours = hours ? hours : 12;
                         const hoursStr = hours.toString().padStart(2, '0');
                         return `${hoursStr}:${minutes} ${ampm}`;
+                      };
+
+                      const formatAvailableTime = (timeStr: string) => {
+                        if (!timeStr) return '';
+                        if (timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) {
+                          return timeStr;
+                        }
+                        return formatTimeAMPM(timeStr);
                       };
 
                       const formatScheduleTiming = (timingStr: string) => {
@@ -839,7 +849,7 @@ export default function DoctorScheduleTV() {
                                 </Text>
                               </View>
 
-                              {tokensAvailable && (
+                              {tokensAvailable && doc.doctor_status !== 'Absent' && (
                                 <View style={[
                                   styles.tokenAvailableBadge,
                                   { 
@@ -852,6 +862,60 @@ export default function DoctorScheduleTV() {
                                     { color: isDarkMode ? '#34D399' : '#065F46' }
                                   ]}>
                                     TOKEN AVAILABLE
+                                  </Text>
+                                </View>
+                              )}
+
+                              {doc.doctor_status === 'Delayed' && (
+                                <View style={[
+                                  styles.tokenAvailableBadge,
+                                  { 
+                                    backgroundColor: '#FEF9C3',
+                                    borderColor: '#FEE2E2',
+                                    borderWidth: 1
+                                  }
+                                ]}>
+                                  <Text style={[
+                                    styles.tokenAvailableBadgeText,
+                                    { color: '#A16207' }
+                                  ]}>
+                                    DELAYED
+                                  </Text>
+                                </View>
+                              )}
+
+                              {doc.doctor_status === 'Absent' && (
+                                <View style={[
+                                  styles.tokenAvailableBadge,
+                                  { 
+                                    backgroundColor: '#FEE2E2',
+                                    borderColor: '#FECACA',
+                                    borderWidth: 1
+                                  }
+                                ]}>
+                                  <Text style={[
+                                    styles.tokenAvailableBadgeText,
+                                    { color: '#B91C1C' }
+                                  ]}>
+                                    ABSENT
+                                  </Text>
+                                </View>
+                              )}
+
+                              {doc.doctor_status === 'Available' && (
+                                <View style={[
+                                  styles.tokenAvailableBadge,
+                                  { 
+                                    backgroundColor: '#DCFCE7',
+                                    borderColor: '#BBF7D0',
+                                    borderWidth: 1
+                                  }
+                                ]}>
+                                  <Text style={[
+                                    styles.tokenAvailableBadgeText,
+                                    { color: '#15803D' }
+                                  ]}>
+                                    ARRIVED
                                   </Text>
                                 </View>
                               )}
@@ -889,9 +953,39 @@ export default function DoctorScheduleTV() {
                                   const start = s.start_time ? formatTimeAMPM(s.start_time) : '';
                                   const end = s.end_time ? formatTimeAMPM(s.end_time) : '';
                                   return (
-                                    <Text key={sIdx} style={[styles.timingValueBig, { color: theme.text }]}>
-                                      {showDate ? `${formattedDate} • ${start} - ${end}` : `${start} - ${end}`}
-                                    </Text>
+                                    <View key={sIdx} style={{ marginBottom: 6 }}>
+                                      <Text style={[
+                                        styles.timingValueBig, 
+                                        { color: theme.text },
+                                        s.doctor_status === 'Absent' && { textDecorationLine: 'line-through', color: '#94a3b8' }
+                                      ]}>
+                                        {showDate ? `${formattedDate} • ${start} - ${end}` : `${start} - ${end}`}
+                                      </Text>
+                                      
+                                      {s.doctor_status === 'Delayed' && (
+                                        <View style={{ backgroundColor: '#FEF9C3', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 4, borderWidth: 1, borderColor: '#FEF08A', alignSelf: 'flex-start' }}>
+                                          <Text style={{ color: '#A16207', fontWeight: 'bold', fontSize: 13 }}>
+                                            Delayed: Expected from {formatAvailableTime(s.doctor_available_time)}
+                                          </Text>
+                                        </View>
+                                      )}
+                                      
+                                      {s.doctor_status === 'Available' && (
+                                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 4, borderWidth: 1, borderColor: '#BBF7D0', alignSelf: 'flex-start' }}>
+                                          <Text style={{ color: '#15803D', fontWeight: 'bold', fontSize: 13 }}>
+                                            Doctor Arrived / Present
+                                          </Text>
+                                        </View>
+                                      )}
+
+                                      {s.doctor_status === 'Absent' && (
+                                        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 4, borderWidth: 1, borderColor: '#FECACA', alignSelf: 'flex-start' }}>
+                                          <Text style={{ color: '#B91C1C', fontWeight: 'bold', fontSize: 13 }}>
+                                            Doctor Absent Today
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </View>
                                   );
                                 })
                               ) : (

@@ -431,7 +431,7 @@ router.put('/:id/update-bus-details', async (req, res) => {
 router.put('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, delivery_otp, pod_payment_mode, payment_txn_id } = req.body;
+    const { status, delivery_otp, pod_payment_mode, payment_txn_id, cash_amount, online_amount, credit_amount } = req.body;
     
     let targetTable = 'ecogreen_sales_orders';
     let checkRes = await pool.query('SELECT delivery_otp FROM ecogreen_sales_orders WHERE id = $1', [id]);
@@ -455,10 +455,21 @@ router.put('/:id/status', async (req, res) => {
        SET status = $1,
            pod_payment_mode = COALESCE($2, pod_payment_mode),
            payment_txn_id = COALESCE($3, payment_txn_id),
+           cash_amount = COALESCE($5, cash_amount),
+           online_amount = COALESCE($6, online_amount),
+           credit_amount = COALESCE($7, credit_amount),
            delivered_at = CASE WHEN $1 = 'DELIVERED' OR $1 = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
        WHERE id = $4 
        RETURNING *`,
-      [status, pod_payment_mode || null, payment_txn_id || null, id]
+      [
+        status, 
+        pod_payment_mode || null, 
+        payment_txn_id || null, 
+        id,
+        cash_amount !== undefined ? parseFloat(cash_amount) : null,
+        online_amount !== undefined ? parseFloat(online_amount) : null,
+        credit_amount !== undefined ? parseFloat(credit_amount) : null
+      ]
     );
 
     if (result.rows.length === 0) {
@@ -472,45 +483,73 @@ router.put('/:id/status', async (req, res) => {
         targetEmployeeId = 'SA-' + targetEmployeeId;
       }
       
-      const amt = parseFloat(updatedOrder.total_amount || updatedOrder.total_price || 0);
-      const isCash = pod_payment_mode === 'Cash';
+      const cAmt = parseFloat(updatedOrder.cash_amount || 0);
+      const oAmt = parseFloat(updatedOrder.online_amount || 0);
+      const crAmt = parseFloat(updatedOrder.credit_amount || 0);
 
-      await pool.query(
-        `INSERT INTO wallet_transactions (
-          employee_id, type, amount, note, status, payment_mode, payment_txn_id,
-          order_no, invoice_no, customer_name, customer_phone, delivery_method, 
-          cash_amount, online_amount
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT DO NOTHING`, 
-        [
-          targetEmployeeId, 
-          isCash ? 'cash_collection' : 'online_collection', 
-          amt, 
-          `Sales Order ${updatedOrder.order_no || updatedOrder.id} Delivered (POD ${isCash ? 'Cash' : 'Online'})`, 
-          'completed', 
-          isCash ? 'Cash' : 'Online',
-          isCash ? null : (payment_txn_id || null),
-          updatedOrder.order_no || updatedOrder.id,
-          '',
-          updatedOrder.patient_name || '',
-          updatedOrder.patient_contact_no || '',
-          updatedOrder.delivery_type || '',
-          isCash ? amt : 0,
-          isCash ? 0 : amt
-        ]
-      );
-
+      // Create or update employee wallet first
       const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
       if (wCheck.rowCount === 0) {
         await pool.query(
-          'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, $2, $3, 0)',
-          [targetEmployeeId, isCash ? amt : 0, isCash ? 0 : amt]
+          'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, 0, 0, 0)',
+          [targetEmployeeId]
         );
-      } else {
-        if (isCash) {
-          await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [amt, targetEmployeeId]);
-        } else {
-          await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [amt, targetEmployeeId]);
-        }
+      }
+
+      if (cAmt > 0) {
+        await pool.query(
+          `INSERT INTO wallet_transactions (
+            employee_id, type, amount, note, status, payment_mode, payment_txn_id,
+            order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+            cash_amount, online_amount, credit_amount
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING`, 
+          [
+            targetEmployeeId, 
+            'cash_collection', 
+            cAmt, 
+            `Sales Order ${updatedOrder.order_no || updatedOrder.id} Delivered (POD Cash portion)`, 
+            'completed', 
+            'Cash',
+            null,
+            updatedOrder.order_no || updatedOrder.id,
+            '',
+            updatedOrder.patient_name || '',
+            updatedOrder.patient_contact_no || '',
+            updatedOrder.delivery_type || '',
+            cAmt,
+            0,
+            crAmt
+          ]
+        );
+        await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [cAmt, targetEmployeeId]);
+      }
+
+      if (oAmt > 0) {
+        await pool.query(
+          `INSERT INTO wallet_transactions (
+            employee_id, type, amount, note, status, payment_mode, payment_txn_id,
+            order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+            cash_amount, online_amount, credit_amount
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING`, 
+          [
+            targetEmployeeId, 
+            'online_collection', 
+            oAmt, 
+            `Sales Order ${updatedOrder.order_no || updatedOrder.id} Delivered (POD Online portion)`, 
+            'completed', 
+            'Online',
+            payment_txn_id || null,
+            updatedOrder.order_no || updatedOrder.id,
+            '',
+            updatedOrder.patient_name || '',
+            updatedOrder.patient_contact_no || '',
+            updatedOrder.delivery_type || '',
+            0,
+            oAmt,
+            crAmt
+          ]
+        );
+        await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [oAmt, targetEmployeeId]);
       }
     }
 
