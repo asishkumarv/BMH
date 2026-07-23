@@ -44,6 +44,7 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
   
   // Creator Filter State
   const [selectedCreator, setSelectedCreator] = useState('All');
+  const [deliveryTypeFilter, setDeliveryTypeFilter] = useState('All');
 
   // Modals
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -475,7 +476,20 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
       matchesCreator = orderCreator.toLowerCase() === selectedCreator.toLowerCase();
     }
 
-    return matchesSearch && matchesAssignment && matchesBoy && matchesDate && matchesCreator;
+    // Delivery Type Filter
+    let matchesDeliveryType = true;
+    if (deliveryTypeFilter !== 'All') {
+      const type = (order.delivery_type || order.mode_of_delivery || 'Local').toLowerCase();
+      if (deliveryTypeFilter === 'Counter') {
+        matchesDeliveryType = type === 'counter' || type === 'store';
+      } else if (deliveryTypeFilter === 'Local') {
+        matchesDeliveryType = type === 'local' || type === 'schedule delivery';
+      } else if (deliveryTypeFilter === 'Bus') {
+        matchesDeliveryType = type === 'bus';
+      }
+    }
+
+    return matchesSearch && matchesAssignment && matchesBoy && matchesDate && matchesCreator && matchesDeliveryType;
   });
 
   // Sort: Latest dated and time on top (guaranteed)
@@ -772,6 +786,20 @@ export default function PurchaseOrders({ deliveryBoys, storeDeliveryFleet, onSta
               {['All', ...new Set(orders.map(order => order.createuser || order.modified_by_name || 'SYSTEM').filter(Boolean))].filter(c => c !== 'All').map((creator) => (
                 <Picker.Item key={creator} label={`Creator: ${creator}`} value={creator} />
               ))}
+            </Picker>
+          </View>
+
+          {/* Delivery Type Filter */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={deliveryTypeFilter}
+              onValueChange={(val) => setDeliveryTypeFilter(val)}
+              style={styles.picker}
+            >
+              <Picker.Item label="All Delivery Types" value="All" />
+              <Picker.Item label="Counter/Store" value="Counter" />
+              <Picker.Item label="Local" value="Local" />
+              <Picker.Item label="Bus" value="Bus" />
             </Picker>
           </View>
 

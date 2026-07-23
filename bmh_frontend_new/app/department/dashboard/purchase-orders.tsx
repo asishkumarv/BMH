@@ -65,6 +65,7 @@ export default function PurchaseOrdersScreen() {
   
   // Creator Filter State
   const [selectedCreator, setSelectedCreator] = useState('All');
+  const [deliveryTypeFilter, setDeliveryTypeFilter] = useState('All');
 
   // Modals
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -536,7 +537,20 @@ export default function PurchaseOrdersScreen() {
       matchesCreator = (order.createuser || order.modified_by_name || 'SYSTEM').toLowerCase() === selectedCreator.toLowerCase();
     }
 
-    return matchesSearch && matchesAssignment && matchesDate && matchesRider && matchesCreator;
+    // Delivery Type Filter
+    let matchesDeliveryType = true;
+    if (deliveryTypeFilter !== 'All') {
+      const type = (order.delivery_type || order.mode_of_delivery || 'Local').toLowerCase();
+      if (deliveryTypeFilter === 'Counter') {
+        matchesDeliveryType = type === 'counter' || type === 'store';
+      } else if (deliveryTypeFilter === 'Local') {
+        matchesDeliveryType = type === 'local' || type === 'schedule delivery';
+      } else if (deliveryTypeFilter === 'Bus') {
+        matchesDeliveryType = type === 'bus';
+      }
+    }
+
+    return matchesSearch && matchesAssignment && matchesDate && matchesRider && matchesCreator && matchesDeliveryType;
   });
 
   // Sort latest on top
@@ -801,6 +815,20 @@ export default function PurchaseOrdersScreen() {
                 </ScrollView>
               </View>
             )}
+          </View>
+
+          {/* Delivery Type Filter */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={deliveryTypeFilter}
+              onValueChange={(val) => setDeliveryTypeFilter(val)}
+              style={styles.picker}
+            >
+              <Picker.Item label="All Delivery Types" value="All" />
+              <Picker.Item label="Counter/Store" value="Counter" />
+              <Picker.Item label="Local" value="Local" />
+              <Picker.Item label="Bus" value="Bus" />
+            </Picker>
           </View>
 
           {/* Date range inputs */}

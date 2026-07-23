@@ -322,7 +322,7 @@ export default function DeliveryFleetScreen() {
       </View>
       
       <View style={styles.statsGrid}>
-        <View style={styles.statSection}>
+        <View style={styles.statSectionToday}>
           <Text style={styles.sectionHeader}>Today</Text>
           <View style={styles.statRow}>
             <View style={styles.statBoxMini}>
@@ -336,7 +336,7 @@ export default function DeliveryFleetScreen() {
           </View>
         </View>
 
-        <View style={styles.statSection}>
+        <View style={styles.statSectionOverall}>
           <Text style={styles.sectionHeader}>Overall</Text>
           <View style={styles.statRow}>
             <View style={styles.statBoxMini}>
@@ -590,19 +590,20 @@ const styles = StyleSheet.create({
   listContainer: { padding: 20, gap: 16 },
   noData: { alignItems: 'center', marginTop: 100 },
   noDataText: { color: '#64748B', fontSize: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   headerTextContainer: { flex: 1, marginLeft: 12 },
-  name: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
-  phone: { fontSize: 14, color: '#64748B', marginTop: 2 },
+  name: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
+  phone: { fontSize: 13, color: '#64748B', marginTop: 1 },
   viewOrdersBtn: { backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   viewOrdersText: { color: '#4F46E5', fontWeight: '600', fontSize: 12 },
-  statsGrid: { flexDirection: 'column', gap: 10, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  statSection: { gap: 4 },
+  statsGrid: { flexDirection: 'row', gap: 16, marginBottom: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  statSectionToday: { flex: 2, gap: 4 },
+  statSectionOverall: { flex: 3, gap: 4 },
   sectionHeader: { fontSize: 10, fontWeight: 'bold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 },
   statRow: { flexDirection: 'row', gap: 8 },
-  statBoxMini: { flex: 1, backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
-  statValueMini: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },
+  statBoxMini: { flex: 1, backgroundColor: '#F8FAFC', padding: 6, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
+  statValueMini: { fontSize: 14, fontWeight: 'bold', color: '#1E293B' },
   statLabelMini: { fontSize: 10, color: '#64748B', marginTop: 1 },
   cardBody: { paddingTop: 4 },
   locationRow: { flexDirection: 'row', alignItems: 'center' },

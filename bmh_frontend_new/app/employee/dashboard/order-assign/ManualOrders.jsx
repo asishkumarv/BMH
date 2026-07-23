@@ -19,6 +19,7 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [assignmentFilter, setAssignmentFilter] = useState('All'); 
   const [selectedDate, setSelectedDate] = useState('');
+  const [deliveryTypeFilter, setDeliveryTypeFilter] = useState('All');
 
   // Modals
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -829,6 +830,20 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
             </Picker>
           </View>
 
+          {/* Delivery Type Filter */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={deliveryTypeFilter}
+              onValueChange={(val) => setDeliveryTypeFilter(val)}
+              style={styles.picker}
+            >
+              <Picker.Item label="All Delivery Types" value="All" />
+              <Picker.Item label="Counter/Store" value="Counter" />
+              <Picker.Item label="Local" value="Local" />
+              <Picker.Item label="Bus" value="Bus" />
+            </Picker>
+          </View>
+
           {/* Delivery Boy Filter Search & Select */}
           <View style={{ zIndex: 100, position: 'relative' }}>
             <TouchableOpacity 
@@ -1013,7 +1028,19 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
         ) : (
           <FlatList
             style={{ flex: 1 }}
-            data={orders}
+            data={orders.filter(o => {
+              const type = (o.mode_of_delivery || o.delivery_type || 'Local').toLowerCase();
+              if (deliveryTypeFilter === 'Counter') {
+                return type === 'counter' || type === 'store';
+              }
+              if (deliveryTypeFilter === 'Local') {
+                return type === 'local' || type === 'schedule delivery';
+              }
+              if (deliveryTypeFilter === 'Bus') {
+                return type === 'bus';
+              }
+              return true;
+            })}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderOrderItem}
           />

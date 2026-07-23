@@ -436,6 +436,48 @@ const fetchData = async () => {
     }
   };
 
+  // Edit Slot States & Functions
+  const [editingSlot, setEditingSlot] = useState<any>(null);
+  const [editSlotForm, setEditSlotForm] = useState({ start_time: '', end_time: '', total_tokens: '', fee: '' });
+  const [savingSlot, setSavingSlot] = useState(false);
+
+  const openEditSlotModal = (slot: any) => {
+    setEditingSlot(slot);
+    setEditSlotForm({
+      start_time: slot.start_time || '',
+      end_time: slot.end_time || '',
+      total_tokens: String(slot.total_tokens || ''),
+      fee: String(slot.fee || '')
+    });
+  };
+
+  const handleUpdateSlot = async () => {
+    if (!editSlotForm.start_time || !editSlotForm.end_time || !editSlotForm.total_tokens || !editSlotForm.fee) {
+      Alert.alert('Error', 'Please fill in all slot fields.');
+      return;
+    }
+    setSavingSlot(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${editingSlot.id}`, {
+        start_time: editSlotForm.start_time,
+        end_time: editSlotForm.end_time,
+        total_tokens: parseInt(editSlotForm.total_tokens),
+        fee: parseFloat(editSlotForm.fee)
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Slot timings updated successfully!');
+        setEditingSlot(null);
+        fetchData();
+      } else {
+        Alert.alert('Error', res.data.message || 'Failed to update slot');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update slot');
+    } finally {
+      setSavingSlot(false);
+    }
+  };
+
   const handleUpdateDoctor = async () => {
     if (!editDoctor.full_name) return Alert.alert('Error', 'Name is required');
     setUpdating(true);
@@ -1024,7 +1066,7 @@ const fetchData = async () => {
               </View>
             )}
 
-            {activeTab === 'Slots' && (
+             {activeTab === 'Slots' && (
               <View style={styles.card}>
                 <View style={styles.tableRowHeader}>
                   <Text style={styles.tableCellHeader}>Date</Text>
@@ -1032,6 +1074,7 @@ const fetchData = async () => {
                   <Text style={styles.tableCellHeader}>Time</Text>
                   <Text style={styles.tableCellHeader}>Tokens/Fee</Text>
                   <Text style={styles.tableCellHeader}>Assigned Peon</Text>
+                  <Text style={styles.tableCellHeader}>Doctor Status</Text>
                   <Text style={styles.tableCellHeader}>Actions</Text>
                 </View>
                 {slots.map((s, i) => (
@@ -1041,12 +1084,21 @@ const fetchData = async () => {
                     <Text style={styles.tableCell}>{s.start_time} - {s.end_time}</Text>
                     <Text style={styles.tableCell}>{s.total_tokens} tokens / ₹{s.fee}</Text>
                     <Text style={styles.tableCell}>{s.peon_name || 'Unassigned'}</Text>
+                    <View style={styles.tableCell}>
+                      <Text style={{ fontWeight: 'bold', color: s.doctor_status === 'Available' ? '#16a34a' : s.doctor_status === 'Delayed' ? '#ca8a04' : s.doctor_status === 'Absent' ? '#dc2626' : '#64748b' }}>
+                        {s.doctor_status === 'Available' ? 'Present' : s.doctor_status === 'Delayed' ? `Delayed (${s.doctor_available_time})` : s.doctor_status === 'Absent' ? 'Absent' : 'Not Marked'}
+                      </Text>
+                    </View>
                     <Text style={styles.tableCell}>
                       <TouchableOpacity style={{backgroundColor: '#3b82f6', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => handleManageTokens(s)}>
                         <Text style={{color: 'white', fontSize: 12}}>Tokens</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={{backgroundColor: '#10b981', padding: 6, borderRadius: 6, alignItems: 'center', marginTop: 4}} onPress={() => { setReassignSlot(s); setReassignPeonId(s.assigned_peon_id || ''); }}>
                         <Text style={{color: 'white', fontSize: 12}}>Reassign</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity style={{backgroundColor: '#eab308', padding: 6, borderRadius: 6, alignItems: 'center', marginTop: 4}} onPress={() => openEditSlotModal(s)}>
+                        <Text style={{color: 'white', fontSize: 12}}>Edit Slot</Text>
                       </TouchableOpacity>
                     </Text>
                   </View>
@@ -1450,6 +1502,63 @@ const fetchData = async () => {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Slot Modal */}
+      {editingSlot && (
+        <Modal visible={!!editingSlot} animationType="slide" transparent={true} onRequestClose={() => setEditingSlot(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeaderContainer}>
+                <Text style={styles.modalTitle}>Edit Slot Timings</Text>
+                <TouchableOpacity onPress={() => setEditingSlot(null)}>
+                  <X color="#64748b" size={24} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.modalForm}>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Start Time (e.g. 09:00:00)</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={editSlotForm.start_time} 
+                    onChangeText={(val) => setEditSlotForm({...editSlotForm, start_time: val})} 
+                    placeholder="HH:MM:SS" 
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>End Time (e.g. 13:00:00)</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={editSlotForm.end_time} 
+                    onChangeText={(val) => setEditSlotForm({...editSlotForm, end_time: val})} 
+                    placeholder="HH:MM:SS" 
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Total Tokens</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={editSlotForm.total_tokens} 
+                    onChangeText={(val) => setEditSlotForm({...editSlotForm, total_tokens: val})} 
+                    keyboardType="numeric" 
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Consultation Fee (₹)</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={editSlotForm.fee} 
+                    onChangeText={(val) => setEditSlotForm({...editSlotForm, fee: val})} 
+                    keyboardType="numeric" 
+                  />
+                </View>
+                <TouchableOpacity style={styles.submitBtn} onPress={handleUpdateSlot} disabled={savingSlot}>
+                  {savingSlot ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Save Changes</Text>}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </View>
   );

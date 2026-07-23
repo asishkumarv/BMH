@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Animated, Easing, Modal, Image, UIManager, LayoutAnimation } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Animated, Easing, Modal, Image, UIManager, LayoutAnimation, Alert } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -98,7 +98,16 @@ export default function PeonLiveQueue() {
     }
   };
 
-  const updateStatus = async (id: number, status: string) => {
+  const updateStatus = async (id: number, status: string, slot?: any) => {
+    if (status === 'Current') {
+      if (!slot || slot.doctor_status !== 'Available') {
+        Alert.alert(
+          'Doctor Not Arrived',
+          'You can only mark a patient as in cabin (Call Next) after the doctor has been marked as Arrived.'
+        );
+        return;
+      }
+    }
     try {
       await axios.put(`https://napi.bharatmedicalhallplus.com/bookings/${id}/status`, { status });
       if (user) fetchQueues(user.id);
@@ -427,7 +436,7 @@ function DoctorQueueCard({ slot, bookings, updateStatus, isMobile, isFullscreen,
               </View>
               <Text style={[styles.waitingName, isFullscreen && { fontSize: 15 * scale }]}>{nextPatient.patient_name}</Text>
             </View>
-            <TouchableOpacity style={[styles.callNextBtn, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 6 * scale }]} onPress={() => updateStatus(nextPatient.booking_id, 'Current')}>
+             <TouchableOpacity style={[styles.callNextBtn, isFullscreen && { paddingHorizontal: 10 * scale, paddingVertical: 6 * scale }]} onPress={() => updateStatus(nextPatient.booking_id, 'Current', slot)}>
               <Text style={[styles.callNextBtnText, isFullscreen && { fontSize: 12 * scale }]}>Call Next</Text>
               <ArrowRight color="white" size={14 * scale} />
             </TouchableOpacity>

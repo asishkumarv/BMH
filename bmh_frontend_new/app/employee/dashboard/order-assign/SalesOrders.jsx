@@ -18,6 +18,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedBoyId, setSelectedBoyId] = useState('All');
+  const [deliveryTypeFilter, setDeliveryTypeFilter] = useState('All');
   
   const [riderDropdownOpen, setRiderDropdownOpen] = useState(false);
   const [deliveryBoySearchQuery, setDeliveryBoySearchQuery] = useState('');
@@ -613,6 +614,20 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
             </Picker>
           </View>
 
+          {/* Delivery Type Filter */}
+          <View style={styles.dropdownWrapper}>
+            <Picker
+              selectedValue={deliveryTypeFilter}
+              onValueChange={(val) => setDeliveryTypeFilter(val)}
+              style={styles.picker}
+            >
+              <Picker.Item label="All Delivery Types" value="All" />
+              <Picker.Item label="Counter/Store" value="Counter" />
+              <Picker.Item label="Local" value="Local" />
+              <Picker.Item label="Bus" value="Bus" />
+            </Picker>
+          </View>
+
           {/* Delivery Boy Filter Search & Select */}
           <View style={{ zIndex: 100, position: 'relative' }}>
             <TouchableOpacity 
@@ -732,7 +747,19 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
           <ActivityIndicator size="large" color="#4338ca" style={{marginTop: 50}} />
         ) : (
           <FlatList
-            data={orders}
+            data={orders.filter(o => {
+              const type = (o.delivery_type || o.mode_of_delivery || 'Local').toLowerCase();
+              if (deliveryTypeFilter === 'Counter') {
+                return type === 'counter' || type === 'store';
+              }
+              if (deliveryTypeFilter === 'Local') {
+                return type === 'local' || type === 'schedule delivery';
+              }
+              if (deliveryTypeFilter === 'Bus') {
+                return type === 'bus';
+              }
+              return true;
+            })}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderOrderItem}
           />

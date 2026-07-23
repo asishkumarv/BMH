@@ -387,3 +387,39 @@ exports.assignPeonToSlot = async (req, res) => {
   }
 };
 
+exports.updateSlot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { start_time, end_time, total_tokens, fee, doctor_status, doctor_available_time } = req.body;
+    
+    // Check if slot exists
+    const slotRes = await pool.query('SELECT * FROM doctor_slots WHERE id = $1', [id]);
+    if (slotRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Slot not found' });
+    
+    // Update the slot fields (if provided)
+    await pool.query(
+      `UPDATE doctor_slots 
+       SET start_time = COALESCE($1, start_time), 
+           end_time = COALESCE($2, end_time),
+           total_tokens = COALESCE($3, total_tokens),
+           fee = COALESCE($4, fee),
+           doctor_status = COALESCE($5, doctor_status),
+           doctor_available_time = $6
+       WHERE id = $7`,
+      [
+        start_time || null, 
+        end_time || null, 
+        total_tokens || null, 
+        fee || null, 
+        doctor_status || null, 
+        doctor_available_time !== undefined ? doctor_available_time : slotRes.rows[0].doctor_available_time,
+        id
+      ]
+    );
+    res.json({ success: true, message: 'Slot updated successfully' });
+  } catch (error) {
+    console.error('Update Slot Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+

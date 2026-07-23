@@ -26,8 +26,25 @@ export default function OrderAssignScreen() {
   
   // Assignment Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [viewDetailsOrder, setViewDetailsOrder] = useState(null);
   const [deliveryType, setDeliveryType] = useState('Local');
   const [selectedBoyId, setSelectedBoyId] = useState('');
+
+  const formatAddress = (addressStr) => {
+    if (!addressStr) return 'No Address Provided';
+    try {
+      if (typeof addressStr === 'string' && addressStr.trim().startsWith('{')) {
+        const parsed = JSON.parse(addressStr);
+        const parts = [];
+        if (parsed.address) parts.push(parsed.address);
+        if (parsed.locality) parts.push(parsed.locality);
+        if (parsed.city) parts.push(parsed.city);
+        if (parsed.pincode) parts.push(parsed.pincode);
+        if (parts.length > 0) return parts.join(', ');
+      }
+    } catch (e) {}
+    return addressStr;
+  };
   
   // Local Pickup fields
   const [address, setAddress] = useState('');
@@ -395,9 +412,9 @@ export default function OrderAssignScreen() {
                 <Text style={styles.patientName}>{item.patient_name || 'N/A'}</Text>
                 <Text style={styles.patientMobile}>{item.mobile_no || 'N/A'}</Text>
 
-                <View style={styles.detailsRow}>
+                 <View style={styles.detailsRow}>
                   <MapPin size={16} color="#64748b" style={{ marginTop: 2 }} />
-                  <Text style={styles.addressText}>{item.address || 'No Address Provided'}</Text>
+                  <Text style={styles.addressText} numberOfLines={2}>{formatAddress(item.address)}</Text>
                 </View>
 
                 <View style={styles.statusRow}>
@@ -413,15 +430,23 @@ export default function OrderAssignScreen() {
                 )}
               </View>
 
-              <TouchableOpacity 
-                style={[styles.assignBtn, item.delivery_boy_id && styles.assignBtnSuccess]} 
-                onPress={() => openAssignModal(item)}
-              >
-                <Bus size={18} color="#fff" />
-                <Text style={styles.assignBtnText}>
-                  {item.delivery_boy_id ? 'Reassign Delivery' : 'Assign Delivery'}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+                <TouchableOpacity 
+                  style={{ flex: 1, backgroundColor: '#f1f5f9', paddingVertical: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }} 
+                  onPress={() => setViewDetailsOrder(item)}
+                >
+                  <Text style={{ color: '#475569', fontWeight: '600', fontSize: 13 }}>View Details</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.assignBtn, { flex: 1.5, marginTop: 0, height: 35 }, item.delivery_boy_id && styles.assignBtnSuccess]} 
+                  onPress={() => openAssignModal(item)}
+                >
+                  <Bus size={16} color="#fff" style={{ marginRight: 4 }} />
+                  <Text style={[styles.assignBtnText, { fontSize: 13 }]} numberOfLines={1}>
+                    {item.delivery_boy_id ? 'Reassign' : 'Assign'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           ListEmptyComponent={
@@ -432,6 +457,94 @@ export default function OrderAssignScreen() {
           }
         />
       </>
+      )}
+
+      {/* View Details Modal */}
+      {viewDetailsOrder && (
+        <Modal transparent animationType="fade" visible={!!viewDetailsOrder} onRequestClose={() => setViewDetailsOrder(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: isDesktop ? 600 : '95%', padding: 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Order Details #{viewDetailsOrder.id}</Text>
+                <TouchableOpacity onPress={() => setViewDetailsOrder(null)}><Text style={{fontSize:20, color:'#64748b'}}>✕</Text></TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ marginTop: 15, maxHeight: 500 }}>
+                <View style={{ gap: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 8 }}>
+                    <Text style={{ fontWeight: 'bold', color: '#64748b' }}>Channel: {getTypeLabel(viewDetailsOrder.type)}</Text>
+                    <Text style={{ fontWeight: 'bold', color: '#10b981' }}>Status: {viewDetailsOrder.status || 'PENDING'}</Text>
+                  </View>
+
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 13, color: '#64748b' }}>Customer Name</Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b' }}>{viewDetailsOrder.patient_name || 'N/A'}</Text>
+                  </View>
+
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 13, color: '#64748b' }}>Phone Number</Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b' }}>{viewDetailsOrder.mobile_no || 'N/A'}</Text>
+                  </View>
+
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 13, color: '#64748b' }}>Amount</Text>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}>₹{viewDetailsOrder.total_amount || 0}</Text>
+                  </View>
+
+                  {/* Expanded Address Fields */}
+                  {(() => {
+                    const addressStr = viewDetailsOrder.address;
+                    if (addressStr && typeof addressStr === 'string' && addressStr.trim().startsWith('{')) {
+                      try {
+                        const parsed = JSON.parse(addressStr);
+                        return (
+                          <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, gap: 6 }}>
+                            <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#475569', marginBottom: 4 }}>Delivery Address</Text>
+                            {parsed.deliver_name && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>Deliver To:</Text> {parsed.deliver_name}</Text>}
+                            {parsed.address && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>Address:</Text> {parsed.address}</Text>}
+                            {parsed.locality && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>Locality:</Text> {parsed.locality}</Text>}
+                            {parsed.landmark && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>Landmark:</Text> {parsed.landmark}</Text>}
+                            {parsed.city && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>City:</Text> {parsed.city}</Text>}
+                            {parsed.pincode && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>Pincode:</Text> {parsed.pincode}</Text>}
+                            {parsed.state && <Text style={{ fontSize: 13, color: '#334155' }}><Text style={{ fontWeight: '600' }}>State:</Text> {parsed.state}</Text>}
+                          </View>
+                        );
+                      } catch (e) {}
+                    }
+                    return (
+                      <View style={{ gap: 4 }}>
+                        <Text style={{ fontSize: 13, color: '#64748b' }}>Delivery Address</Text>
+                        <Text style={{ fontSize: 14, color: '#1e293b' }}>{viewDetailsOrder.address || 'No Address Provided'}</Text>
+                      </View>
+                    );
+                  })()}
+
+                  {/* Items/Details list if available */}
+                  {viewDetailsOrder.details && (
+                    <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#475569', fontSize: 13, marginBottom: 8 }}>Order Items</Text>
+                      {(() => {
+                        let items = [];
+                        try {
+                          items = typeof viewDetailsOrder.details === 'string' ? JSON.parse(viewDetailsOrder.details) : viewDetailsOrder.details;
+                        } catch (e) {}
+                        if (!Array.isArray(items) || items.length === 0) {
+                          return <Text style={{ fontSize: 12, color: '#64748b' }}>No items details.</Text>;
+                        }
+                        return items.map((itm, index) => (
+                          <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: index < items.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+                            <Text style={{ fontSize: 13, color: '#1e293b', flex: 1 }} numberOfLines={1}>{itm.itemName || itm.name}</Text>
+                            <Text style={{ fontSize: 13, color: '#64748b', marginLeft: 8 }}>Qty: {itm.Qty || itm.quantity} | Rate: ₹{itm.rate}</Text>
+                          </View>
+                        ));
+                      })()}
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       )}
 
       {/* Assignment Modal */}

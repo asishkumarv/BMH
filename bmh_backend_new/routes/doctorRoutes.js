@@ -13,6 +13,7 @@ router.post('/slots', doctorController.createSlot);
 router.get('/slots', doctorController.getSlots);
 router.get('/peons', doctorController.getAvailablePeons);
 router.put('/slots/:id/peon', doctorController.assignPeonToSlot);
+router.put('/slots/:id', doctorController.updateSlot);
 router.post('/consultation', doctorController.saveConsultation);
 router.put('/consultation/:id', doctorController.updateConsultation);
 router.get('/:id/patients', doctorController.getDoctorPatients);

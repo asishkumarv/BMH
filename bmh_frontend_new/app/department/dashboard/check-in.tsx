@@ -14,6 +14,8 @@ export default function CheckInPatientScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   // Track which slot accordion cards are expanded (Set of slot IDs)
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
+  const [activeDelayInputId, setActiveDelayInputId] = useState<number | null>(null);
+  const [delayTimeStr, setDelayTimeStr] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -71,6 +73,21 @@ export default function CheckInPatientScreen() {
     } catch (err) {
       console.error(err);
       alert('Failed to mark patient as in-hospital');
+    }
+  };
+
+  const updateDoctorStatus = async (slotId: number, status: string, delayTime: string | null) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${slotId}`, {
+        doctor_status: status,
+        doctor_available_time: status === 'Delayed' ? delayTime : null
+      });
+      if (res.data.success) {
+        Alert.alert('Success', `Doctor status updated to: ${status}`);
+        if (user) fetchQueues(user.id);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update status');
     }
   };
 
@@ -216,9 +233,70 @@ export default function CheckInPatientScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Slot Body — tokens */}
+             {/* Slot Body — tokens */}
             {isExpanded && (
               <View style={styles.slotBody}>
+                {/* Doctor Attendance / Status Marking Layer */}
+                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <Text style={{ fontWeight: '700', fontSize: 13, color: '#1e293b', marginBottom: 8 }}>Doctor Attendance Status:</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <TouchableOpacity 
+                      style={{ backgroundColor: slot.doctor_status === 'Available' ? '#22c55e' : '#cbd5e1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                      onPress={() => updateDoctorStatus(slot.id, 'Available', null)}
+                    >
+                      <Text style={{ color: slot.doctor_status === 'Available' ? 'white' : '#475569', fontWeight: '600', fontSize: 12 }}>Doctor Arrived</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={{ backgroundColor: slot.doctor_status === 'Delayed' ? '#eab308' : '#cbd5e1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                      onPress={() => {
+                        setActiveDelayInputId(slot.id);
+                        setDelayTimeStr(slot.doctor_available_time || '');
+                      }}
+                    >
+                      <Text style={{ color: slot.doctor_status === 'Delayed' ? 'white' : '#475569', fontWeight: '600', fontSize: 12 }}>Delayed</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={{ backgroundColor: slot.doctor_status === 'Absent' ? '#ef4444' : '#cbd5e1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                      onPress={() => updateDoctorStatus(slot.id, 'Absent', null)}
+                    >
+                      <Text style={{ color: slot.doctor_status === 'Absent' ? 'white' : '#475569', fontWeight: '600', fontSize: 12 }}>Absent</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {activeDelayInputId === slot.id && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 8 }}>
+                      <TextInput
+                        style={{ borderWidth: 1, borderColor: '#cbd5e1', padding: 8, borderRadius: 6, flex: 1, fontSize: 13, backgroundColor: 'white' }}
+                        placeholder="Enter expected time (e.g. 10:30 AM)"
+                        value={delayTimeStr}
+                        onChangeText={setDelayTimeStr}
+                      />
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#3b82f6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}
+                        onPress={() => {
+                          updateDoctorStatus(slot.id, 'Delayed', delayTimeStr);
+                          setActiveDelayInputId(null);
+                        }}
+                      >
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>Save</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#cbd5e1', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }}
+                        onPress={() => setActiveDelayInputId(null)}
+                      >
+                        <Text style={{ color: '#334155', fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>
+                    Current status: <Text style={{ fontWeight: 'bold', color: slot.doctor_status === 'Available' ? '#16a34a' : slot.doctor_status === 'Delayed' ? '#ca8a04' : slot.doctor_status === 'Absent' ? '#dc2626' : '#64748b' }}>
+                      {slot.doctor_status || 'Not Marked'} 
+                      {slot.doctor_status === 'Delayed' && slot.doctor_available_time ? ` (Expected from: ${slot.doctor_available_time})` : ''}
+                    </Text>
+                  </Text>
+                </View>
+
                 {bookedTokens.length > 0 ? (
                   <View style={[styles.tokenGrid, isMobile && { flexDirection: 'column' }]}>
                     {bookedTokens.map((token: any) => (
