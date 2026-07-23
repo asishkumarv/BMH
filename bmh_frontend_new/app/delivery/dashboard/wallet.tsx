@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView } from 'react-native';
-import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins, ChevronDown, ChevronUp, Calendar } from 'lucide-react-native';
+import { Wallet, IndianRupee, ArrowUpRight, ArrowDownRight, Clock, CheckCircle2, Banknote, RefreshCcw, HandCoins, ChevronDown, ChevronUp, Calendar, ShieldCheck } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
@@ -26,6 +26,7 @@ type Transaction = {
   delivery_method?: string;
   cash_amount?: string;
   online_amount?: string;
+  credit_amount?: string;
 };
 type Handover = { 
   id: string; 
@@ -460,11 +461,11 @@ export default function EmployeeWalletScreen() {
   });
 
   const allowanceTransactions = filteredTransactions.filter(tx => 
-    tx.type !== 'cash_collection' && tx.type !== 'online_collection'
+    tx.type !== 'cash_collection' && tx.type !== 'online_collection' && tx.type !== 'split_collection'
   );
 
   const collectedTransactions = filteredTransactions.filter(tx => 
-    tx.type === 'cash_collection' || tx.type === 'online_collection'
+    tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection'
   );
 
   const filteredHandovers = handovers.filter(h => {
@@ -476,8 +477,14 @@ export default function EmployeeWalletScreen() {
   });
 
   // Collected cash/online calculations
-  const totalCashBooked = collectedTransactions.filter(tx => tx.payment_mode === 'Cash').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
-  const totalOnlineBooked = collectedTransactions.filter(tx => tx.payment_mode === 'Online').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+  const totalCashBooked = collectedTransactions.reduce((acc, tx) => {
+    const val = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || '0') : 0);
+    return acc + (isNaN(val) ? 0 : val);
+  }, 0);
+  const totalOnlineBooked = collectedTransactions.reduce((acc, tx) => {
+    const val = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || '0') : 0);
+    return acc + (isNaN(val) ? 0 : val);
+  }, 0);
 
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
@@ -736,36 +743,48 @@ export default function EmployeeWalletScreen() {
                   <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(
                     collectedTransactions, 
                     'Order_Collections', 
-                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Total'], 
-                    (tx) => [
-                      formatDateDMY(tx.created_at, true),
-                      tx.invoice_no || '--',
-                      tx.order_no || '--',
-                      tx.customer_name || '--',
-                      tx.customer_phone || '--',
-                      tx.delivery_method || '--',
-                      tx.payment_mode === 'Cash' ? `₹${tx.amount}` : '₹0.00',
-                      tx.payment_mode === 'Online' ? `₹${tx.amount}` : '₹0.00',
-                      `₹${tx.amount}`
-                    ]
+                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Total'], 
+                    (tx) => {
+                      const cAmt = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || 0) : 0);
+                      const oAmt = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || 0) : 0);
+                      const crAmt = tx.credit_amount !== undefined && tx.credit_amount !== null ? parseFloat(tx.credit_amount) : 0;
+                      return [
+                        formatDateDMY(tx.created_at, true),
+                        tx.invoice_no || '--',
+                        tx.order_no || '--',
+                        tx.customer_name || '--',
+                        tx.customer_phone || '--',
+                        tx.delivery_method || '--',
+                        `₹${cAmt.toFixed(2)}`,
+                        `₹${oAmt.toFixed(2)}`,
+                        `₹${crAmt.toFixed(2)}`,
+                        `₹${(parseFloat(tx.amount || 0)).toFixed(2)}`
+                      ];
+                    }
                   )}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
                   <Pressable style={styles.actionIconButton} onPress={() => handlePrint(
                     'My Order Collections', 
-                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Total'], 
+                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Total'], 
                     collectedTransactions, 
-                    (tx) => [
-                      formatDateDMY(tx.created_at, true),
-                      tx.invoice_no || '--',
-                      tx.order_no || '--',
-                      tx.customer_name || '--',
-                      tx.customer_phone || '--',
-                      tx.delivery_method || '--',
-                      tx.payment_mode === 'Cash' ? `₹${tx.amount}` : '₹0.00',
-                      tx.payment_mode === 'Online' ? `₹${tx.amount}` : '₹0.00',
-                      `₹${tx.amount}`
-                    ]
+                    (tx) => {
+                      const cAmt = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || 0) : 0);
+                      const oAmt = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || 0) : 0);
+                      const crAmt = tx.credit_amount !== undefined && tx.credit_amount !== null ? parseFloat(tx.credit_amount) : 0;
+                      return [
+                        formatDateDMY(tx.created_at, true),
+                        tx.invoice_no || '--',
+                        tx.order_no || '--',
+                        tx.customer_name || '--',
+                        tx.customer_phone || '--',
+                        tx.delivery_method || '--',
+                        `₹${cAmt.toFixed(2)}`,
+                        `₹${oAmt.toFixed(2)}`,
+                        `₹${crAmt.toFixed(2)}`,
+                        `₹${(parseFloat(tx.amount || 0)).toFixed(2)}`
+                      ];
+                    }
                   )}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
@@ -775,8 +794,19 @@ export default function EmployeeWalletScreen() {
                 <View key={tx.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View style={[styles.txIconWrapper, { backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
-                        {(tx.payment_mode || 'Cash') === 'Cash' ? <Banknote size={20} color="#16a34a" /> : <RefreshCcw size={20} color={Colors.light.primary} />}
+                      <View style={[
+                        styles.txIconWrapper, 
+                        { 
+                          backgroundColor: tx.payment_mode === 'Cash' ? '#dcfce7' : (tx.payment_mode === 'Online' ? '#e0f2fe' : '#f3e8ff') 
+                        }
+                      ]}>
+                        {tx.payment_mode === 'Cash' ? (
+                          <Banknote size={20} color="#16a34a" />
+                        ) : tx.payment_mode === 'Online' ? (
+                          <RefreshCcw size={20} color={Colors.light.primary} />
+                        ) : (
+                          <ShieldCheck size={20} color="#8b5cf6" />
+                        )}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.txType, { fontWeight: '700' }]} numberOfLines={1}>{tx.note || 'Order Collection'}</Text>
@@ -784,10 +814,21 @@ export default function EmployeeWalletScreen() {
                       </View>
                     </View>
                     <View style={styles.txAmountSection}>
-                      <Text style={[styles.txAmount, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#16a34a' : Colors.light.primary }]}>
+                      <Text style={[
+                        styles.txAmount, 
+                        { 
+                          color: tx.payment_mode === 'Cash' ? '#16a34a' : (tx.payment_mode === 'Online' ? Colors.light.primary : '#7c3aed') 
+                        }
+                      ]}>
                         +₹{tx.amount || 0}
                       </Text>
-                      <Text style={[styles.txStatus, { color: (tx.payment_mode || 'Cash') === 'Cash' ? '#166534' : '#075985', backgroundColor: (tx.payment_mode || 'Cash') === 'Cash' ? '#dcfce7' : '#e0f2fe' }]}>
+                      <Text style={[
+                        styles.txStatus, 
+                        { 
+                          color: tx.payment_mode === 'Cash' ? '#166534' : (tx.payment_mode === 'Online' ? '#075985' : '#5b21b6'), 
+                          backgroundColor: tx.payment_mode === 'Cash' ? '#dcfce7' : (tx.payment_mode === 'Online' ? '#e0f2fe' : '#f3e8ff') 
+                        }
+                      ]}>
                         {tx.payment_mode || 'Cash'}
                       </Text>
                     </View>
@@ -805,12 +846,19 @@ export default function EmployeeWalletScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
                       <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Method:</Text> {tx.delivery_method || '--'}</Text>
                       <Text style={{ fontSize: 13, color: '#475569' }}>
-                        <Text style={{ fontWeight: '600' }}>Cash:</Text> {tx.payment_mode === 'Cash' ? `₹${tx.amount}` : '₹0.00'} | <Text style={{ fontWeight: '600' }}>Online:</Text> {tx.payment_mode === 'Online' ? `₹${tx.amount}` : '₹0.00'}
+                        <Text style={{ fontWeight: '600' }}>Cash:</Text> {tx.cash_amount !== undefined && tx.cash_amount !== null ? `₹${parseFloat(tx.cash_amount).toFixed(2)}` : (tx.payment_mode === 'Cash' ? `₹${parseFloat(tx.amount || '0').toFixed(2)}` : '₹0.00')} | <Text style={{ fontWeight: '600' }}>Online:</Text> {tx.online_amount !== undefined && tx.online_amount !== null ? `₹${parseFloat(tx.online_amount).toFixed(2)}` : (tx.payment_mode === 'Online' ? `₹${parseFloat(tx.amount || '0').toFixed(2)}` : '₹0.00')}
                       </Text>
                     </View>
+                    {tx.credit_amount !== undefined && tx.credit_amount !== null && parseFloat(tx.credit_amount) > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 }}>
+                        <Text style={{ fontSize: 13, color: '#b45309', fontWeight: '600' }}>
+                          Credit (Unpaid): ₹{parseFloat(tx.credit_amount).toFixed(2)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
-                  {tx.payment_mode === 'Cash' && (
+                  {(tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) > 0 : tx.payment_mode === 'Cash') && (
                     <Pressable 
                       style={{ 
                         marginTop: 12, 
@@ -824,14 +872,16 @@ export default function EmployeeWalletScreen() {
                         gap: 6
                       }}
                       onPress={() => {
-                        setAmount(tx.amount || '0');
+                        const targetCash = tx.cash_amount !== undefined && tx.cash_amount !== null ? tx.cash_amount : (tx.amount || '0');
+                        const targetOnline = tx.online_amount !== undefined && tx.online_amount !== null ? tx.online_amount : '0';
+                        setAmount(String(targetCash));
                         setOrderNo(tx.order_no || '');
                         setInvoiceNo(tx.invoice_no || '');
                         setCustomerName(tx.customer_name || '');
                         setCustomerPhone(tx.customer_phone || '');
                         setDeliveryMethod(tx.delivery_method || '');
-                        setCashAmount(tx.amount || '0');
-                        setOnlineAmount('0');
+                        setCashAmount(String(targetCash));
+                        setOnlineAmount(String(targetOnline));
                         setNote(`Handover for Order ${tx.order_no || tx.id}`);
                         setHandoverModalVisible(true);
                       }}
