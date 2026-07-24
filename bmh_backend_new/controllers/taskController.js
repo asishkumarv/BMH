@@ -46,7 +46,7 @@ exports.createTask = async (req, res) => {
     // Check attendance for assigner (if employee or department admin)
     const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
     if (!isCheckedIn) {
-      return res.status(403).json({ success: false, message: 'Please check in to assign tasks.' });
+      return res.status(200).json({ success: false, checkInRequired: true, message: 'Please check in to assign tasks.' });
     }
 
     const result = await pool.query(
@@ -162,7 +162,7 @@ exports.updateTaskStatus = async (req, res) => {
     // Check attendance for updater (if employee or department admin)
     const isCheckedIn = await checkCheckedIn(updater_id, updater_type);
     if (!isCheckedIn) {
-      return res.status(403).json({ success: false, message: 'Please check in to manage your tasks.' });
+      return res.status(200).json({ success: false, checkInRequired: true, message: 'Please check in to manage your tasks.' });
     }
 
     // Fetch existing task to know who to notify
@@ -289,7 +289,7 @@ exports.reassignTask = async (req, res) => {
     // Check attendance for assigner (if employee or department admin)
     const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
     if (!isCheckedIn) {
-      return res.status(403).json({ success: false, message: 'Please check in to assign tasks.' });
+      return res.status(200).json({ success: false, checkInRequired: true, message: 'Please check in to assign tasks.' });
     }
 
     const existingResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
@@ -360,7 +360,7 @@ exports.createRecurringTask = async (req, res) => {
     // Check attendance for assigner (if employee or department admin)
     const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
     if (!isCheckedIn) {
-      return res.status(403).json({ success: false, message: 'Please check in to assign tasks.' });
+      return res.status(200).json({ success: false, checkInRequired: true, message: 'Please check in to assign tasks.' });
     }
 
     const query = 'INSERT INTO recurring_tasks (title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days, due_time_type, due_time_hours, due_time_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *';

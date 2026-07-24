@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, Pressable, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, Pressable, TextInput, Modal, Alert as RNAlert } from 'react-native';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import axios from 'axios';
@@ -9,6 +9,18 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function DepartmentTasksScreen() {
   const { isDesktop } = useResponsive();
+  const [customAlert, setCustomAlert] = useState<{ visible: boolean; title: string; message: string } | null>(null);
+
+  const Alert = {
+    alert: (title: string, message?: string) => {
+      if (Platform.OS === 'web') {
+        setCustomAlert({ visible: true, title, message: message || '' });
+      } else {
+        RNAlert.alert(title, message);
+      }
+    }
+  };
+
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -170,7 +182,7 @@ export default function DepartmentTasksScreen() {
           if (!specificDays) return Alert.alert('Error', 'Please specify days or dates.');
           parsedDays = specificDays.split(',').map(s => s.trim()).filter(s => s);
         }
-        await axios.post('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
           title, description, assigner_type: 'department_admin', assigner_id: adminUser.id || 1,
           assignee_type: finalAssigneeType, assignee_id: parseInt(finalAssigneeId), department: finalDept,
           priority, frequency, specific_days: parsedDays,
@@ -178,9 +190,13 @@ export default function DepartmentTasksScreen() {
           due_time_hours: parseInt(dueTimeHours) || 0,
           due_time_days: parseInt(dueTimeDays) || 0
         });
+        if (res.data && res.data.success === false) {
+          Alert.alert('Error', res.data.message || 'Failed to assign task');
+          return;
+        }
         fetchInitData();
       } else {
-        await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/tasks', {
           title,
           description,
           assigner_type: 'department_admin',
@@ -193,6 +209,10 @@ export default function DepartmentTasksScreen() {
           is_group_task: isGroupTask,
           group_assignees: resolvedGroupAssignees
         });
+        if (res.data && res.data.success === false) {
+          Alert.alert('Error', res.data.message || 'Failed to assign task');
+          return;
+        }
       }
       setShowCreateModal(false);
       fetchInitData();
@@ -265,13 +285,17 @@ export default function DepartmentTasksScreen() {
 
   const handleDirectAccept = async (task: any) => {
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${task.id}/status`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${task.id}/status`, {
         status: 'accepted',
         rejection_reason: '',
         notes: task.notes || '',
         updater_type: 'department_admin',
         updater_id: adminUser.id
       });
+      if (res.data && res.data.success === false) {
+        Alert.alert('Error', res.data.message || 'Failed to accept task');
+        return;
+      }
       fetchInitData();
       Alert.alert('Success', 'Task accepted successfully');
     } catch (e: any) {
@@ -283,13 +307,17 @@ export default function DepartmentTasksScreen() {
   const handleDirectRejectSubmit = async () => {
     if (!directRejectTask) return;
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${directRejectTask.id}/status`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${directRejectTask.id}/status`, {
         status: 'rejected',
         rejection_reason: directRejectText || '',
         notes: directRejectTask.notes || '',
         updater_type: 'department_admin',
         updater_id: adminUser.id
       });
+      if (res.data && res.data.success === false) {
+        Alert.alert('Error', res.data.message || 'Failed to reject task');
+        return;
+      }
       setShowDirectRejectModal(false);
       setDirectRejectTask(null);
       fetchInitData();
@@ -302,13 +330,17 @@ export default function DepartmentTasksScreen() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
         rejection_reason: rejectionReason,
         notes: statusNotes,
         updater_type: 'department_admin',
         updater_id: adminUser.id
       });
+      if (res.data && res.data.success === false) {
+        Alert.alert('Error', res.data.message || 'Failed to update task status');
+        return;
+      }
       setShowStatusModal(false);
       fetchInitData();
       Alert.alert('Success', `Task marked as ${newStatus}`);
@@ -324,13 +356,17 @@ export default function DepartmentTasksScreen() {
     const newType = selectedUser?.type || 'employee';
     const newDept = selectedUser?.department || myDeptName;
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/reassign`, {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/reassign`, {
         assignee_type: newType,
         assignee_id: parseInt(assigneeId),
         department: newDept,
         assigner_id: adminUser.id,
         assigner_type: 'department_admin'
       });
+      if (res.data && res.data.success === false) {
+        Alert.alert('Error', res.data.message || 'Failed to reassign task');
+        return;
+      }
       setShowReassignModal(false);
       setAssigneeId('');
       fetchInitData();
@@ -1715,6 +1751,37 @@ export default function DepartmentTasksScreen() {
           </View>
         </View>
       </Modal>
+      {customAlert?.visible && (
+        <View style={[styles.modalOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }]}>
+          <View style={[styles.modalContent, { width: isDesktop ? 400 : '90%', padding: 24, alignItems: 'center' }]}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: customAlert.title.toLowerCase().includes('error') ? '#fef2f2' : '#f0fdf4', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 28 }}>{customAlert.title.toLowerCase().includes('error') ? '⚠️' : '✅'}</Text>
+            </View>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, textAlign: 'center' }}>
+              {customAlert.title}
+            </Text>
+            <Text style={{ fontSize: 16, color: '#64748b', textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
+              {customAlert.message}
+            </Text>
+            <Pressable 
+              style={({ pressed }) => [
+                { 
+                  backgroundColor: customAlert.title.toLowerCase().includes('error') ? '#ef4444' : '#10b981', 
+                  paddingVertical: 12, 
+                  paddingHorizontal: 24, 
+                  borderRadius: 12, 
+                  width: '100%', 
+                  alignItems: 'center',
+                  opacity: pressed ? 0.9 : 1
+                }
+              ]} 
+              onPress={() => setCustomAlert(null)}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 </View>
   );
 }
