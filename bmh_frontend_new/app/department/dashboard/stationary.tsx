@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
-import { Package, Plus, MoreVertical, Check, X, Upload, Search, Trash2, Edit2, AlertCircle, CheckCircle, Clock, XCircle, Info } from 'lucide-react-native';
+import { Package, Plus, MoreVertical, Check, X, Upload, Search, Trash2, Edit2, AlertCircle, CheckCircle, Clock, XCircle, Info, Minus, ShoppingCart } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -14,12 +14,20 @@ type RequestHistory = { id: string; employee_name: string; employee_department: 
 
 export default function SubAdminStationaryScreen() {
   const { isDesktop } = useResponsive();
-  const [activeTab, setActiveTab] = useState<'inventory' | 'requests'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'requests' | 'my_requests'>('inventory');
   const [departmentId, setDepartmentId] = useState<string | null>(null);
+  const [subAdminUser, setSubAdminUser] = useState<any>(null);
   
   const [items, setItems] = useState<StationaryItem[]>([]);
   const [requests, setRequests] = useState<RequestHistory[]>([]);
+  const [myRequests, setMyRequests] = useState<RequestHistory[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Cart & Request states for Sub-Admin
+  const [cart, setCart] = useState<{ [key: string]: number }>({});
+  const [notes, setNotes] = useState('');
+  const [cartModalVisible, setCartModalVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Add Item Modal
   const [addItemModalVisible, setAddItemModalVisible] = useState(false);
@@ -64,6 +72,7 @@ export default function SubAdminStationaryScreen() {
       if (userStr) {
         const user = JSON.parse(userStr);
         setDepartmentId(user.department_id);
+        setSubAdminUser(user);
       }
     };
     init();
@@ -71,7 +80,7 @@ export default function SubAdminStationaryScreen() {
 
   useEffect(() => {
     fetchData();
-  }, [activeTab, departmentId]);
+  }, [activeTab, departmentId, subAdminUser]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -79,13 +88,25 @@ export default function SubAdminStationaryScreen() {
       if (activeTab === 'inventory') {
         const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
         if (res.data.success) setItems(res.data.data);
-      } else {
+      } else if (activeTab === 'requests') {
         let url = 'https://napi.bharatmedicalhallplus.com/stationary/requests';
         if (departmentId) {
           url += `?department_id=${encodeURIComponent(departmentId)}`;
         }
         const res = await axios.get(url);
         if (res.data.success) setRequests(res.data.data);
+      } else if (activeTab === 'my_requests') {
+        // Fetch active items
+        const itemsRes = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
+        if (itemsRes.data.success) {
+          const activeItems = itemsRes.data.data.filter((i: StationaryItem) => i.status !== 'hold');
+          setItems(activeItems);
+        }
+        // Fetch sub-admin's own request history
+        if (subAdminUser) {
+          const reqRes = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/requests?requester_id=${subAdminUser.id}&requester_type=department_admin`);
+          if (reqRes.data.success) setMyRequests(reqRes.data.data);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -202,6 +223,10 @@ export default function SubAdminStationaryScreen() {
 
   const handleSaveEditItem = async () => {
     if (!editingItem || !editItemName) return Alert.alert('Error', 'Name is required');
+    const newStock = parseInt(editItemStock) || 0;
+    if (newStock < editingItem.stock) {
+      return Alert.alert('Error', 'You cannot decrease the stock. You can only increase it.');
+    }
     setSavingEdit(true);
     try {
       const finalName = editDynamicFields.length > 0 
@@ -256,6 +281,56 @@ export default function SubAdminStationaryScreen() {
       ]);
     }
   };
+
+  const updateCart = (itemId: string, qtyDelta: number) => {
+    setCart(prev => {
+      const newQty = (prev[itemId] || 0) + qtyDelta;
+      if (newQty <= 0) {
+        const newCart = { ...prev };
+        delete newCart[itemId];
+        return newCart;
+      }
+      return { ...prev, [itemId]: newQty };
+    });
+  };
+
+  const submitRequest = async () => {
+    if (Object.keys(cart).length === 0) {
+      Alert.alert('Error', 'Your cart is empty');
+      return;
+    }
+    if (!subAdminUser) return;
+
+    setSubmitting(true);
+    try {
+      const payloadItems = Object.keys(cart).map(itemId => ({
+        item_id: itemId,
+        requested_qty: cart[itemId]
+      }));
+
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/requests', {
+        notes,
+        items: payloadItems,
+        requester_type: 'department_admin',
+        requester_id: subAdminUser.id
+      });
+
+      if (res.data.success) {
+        Alert.alert('Success', 'Stationary request submitted successfully!');
+        setCart({});
+        setNotes('');
+        setCartModalVisible(false);
+        fetchData();
+      }
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cartItemsCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
   const openReviewModal = (req: RequestHistory) => {
     setSelectedRequest(req);
@@ -323,6 +398,56 @@ export default function SubAdminStationaryScreen() {
       <Text style={styles.itemStock}>Stock: {item.stock}</Text>
     </Pressable>
   );
+
+  const renderItemCard = ({ item }: { item: StationaryItem }) => {
+    const qtyInCart = cart[item.id] || 0;
+    const parts = item.name.split(' | ');
+    const baseName = parts[0];
+    const details = parts.slice(1);
+
+    return (
+      <View style={[styles.itemCard, { maxWidth: isDesktop ? 220 : '47%', width: isDesktop ? 220 : '47%', flex: 0, padding: 16, alignItems: 'flex-start' }]}>
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.itemImage, { backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }]}>
+            <Package size={32} color={Colors.light.icon} />
+          </View>
+        )}
+        <View style={styles.itemInfo}>
+          <Text style={[styles.itemName, { textAlign: 'left' }]} numberOfLines={1}>{baseName}</Text>
+          {details.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, marginBottom: 4 }}>
+              {details.map((d, i) => (
+                <View key={i} style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 10, color: Colors.light.icon, fontWeight: '600' }}>{d}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.itemStock}>Available: {item.stock}</Text>
+          
+          <View style={styles.qtyContainer}>
+            <Pressable 
+              style={[styles.qtyBtn, qtyInCart === 0 && { opacity: 0.5 }]} 
+              onPress={() => updateCart(item.id, -1)}
+              disabled={qtyInCart === 0}
+            >
+              <Minus size={16} color={Colors.light.primary} />
+            </Pressable>
+            <Text style={styles.qtyText}>{qtyInCart}</Text>
+            <Pressable 
+              style={[styles.qtyBtn, (qtyInCart >= item.stock) && { opacity: 0.5 }]} 
+              onPress={() => updateCart(item.id, 1)}
+              disabled={qtyInCart >= item.stock}
+            >
+              <Plus size={16} color={Colors.light.primary} />
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const renderRequestItem = ({ item }: { item: RequestHistory }) => (
     <View style={styles.requestRow}>
@@ -412,6 +537,20 @@ export default function SubAdminStationaryScreen() {
             </Pressable>
           </View>
         )}
+
+        {activeTab === 'my_requests' && (
+          <Pressable style={styles.cartBtn} onPress={() => setCartModalVisible(true)}>
+            <View style={styles.cartIconWrapper}>
+              <ShoppingCart size={20} color="#FFF" />
+              {cartItemsCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartItemsCount}</Text>
+                </View>
+              )}
+            </View>
+            {isDesktop && <Text style={styles.cartBtnText}>View Cart</Text>}
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.tabsContainer}>
@@ -425,7 +564,13 @@ export default function SubAdminStationaryScreen() {
           style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
           onPress={() => setActiveTab('requests')}
         >
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Requests</Text>
+          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Requests Approval</Text>
+        </Pressable>
+        <Pressable 
+          style={[styles.tab, activeTab === 'my_requests' && styles.activeTab]} 
+          onPress={() => setActiveTab('my_requests')}
+        >
+          <Text style={[styles.tabText, activeTab === 'my_requests' && styles.activeTabText]}>Request Stationary</Text>
         </Pressable>
       </View>
 
@@ -442,7 +587,7 @@ export default function SubAdminStationaryScreen() {
             renderItem={renderInventoryItem}
             ListEmptyComponent={<Text style={styles.emptyText}>No stationary items found.</Text>}
           />
-        ) : (
+        ) : activeTab === 'requests' ? (
           <>
             <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'flex-start', marginBottom: 16, gap: 12 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -514,6 +659,64 @@ export default function SubAdminStationaryScreen() {
               </View>
             </ScrollView>
           </>
+        ) : (
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 16 }}>Available Items</Text>
+            {items.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center', backgroundColor: Colors.light.card, borderRadius: 16 }}>
+                <Text style={{ color: Colors.light.icon }}>No items available.</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 32 }}>
+                {items.map(item => <React.Fragment key={item.id}>{renderItemCard({item})}</React.Fragment>)}
+              </View>
+            )}
+
+            <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 16 }}>Your Request History</Text>
+            {myRequests.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center', backgroundColor: Colors.light.card, borderRadius: 16 }}>
+                <Text style={{ color: Colors.light.icon }}>You haven't made any requests yet.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 16 }}>
+                {myRequests.map(req => (
+                  <View key={req.id} style={{ backgroundColor: Colors.light.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: Colors.light.border }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Clock size={16} color={Colors.light.icon} />
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.icon }}>{new Date(req.created_at).toLocaleDateString()}</Text>
+                      </View>
+                      <View style={[styles.statusBadge, (styles as any)[`status_${req.status}`] || styles.status_pending]}>
+                        <Text style={[styles.statusText, (styles as any)[`text_${req.status}`] || styles.text_pending]}>{req.status.replace('_', ' ')}</Text>
+                      </View>
+                    </View>
+                    
+                    {req.approved_by && req.status !== 'pending' && (
+                      <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 8, fontWeight: '600' }}>Processed By: {req.approved_by.split(':')[0]}</Text>
+                    )}
+                    {req.notes ? <Text style={{ fontSize: 14, color: Colors.light.text, marginBottom: 12, fontStyle: 'italic' }}>Notes: {req.notes}</Text> : null}
+                    
+                    {(!req.items || req.items.length === 0) ? (
+                      <Text style={{ fontStyle: 'italic', color: Colors.light.icon, fontSize: 13 }}>
+                        Items have been removed from inventory.
+                      </Text>
+                    ) : (
+                      <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 12, gap: 8 }}>
+                        {req.items.map(i => (
+                          <View key={i.id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.text }}>{i.name}</Text>
+                            <Text style={{ fontSize: 13, color: Colors.light.icon, fontWeight: '500' }}>
+                              Req: {i.requested_qty} {req.status !== 'pending' && req.status !== 'rejected' && `| Appr: ${i.approved_qty}`}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
         )}
       </View>
 
@@ -729,6 +932,66 @@ export default function SubAdminStationaryScreen() {
         </View>
       </Modal>
 
+      {/* Cart Modal */}
+      <Modal visible={cartModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
+            <Text style={styles.modalTitle}>Your Cart</Text>
+            
+            <ScrollView style={{ maxHeight: 300, marginBottom: 20 }} showsVerticalScrollIndicator={true}>
+              {Object.keys(cart).length === 0 ? (
+                <Text style={{ textAlign: 'center', color: Colors.light.icon, marginVertical: 20 }}>Your cart is empty.</Text>
+              ) : (
+                Object.keys(cart).map(itemId => {
+                  const item = items.find(i => i.id === itemId);
+                  if (!item) return null;
+                  return (
+                    <View key={itemId} style={styles.cartItemRow}>
+                      <Text style={styles.cartItemName}>{item.name.split(' | ')[0]}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <Pressable 
+                          style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }} 
+                          onPress={() => updateCart(item.id, -1)}
+                        >
+                          <Minus size={14} color={Colors.light.primary} />
+                        </Pressable>
+                        <Text style={styles.cartItemQty}>{cart[itemId]}</Text>
+                        <Pressable 
+                          style={[{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }, cart[itemId] >= item.stock && { opacity: 0.5 }]} 
+                          onPress={() => updateCart(item.id, 1)}
+                          disabled={cart[itemId] >= item.stock}
+                        >
+                          <Plus size={14} color={Colors.light.primary} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <Text style={styles.label}>Notes (Optional)</Text>
+            <TextInput 
+              style={[styles.input, { height: 80 }]} 
+              placeholder="Why do you need these items?" 
+              multiline 
+              value={notes} 
+              onChangeText={setNotes} 
+            />
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.cancelBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setCartModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              {Object.keys(cart).length > 0 && (
+                <Pressable style={styles.submitBtn} onPress={submitRequest} disabled={submitting}>
+                  <Text style={styles.submitBtnText}>{submitting ? 'Submitting...' : 'Submit Request'}</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -790,5 +1053,18 @@ const styles = StyleSheet.create({
   statusToggleActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   statusToggleActiveText: { color: Colors.light.primary },
   statusToggleActiveHold: { backgroundColor: '#FEF08A', borderColor: '#FDE047' },
-  statusToggleActiveHoldText: { color: '#854D0E' }
+  statusToggleActiveHoldText: { color: '#854D0E' },
+  
+  cartBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  cartIconWrapper: { position: 'relative' },
+  cartBadge: { position: 'absolute', top: -8, right: -8, backgroundColor: Colors.light.error, borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  cartBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
+  cartBtnText: { color: '#FFF', fontWeight: '700', marginLeft: 8, fontSize: 15 },
+  itemInfo: { gap: 4, width: '100%' },
+  qtyContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, backgroundColor: '#F8FAFC', borderRadius: 8, padding: 4, width: '100%' },
+  qtyBtn: { padding: 8, backgroundColor: '#EFF6FF', borderRadius: 6 },
+  qtyText: { fontSize: 16, fontWeight: '700', color: Colors.light.text },
+  cartItemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  cartItemName: { fontSize: 16, fontWeight: '600', color: Colors.light.text },
+  cartItemQty: { fontSize: 16, fontWeight: '700', color: Colors.light.primary }
 });

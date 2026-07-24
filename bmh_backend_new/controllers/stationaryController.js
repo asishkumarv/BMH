@@ -132,7 +132,7 @@ exports.deleteItem = async (req, res) => {
 
 exports.createRequest = async (req, res) => {
   try {
-    const { employee_id, notes, items } = req.body; // items: array of { item_id, requested_qty }
+    const { employee_id, notes, items, requester_type, requester_id } = req.body; // items: array of { item_id, requested_qty }
     
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Cart is empty' });
@@ -142,9 +142,21 @@ exports.createRequest = async (req, res) => {
     try {
       await client.query('BEGIN');
       
+      let empId = employee_id;
+      if (requester_type === 'department_admin' && requester_id) {
+        // Query the corresponding employee ID by matching email of this department admin
+        const empRes = await client.query(
+          'SELECT id FROM employees WHERE email = (SELECT email FROM department_admins WHERE id = $1)',
+          [requester_id]
+        );
+        if (empRes.rows.length > 0) {
+          empId = empRes.rows[0].id;
+        }
+      }
+
       const reqResult = await client.query(
-        'INSERT INTO stationary_requests (employee_id, notes, status) VALUES ($1, $2, $3) RETURNING *',
-        [employee_id, notes, 'pending']
+        'INSERT INTO stationary_requests (employee_id, notes, status, requester_type, requester_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [empId, notes, 'pending', requester_type || 'employee', requester_id || empId]
       );
       const requestId = reqResult.rows[0].id;
 
@@ -171,13 +183,25 @@ exports.createRequest = async (req, res) => {
 
 exports.getRequests = async (req, res) => {
   try {
-    const { employee_id, department, department_id } = req.query; // If provided, filter by employee or department
+    // Run schema migrations for sub admin requester columns
+    await pool.query(`
+      ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_type VARCHAR(50) DEFAULT 'employee';
+      ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_id INTEGER;
+    `);
+
+    const { employee_id, department, department_id, requester_id, requester_type } = req.query; // If provided, filter by employee or department
     
     let query = `
       SELECT 
         sr.*,
-        e.full_name as employee_name,
-        e.department as employee_department,
+        (CASE 
+          WHEN sr.requester_type = 'department_admin' THEN (SELECT full_name FROM department_admins WHERE id = sr.requester_id)
+          ELSE (SELECT full_name FROM employees WHERE id = COALESCE(sr.requester_id, sr.employee_id))
+        END) as employee_name,
+        (CASE 
+          WHEN sr.requester_type = 'department_admin' THEN (SELECT d.name FROM departments d JOIN department_admins da ON da.department_id = d.id WHERE da.id = sr.requester_id)
+          ELSE (SELECT department FROM employees WHERE id = COALESCE(sr.requester_id, sr.employee_id))
+        END) as employee_department,
         (
           SELECT json_agg(json_build_object(
             'id', sri.id,
@@ -191,7 +215,6 @@ exports.getRequests = async (req, res) => {
           WHERE sri.request_id = sr.id
         ) as items
       FROM stationary_requests sr
-      JOIN employees e ON sr.employee_id = e.id
       WHERE 1=1
     `;
     const params = [];
@@ -203,17 +226,29 @@ exports.getRequests = async (req, res) => {
       paramIndex++;
     }
 
+    if (requester_id && requester_type) {
+      query += ` AND sr.requester_id = $${paramIndex} AND sr.requester_type = $${paramIndex + 1}`;
+      params.push(requester_id, requester_type);
+      paramIndex += 2;
+    }
+
     if (department_id) {
       const deptRes = await pool.query('SELECT name FROM departments WHERE id = $1', [department_id]);
       if (deptRes.rows.length > 0) {
-        query += ` AND e.department = $${paramIndex}`;
+        query += ` AND (CASE 
+          WHEN sr.requester_type = 'department_admin' THEN (SELECT d.name FROM departments d JOIN department_admins da ON da.department_id = d.id WHERE da.id = sr.requester_id)
+          ELSE (SELECT department FROM employees WHERE id = COALESCE(sr.requester_id, sr.employee_id))
+        END) = $${paramIndex} AND sr.requester_type = 'employee'`;
         params.push(deptRes.rows[0].name);
         paramIndex++;
       } else {
         return res.json({ success: true, data: [] });
       }
     } else if (department) {
-      query += ` AND e.department = $${paramIndex}`;
+      query += ` AND (CASE 
+        WHEN sr.requester_type = 'department_admin' THEN (SELECT d.name FROM departments d JOIN department_admins da ON da.department_id = d.id WHERE da.id = sr.requester_id)
+        ELSE (SELECT department FROM employees WHERE id = COALESCE(sr.requester_id, sr.employee_id))
+      END) = $${paramIndex} AND sr.requester_type = 'employee'`;
       params.push(department);
       paramIndex++;
     }
