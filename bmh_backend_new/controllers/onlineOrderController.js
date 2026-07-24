@@ -310,7 +310,7 @@ exports.updateOrderDetails = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
 
-        const wasDelivered = currentRes.rows[0].status === 'DELIVERED' || currentRes.rows[0].status === 'Delivered';
+        const wasDelivered = currentRes.rows[0].status && currentRes.rows[0].status.toLowerCase() === 'delivered';
 
         let updatedNotes = currentRes.rows[0].notes || '[]';
         if (new_note) {

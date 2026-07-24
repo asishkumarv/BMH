@@ -3056,7 +3056,7 @@ router.put('/sales-orders/details/:id', async (req, res) => {
     if (currentRes.rowCount === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    const wasDelivered = currentRes.rows[0].status === 'DELIVERED' || currentRes.rows[0].status === 'Delivered';
+    const wasDelivered = currentRes.rows[0].status && currentRes.rows[0].status.toLowerCase() === 'delivered';
 
     const result = await pool.query(`
       UPDATE ecogreensales_orders
