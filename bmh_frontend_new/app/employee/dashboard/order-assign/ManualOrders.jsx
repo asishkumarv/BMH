@@ -346,24 +346,70 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
           modified_by_name: authName
         });
       } else if (selectedOrder.order_source_type === 'online_order') {
+        // Validation check for split
+        if (selectedOrder.payment_mode === 'POD' && selectedOrder.pod_payment_mode === 'Split') {
+          const cAmt = parseFloat(selectedOrder.cash_amount || 0);
+          const oAmt = parseFloat(selectedOrder.online_amount || 0);
+          const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+          if (Math.abs((cAmt + oAmt) - paidAmt) > 0.01) {
+            alert("Split Cash Portion + UPI Portion must equal Paid Amount!");
+            return;
+          }
+        }
         await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${selectedOrder.id}/update`, {
           address: editAddress,
           new_note: newNote,
           note_author: authName,
           modified_by_id: modifiedById,
           modified_by_type: modifiedByType,
-          modified_by_name: authName
+          modified_by_name: authName,
+          payment_mode: selectedOrder.payment_mode,
+          pod_payment_mode: selectedOrder.pod_payment_mode,
+          payment_txn_id: selectedOrder.payment_txn_id,
+          cash_amount: selectedOrder.cash_amount,
+          online_amount: selectedOrder.online_amount,
+          credit_amount: selectedOrder.credit_amount,
+          paid_amount: selectedOrder.paid_amount,
+          status: selectedOrder.status
         });
       } else if (selectedOrder.order_source_type === 'sales_order') {
+        // Validation check for split
+        if (selectedOrder.payment_mode === 'POD' && selectedOrder.pod_payment_mode === 'Split') {
+          const cAmt = parseFloat(selectedOrder.cash_amount || 0);
+          const oAmt = parseFloat(selectedOrder.online_amount || 0);
+          const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+          if (Math.abs((cAmt + oAmt) - paidAmt) > 0.01) {
+            alert("Split Cash Portion + UPI Portion must equal Paid Amount!");
+            return;
+          }
+        }
         await axios.put(`https://napi.bharatmedicalhallplus.com/sales-order/${selectedOrder.id}/update`, {
           address: editAddress,
           new_note: newNote,
           note_author: authName,
           modified_by_id: modifiedById,
           modified_by_type: modifiedByType,
-          modified_by_name: authName
+          modified_by_name: authName,
+          payment_mode: selectedOrder.payment_mode,
+          pod_payment_mode: selectedOrder.pod_payment_mode,
+          payment_txn_id: selectedOrder.payment_txn_id,
+          cash_amount: selectedOrder.cash_amount,
+          online_amount: selectedOrder.online_amount,
+          credit_amount: selectedOrder.credit_amount,
+          paid_amount: selectedOrder.paid_amount,
+          status: selectedOrder.status
         });
       } else {
+        // Validation check for split
+        if (selectedOrder.payment_mode === 'POD' && selectedOrder.pod_payment_mode === 'Split') {
+          const cAmt = parseFloat(selectedOrder.cash_amount || 0);
+          const oAmt = parseFloat(selectedOrder.online_amount || 0);
+          const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+          if (Math.abs((cAmt + oAmt) - paidAmt) > 0.01) {
+            alert("Split Cash Portion + UPI Portion must equal Paid Amount!");
+            return;
+          }
+        }
         await axios.put(`https://napi.bharatmedicalhallplus.com/manual-orders/${selectedOrder.id}`, {
           ...selectedOrder,
           address: editAddress,
@@ -1570,42 +1616,150 @@ export default function ManualOrders({ deliveryBoys, onStartAssignment }) {
                )}
 
                <View style={{marginTop: 20, backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8}}>
-                  <Text style={{fontWeight:'bold', marginBottom: 10}}>Payment Info</Text>
-                  <View style={styles.dropdownWrapper}>
-                    <Picker
-                      selectedValue={selectedOrder.payment_mode || 'POD'}
-                      onValueChange={(val) => setSelectedOrder({...selectedOrder, payment_mode: val})}
-                      style={[styles.picker, {marginBottom:5}]}
-                    >
-                      <Picker.Item label="Cash" value="Cash" />
-                      <Picker.Item label="Online" value="Online" />
-                      <Picker.Item label="Prepaid" value="Prepaid" />
-                      <Picker.Item label="POD" value="POD" />
-                    </Picker>
-                  </View>
-                  <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Paid Amount" value={selectedOrder.paid_amount || ''} onChangeText={t => setSelectedOrder({...selectedOrder, paid_amount: t})} />
-                  <TextInput style={[styles.input, {marginBottom:5}]} placeholder="Txn ID" value={selectedOrder.payment_txn_id || ''} onChangeText={t => setSelectedOrder({...selectedOrder, payment_txn_id: t})} />
-                  {selectedOrder.pod_payment_mode && (
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e3a8a', marginTop: 8 }}>
-                      POD Mode: {selectedOrder.pod_payment_mode}
-                    </Text>
-                  )}
-                  {selectedOrder.cash_amount !== undefined && selectedOrder.cash_amount !== null && (
-                    <Text style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>
-                      Cash Portion: ₹{selectedOrder.cash_amount}
-                    </Text>
-                  )}
-                  {selectedOrder.online_amount !== undefined && selectedOrder.online_amount !== null && (
-                    <Text style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>
-                      Online Portion: ₹{selectedOrder.online_amount}
-                    </Text>
-                  )}
-                  {selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null && (
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#b45309', marginTop: 4 }}>
-                      Credit Portion (Unpaid): ₹{selectedOrder.credit_amount}
-                    </Text>
-                  )}
-                  {selectedOrder.payment_attachment && <Image source={{uri: `https://napi.bharatmedicalhallplus.com${selectedOrder.payment_attachment}`}} style={{width: 100, height: 100, marginTop: 10}}/>}
+                   <Text style={{fontWeight:'bold', marginBottom: 10}}>Payment Info</Text>
+                   
+                   <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4}}>Order Type</Text>
+                   <View style={styles.dropdownWrapper}>
+                     <Picker
+                       selectedValue={selectedOrder.payment_mode === 'Prepaid' ? 'Prepaid' : 'POD'}
+                       onValueChange={(val) => {
+                         const isPrepaid = val === 'Prepaid';
+                         const totalAmt = parseFloat(selectedOrder.amount || 0);
+                         setSelectedOrder({
+                           ...selectedOrder,
+                           payment_mode: val,
+                           paid_amount: isPrepaid ? totalAmt.toString() : (selectedOrder.paid_amount || '0'),
+                           credit_amount: isPrepaid ? 0 : Math.max(0, totalAmt - parseFloat(selectedOrder.paid_amount || 0)),
+                           pod_payment_mode: isPrepaid ? 'Online' : (selectedOrder.pod_payment_mode || 'Cash'),
+                           cash_amount: isPrepaid ? 0 : (selectedOrder.cash_amount || 0),
+                           online_amount: isPrepaid ? totalAmt : (selectedOrder.online_amount || 0)
+                         });
+                       }}
+                       style={[styles.picker, {marginBottom:5}]}
+                     >
+                       <Picker.Item label="POD" value="POD" />
+                       <Picker.Item label="Prepaid" value="Prepaid" />
+                     </Picker>
+                   </View>
+
+                   {selectedOrder.payment_mode !== 'Prepaid' && (
+                     <>
+                       <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4, marginTop: 8}}>Payment Type</Text>
+                       <View style={styles.dropdownWrapper}>
+                         <Picker
+                           selectedValue={selectedOrder.pod_payment_mode || 'Cash'}
+                           onValueChange={(val) => {
+                             const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+                             let cPortion = 0;
+                             let oPortion = 0;
+                             if (val === 'Cash') {
+                               cPortion = paidAmt;
+                             } else if (val === 'Online') {
+                               oPortion = paidAmt;
+                             } else if (val === 'Split') {
+                               cPortion = Math.floor(paidAmt / 2);
+                               oPortion = paidAmt - cPortion;
+                             }
+                             setSelectedOrder({
+                               ...selectedOrder,
+                               pod_payment_mode: val,
+                               cash_amount: cPortion,
+                               online_amount: oPortion
+                             });
+                           }}
+                           style={[styles.picker, {marginBottom:5}]}
+                         >
+                           <Picker.Item label="Cash" value="Cash" />
+                           <Picker.Item label="UPI" value="Online" />
+                           <Picker.Item label="Split" value="Split" />
+                         </Picker>
+                       </View>
+
+                       <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4, marginTop: 8}}>Paid Amount (₹)</Text>
+                       <TextInput 
+                         style={[styles.input, {marginBottom:5}]} 
+                         placeholder="Paid Amount" 
+                         value={selectedOrder.paid_amount !== null && selectedOrder.paid_amount !== undefined ? selectedOrder.paid_amount.toString() : ''} 
+                         keyboardType="numeric"
+                         onChangeText={t => {
+                           const val = parseFloat(t || '0');
+                           const totalAmt = parseFloat(selectedOrder.amount || 0);
+                           let cPortion = 0;
+                           let oPortion = 0;
+                           const currentMode = selectedOrder.pod_payment_mode || 'Cash';
+                           if (currentMode === 'Cash') {
+                             cPortion = val;
+                           } else if (currentMode === 'Online') {
+                             oPortion = val;
+                           } else if (currentMode === 'Split') {
+                             cPortion = Math.floor(val / 2);
+                             oPortion = val - cPortion;
+                           }
+                           setSelectedOrder({
+                             ...selectedOrder,
+                             paid_amount: t,
+                             cash_amount: cPortion,
+                             online_amount: oPortion,
+                             credit_amount: Math.max(0, totalAmt - val)
+                           });
+                         }} 
+                       />
+
+                       {selectedOrder.pod_payment_mode === 'Split' && (
+                         <View style={{marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                           <Text style={{fontWeight: '700', fontSize: 13, marginBottom: 5, color: '#334155'}}>Split Breakdown</Text>
+                           
+                           <Text style={{fontSize: 11, color: '#64748b', marginBottom: 2}}>Cash Portion (₹)</Text>
+                           <TextInput 
+                             style={[styles.input, {marginBottom:5, height: 35, paddingVertical: 5}]} 
+                             value={selectedOrder.cash_amount !== null && selectedOrder.cash_amount !== undefined ? selectedOrder.cash_amount.toString() : ''} 
+                             keyboardType="numeric"
+                             onChangeText={t => setSelectedOrder({...selectedOrder, cash_amount: t})} 
+                           />
+
+                           <Text style={{fontSize: 11, color: '#64748b', marginBottom: 2, marginTop: 4}}>UPI Portion (₹)</Text>
+                           <TextInput 
+                             style={[styles.input, {marginBottom:5, height: 35, paddingVertical: 5}]} 
+                             value={selectedOrder.online_amount !== null && selectedOrder.online_amount !== undefined ? selectedOrder.online_amount.toString() : ''} 
+                             keyboardType="numeric"
+                             onChangeText={t => setSelectedOrder({...selectedOrder, online_amount: t})} 
+                           />
+
+                           {Math.abs((parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0)) - parseFloat(selectedOrder.paid_amount || 0)) > 0.01 && (
+                             <Text style={{color: '#ef4444', fontSize: 11, marginTop: 4, fontWeight: '600'}}>
+                               ❌ Cash portion + UPI portion must equal Paid Amount!
+                             </Text>
+                           )}
+                         </View>
+                       )}
+                     </>
+                   )}
+
+                   {(selectedOrder.payment_mode === 'Prepaid' || selectedOrder.pod_payment_mode === 'Online' || selectedOrder.pod_payment_mode === 'Split') && (
+                     <>
+                       <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4, marginTop: 8}}>Transaction ID (UPI/Online)</Text>
+                       <TextInput 
+                         style={[styles.input, {marginBottom:5}]} 
+                         placeholder="e.g. UTR / Ref No" 
+                         value={selectedOrder.payment_txn_id || ''} 
+                         onChangeText={t => setSelectedOrder({...selectedOrder, payment_txn_id: t})} 
+                       />
+                     </>
+                   )}
+
+                   {selectedOrder.payment_mode !== 'Prepaid' && (
+                     <Text style={{fontSize: 13, fontWeight: 'bold', color: '#b45309', marginTop: 8}}>
+                       Credit Portion (Unpaid): ₹{selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null ? parseFloat(selectedOrder.credit_amount).toFixed(2) : (parseFloat(selectedOrder.amount || 0) - parseFloat(selectedOrder.paid_amount || 0)).toFixed(2)}
+                     </Text>
+                   )}
+
+                   {selectedOrder.payment_re_edited_by && (
+                     <Text style={{fontSize: 13, fontWeight: '700', color: '#dc2626', marginTop: 8}}>
+                       ⚠️ Re-edited by: {selectedOrder.payment_re_edited_by}
+                     </Text>
+                   )}
+
+                   {selectedOrder.payment_attachment && <Image source={{uri: `https://napi.bharatmedicalhallplus.com${selectedOrder.payment_attachment}`}} style={{width: 100, height: 100, marginTop: 10}}/>}
                </View>
 
                <View style={{marginTop: 20}}>

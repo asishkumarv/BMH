@@ -472,6 +472,13 @@ exports.updateOrder = async (req, res) => {
       updateFields.push(`notes = $${params.length}::jsonb`);
     }
 
+    const wasDelivered = currentOrder.rows[0].status === 'Delivered' || currentOrder.rows[0].status === 'DELIVERED';
+    if (wasDelivered) {
+      const editorName = req.body.modified_by_name || req.body.note_author || 'System';
+      params.push(editorName);
+      updateFields.push(`payment_re_edited_by = $${params.length}`);
+    }
+
     if (updateFields.length === 0) {
       return res.status(400).json({ success: false, message: 'No fields to update' });
     }

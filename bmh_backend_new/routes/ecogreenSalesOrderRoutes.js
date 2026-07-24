@@ -562,16 +562,30 @@ router.put('/:id/status', async (req, res) => {
   }
 });
 
-// Update details (address, notes, modified_by metadata)
+// Update details (address, notes, modified_by metadata, payment fields)
 router.put('/:id/update', async (req, res) => {
   try {
     const { id } = req.params;
-    const { address, new_note, note_author, modified_by_id, modified_by_type, modified_by_name } = req.body;
+    const { 
+      address, new_note, note_author, 
+      modified_by_id, modified_by_type, modified_by_name,
+      payment_mode, pod_payment_mode, payment_txn_id, 
+      cash_amount, online_amount, credit_amount, paid_amount, 
+      status
+    } = req.body;
 
-    const currentRes = await pool.query('SELECT notes FROM ecogreen_sales_orders WHERE id = $1', [id]);
+    let targetTable = 'ecogreen_sales_orders';
+    let currentRes = await pool.query('SELECT notes, status, payment_mode, delivery_boy_id, delivery_assigned_user_type, total_price FROM ecogreen_sales_orders WHERE id = $1', [id]);
     if (currentRes.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      currentRes = await pool.query('SELECT notes, status, payment_mode, delivery_boy_id, delivery_assigned_user_type, total_price FROM ecogreensales_orders WHERE id = $1', [id]);
+      if (currentRes.rowCount > 0) {
+        targetTable = 'ecogreensales_orders';
+      } else {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
     }
+
+    const wasDelivered = currentRes.rows[0].status === 'DELIVERED' || currentRes.rows[0].status === 'Delivered';
 
     let updatedNotes = currentRes.rows[0].notes || '[]';
     if (new_note) {
@@ -591,12 +605,22 @@ router.put('/:id/update', async (req, res) => {
     }
 
     const queryText = `
-      UPDATE ecogreen_sales_orders 
+      UPDATE ${targetTable} 
       SET patient_address = COALESCE($1, patient_address),
           notes = $2,
           modified_by_id = $3,
           modified_by_type = $4,
-          modified_by_name = $5
+          modified_by_name = $5,
+          payment_mode = COALESCE($7, payment_mode),
+          pod_payment_mode = COALESCE($8, pod_payment_mode),
+          payment_txn_id = COALESCE($9, payment_txn_id),
+          cash_amount = COALESCE($10, cash_amount),
+          online_amount = COALESCE($11, online_amount),
+          credit_amount = COALESCE($12, credit_amount),
+          paid_amount = COALESCE($13, paid_amount),
+          status = COALESCE($14, status),
+          delivered_at = CASE WHEN COALESCE($14, status) = 'DELIVERED' OR COALESCE($14, status) = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+          payment_re_edited_by = CASE WHEN $15 = TRUE THEN COALESCE($5, payment_re_edited_by) ELSE payment_re_edited_by END
       WHERE id = $6
       RETURNING *;
     `;
@@ -606,9 +630,113 @@ router.put('/:id/update', async (req, res) => {
       modified_by_id || null, 
       modified_by_type || null, 
       modified_by_name || null, 
-      id
+      id,
+      payment_mode || null,
+      pod_payment_mode || null,
+      payment_txn_id || null,
+      cash_amount !== undefined ? parseFloat(cash_amount) : null,
+      online_amount !== undefined ? parseFloat(online_amount) : null,
+      credit_amount !== undefined ? parseFloat(credit_amount) : null,
+      paid_amount !== undefined ? parseFloat(paid_amount) : null,
+      status || null,
+      wasDelivered
     ]);
-    res.json({ success: true, message: 'Order details updated', order: rows[0] });
+
+    const updatedOrder = rows[0];
+
+    // Wallet update logic for POD orders when transitioning to Delivered (only if NOT previously delivered)
+    const isPOD = updatedOrder.payment_mode === 'POD' || 
+                  updatedOrder.payment_mode === 'COD' || 
+                  updatedOrder.payment_mode === 'Cash' || 
+                  updatedOrder.payment_mode === 'Online' || 
+                  updatedOrder.payment_mode === 'Split';
+
+    const isDelivered = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered';
+
+    if (isDelivered && !wasDelivered && isPOD) {
+      let updaterId = modified_by_id || updatedOrder.delivery_boy_id;
+      if (updaterId) {
+        let targetEmployeeId = updaterId.toString();
+        if (modified_by_type === 'Admin' || modified_by_type === 'Sub Admin' || updatedOrder.delivery_assigned_user_type === 'sub_admin') {
+          if (!targetEmployeeId.startsWith('SA-')) {
+            targetEmployeeId = 'SA-' + targetEmployeeId;
+          }
+        }
+
+        // Duplicate wallet transaction check
+        const txCheck = await pool.query(
+          'SELECT id FROM wallet_transactions WHERE order_no = $1 OR (invoice_no = $2 AND invoice_no <> \'\')',
+          [(updatedOrder.order_no || updatedOrder.id || '').toString(), (updatedOrder.invoice_id || '').toString()]
+        );
+
+        if (txCheck.rowCount === 0) {
+          let cAmt = parseFloat(updatedOrder.cash_amount || 0);
+          let oAmt = parseFloat(updatedOrder.online_amount || 0);
+          const crAmt = parseFloat(updatedOrder.credit_amount || 0);
+
+          if (cAmt === 0 && oAmt === 0) {
+            const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
+            const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.total_price || 0);
+            if (mode === 'Online') {
+              oAmt = totalPaid;
+            } else if (mode === 'Split') {
+              cAmt = Math.floor(totalPaid / 2);
+              oAmt = totalPaid - cAmt;
+            } else {
+              cAmt = totalPaid;
+            }
+          }
+
+          const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
+          if (wCheck.rowCount === 0) {
+            await pool.query(
+              'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, 0, 0, 0)',
+              [targetEmployeeId]
+            );
+          }
+
+          if (cAmt > 0 || oAmt > 0) {
+            const txType = (updatedOrder.pod_payment_mode === 'Split') ? 'split_collection' : ((updatedOrder.pod_payment_mode === 'Online') ? 'online_collection' : 'cash_collection');
+            const txMode = updatedOrder.pod_payment_mode || 'Cash';
+            const totalPaid = cAmt + oAmt;
+
+            await pool.query(
+              `INSERT INTO wallet_transactions (
+                employee_id, type, amount, note, status, payment_mode, payment_txn_id,
+                order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+                cash_amount, online_amount, credit_amount
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING`, 
+              [
+                targetEmployeeId, 
+                txType, 
+                totalPaid, 
+                `Order ${updatedOrder.order_no || updatedOrder.id} Delivered (${txMode})`, 
+                'completed', 
+                txMode,
+                updatedOrder.payment_txn_id || null,
+                updatedOrder.order_no || updatedOrder.id,
+                updatedOrder.invoice_id || '',
+                updatedOrder.patient_name || '',
+                updatedOrder.patient_contact_no || '',
+                updatedOrder.delivery_type || '',
+                cAmt,
+                oAmt,
+                crAmt
+              ]
+            );
+
+            if (cAmt > 0) {
+              await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [cAmt, targetEmployeeId]);
+            }
+            if (oAmt > 0) {
+              await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [oAmt, targetEmployeeId]);
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Order details updated', order: updatedOrder });
   } catch (err) {
     console.error("Update sales order details error:", err);
     res.status(500).json({ success: false, error: err.message });

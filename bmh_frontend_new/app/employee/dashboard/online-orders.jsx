@@ -60,6 +60,63 @@ export default function OnlineOrdersScreen() {
     }
   };
 
+  const handleSavePaymentUpdates = async () => {
+    try {
+      // Validation check for split
+      if (selectedOrder.payment_mode === 'POD' && selectedOrder.pod_payment_mode === 'Split') {
+        const cAmt = parseFloat(selectedOrder.cash_amount || 0);
+        const oAmt = parseFloat(selectedOrder.online_amount || 0);
+        const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+        if (Math.abs((cAmt + oAmt) - paidAmt) > 0.01) {
+          alert("Split Cash Portion + UPI Portion must equal Paid Amount!");
+          return;
+        }
+      }
+
+      let authName = 'Employee';
+      let modifiedById = null;
+      let modifiedByType = 'Employee';
+
+      if (typeof window !== 'undefined') {
+        const adminUser = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser');
+        const empUser = localStorage.getItem('employeeUser');
+        if (adminUser) {
+          const auth = JSON.parse(adminUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Admin';
+        } else if (empUser) {
+          const auth = JSON.parse(empUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Employee';
+        }
+      }
+
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${selectedOrder.id}/update`, {
+        payment_mode: selectedOrder.payment_mode,
+        pod_payment_mode: selectedOrder.pod_payment_mode,
+        payment_txn_id: selectedOrder.payment_txn_id,
+        cash_amount: selectedOrder.cash_amount,
+        online_amount: selectedOrder.online_amount,
+        credit_amount: selectedOrder.credit_amount,
+        paid_amount: selectedOrder.paid_amount,
+        status: selectedOrder.status,
+        modified_by_id: modifiedById,
+        modified_by_type: modifiedByType,
+        modified_by_name: authName
+      });
+
+      if (res.data.success) {
+        alert('Payment details updated successfully!');
+        setSelectedOrder(null);
+        fetchOrdersAndBoys();
+      }
+    } catch (err) {
+      alert('Failed to update payment details: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   const openMap = (lat, lng) => {
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     if (Platform.OS === 'web') {
@@ -130,43 +187,198 @@ export default function OnlineOrdersScreen() {
       {selectedOrder && (
         <Modal visible transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { maxHeight: '90%', width: '90%', maxWidth: 600 }]}>
               <Text style={styles.modalTitle}>Order Details #{selectedOrder.id}</Text>
               
-              <Text style={styles.sectionTitle}>Patient Info</Text>
-              <Text style={styles.modalText}>{selectedOrder.patient_name} - {selectedOrder.patient_mobile}</Text>
-              <Text style={styles.modalText}>{selectedOrder.manual_address}</Text>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+                <Text style={styles.sectionTitle}>Patient Info</Text>
+                <Text style={styles.modalText}>{selectedOrder.patient_name} - {selectedOrder.patient_mobile}</Text>
+                <Text style={styles.modalText}>{selectedOrder.manual_address}</Text>
 
-              {selectedOrder.map_lat && (
-                <TouchableOpacity 
-                  style={styles.mapBtn} 
-                  onPress={() => openMap(selectedOrder.map_lat, selectedOrder.map_lng)}
-                >
-                  <MapPin color="#fff" size={18} style={{marginRight: 8}} />
-                  <Text style={styles.mapBtnText}>Open Delivery Location in Google Maps</Text>
-                </TouchableOpacity>
-              )}
-
-              <Text style={styles.sectionTitle}>Items to Pack</Text>
-              <FlatList
-                data={selectedOrder.items}
-                keyExtractor={(it, idx) => idx.toString()}
-                renderItem={({item}) => (
-                  <View style={styles.itemRow}>
-                    <Text style={styles.itemRowName}>{item.itemName}</Text>
-                    <Text style={styles.itemRowQty}>Qty: {item.qty}</Text>
-                  </View>
+                {selectedOrder.map_lat && (
+                  <TouchableOpacity 
+                    style={styles.mapBtn} 
+                    onPress={() => openMap(selectedOrder.map_lat, selectedOrder.map_lng)}
+                  >
+                    <MapPin color="#fff" size={18} style={{marginRight: 8}} />
+                    <Text style={styles.mapBtnText}>Open Delivery Location in Google Maps</Text>
+                  </TouchableOpacity>
                 )}
-                style={styles.itemsList}
-              />
 
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setSelectedOrder(null)}>
-                  <Text style={styles.cancelBtnText}>Close</Text>
-                </TouchableOpacity>
+                <Text style={styles.sectionTitle}>Items to Pack</Text>
+                <FlatList
+                  data={selectedOrder.items}
+                  keyExtractor={(it, idx) => idx.toString()}
+                  renderItem={({item}) => (
+                    <View style={styles.itemRow}>
+                      <Text style={styles.itemRowName}>{item.itemName}</Text>
+                      <Text style={styles.itemRowQty}>Qty: {item.qty}</Text>
+                    </View>
+                  )}
+                  style={styles.itemsList}
+                  scrollEnabled={false}
+                />
+
+                <Text style={styles.sectionTitle}>Order Status</Text>
+                <View style={styles.dropdownWrapper}>
+                  <Picker
+                    selectedValue={selectedOrder.status}
+                    onValueChange={(val) => setSelectedOrder({...selectedOrder, status: val})}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Pending" value="Pending" />
+                    <Picker.Item label="DISBURSED" value="DISBURSED" />
+                    <Picker.Item label="DELIVERED" value="DELIVERED" />
+                    <Picker.Item label="Cancelled" value="Cancelled" />
+                  </Picker>
+                </View>
+
+                <Text style={styles.sectionTitle}>Payment Details</Text>
+                <View style={{ backgroundColor: '#f0fdf4', padding: 15, borderRadius: 8 }}>
+                   <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4}}>Order Type</Text>
+                   <View style={styles.dropdownWrapper}>
+                     <Picker
+                       selectedValue={selectedOrder.payment_mode === 'Prepaid' ? 'Prepaid' : 'POD'}
+                       onValueChange={(val) => {
+                         const isPrepaid = val === 'Prepaid';
+                         const totalAmt = parseFloat(selectedOrder.total_amount || 0);
+                         setSelectedOrder({
+                           ...selectedOrder,
+                           payment_mode: val,
+                           paid_amount: isPrepaid ? totalAmt.toString() : (selectedOrder.paid_amount || '0'),
+                           credit_amount: isPrepaid ? 0 : Math.max(0, totalAmt - parseFloat(selectedOrder.paid_amount || 0)),
+                           pod_payment_mode: isPrepaid ? 'Online' : (selectedOrder.pod_payment_mode || 'Cash'),
+                           cash_amount: isPrepaid ? 0 : (selectedOrder.cash_amount || 0),
+                           online_amount: isPrepaid ? totalAmt : (selectedOrder.online_amount || 0)
+                         });
+                       }}
+                       style={styles.picker}
+                     >
+                       <Picker.Item label="POD" value="POD" />
+                       <Picker.Item label="Prepaid" value="Prepaid" />
+                     </Picker>
+                   </View>
+
+                   {selectedOrder.payment_mode !== 'Prepaid' && (
+                     <>
+                       <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4, marginTop: 8}}>Payment Type</Text>
+                       <View style={styles.dropdownWrapper}>
+                         <Picker
+                           selectedValue={selectedOrder.pod_payment_mode || 'Cash'}
+                           onValueChange={(val) => {
+                             const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+                             let cPortion = 0;
+                             let oPortion = 0;
+                             if (val === 'Cash') {
+                               cPortion = paidAmt;
+                             } else if (val === 'Online') {
+                               oPortion = paidAmt;
+                             } else if (val === 'Split') {
+                               cPortion = Math.floor(paidAmt / 2);
+                               oPortion = paidAmt - cPortion;
+                             }
+                             setSelectedOrder({
+                               ...selectedOrder,
+                               pod_payment_mode: val,
+                               cash_amount: cPortion,
+                               online_amount: oPortion
+                             });
+                           }}
+                           style={styles.picker}
+                         >
+                           <Picker.Item label="Cash" value="Cash" />
+                           <Picker.Item label="UPI" value="Online" />
+                           <Picker.Item label="Split" value="Split" />
+                         </Picker>
+                       </View>
+
+                       <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4, marginTop: 8}}>Paid Amount (₹)</Text>
+                       <TextInput 
+                         style={styles.input} 
+                         placeholder="Paid Amount" 
+                         value={selectedOrder.paid_amount !== null && selectedOrder.paid_amount !== undefined ? selectedOrder.paid_amount.toString() : ''} 
+                         keyboardType="numeric"
+                         onChangeText={t => {
+                           const val = parseFloat(t || '0');
+                           const totalAmt = parseFloat(selectedOrder.total_amount || 0);
+                           let cPortion = 0;
+                           let oPortion = 0;
+                           const currentMode = selectedOrder.pod_payment_mode || 'Cash';
+                           if (currentMode === 'Cash') {
+                             cPortion = val;
+                           } else if (currentMode === 'Online') {
+                             oPortion = val;
+                           } else if (currentMode === 'Split') {
+                             cPortion = Math.floor(val / 2);
+                             oPortion = val - cPortion;
+                           }
+                           setSelectedOrder({
+                             ...selectedOrder,
+                             paid_amount: t,
+                             cash_amount: cPortion,
+                             online_amount: oPortion,
+                             credit_amount: Math.max(0, totalAmt - val)
+                           });
+                         }} 
+                       />
+
+                       {selectedOrder.pod_payment_mode === 'Split' && (
+                         <View style={{marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                           <Text style={{fontWeight: '700', fontSize: 13, marginBottom: 5, color: '#334155'}}>Split Breakdown</Text>
+                           
+                           <Text style={{fontSize: 11, color: '#64748b', marginBottom: 2}}>Cash Portion (₹)</Text>
+                           <TextInput 
+                             style={[styles.input, {marginBottom:5, height: 35, paddingVertical: 5}]} 
+                             value={selectedOrder.cash_amount !== null && selectedOrder.cash_amount !== undefined ? selectedOrder.cash_amount.toString() : ''} 
+                             keyboardType="numeric"
+                             onChangeText={t => setSelectedOrder({...selectedOrder, cash_amount: t})} 
+                           />
+
+                           <Text style={{fontSize: 11, color: '#64748b', marginBottom: 2, marginTop: 4}}>UPI Portion (₹)</Text>
+                           <TextInput 
+                             style={[styles.input, {marginBottom:5, height: 35, paddingVertical: 5}]} 
+                             value={selectedOrder.online_amount !== null && selectedOrder.online_amount !== undefined ? selectedOrder.online_amount.toString() : ''} 
+                             keyboardType="numeric"
+                             onChangeText={t => setSelectedOrder({...selectedOrder, online_amount: t})} 
+                           />
+
+                           {Math.abs((parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0)) - parseFloat(selectedOrder.paid_amount || 0)) > 0.01 && (
+                             <Text style={{color: '#ef4444', fontSize: 11, marginTop: 4, fontWeight: '600'}}>
+                               ❌ Cash portion + UPI portion must equal Paid Amount!
+                             </Text>
+                           )}
+                         </View>
+                       )}
+                     </>
+                   )}
+
+                   {(selectedOrder.payment_mode === 'Prepaid' || selectedOrder.pod_payment_mode === 'Online' || selectedOrder.pod_payment_mode === 'Split') && (
+                     <>
+                       <Text style={{fontSize: 12, color: '#64748b', marginBottom: 4, marginTop: 8}}>Transaction ID (UPI/Online)</Text>
+                       <TextInput 
+                         style={styles.input} 
+                         placeholder="e.g. UTR / Ref No" 
+                         value={selectedOrder.payment_txn_id || ''} 
+                         onChangeText={t => setSelectedOrder({...selectedOrder, payment_txn_id: t})} 
+                       />
+                     </>
+                   )}
+
+                   {selectedOrder.payment_mode !== 'Prepaid' && (
+                     <Text style={{fontSize: 13, fontWeight: 'bold', color: '#b45309', marginTop: 8}}>
+                       Credit Portion (Unpaid): ₹{selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null ? parseFloat(selectedOrder.credit_amount).toFixed(2) : (parseFloat(selectedOrder.total_amount || 0) - parseFloat(selectedOrder.paid_amount || 0)).toFixed(2)}
+                     </Text>
+                   )}
+
+                   {selectedOrder.payment_re_edited_by && (
+                     <Text style={{fontSize: 13, fontWeight: '700', color: '#dc2626', marginTop: 8}}>
+                       ⚠️ Re-edited by: {selectedOrder.payment_re_edited_by}
+                     </Text>
+                   )}
+                </View>
 
                 {selectedOrder.status !== 'DISBURSED' && selectedOrder.status !== 'DELIVERED' && !selectedOrder.delivery_boy_id && (
-                  <View style={{ flex: 1, marginLeft: 16 }}>
+                  <View style={{ marginTop: 16 }}>
                     <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Assign Delivery Boy:</Text>
                     <View style={styles.dropdownWrapper}>
                       <Picker
@@ -185,13 +397,17 @@ export default function OnlineOrdersScreen() {
                     {deliveryBoys.length === 0 && <Text style={{fontSize: 12, color: '#DC2626'}}>No approved delivery boys found</Text>}
                   </View>
                 )}
+              </ScrollView>
 
-                {selectedOrder.status !== 'DISBURSED' && selectedOrder.status !== 'DELIVERED' && (
-                  <TouchableOpacity style={styles.disburseBtn} onPress={() => handleDisburse(selectedOrder.id)}>
-                    <CheckCircle color="#fff" size={18} style={{marginRight: 6}} />
-                    <Text style={styles.disburseBtnText}>Mark Disbursed</Text>
-                  </TouchableOpacity>
-                )}
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setSelectedOrder(null)}>
+                  <Text style={styles.cancelBtnText}>Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.disburseBtn} onPress={handleSavePaymentUpdates}>
+                  <CheckCircle color="#fff" size={18} style={{marginRight: 6}} />
+                  <Text style={styles.disburseBtnText}>Save Updates</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>

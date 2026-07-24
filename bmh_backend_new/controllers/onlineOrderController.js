@@ -133,73 +133,79 @@ exports.updateOrderStatus = async (req, res) => {
                       updatedOrder.payment_mode === 'Split';
 
         if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivery_boy_id) {
-          let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
-          if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
-            targetEmployeeId = 'SA-' + targetEmployeeId;
-          }
-          
-          let cAmt = parseFloat(updatedOrder.cash_amount || 0);
-          let oAmt = parseFloat(updatedOrder.online_amount || 0);
-          const crAmt = parseFloat(updatedOrder.credit_amount || 0);
-
-          // Fallback for old system / unspecified split amounts
-          if (cAmt === 0 && oAmt === 0) {
-            const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
-            const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
-            if (mode === 'Online') {
-              oAmt = totalPaid;
-            } else if (mode === 'Split') {
-              cAmt = Math.floor(totalPaid / 2);
-              oAmt = totalPaid - cAmt;
-            } else {
-              cAmt = totalPaid;
+          const txCheck = await pool.query(
+            'SELECT id FROM wallet_transactions WHERE order_no = $1 OR (invoice_no = $2 AND invoice_no <> \'\')',
+            [(updatedOrder.order_id || updatedOrder.id || '').toString(), '']
+          );
+          if (txCheck.rowCount === 0) {
+            let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
+            if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
+              targetEmployeeId = 'SA-' + targetEmployeeId;
             }
-          }
+            
+            let cAmt = parseFloat(updatedOrder.cash_amount || 0);
+            let oAmt = parseFloat(updatedOrder.online_amount || 0);
+            const crAmt = parseFloat(updatedOrder.credit_amount || 0);
 
-          // Create or update employee wallet first
-          const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
-          if (wCheck.rowCount === 0) {
-            await pool.query(
-              'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, 0, 0, 0)',
-              [targetEmployeeId]
-            );
-          }
-
-          if (cAmt > 0 || oAmt > 0) {
-            const txType = pod_payment_mode === 'Split' ? 'split_collection' : (pod_payment_mode === 'Online' ? 'online_collection' : 'cash_collection');
-            const txMode = pod_payment_mode || 'Cash';
-            const totalPaid = cAmt + oAmt;
-
-            await pool.query(
-              `INSERT INTO wallet_transactions (
-                employee_id, type, amount, note, status, payment_mode, payment_txn_id,
-                order_no, invoice_no, customer_name, customer_phone, delivery_method, 
-                cash_amount, online_amount, credit_amount
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING`, 
-              [
-                targetEmployeeId, 
-                txType, 
-                totalPaid, 
-                `Order ${updatedOrder.order_id || updatedOrder.id} Delivered (${txMode})`, 
-                'completed', 
-                txMode,
-                payment_txn_id || null,
-                updatedOrder.order_id || updatedOrder.id,
-                '',
-                updatedOrder.patient_name || '',
-                updatedOrder.patient_mobile || '',
-                updatedOrder.delivery_type || '',
-                cAmt,
-                oAmt,
-                crAmt
-              ]
-            );
-
-            if (cAmt > 0) {
-              await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [cAmt, targetEmployeeId]);
+            // Fallback for old system / unspecified split amounts
+            if (cAmt === 0 && oAmt === 0) {
+              const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
+              const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
+              if (mode === 'Online') {
+                oAmt = totalPaid;
+              } else if (mode === 'Split') {
+                cAmt = Math.floor(totalPaid / 2);
+                oAmt = totalPaid - cAmt;
+              } else {
+                cAmt = totalPaid;
+              }
             }
-            if (oAmt > 0) {
-              await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [oAmt, targetEmployeeId]);
+
+            // Create or update employee wallet first
+            const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
+            if (wCheck.rowCount === 0) {
+              await pool.query(
+                'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, 0, 0, 0)',
+                [targetEmployeeId]
+              );
+            }
+
+            if (cAmt > 0 || oAmt > 0) {
+              const txType = (updatedOrder.pod_payment_mode === 'Split') ? 'split_collection' : ((updatedOrder.pod_payment_mode === 'Online') ? 'online_collection' : 'cash_collection');
+              const txMode = updatedOrder.pod_payment_mode || 'Cash';
+              const totalPaid = cAmt + oAmt;
+
+              await pool.query(
+                `INSERT INTO wallet_transactions (
+                  employee_id, type, amount, note, status, payment_mode, payment_txn_id,
+                  order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+                  cash_amount, online_amount, credit_amount
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING`, 
+                [
+                  targetEmployeeId, 
+                  txType, 
+                  totalPaid, 
+                  `Order ${updatedOrder.order_id || updatedOrder.id} Delivered (${txMode})`, 
+                  'completed', 
+                  txMode,
+                  updatedOrder.payment_txn_id || null,
+                  updatedOrder.order_id || updatedOrder.id,
+                  '',
+                  updatedOrder.patient_name || '',
+                  updatedOrder.patient_mobile || '',
+                  updatedOrder.delivery_type || '',
+                  cAmt,
+                  oAmt,
+                  crAmt
+                ]
+              );
+
+              if (cAmt > 0) {
+                await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [cAmt, targetEmployeeId]);
+              }
+              if (oAmt > 0) {
+                await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [oAmt, targetEmployeeId]);
+              }
             }
           }
         }
@@ -290,13 +296,21 @@ exports.assignDelivery = async (req, res) => {
 exports.updateOrderDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const { address, new_note, note_author, modified_by_id, modified_by_type, modified_by_name } = req.body;
+        const { 
+            address, new_note, note_author, 
+            modified_by_id, modified_by_type, modified_by_name,
+            payment_mode, pod_payment_mode, payment_txn_id,
+            cash_amount, online_amount, credit_amount, paid_amount,
+            status
+        } = req.body;
 
-        // Fetch current notes to append
-        const currentRes = await pool.query('SELECT notes FROM online_orders WHERE id = $1', [id]);
+        // Fetch current order to check previous status and notes
+        const currentRes = await pool.query('SELECT status, notes, delivery_boy_id, delivery_assigned_user_type FROM online_orders WHERE id = $1', [id]);
         if (currentRes.rowCount === 0) {
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
+
+        const wasDelivered = currentRes.rows[0].status === 'DELIVERED' || currentRes.rows[0].status === 'Delivered';
 
         let updatedNotes = currentRes.rows[0].notes || '[]';
         if (new_note) {
@@ -322,8 +336,18 @@ exports.updateOrderDetails = async (req, res) => {
                 modified_by_id = $3,
                 modified_by_type = $4,
                 modified_by_name = $5,
+                payment_mode = COALESCE($6, payment_mode),
+                pod_payment_mode = COALESCE($7, pod_payment_mode),
+                payment_txn_id = COALESCE($8, payment_txn_id),
+                cash_amount = COALESCE($9, cash_amount),
+                online_amount = COALESCE($10, online_amount),
+                credit_amount = COALESCE($11, credit_amount),
+                paid_amount = COALESCE($12, paid_amount),
+                status = COALESCE($13, status),
+                delivered_at = CASE WHEN COALESCE($13, status) = 'DELIVERED' OR COALESCE($13, status) = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+                payment_re_edited_by = CASE WHEN $15 = TRUE THEN COALESCE($5, payment_re_edited_by) ELSE payment_re_edited_by END,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $6
+            WHERE id = $14
             RETURNING *;
         `;
         const { rows } = await pool.query(queryText, [
@@ -331,10 +355,115 @@ exports.updateOrderDetails = async (req, res) => {
             JSON.stringify(updatedNotes), 
             modified_by_id || null, 
             modified_by_type || null, 
-            modified_by_name || null, 
-            id
+            modified_by_name || null,
+            payment_mode || null,
+            pod_payment_mode || null,
+            payment_txn_id || null,
+            cash_amount !== undefined ? parseFloat(cash_amount) : null,
+            online_amount !== undefined ? parseFloat(online_amount) : null,
+            credit_amount !== undefined ? parseFloat(credit_amount) : null,
+            paid_amount !== undefined ? parseFloat(paid_amount) : null,
+            status || null,
+            id,
+            wasDelivered
         ]);
-        res.status(200).json({ success: true, message: 'Order details updated', order: rows[0] });
+        
+        const updatedOrder = rows[0];
+
+        // Wallet update logic for POD orders when transitioning to Delivered (only if NOT previously delivered)
+        const isPOD = updatedOrder.payment_mode === 'POD' || 
+                      updatedOrder.payment_mode === 'COD' || 
+                      updatedOrder.payment_mode === 'Cash' || 
+                      updatedOrder.payment_mode === 'Online' || 
+                      updatedOrder.payment_mode === 'Split';
+
+        const isDelivered = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered';
+
+        if (isDelivered && !wasDelivered && isPOD) {
+          // Identify updater ID for wallet collections
+          let updaterId = modified_by_id || updatedOrder.delivery_boy_id;
+          if (updaterId) {
+            let targetEmployeeId = updaterId.toString();
+            if (modified_by_type === 'Admin' || modified_by_type === 'Sub Admin' || updatedOrder.delivery_assigned_user_type === 'sub_admin') {
+              if (!targetEmployeeId.startsWith('SA-')) {
+                targetEmployeeId = 'SA-' + targetEmployeeId;
+              }
+            }
+
+            // Check duplicate transaction in wallet_transactions
+            const txCheck = await pool.query(
+              'SELECT id FROM wallet_transactions WHERE order_no = $1 OR (invoice_no = $2 AND invoice_no <> \'\')',
+              [(updatedOrder.order_id || updatedOrder.id || '').toString(), '']
+            );
+
+            if (txCheck.rowCount === 0) {
+              let cAmt = parseFloat(updatedOrder.cash_amount || 0);
+              let oAmt = parseFloat(updatedOrder.online_amount || 0);
+              const crAmt = parseFloat(updatedOrder.credit_amount || 0);
+
+              if (cAmt === 0 && oAmt === 0) {
+                const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
+                const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
+                if (mode === 'Online') {
+                  oAmt = totalPaid;
+                } else if (mode === 'Split') {
+                  cAmt = Math.floor(totalPaid / 2);
+                  oAmt = totalPaid - cAmt;
+                } else {
+                  cAmt = totalPaid;
+                }
+              }
+
+              const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
+              if (wCheck.rowCount === 0) {
+                await pool.query(
+                  'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, 0, 0, 0)',
+                  [targetEmployeeId]
+                );
+              }
+
+              if (cAmt > 0 || oAmt > 0) {
+                const txType = (updatedOrder.pod_payment_mode === 'Split') ? 'split_collection' : ((updatedOrder.pod_payment_mode === 'Online') ? 'online_collection' : 'cash_collection');
+                const txMode = updatedOrder.pod_payment_mode || 'Cash';
+                const totalPaid = cAmt + oAmt;
+
+                await pool.query(
+                  `INSERT INTO wallet_transactions (
+                    employee_id, type, amount, note, status, payment_mode, payment_txn_id,
+                    order_no, invoice_no, customer_name, customer_phone, delivery_method, 
+                    cash_amount, online_amount, credit_amount
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING`, 
+                  [
+                    targetEmployeeId, 
+                    txType, 
+                    totalPaid, 
+                    `Order ${updatedOrder.order_id || updatedOrder.id} Delivered (${txMode})`, 
+                    'completed', 
+                    txMode,
+                    updatedOrder.payment_txn_id || null,
+                    updatedOrder.order_id || updatedOrder.id,
+                    '',
+                    updatedOrder.patient_name || '',
+                    updatedOrder.patient_mobile || '',
+                    updatedOrder.delivery_type || '',
+                    cAmt,
+                    oAmt,
+                    crAmt
+                  ]
+                );
+
+                if (cAmt > 0) {
+                  await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [cAmt, targetEmployeeId]);
+                }
+                if (oAmt > 0) {
+                  await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [oAmt, targetEmployeeId]);
+                }
+              }
+            }
+          }
+        }
+
+        res.status(200).json({ success: true, message: 'Order details updated', order: updatedOrder });
     } catch (err) {
         console.error("Update order details error:", err);
         res.status(500).json({ success: false, error: err.message });

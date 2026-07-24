@@ -268,6 +268,37 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
   const handleUpdateOrderDetails = async () => {
     try {
+      // Validation check for split
+      if (selectedOrder.payment_mode === 'POD' && selectedOrder.pod_payment_mode === 'Split') {
+        const cAmt = parseFloat(selectedOrder.cash_amount || 0);
+        const oAmt = parseFloat(selectedOrder.online_amount || 0);
+        const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+        if (Math.abs((cAmt + oAmt) - paidAmt) > 0.01) {
+          alert("Split Cash Portion + UPI Portion must equal Paid Amount!");
+          return;
+        }
+      }
+
+      let authName = 'Employee';
+      let modifiedById = null;
+      let modifiedByType = 'Employee';
+
+      if (typeof window !== 'undefined') {
+        const adminUser = localStorage.getItem('superAdminUser') || localStorage.getItem('subAdminUser');
+        const empUser = localStorage.getItem('employeeUser');
+        if (adminUser) {
+          const auth = JSON.parse(adminUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Admin';
+        } else if (empUser) {
+          const auth = JSON.parse(empUser);
+          authName = auth.full_name || authName;
+          modifiedById = auth.id;
+          modifiedByType = 'Employee';
+        }
+      }
+
       let finalCreatedAt = null;
       if (editCreatedAtDate) {
         finalCreatedAt = `${editCreatedAtDate}T${editCreatedAtTime || '00:00'}:00`;
@@ -281,7 +312,18 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
         bus_details: busDetails,
         order_no: selectedOrder.order_no,
         invoice_id: selectedOrder.invoice_id,
-        created_at: finalCreatedAt
+        created_at: finalCreatedAt,
+        payment_mode: selectedOrder.payment_mode,
+        pod_payment_mode: selectedOrder.pod_payment_mode,
+        payment_txn_id: selectedOrder.payment_txn_id,
+        cash_amount: selectedOrder.cash_amount,
+        online_amount: selectedOrder.online_amount,
+        credit_amount: selectedOrder.credit_amount,
+        paid_amount: selectedOrder.paid_amount,
+        status: selectedOrder.status,
+        modified_by_id: modifiedById,
+        modified_by_type: modifiedByType,
+        modified_by_name: authName
       });
       if (res.data.success) {
         alert('Order details updated successfully!');
@@ -1120,34 +1162,150 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                 </View>
 
                 <View style={styles.detailsGroup}>
-                  <Text style={styles.detailsTitle}>Financial Details</Text>
-                  <Text style={styles.detailsText}>Total Price: ₹{selectedOrder.total_price}</Text>
-                  <Text style={styles.detailsText}>Total Discount: {selectedOrder.total_discount}%</Text>
-                  <Text style={styles.detailsText}>Payment Status: {selectedOrder.payment_status}</Text>
-                  {selectedOrder.pod_payment_mode && (
-                    <Text style={[styles.detailsText, { fontWeight: '600', color: '#1e3a8a', marginTop: 4 }]}>
-                      POD Mode: {selectedOrder.pod_payment_mode}
-                    </Text>
-                  )}
-                  {selectedOrder.cash_amount !== undefined && selectedOrder.cash_amount !== null && (
-                    <Text style={styles.detailsText}>Cash Portion: ₹{selectedOrder.cash_amount}</Text>
-                  )}
-                  {selectedOrder.online_amount !== undefined && selectedOrder.online_amount !== null && (
-                    <Text style={styles.detailsText}>Online Portion: ₹{selectedOrder.online_amount}</Text>
-                  )}
-                  {selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null && (
-                    <Text style={[styles.detailsText, { fontWeight: 'bold', color: '#b45309' }]}>
-                      Credit Portion (Unpaid): ₹{selectedOrder.credit_amount}
-                    </Text>
-                  )}
-                  {parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0) > 0 && (
-                    <Text style={styles.detailsText}>
-                      Paid Amount: ₹{parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0)}
-                    </Text>
-                  )}
-                  {selectedOrder.payment_txn_id ? (
-                    <Text style={styles.detailsText}>Transaction ID: {selectedOrder.payment_txn_id}</Text>
-                  ) : null}
+                   <Text style={styles.detailsTitle}>Financial Details</Text>
+                   <Text style={styles.detailsText}>Total Price: ₹{selectedOrder.total_price}</Text>
+                   <Text style={styles.detailsText}>Total Discount: {selectedOrder.total_discount}%</Text>
+                   
+                   <Text style={[styles.label, {marginTop: 10}]}>Order Type</Text>
+                   <View style={[styles.dropdownWrapper, {height: 40}]}>
+                     <Picker
+                       selectedValue={selectedOrder.payment_mode === 'Prepaid' ? 'Prepaid' : 'POD'}
+                       onValueChange={(val) => {
+                         const isPrepaid = val === 'Prepaid';
+                         const totalAmt = parseFloat(selectedOrder.total_price || 0);
+                         setSelectedOrder({
+                           ...selectedOrder,
+                           payment_mode: val,
+                           paid_amount: isPrepaid ? totalAmt.toString() : (selectedOrder.paid_amount || '0'),
+                           credit_amount: isPrepaid ? 0 : Math.max(0, totalAmt - parseFloat(selectedOrder.paid_amount || 0)),
+                           pod_payment_mode: isPrepaid ? 'Online' : (selectedOrder.pod_payment_mode || 'Cash'),
+                           cash_amount: isPrepaid ? 0 : (selectedOrder.cash_amount || 0),
+                           online_amount: isPrepaid ? totalAmt : (selectedOrder.online_amount || 0)
+                         });
+                       }}
+                       style={[styles.picker, {height: 40}]}
+                     >
+                       <Picker.Item label="POD" value="POD" />
+                       <Picker.Item label="Prepaid" value="Prepaid" />
+                     </Picker>
+                   </View>
+
+                   {selectedOrder.payment_mode !== 'Prepaid' && (
+                     <>
+                       <Text style={[styles.label, {marginTop: 10}]}>Payment Type</Text>
+                       <View style={[styles.dropdownWrapper, {height: 40}]}>
+                         <Picker
+                           selectedValue={selectedOrder.pod_payment_mode || 'Cash'}
+                           onValueChange={(val) => {
+                             const paidAmt = parseFloat(selectedOrder.paid_amount || 0);
+                             let cPortion = 0;
+                             let oPortion = 0;
+                             if (val === 'Cash') {
+                               cPortion = paidAmt;
+                             } else if (val === 'Online') {
+                               oPortion = paidAmt;
+                             } else if (val === 'Split') {
+                               cPortion = Math.floor(paidAmt / 2);
+                               oPortion = paidAmt - cPortion;
+                             }
+                             setSelectedOrder({
+                               ...selectedOrder,
+                               pod_payment_mode: val,
+                               cash_amount: cPortion,
+                               online_amount: oPortion
+                             });
+                           }}
+                           style={[styles.picker, {height: 40}]}
+                         >
+                           <Picker.Item label="Cash" value="Cash" />
+                           <Picker.Item label="UPI" value="Online" />
+                           <Picker.Item label="Split" value="Split" />
+                         </Picker>
+                       </View>
+
+                       <Text style={[styles.label, {marginTop: 10}]}>Paid Amount (₹)</Text>
+                       <TextInput 
+                         style={[styles.input, {marginBottom:5}]} 
+                         placeholder="Paid Amount" 
+                         value={selectedOrder.paid_amount !== null && selectedOrder.paid_amount !== undefined ? selectedOrder.paid_amount.toString() : ''} 
+                         keyboardType="numeric"
+                         onChangeText={t => {
+                           const val = parseFloat(t || '0');
+                           const totalAmt = parseFloat(selectedOrder.total_price || 0);
+                           let cPortion = 0;
+                           let oPortion = 0;
+                           const currentMode = selectedOrder.pod_payment_mode || 'Cash';
+                           if (currentMode === 'Cash') {
+                             cPortion = val;
+                           } else if (currentMode === 'Online') {
+                             oPortion = val;
+                           } else if (currentMode === 'Split') {
+                             cPortion = Math.floor(val / 2);
+                             oPortion = val - cPortion;
+                           }
+                           setSelectedOrder({
+                             ...selectedOrder,
+                             paid_amount: t,
+                             cash_amount: cPortion,
+                             online_amount: oPortion,
+                             credit_amount: Math.max(0, totalAmt - val)
+                           });
+                         }} 
+                       />
+
+                       {selectedOrder.pod_payment_mode === 'Split' && (
+                         <View style={{marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                           <Text style={{fontWeight: '700', fontSize: 13, marginBottom: 5, color: '#334155'}}>Split Breakdown</Text>
+                           
+                           <Text style={{fontSize: 11, color: '#64748b', marginBottom: 2}}>Cash Portion (₹)</Text>
+                           <TextInput 
+                             style={[styles.input, {marginBottom:5, height: 35, paddingVertical: 5}]} 
+                             value={selectedOrder.cash_amount !== null && selectedOrder.cash_amount !== undefined ? selectedOrder.cash_amount.toString() : ''} 
+                             keyboardType="numeric"
+                             onChangeText={t => setSelectedOrder({...selectedOrder, cash_amount: t})} 
+                           />
+
+                           <Text style={{fontSize: 11, color: '#64748b', marginBottom: 2, marginTop: 4}}>UPI Portion (₹)</Text>
+                           <TextInput 
+                             style={[styles.input, {marginBottom:5, height: 35, paddingVertical: 5}]} 
+                             value={selectedOrder.online_amount !== null && selectedOrder.online_amount !== undefined ? selectedOrder.online_amount.toString() : ''} 
+                             keyboardType="numeric"
+                             onChangeText={t => setSelectedOrder({...selectedOrder, online_amount: t})} 
+                           />
+
+                           {Math.abs((parseFloat(selectedOrder.cash_amount || 0) + parseFloat(selectedOrder.online_amount || 0)) - parseFloat(selectedOrder.paid_amount || 0)) > 0.01 && (
+                             <Text style={{color: '#ef4444', fontSize: 11, marginTop: 4, fontWeight: '600'}}>
+                               ❌ Cash portion + UPI portion must equal Paid Amount!
+                             </Text>
+                           )}
+                         </View>
+                       )}
+                     </>
+                   )}
+
+                   {(selectedOrder.payment_mode === 'Prepaid' || selectedOrder.pod_payment_mode === 'Online' || selectedOrder.pod_payment_mode === 'Split') && (
+                     <>
+                       <Text style={[styles.label, {marginTop: 10}]}>Transaction ID (UPI/Online)</Text>
+                       <TextInput 
+                         style={[styles.input, {marginBottom:5}]} 
+                         placeholder="e.g. UTR / Ref No" 
+                         value={selectedOrder.payment_txn_id || ''} 
+                         onChangeText={t => setSelectedOrder({...selectedOrder, payment_txn_id: t})} 
+                       />
+                     </>
+                   )}
+
+                   {selectedOrder.payment_mode !== 'Prepaid' && (
+                     <Text style={{fontSize: 13, fontWeight: 'bold', color: '#b45309', marginTop: 8}}>
+                       Credit Portion (Unpaid): ₹{selectedOrder.credit_amount !== undefined && selectedOrder.credit_amount !== null ? parseFloat(selectedOrder.credit_amount).toFixed(2) : (parseFloat(selectedOrder.total_price || 0) - parseFloat(selectedOrder.paid_amount || 0)).toFixed(2)}
+                     </Text>
+                   )}
+
+                   {selectedOrder.payment_re_edited_by && (
+                     <Text style={{fontSize: 13, fontWeight: '700', color: '#dc2626', marginTop: 8}}>
+                       ⚠️ Re-edited by: {selectedOrder.payment_re_edited_by}
+                     </Text>
+                   )}
                 </View>
 
                 {/* Items */}

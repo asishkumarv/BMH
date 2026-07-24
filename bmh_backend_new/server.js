@@ -255,6 +255,22 @@ app.listen(PORT, () => {
   pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'POD'").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreen_sales_invoices ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'POD'").catch(e => console.error(e.message));
 
+  // paid, cash, online, credit split columns
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS cash_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS online_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS credit_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS pod_payment_mode VARCHAR(50) DEFAULT NULL").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS payment_txn_id VARCHAR(255) DEFAULT NULL").catch(e => console.error(e.message));
+
+  // payment_re_edited_by columns to track who re-edited delivered/paid orders
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS payment_re_edited_by VARCHAR(255)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS payment_re_edited_by VARCHAR(255)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS payment_re_edited_by VARCHAR(255)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS payment_re_edited_by VARCHAR(255)").catch(e => console.error(e.message));
+
   // ecogreensales_invoices modifications
   pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending'").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivered_by_id INTEGER").catch(e => console.error(e.message));

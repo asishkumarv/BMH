@@ -704,16 +704,21 @@ export default function DeliveryDashboard() {
       const onlineAmt = paymentMode === 'Online' ? paidAmt : (paymentMode === 'Split' ? parseFloat(onlinePortion || 0) : 0);
       const creditAmt = Math.max(0, totalAmt - paidAmt);
 
+      const isPrepaidOrPreUpdated = currentOrder.payment_mode === 'Prepaid' || !!currentOrder.pod_payment_mode;
+
       const payload = {
         status: (type === 'manual_order') ? 'Delivered' : 'DELIVERED',
-        delivery_otp: otp,
-        pod_payment_mode: paymentMode,
-        paid_amount: paidAmt,
-        cash_amount: cashAmt,
-        online_amount: onlineAmt,
-        credit_amount: creditAmt,
-        payment_txn_id: paymentMode !== 'Cash' ? paymentTxnId : null
+        delivery_otp: otp
       };
+
+      if (!isPrepaidOrPreUpdated) {
+        payload.pod_payment_mode = paymentMode;
+        payload.paid_amount = paidAmt;
+        payload.cash_amount = cashAmt;
+        payload.online_amount = onlineAmt;
+        payload.credit_amount = creditAmt;
+        payload.payment_txn_id = paymentMode !== 'Cash' ? paymentTxnId : null;
+      }
 
       if (type === 'online_order') {
         await axios.put(`https://napi.bharatmedicalhallplus.com/online-orders/${orderId}/status`, payload);
@@ -1383,7 +1388,7 @@ export default function DeliveryDashboard() {
                 placeholder="0000"
               />
 
-              {currentOrder.payment_mode !== 'Prepaid' && (currentOrder.type === 'manual_order' || currentOrder.type === 'online_order' || currentOrder.type === 'sales_order') && (
+              {currentOrder.payment_mode !== 'Prepaid' && !currentOrder.pod_payment_mode && (currentOrder.type === 'manual_order' || currentOrder.type === 'online_order' || currentOrder.type === 'sales_order') && (
                 <>
                   <Text style={[styles.label, { marginTop: 20 }]}>Payment Mode</Text>
                   <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
