@@ -164,25 +164,25 @@ exports.getAssignedOrders = async (req, res) => {
     
     // Fetch from online_orders
     const onlineOrdersRes = await pool.query(
-      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, 'Local' as delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link 
+      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, 'Local' as delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode 
        FROM online_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 
     // Fetch from ecogreensales_orders
     const ecogreenSalesOrdersRes = await pool.query(
-      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link
+      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode
        FROM ecogreensales_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 
     // Fetch from ecogreensales_invoices
     const ecogreenSalesInvoicesRes = await pool.query(
-      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link
+      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode
        FROM ecogreensales_invoices WHERE delivered_by_id = $1 ORDER BY created_at DESC`, [id]
     );
 
     // Fetch from manual_orders
     const manualOrdersRes = await pool.query(
-      `SELECT id, 'manual_order' as type, status, amount as total_amount, COALESCE(ship_to_name, customer_name) as patient_name, COALESCE(ship_to_phone, customer_phone) as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, location_link, created_at, mode_of_delivery as delivery_type, json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', COALESCE(est_reach_time::text, scheduled_time::text), 'bus_date', bus_date, 'waybill_number', bus_travels_name) as bus_details, delivery_otp, payment_mode, is_scheduled, scheduled_date, scheduled_time, notes, ship_to_name, ship_to_phone, order_no, invoice_no
+      `SELECT id, 'manual_order' as type, status, amount as total_amount, COALESCE(ship_to_name, customer_name) as patient_name, COALESCE(ship_to_phone, customer_phone) as mobile_no, address, NULL::numeric as map_lat, NULL::numeric as map_lng, location_link, created_at, mode_of_delivery as delivery_type, json_build_object('bus_number', bus_number, 'driver_name', bus_driver_name, 'driver_number', bus_driver_number, 'arrival_time', COALESCE(est_reach_time::text, scheduled_time::text), 'bus_date', bus_date, 'waybill_number', bus_travels_name) as bus_details, delivery_otp, payment_mode, pod_payment_mode, is_scheduled, scheduled_date, scheduled_time, notes, ship_to_name, ship_to_phone, order_no, invoice_no
        FROM manual_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 

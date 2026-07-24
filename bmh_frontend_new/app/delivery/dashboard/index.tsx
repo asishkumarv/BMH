@@ -97,7 +97,7 @@ export default function DeliveryDashboard() {
   const [cashPortion, setCashPortion] = useState('');
   const [onlinePortion, setOnlinePortion] = useState('');
   const [paymentImage, setPaymentImage] = useState<any>(null);
-  const [currentOrder, setCurrentOrder] = useState({ id: '', type: '', amount: '', payment_mode: '' });
+  const [currentOrder, setCurrentOrder] = useState<any>({ id: '', type: '', amount: '', payment_mode: '', pod_payment_mode: '' });
   const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
 
   // Update Modal State
@@ -522,9 +522,9 @@ export default function DeliveryDashboard() {
     );
   };
 
-  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string, amount: string = '', paymentMode: string = '') => {
+  const handleMarkDelivered = async (orderId: string | number, type: string, deliveryType: string, amount: string = '', paymentMode: string = '', podPaymentMode: string = '') => {
     if ((type === 'online_order' || type === 'sales_order' || type === 'manual_order') && (deliveryType === 'Local' || deliveryType === 'Schedule Delivery')) {
-      setCurrentOrder({ id: String(orderId), type, amount: String(amount), payment_mode: paymentMode });
+      setCurrentOrder({ id: String(orderId), type, amount: String(amount), payment_mode: paymentMode, pod_payment_mode: podPaymentMode });
       setDeliveryOtp('');
       setPaymentMode('Cash');
       setPaidAmount(String(amount));
@@ -698,15 +698,15 @@ export default function DeliveryDashboard() {
 
   const processDelivery = async (orderId: string | number, type: string, otp?: string) => {
     try {
-      const totalAmt = parseFloat(currentOrder.amount || 0);
-      const paidAmt = parseFloat(paidAmount || 0);
-      const cashAmt = paymentMode === 'Cash' ? paidAmt : (paymentMode === 'Split' ? parseFloat(cashPortion || 0) : 0);
-      const onlineAmt = paymentMode === 'Online' ? paidAmt : (paymentMode === 'Split' ? parseFloat(onlinePortion || 0) : 0);
+      const totalAmt = parseFloat(currentOrder.amount || '0');
+      const paidAmt = parseFloat(paidAmount || '0');
+      const cashAmt = paymentMode === 'Cash' ? paidAmt : (paymentMode === 'Split' ? parseFloat(cashPortion || '0') : 0);
+      const onlineAmt = paymentMode === 'Online' ? paidAmt : (paymentMode === 'Split' ? parseFloat(onlinePortion || '0') : 0);
       const creditAmt = Math.max(0, totalAmt - paidAmt);
 
       const isPrepaidOrPreUpdated = currentOrder.payment_mode === 'Prepaid' || !!currentOrder.pod_payment_mode;
 
-      const payload = {
+      const payload: any = {
         status: (type === 'manual_order') ? 'Delivered' : 'DELIVERED',
         delivery_otp: otp
       };
@@ -1115,7 +1115,7 @@ export default function DeliveryDashboard() {
           item.status?.toLowerCase() === 'out for delivery') && (
             <TouchableOpacity
               style={[styles.footerBtn, { backgroundColor: '#10B981' }]}
-              onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode)}
+              onPress={() => handleMarkDelivered(item.id, item.type, item.delivery_type, item.total_amount, item.payment_mode, item.pod_payment_mode)}
             >
               <CheckCircle color="#fff" size={16} style={{ marginRight: 6 }} />
               <Text style={[styles.footerBtnText, { color: '#fff' }]}>Delivered</Text>
