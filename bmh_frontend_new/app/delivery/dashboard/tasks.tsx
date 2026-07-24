@@ -118,9 +118,9 @@ export default function EmployeeTasksScreen() {
       setDueDate('');
       setPriority('Moderate');
       Alert.alert('Success', 'Task assigned successfully');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to assign task');
+      Alert.alert('Error', e.response?.data?.message || 'Failed to assign task');
     }
   };
 
@@ -179,9 +179,9 @@ export default function EmployeeTasksScreen() {
       });
       fetchInitData();
       Alert.alert('Success', 'Task accepted successfully');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to accept task');
+      Alert.alert('Error', e.response?.data?.message || 'Failed to accept task');
     }
   };
 
@@ -199,9 +199,9 @@ export default function EmployeeTasksScreen() {
       setDirectRejectTask(null);
       fetchInitData();
       Alert.alert('Success', 'Task rejected successfully');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to reject task');
+      Alert.alert('Error', e.response?.data?.message || 'Failed to reject task');
     }
   };
 
@@ -217,9 +217,9 @@ export default function EmployeeTasksScreen() {
       setShowStatusModal(false);
       fetchInitData();
       Alert.alert('Success', `Task marked as ${newStatus}`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to update task status');
+      Alert.alert('Error', e.response?.data?.message || 'Failed to update task status');
     }
   };
 
@@ -232,15 +232,17 @@ export default function EmployeeTasksScreen() {
       await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/reassign`, {
         assignee_type: newType,
         assignee_id: parseInt(assigneeId),
-        department: newDept
+        department: newDept,
+        assigner_id: empUser.id,
+        assigner_type: 'employee'
       });
       setShowReassignModal(false);
       setAssigneeId('');
       fetchInitData();
       Alert.alert('Success', 'Task reassigned successfully');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'Failed to reassign task');
+      Alert.alert('Error', e.response?.data?.message || 'Failed to reassign task');
     }
   };
 

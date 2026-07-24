@@ -1,8 +1,9 @@
 const cron = require('node-cron');
 const pool = require('../db');
+const { sendExpoPushNotification, notifyAssignee } = require('../utils/pushNotification');
 
-// Run everyday at 12:01 AM
-cron.schedule('1 0 * * *', async () => {
+// Run everyday at 7:00 AM IST (1:30 AM UTC)
+cron.schedule('30 1 * * *', async () => {
     console.log('Running daily recurring task scheduler...');
     try {
         const today = new Date();
@@ -91,6 +92,7 @@ function calculateDueDate(today, rTask) {
                             title, description, department, assigner_type, assigner_id, 
                             assignee_type, assignee_id, priority, due_date, status, is_recurring
                         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', true)
+                        RETURNING id
                     `;
                     const values = [
                         rTask.title,
@@ -104,16 +106,57 @@ function calculateDueDate(today, rTask) {
                         dueAt.toISOString()
                     ];
                     
-                    await pool.query(insertTask, values);
+                    const insertRes = await pool.query(insertTask, values);
+                    const generatedTaskId = insertRes.rows[0].id;
+
+                    // Send push notification to assignee
+                    await notifyAssignee(rTask.assignee_type, rTask.assignee_id, rTask.title, rTask.assigner_type, rTask.assigner_id, generatedTaskId);
 
                     // Update last generated timestamp
                     await pool.query(`UPDATE recurring_tasks SET last_generated_at = CURRENT_TIMESTAMP WHERE id = $1`, [rTask.id]);
-                    console.log(`Generated recurring task ID ${rTask.id} for employee ID ${rTask.assignee_id}`);
+                    console.log(`Generated recurring task ID ${rTask.id} and sent push notification to employee ID ${rTask.assignee_id}`);
                 }
             }
         }
     } catch (error) {
         console.error('Error running recurring task scheduler:', error);
+    }
+});
+
+// Run every minute to check for tasks due in 30 minutes (Hard Alarm)
+cron.schedule('* * * * *', async () => {
+    try {
+        // Query tasks that are active (not completed/rejected/terminated),
+        // have a due date, the due date is within the next 30 minutes,
+        // and the reminder hasn't been sent.
+        const result = await pool.query(`
+            SELECT t.*, 
+              (CASE 
+                WHEN t.assignee_type = 'department_admin' THEN (SELECT push_token FROM department_admins WHERE id = t.assignee_id)
+                WHEN t.assignee_type = 'employee' THEN (SELECT push_token FROM employees WHERE id = t.assignee_id)
+              END) as push_token
+            FROM tasks t
+            WHERE t.status NOT IN ('completed', 'rejected', 'terminated')
+              AND t.due_date IS NOT NULL
+              AND t.due_date <= CURRENT_TIMESTAMP + INTERVAL '30 minutes'
+              AND t.due_reminder_sent = false
+        `);
+
+        for (const task of result.rows) {
+            if (task.push_token) {
+                const title = '🚨 HARD ALARM: Task Due Soon!';
+                const dueTimeStr = new Date(task.due_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const body = `Your task "${task.title}" is due in less than 30 minutes (at ${dueTimeStr})!`;
+                await sendExpoPushNotification(task.push_token, title, body, {
+                    type: 'task_due_reminder',
+                    taskId: task.id
+                });
+            }
+            // Mark as sent
+            await pool.query('UPDATE tasks SET due_reminder_sent = true WHERE id = $1', [task.id]);
+        }
+    } catch (error) {
+        console.error('Error running task due reminder cron:', error);
     }
 });
 

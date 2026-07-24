@@ -1,4 +1,29 @@
 const pool = require('../db');
+const { sendExpoPushNotification, notifyAssignee } = require('../utils/pushNotification');
+
+// Helper to check today's check-in status
+const checkCheckedIn = async (employeeId, userType) => {
+  if (!employeeId || !userType) return true;
+  if (userType === 'super_admin' || userType === 'superadmin') return true;
+
+  const targetType = (userType === 'department_admin' || userType === 'sub_admin') ? 'department_admin' : 'employee';
+
+  const result = await pool.query(
+    `SELECT status FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,
+    [employeeId, targetType]
+  );
+
+  if (result.rowCount === 0) {
+    return false;
+  }
+
+  const status = result.rows[0].status;
+  if (status === 'Absent') {
+    return false;
+  }
+
+  return true;
+};
 
 // Helper to create a notification
 const createNotification = async (userType, userId, message) => {
@@ -17,6 +42,12 @@ const createNotification = async (userType, userId, message) => {
 exports.createTask = async (req, res) => {
   try {
     const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees } = req.body;
+
+    // Check attendance for assigner (if employee or department admin)
+    const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
+    if (!isCheckedIn) {
+      return res.status(403).json({ success: false, message: 'You must check-in first to assign tasks!' });
+    }
 
     const result = await pool.query(
       `INSERT INTO tasks 
@@ -39,13 +70,15 @@ exports.createTask = async (req, res) => {
 
     const task = result.rows[0];
 
-    // Create notifications
+    // Create notifications and send push alerts
     if (is_group_task && Array.isArray(group_assignees)) {
       for (const item of group_assignees) {
         await createNotification(item.assignee_type, item.assignee_id, `You have been assigned a new group task: "${title}" by a ${assigner_type.replace('_', ' ')}.`);
+        await notifyAssignee(item.assignee_type, item.assignee_id, title, assigner_type, assigner_id, task.id);
       }
     } else {
       await createNotification(assignee_type, assignee_id, `You have been assigned a new task: "${title}" by a ${assigner_type.replace('_', ' ')}.`);
+      await notifyAssignee(assignee_type, assignee_id, title, assigner_type, assigner_id, task.id);
     }
 
     res.status(201).json({ success: true, data: task });
@@ -63,6 +96,7 @@ exports.getTasks = async (req, res) => {
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_group_task BOOLEAN DEFAULT false`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS group_assignees JSONB DEFAULT '[]'`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT false`);
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_reminder_sent BOOLEAN DEFAULT false`);
 
     const { user_type, user_id, department } = req.query;
 
@@ -124,6 +158,12 @@ exports.updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, rejection_reason, notes, updater_type, updater_id } = req.body;
+
+    // Check attendance for updater (if employee or department admin)
+    const isCheckedIn = await checkCheckedIn(updater_id, updater_type);
+    if (!isCheckedIn) {
+      return res.status(403).json({ success: false, message: 'You must check-in first to accept or update tasks!' });
+    }
 
     // Fetch existing task to know who to notify
     const existingTaskResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
@@ -240,10 +280,16 @@ exports.updateTaskStatus = async (req, res) => {
 exports.reassignTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { assignee_type, assignee_id, department } = req.body;
+    const { assignee_type, assignee_id, department, assigner_id, assigner_type } = req.body;
 
     if (!assignee_id || !assignee_type) {
       return res.status(400).json({ success: false, message: 'assignee_id and assignee_type are required' });
+    }
+
+    // Check attendance for assigner (if employee or department admin)
+    const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
+    if (!isCheckedIn) {
+      return res.status(403).json({ success: false, message: 'You must check-in first to assign tasks!' });
     }
 
     const existingResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
@@ -268,6 +314,9 @@ exports.reassignTask = async (req, res) => {
       assignee_id,
       `You have been assigned a task: "${task.title}" by a ${task.assigner_type.replace('_', ' ')}.`
     );
+
+    // Send push notification to new assignee
+    await notifyAssignee(assignee_type, assignee_id, task.title, assigner_type || task.assigner_type, assigner_id || task.assigner_id, task.id);
 
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -308,6 +357,12 @@ exports.createRecurringTask = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
+    // Check attendance for assigner (if employee or department admin)
+    const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
+    if (!isCheckedIn) {
+      return res.status(403).json({ success: false, message: 'You must check-in first to assign tasks!' });
+    }
+
     const query = 'INSERT INTO recurring_tasks (title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days, due_time_type, due_time_hours, due_time_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *';
     const values = [
       title, description, department, assigner_type, assigner_id,
@@ -319,6 +374,9 @@ exports.createRecurringTask = async (req, res) => {
     ];
     const result = await pool.query(query, values);
     const rTask = result.rows[0];
+
+    // Send push notification to assignee
+    await notifyAssignee(assignee_type, assignee_id, title, assigner_type, assigner_id, rTask.id);
     
     // Trigger immediate generation if due today
     try {
