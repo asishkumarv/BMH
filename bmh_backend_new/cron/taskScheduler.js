@@ -145,7 +145,12 @@ cron.schedule('* * * * *', async () => {
         for (const task of result.rows) {
             if (task.push_token) {
                 const title = '🚨 HARD ALARM: Task Due Soon!';
-                const dueTimeStr = new Date(task.due_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dueTimeStr = new Date(task.due_date).toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
                 const body = `Your task "${task.title}" is due in less than 30 minutes (at ${dueTimeStr})!`;
                 await sendExpoPushNotification(task.push_token, title, body, {
                     type: 'task_due_reminder',
