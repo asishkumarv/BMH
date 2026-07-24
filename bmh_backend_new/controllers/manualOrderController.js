@@ -538,38 +538,91 @@ exports.updateOrder = async (req, res) => {
                   updatedOrder.payment_mode === 'Online' || 
                   updatedOrder.payment_mode === 'Split';
 
-    if (updatedOrder.status === 'Delivered' && !wasDelivered && isPOD && updatedOrder.delivery_boy_id) {
-      // Duplicate wallet transaction check
+    if (updatedOrder.status === 'Delivered' && isPOD && updatedOrder.delivery_boy_id) {
+      let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
+      if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
+        targetEmployeeId = 'SA-' + targetEmployeeId;
+      }
+      
+      let cAmt = parseFloat(updatedOrder.cash_amount || 0);
+      let oAmt = parseFloat(updatedOrder.online_amount || 0);
+      const crAmt = parseFloat(updatedOrder.credit_amount || 0);
+
+      // Fallback for old system / unspecified split amounts
+      const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
+      if (cAmt === 0 && oAmt === 0) {
+        const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
+        if (mode === 'Online') {
+          oAmt = totalPaid;
+        } else if (mode === 'Split') {
+          cAmt = Math.floor(totalPaid / 2);
+          oAmt = totalPaid - cAmt;
+        } else {
+          cAmt = totalPaid;
+        }
+      }
+
+      // Check if a transaction already exists for this order
       const txCheck = await pool.query(
-        'SELECT id FROM wallet_transactions WHERE order_no = $1 OR (invoice_no = $2 AND invoice_no <> \'\')',
+        'SELECT * FROM wallet_transactions WHERE order_no = $1 OR (invoice_no = $2 AND invoice_no <> \'\')',
         [(updatedOrder.order_no || updatedOrder.id || '').toString(), (updatedOrder.invoice_no || '').toString()]
       );
 
-      if (txCheck.rowCount === 0) {
-        let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
-        if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
-          targetEmployeeId = 'SA-' + targetEmployeeId;
-        }
-        
-        let cAmt = parseFloat(updatedOrder.cash_amount || 0);
-        let oAmt = parseFloat(updatedOrder.online_amount || 0);
-        const crAmt = parseFloat(updatedOrder.credit_amount || 0);
+      const txType = mode === 'Split' ? 'split_collection' : (mode === 'Online' ? 'online_collection' : 'cash_collection');
+      const txMode = mode;
+      const totalPaid = cAmt + oAmt;
 
-        // Fallback for old system / unspecified split amounts
-        if (cAmt === 0 && oAmt === 0) {
-          const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
-          const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
-          if (mode === 'Online') {
-            oAmt = totalPaid;
-          } else if (mode === 'Split') {
-            cAmt = Math.floor(totalPaid / 2);
-            oAmt = totalPaid - cAmt;
-          } else {
-            cAmt = totalPaid;
-          }
+      if (txCheck.rowCount > 0) {
+        const existingTx = txCheck.rows[0];
+        const oldCash = parseFloat(existingTx.cash_amount || 0);
+        const oldOnline = parseFloat(existingTx.online_amount || 0);
+        const oldEmpId = existingTx.employee_id;
+
+        // Update the existing transaction
+        await pool.query(
+          `UPDATE wallet_transactions 
+           SET employee_id = $1, type = $2, amount = $3, 
+               note = $4, payment_mode = $5, payment_txn_id = $6,
+               cash_amount = $7, online_amount = $8, credit_amount = $9
+           WHERE id = $10`,
+          [
+            targetEmployeeId,
+            txType,
+            totalPaid,
+            `Order ${updatedOrder.order_no || updatedOrder.id} Delivered (${txMode}) (Updated)`,
+            txMode,
+            payment_txn_id || null,
+            cAmt,
+            oAmt,
+            crAmt,
+            existingTx.id
+          ]
+        );
+
+        // Deduct old values from the previous employee's wallet
+        if (oldCash > 0) {
+          await pool.query('UPDATE employee_wallets SET cash_in_hand = GREATEST(0, cash_in_hand - $1) WHERE employee_id = $2', [oldCash, oldEmpId]);
+        }
+        if (oldOnline > 0) {
+          await pool.query('UPDATE employee_wallets SET online_collected = GREATEST(0, online_collected - $1) WHERE employee_id = $2', [oldOnline, oldEmpId]);
         }
 
-        // Create or update employee wallet first
+        // Credit new values to the current employee's wallet
+        const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
+        if (wCheck.rowCount === 0) {
+          await pool.query(
+            'INSERT INTO employee_wallets (employee_id, cash_in_hand, online_collected, balance) VALUES ($1, 0, 0, 0)',
+            [targetEmployeeId]
+          );
+        }
+        if (cAmt > 0) {
+          await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [cAmt, targetEmployeeId]);
+        }
+        if (oAmt > 0) {
+          await pool.query('UPDATE employee_wallets SET online_collected = online_collected + $1 WHERE employee_id = $2', [oAmt, targetEmployeeId]);
+        }
+      } else {
+        // Create new wallet if not exists
         const wCheck = await pool.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [targetEmployeeId]);
         if (wCheck.rowCount === 0) {
           await pool.query(
@@ -579,10 +632,6 @@ exports.updateOrder = async (req, res) => {
         }
 
         if (cAmt > 0 || oAmt > 0) {
-          const txType = pod_payment_mode === 'Split' ? 'split_collection' : (pod_payment_mode === 'Online' ? 'online_collection' : 'cash_collection');
-          const txMode = pod_payment_mode || 'Cash';
-          const totalPaid = cAmt + oAmt;
-
           await pool.query(
             `INSERT INTO wallet_transactions (
               employee_id, type, amount, note, status, payment_mode, payment_txn_id,
