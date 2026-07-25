@@ -165,7 +165,7 @@ export default function DepartmentTasksScreen() {
           finalDept = dept;
         }
         return {
-          assignee_id: parseInt(id),
+          assignee_id: id.startsWith('SA-') ? parseInt(id.replace('SA-', '')) : parseInt(id),
           assignee_type: u ? u.type : assigneeType,
           assignee_name: name,
           department: dept,
@@ -184,7 +184,7 @@ export default function DepartmentTasksScreen() {
         }
         const res = await axios.post('https://napi.bharatmedicalhallplus.com/tasks/recurring', {
           title, description, assigner_type: 'department_admin', assigner_id: adminUser.id || 1,
-          assignee_type: finalAssigneeType, assignee_id: parseInt(finalAssigneeId), department: finalDept,
+          assignee_type: finalAssigneeType, assignee_id: finalAssigneeId.startsWith('SA-') ? parseInt(finalAssigneeId.replace('SA-', '')) : parseInt(finalAssigneeId), department: finalDept,
           priority, frequency, specific_days: parsedDays,
           due_time_type: dueTimeType,
           due_time_hours: parseInt(dueTimeHours) || 0,
@@ -358,7 +358,7 @@ export default function DepartmentTasksScreen() {
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/reassign`, {
         assignee_type: newType,
-        assignee_id: parseInt(assigneeId),
+        assignee_id: assigneeId.startsWith('SA-') ? parseInt(assigneeId.replace('SA-', '')) : parseInt(assigneeId),
         department: newDept,
         assigner_id: adminUser.id,
         assigner_type: 'department_admin'
@@ -522,7 +522,10 @@ export default function DepartmentTasksScreen() {
                 if (m.status === 'completed') statusColor = '#10b981';
                 if (m.status === 'rejected') statusColor = '#ef4444';
 
-                const foundUser = globalUsers.find(u => String(u.id) === String(m.assignee_id));
+                const foundUser = globalUsers.find(u => {
+                  const targetId = m.assignee_type === 'department_admin' ? `SA-${m.assignee_id}` : String(m.assignee_id);
+                  return String(u.id) === targetId;
+                });
                 const dept = m.department || foundUser?.department || '';
                 const role = m.role || foundUser?.role || '';
                 const label = dept || role ? ` (${dept}${dept && role ? ' - ' : ''}${role})` : ` (${m.assignee_type.replace('_', ' ')})`;
@@ -538,7 +541,10 @@ export default function DepartmentTasksScreen() {
           </View>
         ) : (
           (() => {
-            const foundUser = globalUsers.find(u => String(u.id) === String(task.assignee_id));
+            const foundUser = globalUsers.find(u => {
+              const targetId = task.assignee_type === 'department_admin' ? `SA-${task.assignee_id}` : String(task.assignee_id);
+              return String(u.id) === targetId;
+            });
             const role = foundUser?.role || task.assignee_type.replace('_', ' ');
             const dept = task.department || foundUser?.department || 'N/A';
             return (
@@ -1005,9 +1011,13 @@ export default function DepartmentTasksScreen() {
 
                 <Text style={styles.label}>Assignee Type</Text>
                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                  {['employee', 'self'].map(type => (
-                    <Pressable key={type} style={[styles.radioBtn, assigneeType === type && styles.radioActive]} onPress={() => { setAssigneeType(type); setAssigneeId(''); setGroupAssigneeIds([]); }}>
-                      <Text style={{ color: assigneeType === type ? '#FFF' : Colors.light.text }}>{type.replace('_', ' ')}</Text>
+                  {[
+                    { value: 'employee', label: 'Employee' },
+                    { value: 'department_admin', label: 'Co-Admin' },
+                    { value: 'self', label: 'Self' }
+                  ].map(opt => (
+                    <Pressable key={opt.value} style={[styles.radioBtn, assigneeType === opt.value && styles.radioActive]} onPress={() => { setAssigneeType(opt.value); setAssigneeId(''); setGroupAssigneeIds([]); }}>
+                      <Text style={{ color: assigneeType === opt.value ? '#FFF' : Colors.light.text }}>{opt.label}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -1131,7 +1141,7 @@ export default function DepartmentTasksScreen() {
                         <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
                           {(() => {
                             const list = globalUsers
-                              .filter(u => u.type === 'employee')
+                              .filter(u => u.type === assigneeType)
                               .filter(u => {
                                 if (!selectedDeptId) return true;
                                 const d = depts.find(dept => String(dept.id) === String(selectedDeptId));
@@ -1243,7 +1253,7 @@ export default function DepartmentTasksScreen() {
                               </Pressable>
                               {(() => {
                                 const list = globalUsers
-                                  .filter(u => u.type === 'employee')
+                                  .filter(u => u.type === assigneeType)
                                   .filter(u => {
                                     if (!selectedDeptId) return true;
                                     const d = depts.find(dept => String(dept.id) === String(selectedDeptId));

@@ -544,7 +544,10 @@ export default function AdminTasksScreen() {
                 if (m.status === 'completed') statusColor = '#10b981';
                 if (m.status === 'rejected') statusColor = '#ef4444';
 
-                const foundUser = globalUsers.find(u => String(u.id) === String(m.assignee_id));
+                const foundUser = globalUsers.find(u => {
+                  const targetId = m.assignee_type === 'department_admin' ? `SA-${m.assignee_id}` : String(m.assignee_id);
+                  return String(u.id) === targetId;
+                });
                 const dept = m.department || foundUser?.department || '';
                 const role = m.role || foundUser?.role || '';
                 const label = dept || role ? ` (${dept}${dept && role ? ' - ' : ''}${role})` : ` (${m.assignee_type.replace('_', ' ')})`;
@@ -560,7 +563,10 @@ export default function AdminTasksScreen() {
           </View>
         ) : (
           (() => {
-            const foundUser = globalUsers.find(u => String(u.id) === String(task.assignee_id));
+            const foundUser = globalUsers.find(u => {
+              const targetId = task.assignee_type === 'department_admin' ? `SA-${task.assignee_id}` : String(task.assignee_id);
+              return String(u.id) === targetId;
+            });
             const role = foundUser?.role || task.assignee_type.replace('_', ' ');
             const dept = task.department || foundUser?.department || 'N/A';
             return (
