@@ -383,6 +383,25 @@ export default function DoctorScheduleTV() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const cycleTimer = useRef<any>(null);
+  const currentSlideRef = useRef<{ type: string; page: number } | null>(null);
+  const pendingData = useRef<{ schedules: any[]; slots: any[] } | null>(null);
+  const hasInitialDataLoaded = useRef(false);
+
+  useEffect(() => {
+    if (slides.length > 0 && slides[currentSlideIndex]) {
+      const s = slides[currentSlideIndex];
+      currentSlideRef.current = { type: s.type, page: s.page };
+    }
+  }, [slides, currentSlideIndex]);
+
+  const applyPendingDataIfNeeded = () => {
+    if (pendingData.current) {
+      const { schedules: nextScheds, slots: nextSlots } = pendingData.current;
+      pendingData.current = null;
+      setSchedules(nextScheds);
+      setSlots(nextSlots);
+    }
+  };
 
   // Automatically adjust grid layout based on screen rotation:
   // Rotation (90R or 90L) forces Portrait mode, normal rotation uses Landscape mode.
@@ -438,8 +457,15 @@ export default function DoctorScheduleTV() {
         allSlots = slotsRes.data.data || [];
       }
 
-      setSchedules(allDocs);
-      setSlots(allSlots);
+      if (!hasInitialDataLoaded.current) {
+        setSchedules(allDocs);
+        setSlots(allSlots);
+        if (allDocs.length > 0 || allSlots.length > 0) {
+          hasInitialDataLoaded.current = true;
+        }
+      } else {
+        pendingData.current = { schedules: allDocs, slots: allSlots };
+      }
     } catch (err) {
       console.error('Error fetching schedules:', err);
     } finally {
@@ -517,7 +543,19 @@ export default function DoctorScheduleTV() {
     addChunkedSlides(monthly, 'Monthly');
 
     setSlides(tempSlides);
-    setCurrentSlideIndex(0);
+    setCurrentSlideIndex(() => {
+      if (tempSlides.length === 0) return 0;
+      const prevSlide = currentSlideRef.current;
+      if (prevSlide) {
+        const matchingIndex = tempSlides.findIndex(
+          s => s.type === prevSlide.type && s.page === prevSlide.page
+        );
+        if (matchingIndex !== -1) {
+          return matchingIndex;
+        }
+      }
+      return 0;
+    });
   };
 
   const startCycle = () => {
@@ -553,6 +591,7 @@ export default function DoctorScheduleTV() {
       duration: 400,
       useNativeDriver: true,
     }).start(() => {
+      applyPendingDataIfNeeded();
       setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -1052,6 +1091,7 @@ export default function DoctorScheduleTV() {
               style={[styles.navButton, { borderColor: theme.border, backgroundColor: theme.toggleBg }]} 
               onPress={() => {
                 stopCycle();
+                applyPendingDataIfNeeded();
                 setCurrentSlideIndex((prev) => (prev - 1 + slides.length) % slides.length);
               }}
             >
@@ -1073,6 +1113,7 @@ export default function DoctorScheduleTV() {
                     ]}
                     onPress={() => {
                       stopCycle();
+                      applyPendingDataIfNeeded();
                       setCurrentSlideIndex(idx);
                     }}
                   >
@@ -1092,6 +1133,7 @@ export default function DoctorScheduleTV() {
               style={[styles.navButton, { borderColor: theme.border, backgroundColor: theme.toggleBg }]} 
               onPress={() => {
                 stopCycle();
+                applyPendingDataIfNeeded();
                 setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
               }}
             >
