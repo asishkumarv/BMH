@@ -6,7 +6,7 @@ const checkCheckedIn = async (employeeId, userType) => {
   if (!employeeId || !userType) return true;
   if (userType === 'super_admin' || userType === 'superadmin') return true;
 
-  const targetType = (userType === 'department_admin' || userType === 'sub_admin') ? 'department_admin' : 'employee';
+  const targetType = (userType === 'department_admin' || userType === 'sub_admin') ? 'sub_admin' : 'employee';
 
   const result = await pool.query(
     `SELECT status FROM attendance WHERE employee_id = $1 AND user_type = $2 AND date = CURRENT_DATE LIMIT 1`,

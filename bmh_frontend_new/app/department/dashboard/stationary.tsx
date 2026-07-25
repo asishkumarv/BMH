@@ -406,7 +406,7 @@ export default function SubAdminStationaryScreen() {
     const details = parts.slice(1);
 
     return (
-      <View style={[styles.itemCard, { maxWidth: isDesktop ? 220 : '47%', width: isDesktop ? 220 : '47%', flex: 0, padding: 16, alignItems: 'flex-start' }]}>
+      <View style={[styles.availableItemCard, !isDesktop && styles.availableItemCardMobile]}>
         {item.image ? (
           <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
         ) : (
@@ -553,25 +553,32 @@ export default function SubAdminStationaryScreen() {
         )}
       </View>
 
-      <View style={styles.tabsContainer}>
-        <Pressable 
-          style={[styles.tab, activeTab === 'inventory' && styles.activeTab]} 
-          onPress={() => setActiveTab('inventory')}
+      <View style={{ borderBottomWidth: 1, borderBottomColor: Colors.light.border, marginBottom: 24 }}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.tabsContainer}
+          style={{ width: '100%' }}
         >
-          <Text style={[styles.tabText, activeTab === 'inventory' && styles.activeTabText]}>Inventory</Text>
-        </Pressable>
-        <Pressable 
-          style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
-          onPress={() => setActiveTab('requests')}
-        >
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Requests Approval</Text>
-        </Pressable>
-        <Pressable 
-          style={[styles.tab, activeTab === 'my_requests' && styles.activeTab]} 
-          onPress={() => setActiveTab('my_requests')}
-        >
-          <Text style={[styles.tabText, activeTab === 'my_requests' && styles.activeTabText]}>Request Stationary</Text>
-        </Pressable>
+          <Pressable 
+            style={[styles.tab, activeTab === 'inventory' && styles.activeTab]} 
+            onPress={() => setActiveTab('inventory')}
+          >
+            <Text style={[styles.tabText, activeTab === 'inventory' && styles.activeTabText]}>Inventory</Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
+            onPress={() => setActiveTab('requests')}
+          >
+            <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Requests Approval</Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.tab, activeTab === 'my_requests' && styles.activeTab]} 
+            onPress={() => setActiveTab('my_requests')}
+          >
+            <Text style={[styles.tabText, activeTab === 'my_requests' && styles.activeTabText]}>Request Stationary</Text>
+          </Pressable>
+        </ScrollView>
       </View>
 
       <View style={styles.contentArea}>
@@ -667,7 +674,7 @@ export default function SubAdminStationaryScreen() {
                 <Text style={{ color: Colors.light.icon }}>No items available.</Text>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 32 }}>
+              <View style={[styles.gridContainer, { marginBottom: 32 }]}>
                 {items.map(item => <React.Fragment key={item.id}>{renderItemCard({item})}</React.Fragment>)}
               </View>
             )}
@@ -723,45 +730,47 @@ export default function SubAdminStationaryScreen() {
       {/* Add Item Modal */}
       <Modal visible={addItemModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 400 }]}>
+          <View style={[styles.modalContent, isDesktop && { width: 400 }, { maxHeight: '90%' }]}>
             <Text style={styles.modalTitle}>Add Stationary Item</Text>
             
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <Pressable style={styles.imagePicker} onPress={handlePickImage}>
-                {newItemImage ? (
-                  <Image source={{ uri: newItemImage }} style={styles.imagePreview} />
-                ) : (
-                  <>
-                    <Upload size={24} color={Colors.light.icon} />
-                    <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Upload Image</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
-
-            <Text style={styles.label}>Item Name</Text>
-            <TextInput style={styles.input} value={newItemName} onChangeText={setNewItemName} placeholder="e.g. A4 Paper Rim" />
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
-              <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
-              <Pressable onPress={() => setNewDynamicFields([...newDynamicFields, {key: '', value: ''}])} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
-                <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Field</Text>
-              </Pressable>
-            </View>
-            {newDynamicFields.map((field, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.key} onChangeText={(val) => { const newF = [...newDynamicFields]; newF[idx].key = val; setNewDynamicFields(newF); }} placeholder="e.g. Size" />
-                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.value} onChangeText={(val) => { const newF = [...newDynamicFields]; newF[idx].value = val; setNewDynamicFields(newF); }} placeholder="e.g. XL" />
-                <Pressable onPress={() => { const newF = [...newDynamicFields]; newF.splice(idx, 1); setNewDynamicFields(newF); }} style={{ justifyContent: 'center', paddingHorizontal: 8 }}>
-                  <X size={20} color={Colors.light.error} />
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Pressable style={styles.imagePicker} onPress={handlePickImage}>
+                  {newItemImage ? (
+                    <Image source={{ uri: newItemImage }} style={styles.imagePreview} />
+                  ) : (
+                    <>
+                      <Upload size={24} color={Colors.light.icon} />
+                      <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Upload Image</Text>
+                    </>
+                  )}
                 </Pressable>
               </View>
-            ))}
 
-            <Text style={[styles.label, { marginTop: 12 }]}>Initial Stock</Text>
-            <TextInput style={styles.input} value={newItemStock} onChangeText={setNewItemStock} keyboardType="numeric" />
+              <Text style={styles.label}>Item Name</Text>
+              <TextInput style={styles.input} value={newItemName} onChangeText={setNewItemName} placeholder="e.g. A4 Paper Rim" />
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
+                <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
+                <Pressable onPress={() => setNewDynamicFields([...newDynamicFields, {key: '', value: ''}])} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
+                  <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Field</Text>
+                </Pressable>
+              </View>
+              {newDynamicFields.map((field, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0, width: 0, minWidth: 0 }]} value={field.key} onChangeText={(val) => { const newF = [...newDynamicFields]; newF[idx].key = val; setNewDynamicFields(newF); }} placeholder="e.g. Size" />
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0, width: 0, minWidth: 0 }]} value={field.value} onChangeText={(val) => { const newF = [...newDynamicFields]; newF[idx].value = val; setNewDynamicFields(newF); }} placeholder="e.g. XL" />
+                  <Pressable onPress={() => { const newF = [...newDynamicFields]; newF.splice(idx, 1); setNewDynamicFields(newF); }} style={{ justifyContent: 'center', paddingHorizontal: 4 }}>
+                    <X size={20} color={Colors.light.error} />
+                  </Pressable>
+                </View>
+              ))}
 
-            <View style={styles.modalActions}>
+              <Text style={[styles.label, { marginTop: 12 }]}>Initial Stock</Text>
+              <TextInput style={styles.input} value={newItemStock} onChangeText={setNewItemStock} keyboardType="numeric" />
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 16 }]}>
               <Pressable style={styles.cancelBtn} onPress={() => setAddItemModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
               <Pressable style={styles.submitBtn} onPress={handleAddItem} disabled={adding}><Text style={styles.submitBtnText}>{adding ? 'Adding...' : 'Add'}</Text></Pressable>
             </View>
@@ -793,7 +802,7 @@ export default function SubAdminStationaryScreen() {
       {/* Edit Item Modal */}
       <Modal visible={editItemModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 400 }]}>
+          <View style={[styles.modalContent, isDesktop && { width: 400 }, { maxHeight: '90%' }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Text style={styles.modalTitle}>Edit Item</Text>
               <Pressable onPress={handleDeleteItem} style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
@@ -801,58 +810,60 @@ export default function SubAdminStationaryScreen() {
               </Pressable>
             </View>
             
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <Pressable style={styles.imagePicker} onPress={handlePickEditImage}>
-                {editItemImage ? (
-                  <Image source={{ uri: editItemImage }} style={styles.imagePreview} />
-                ) : (
-                  <>
-                    <Upload size={24} color={Colors.light.icon} />
-                    <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Upload Image</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
-
-            <Text style={styles.label}>Item Name</Text>
-            <TextInput style={styles.input} value={editItemName} onChangeText={setEditItemName} />
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
-              <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
-              <Pressable onPress={() => setEditDynamicFields([...editDynamicFields, {key: '', value: ''}])} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
-                <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Field</Text>
-              </Pressable>
-            </View>
-            {editDynamicFields.map((field, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.key} onChangeText={(val) => { const newF = [...editDynamicFields]; newF[idx].key = val; setEditDynamicFields(newF); }} placeholder="e.g. Size" />
-                <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={field.value} onChangeText={(val) => { const newF = [...editDynamicFields]; newF[idx].value = val; setEditDynamicFields(newF); }} placeholder="e.g. XL" />
-                <Pressable onPress={() => { const newF = [...editDynamicFields]; newF.splice(idx, 1); setEditDynamicFields(newF); }} style={{ justifyContent: 'center', paddingHorizontal: 8 }}>
-                  <X size={20} color={Colors.light.error} />
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Pressable style={styles.imagePicker} onPress={handlePickEditImage}>
+                  {editItemImage ? (
+                    <Image source={{ uri: editItemImage }} style={styles.imagePreview} />
+                  ) : (
+                    <>
+                      <Upload size={24} color={Colors.light.icon} />
+                      <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Upload Image</Text>
+                    </>
+                  )}
                 </Pressable>
               </View>
-            ))}
 
-            <Text style={[styles.label, { marginTop: 12 }]}>Stock</Text>
-            <TextInput style={styles.input} value={editItemStock} onChangeText={setEditItemStock} keyboardType="numeric" />
+              <Text style={styles.label}>Item Name</Text>
+              <TextInput style={styles.input} value={editItemName} onChangeText={setEditItemName} />
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
+                <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
+                <Pressable onPress={() => setEditDynamicFields([...editDynamicFields, {key: '', value: ''}])} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
+                  <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Field</Text>
+                </Pressable>
+              </View>
+              {editDynamicFields.map((field, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0, width: 0, minWidth: 0 }]} value={field.key} onChangeText={(val) => { const newF = [...editDynamicFields]; newF[idx].key = val; setEditDynamicFields(newF); }} placeholder="e.g. Size" />
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0, width: 0, minWidth: 0 }]} value={field.value} onChangeText={(val) => { const newF = [...editDynamicFields]; newF[idx].value = val; setEditDynamicFields(newF); }} placeholder="e.g. XL" />
+                  <Pressable onPress={() => { const newF = [...editDynamicFields]; newF.splice(idx, 1); setEditDynamicFields(newF); }} style={{ justifyContent: 'center', paddingHorizontal: 4 }}>
+                    <X size={20} color={Colors.light.error} />
+                  </Pressable>
+                </View>
+              ))}
 
-            <Text style={styles.label}>Status</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-              <Pressable 
-                style={[styles.statusToggleBtn, editItemStatus === 'active' && styles.statusToggleActive]}
-                onPress={() => setEditItemStatus('active')}
-              >
-                <Text style={[styles.statusToggleText, editItemStatus === 'active' && styles.statusToggleActiveText]}>Active</Text>
-              </Pressable>
-              <Pressable 
-                style={[styles.statusToggleBtn, editItemStatus === 'hold' && styles.statusToggleActiveHold]}
-                onPress={() => setEditItemStatus('hold')}
-              >
-                <Text style={[styles.statusToggleText, editItemStatus === 'hold' && styles.statusToggleActiveHoldText]}>Hold</Text>
-              </Pressable>
-            </View>
+              <Text style={[styles.label, { marginTop: 12 }]}>Stock</Text>
+              <TextInput style={styles.input} value={editItemStock} onChangeText={setEditItemStock} keyboardType="numeric" />
 
-            <View style={styles.modalActions}>
+              <Text style={styles.label}>Status</Text>
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                <Pressable 
+                  style={[styles.statusToggleBtn, editItemStatus === 'active' && styles.statusToggleActive]}
+                  onPress={() => setEditItemStatus('active')}
+                >
+                  <Text style={[styles.statusToggleText, editItemStatus === 'active' && styles.statusToggleActiveText]}>Active</Text>
+                </Pressable>
+                <Pressable 
+                  style={[styles.statusToggleBtn, editItemStatus === 'hold' && styles.statusToggleActiveHold]}
+                  onPress={() => setEditItemStatus('hold')}
+                >
+                  <Text style={[styles.statusToggleText, editItemStatus === 'hold' && styles.statusToggleActiveHoldText]}>Hold</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 16 }]}>
               <Pressable style={styles.cancelBtn} onPress={() => setEditItemModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
               <Pressable style={styles.submitBtn} onPress={handleSaveEditItem} disabled={savingEdit}><Text style={styles.submitBtnText}>{savingEdit ? 'Saving...' : 'Save Changes'}</Text></Pressable>
             </View>
@@ -943,7 +954,7 @@ export default function SubAdminStationaryScreen() {
                 <Text style={{ textAlign: 'center', color: Colors.light.icon, marginVertical: 20 }}>Your cart is empty.</Text>
               ) : (
                 Object.keys(cart).map(itemId => {
-                  const item = items.find(i => i.id === itemId);
+                  const item = items.find(i => String(i.id) === String(itemId));
                   if (!item) return null;
                   return (
                     <View key={itemId} style={styles.cartItemRow}>
@@ -1009,7 +1020,7 @@ const styles = StyleSheet.create({
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE' },
   secondaryBtnText: { color: Colors.light.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 },
   
-  tabsContainer: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.light.border, marginBottom: 24 },
+  tabsContainer: { flexDirection: 'row' },
   tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: Colors.light.primary },
   tabText: { fontSize: 16, fontWeight: '600', color: Colors.light.icon },
@@ -1066,5 +1077,8 @@ const styles = StyleSheet.create({
   qtyText: { fontSize: 16, fontWeight: '700', color: Colors.light.text },
   cartItemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
   cartItemName: { fontSize: 16, fontWeight: '600', color: Colors.light.text },
-  cartItemQty: { fontSize: 16, fontWeight: '700', color: Colors.light.primary }
+  cartItemQty: { fontSize: 16, fontWeight: '700', color: Colors.light.primary },
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  availableItemCard: { width: 220, backgroundColor: Colors.light.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.light.border, alignItems: 'flex-start' },
+  availableItemCardMobile: { width: '47%' }
 });
