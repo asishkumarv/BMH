@@ -17,6 +17,7 @@ export default function ItemsScreen() {
   const [search, setSearch] = useState('');
   const [itemCode, setItemCode] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [batchNoFilter, setBatchNoFilter] = useState('');
 
   // Editing State
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -46,7 +47,8 @@ export default function ItemsScreen() {
           limit,
           search,
           item_code: itemCode,
-          expiry_date: expiryDate
+          expiry_date: expiryDate,
+          batch_no: batchNoFilter
         }),
       });
       if (!res.ok) throw new Error('Failed to fetch medicines');
@@ -66,7 +68,7 @@ export default function ItemsScreen() {
 
   useEffect(() => {
     fetchMedicines(1);
-  }, [search, itemCode, expiryDate]);
+  }, [search, itemCode, expiryDate, batchNoFilter]);
 
   const handleEditPress = (item: any) => {
     setSelectedItem(item);
@@ -194,6 +196,19 @@ export default function ItemsScreen() {
                 placeholder="YYYY-MM-DD"
                 value={expiryDate}
                 onChangeText={setExpiryDate}
+              />
+            </View>
+          </View>
+
+          <View style={styles.filterField}>
+            <Text style={styles.filterLabel}>Filter by Batch No</Text>
+            <View style={styles.inputIconWrapper}>
+              <FileText size={16} color="#94A3B8" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Batch No..."
+                value={batchNoFilter}
+                onChangeText={setBatchNoFilter}
               />
             </View>
           </View>

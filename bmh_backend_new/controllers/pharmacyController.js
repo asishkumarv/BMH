@@ -802,30 +802,57 @@ exports.getMedicines = async (req, res) => {
         const search = req.body.search || '';
         const itemCode = req.body.item_code || '';
         const expiryDate = req.body.expiry_date || '';
+        const batchNo = req.body.batch_no || '';
 
-        let queryArgs = [limit, offset];
+        let dataQueryArgs = [limit, offset];
+        let countQueryArgs = [];
         let conditions = [];
+        let countConditions = [];
         let paramIndex = 3;
+        let countParamIndex = 1;
 
         if (search) {
             conditions.push(`(m.itemname ILIKE $${paramIndex} OR m.c_item_code ILIKE $${paramIndex})`);
-            queryArgs.push(`%${search}%`);
+            dataQueryArgs.push(`%${search}%`);
             paramIndex++;
+
+            countConditions.push(`(m.itemname ILIKE $${countParamIndex} OR m.c_item_code ILIKE $${countParamIndex})`);
+            countQueryArgs.push(`%${search}%`);
+            countParamIndex++;
         }
 
         if (itemCode) {
             conditions.push(`m.c_item_code ILIKE $${paramIndex}`);
-            queryArgs.push(`%${itemCode}%`);
+            dataQueryArgs.push(`%${itemCode}%`);
             paramIndex++;
+
+            countConditions.push(`m.c_item_code ILIKE $${countParamIndex}`);
+            countQueryArgs.push(`%${itemCode}%`);
+            countParamIndex++;
         }
 
         if (expiryDate) {
             conditions.push(`m.expirydate ILIKE $${paramIndex}`);
-            queryArgs.push(`%${expiryDate}%`);
+            dataQueryArgs.push(`%${expiryDate}%`);
             paramIndex++;
+
+            countConditions.push(`m.expirydate ILIKE $${countParamIndex}`);
+            countQueryArgs.push(`%${expiryDate}%`);
+            countParamIndex++;
+        }
+
+        if (batchNo) {
+            conditions.push(`m.batchno ILIKE $${paramIndex}`);
+            dataQueryArgs.push(`%${batchNo}%`);
+            paramIndex++;
+
+            countConditions.push(`m.batchno ILIKE $${countParamIndex}`);
+            countQueryArgs.push(`%${batchNo}%`);
+            countParamIndex++;
         }
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        const countWhereClause = countConditions.length > 0 ? `WHERE ${countConditions.join(' AND ')}` : '';
 
         const dataQuery = `
             SELECT 
@@ -852,13 +879,11 @@ exports.getMedicines = async (req, res) => {
         const countQuery = `
             SELECT COUNT(*) 
             FROM ecogreen_medicines m
-            ${whereClause}
+            ${countWhereClause}
         `;
 
-        const countQueryArgs = queryArgs.slice(2);
-
         const [dataResult, countResult] = await Promise.all([
-            pool.query(dataQuery, queryArgs),
+            pool.query(dataQuery, dataQueryArgs),
             pool.query(countQuery, countQueryArgs)
         ]);
 
