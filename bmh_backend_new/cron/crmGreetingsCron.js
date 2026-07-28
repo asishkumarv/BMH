@@ -153,35 +153,45 @@ async function processGreetings(order, tableType) {
     return false; // Retry later when admin configures it
   }
 
-  // Build greetings message content
-  let messageText = `Hello ${patientName},\n\n`;
-  messageText += `Greetings from *Bharat Medical Hall*! 🌟\n`;
-  messageText += `Your order *${orderNo}* has been successfully delivered. \n\n`;
-  messageText += `Here are the usage instructions for your prescribed medicines:\n\n`;
-
+  // Build greetings message content placeholders
+  let instructionsText = '';
   itemsWithGuides.forEach((item, index) => {
-    messageText += `*${index + 1}. ${item.name}* (Qty: ${item.qty})\n`;
+    instructionsText += `${index + 1}. ${item.name} (Qty: ${item.qty})\n`;
     if (item.desc) {
-      messageText += `📝 *Instructions:* ${item.desc}\n`;
+      instructionsText += `   Instructions: ${item.desc}\n`;
     }
     if (item.video) {
-      messageText += `🎥 *Video Guide:* ${item.video}\n`;
+      instructionsText += `   Video: ${item.video}\n`;
     }
-    messageText += `\n`;
+    instructionsText += `\n`;
   });
+  instructionsText = instructionsText.trim();
 
-  messageText += `Thank you for choosing Bharat Medical Hall! Stay healthy and safe. ❤️`;
-
-  // Send WhatsApp message via DoubleTick
+  // Send Template message via DoubleTick V2 API
   try {
     await axios.post(
-      'https://public.doubletick.io/whatsapp/message/text',
+      'https://public.doubletick.io/v2/whatsapp/message/template',
       {
-        to: cleanPhone,
-        from: config.wabaNumber,
-        content: {
-          text: messageText
-        }
+        messages: [
+          {
+            to: cleanPhone,
+            from: config.wabaNumber,
+            content: {
+              templateName: 'medicine_usage_greetings',
+              language: config.defaultLanguage || 'en',
+              templateData: {
+                body: {
+                  placeholders: [
+                    patientName,
+                    orderNo,
+                    instructionsText
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        byPassMediaUrlValidation: false
       },
       {
         headers: {
@@ -191,10 +201,10 @@ async function processGreetings(order, tableType) {
         }
       }
     );
-    console.log(`[CRM Greetings] WhatsApp greetings successfully sent to ${cleanPhone} for ${tableType} ${orderNo}`);
+    console.log(`[CRM Greetings] WhatsApp template greetings successfully sent to ${cleanPhone} for ${tableType} ${orderNo}`);
     return true;
   } catch (err) {
-    console.error(`[CRM Greetings] Failed to send DoubleTick WhatsApp to ${cleanPhone}:`, err.response?.data || err.message);
+    console.error(`[CRM Greetings] Failed to send DoubleTick Template WhatsApp to ${cleanPhone}:`, err.response?.data || err.message);
     const isPermanentError = err.response && (err.response.status === 400 || err.response.status === 404);
     return isPermanentError;
   }
