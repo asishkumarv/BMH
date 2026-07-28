@@ -13,7 +13,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; payment_mode?: string; payment_txn_id?: string; order_no?: string; invoice_no?: string; customer_name?: string; customer_phone?: string; delivery_method?: string; cash_amount?: string; online_amount?: string; credit_amount?: string; };
 type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; note?: string; credit_amount?: string; };
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
-type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
+type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; created_at?: string; };
 
 export default function SubAdminWalletScreen() {
   const { isDesktop } = useResponsive();
@@ -32,6 +32,7 @@ export default function SubAdminWalletScreen() {
   const [endDate, setEndDate] = useState('');
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [filterType, setFilterType] = useState<'booking' | 'appointment'>('booking');
 
   // Allowances
   const [balance, setBalance] = useState('0.00');
@@ -151,7 +152,7 @@ export default function SubAdminWalletScreen() {
     }
   };
 
-  const handlePrint = async (title: string, headers: string[], rows: any[], rowMapper: (item: any) => string[]) => {
+  const handlePrint = async (title: string, headers: string[], rows: any[], rowMapper: (item: any) => string[], extraHtml?: string) => {
     try {
       const tableHeadersHtml = headers.map(h => `<th>${h}</th>`).join('');
       const tableRowsHtml = rows.map(row => {
@@ -182,6 +183,7 @@ export default function SubAdminWalletScreen() {
               <div class="meta-row"><span class="meta-label">Department:</span><span>${user?.department || 'N/A'}</span></div>
               <div class="meta-row"><span class="meta-label">Role:</span><span>Sub Admin</span></div>
               <div class="meta-row"><span class="meta-label">Date Range:</span><span>${startDate || 'All'} to ${endDate || 'All'}</span></div>
+              ${extraHtml || ''}
             </div>
             <table>
               <thead>
@@ -380,18 +382,23 @@ export default function SubAdminWalletScreen() {
 
   const allowanceTransactions = filteredTransactions.filter(tx => 
     tx.type !== 'cash_collection' && tx.type !== 'online_collection' && tx.type !== 'split_collection'
-  );
+  ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const collectedTransactions = filteredTransactions.filter(tx => 
     tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection'
-  );
+  ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const filteredBookings = bookings.filter(b => {
-    if (!b.date) return true;
-    const bDate = new Date(b.date).toISOString().split('T')[0];
+    const targetDateStr = filterType === 'booking' ? b.created_at : b.date;
+    if (!targetDateStr) return true;
+    const bDate = new Date(targetDateStr).toISOString().split('T')[0];
     if (startDate && bDate < startDate) return false;
     if (endDate && bDate > endDate) return false;
     return true;
+  }).sort((a, b) => {
+    const dateA = new Date(filterType === 'booking' ? (a.created_at || a.date) : a.date).getTime();
+    const dateB = new Date(filterType === 'booking' ? (b.created_at || b.date) : b.date).getTime();
+    return dateB - dateA;
   });
 
   const filteredHandovers = handovers.filter(h => {
@@ -400,11 +407,25 @@ export default function SubAdminWalletScreen() {
     if (startDate && hDate < startDate) return false;
     if (endDate && hDate > endDate) return false;
     return true;
-  });
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Bookings calculations
   const totalCashBooked = filteredBookings.filter(b => b.payment_mode === 'Cash').reduce((acc, b) => acc + Number(b.fee || 0), 0);
   const totalOnlineBooked = filteredBookings.filter(b => b.payment_mode === 'Online').reduce((acc, b) => acc + Number(b.fee || 0), 0);
+
+  // Orders calculations
+  const totalOrderCash = collectedTransactions.reduce((acc, tx) => {
+    const cashVal = tx.cash_amount !== undefined && tx.cash_amount !== null ? Number(tx.cash_amount) : (tx.payment_mode === 'Cash' ? Number(tx.amount || 0) : 0);
+    return acc + cashVal;
+  }, 0);
+  const totalOrderOnline = collectedTransactions.reduce((acc, tx) => {
+    const onlineVal = tx.online_amount !== undefined && tx.online_amount !== null ? Number(tx.online_amount) : (tx.payment_mode === 'Online' ? Number(tx.amount || 0) : 0);
+    return acc + onlineVal;
+  }, 0);
+
+  // Combined calculations
+  const combinedCash = totalCashBooked + totalOrderCash;
+  const combinedOnline = totalOnlineBooked + totalOrderOnline;
 
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
@@ -512,6 +533,56 @@ export default function SubAdminWalletScreen() {
                 </Pressable>
               )}
             </View>
+
+            {activeTab === 'Cash' && (
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Filter Bookings By:</Text>
+                <Pressable 
+                  style={{ 
+                    paddingVertical: 6, 
+                    paddingHorizontal: 12, 
+                    borderRadius: 6, 
+                    backgroundColor: filterType === 'booking' ? Colors.light.primary : '#f1f5f9' 
+                  }} 
+                  onPress={() => setFilterType('booking')}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: filterType === 'booking' ? '#fff' : '#475569' }}>Booking Date</Text>
+                </Pressable>
+                <Pressable 
+                  style={{ 
+                    paddingVertical: 6, 
+                    paddingHorizontal: 12, 
+                    borderRadius: 6, 
+                    backgroundColor: filterType === 'appointment' ? Colors.light.primary : '#f1f5f9' 
+                  }} 
+                  onPress={() => setFilterType('appointment')}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: filterType === 'appointment' ? '#fff' : '#475569' }}>Appointment Date</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {activeTab === 'Cash' && (startDate !== '' || endDate !== '') && (
+              <View style={{ marginTop: 16, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 8 }}>Date Filter Cash & Online Summary:</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <Text style={{ fontSize: 13, color: '#334155' }}>
+                    <Text style={{ fontWeight: '500' }}>Bookings Cash:</Text> ₹{totalCashBooked.toFixed(2)} | <Text style={{ fontWeight: '500' }}>Online:</Text> ₹{totalOnlineBooked.toFixed(2)}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#334155' }}>
+                    <Text style={{ fontWeight: '500' }}>Orders Cash:</Text> ₹{totalOrderCash.toFixed(2)} | <Text style={{ fontWeight: '500' }}>Online:</Text> ₹{totalOrderOnline.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>
+                    Combined Cash: ₹{combinedCash.toFixed(2)}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.primary }}>
+                    Combined Online: ₹{combinedOnline.toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
           
           {incomingHandovers.length > 0 && activeTab === 'Cash' && (
@@ -771,9 +842,10 @@ export default function SubAdminWalletScreen() {
                   {isBookingsExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
                 </Pressable>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredBookings, 'Booking_Collections', ['Booking ID', 'Patient Name', 'Date', 'Fee', 'Payment Mode', 'Doctor'], (b) => [
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredBookings, 'Booking_Collections', ['Booking ID', 'Patient Name', 'Booking Date', 'Appointment Date', 'Fee', 'Payment Mode', 'Doctor'], (b) => [
                     b.booking_id,
                     b.patient_name,
+                    formatDateDMY(b.created_at || '', true),
                     formatDateDMY(b.date, false),
                     `₹${b.fee}`,
                     b.payment_mode,
@@ -781,14 +853,28 @@ export default function SubAdminWalletScreen() {
                   ])}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('My Booking Collections', ['Booking ID', 'Patient Name', 'Date', 'Fee', 'Payment Mode', 'Doctor'], filteredBookings, (b) => [
-                    b.booking_id,
-                    b.patient_name,
-                    formatDateDMY(b.date, false),
-                    `₹${b.fee}`,
-                    b.payment_mode,
-                    `Dr. ${b.doctor_name}`
-                  ])}>
+                  <Pressable style={styles.actionIconButton} onPress={() => {
+                    const printTotalCash = filteredBookings.filter(b => b.payment_mode === 'Cash').reduce((acc, b) => acc + Number(b.fee || 0), 0);
+                    const printTotalOnline = filteredBookings.filter(b => b.payment_mode === 'Online').reduce((acc, b) => acc + Number(b.fee || 0), 0);
+                    const printTotalCombined = printTotalCash + printTotalOnline;
+
+                    const extraHtml = `
+                      <div class="meta-row"><span class="meta-label">Total Cash Amount:</span><span>₹${printTotalCash.toFixed(2)}</span></div>
+                      <div class="meta-row"><span class="meta-label">Total Online Amount:</span><span>₹${printTotalOnline.toFixed(2)}</span></div>
+                      <div class="meta-row"><span class="meta-label">Total Combined Amount:</span><span>₹${printTotalCombined.toFixed(2)}</span></div>
+                      <div class="meta-row"><span class="meta-label">Booking Date Range:</span><span>${startDate || 'All'} to ${endDate || 'All'} (${filterType === 'booking' ? 'Filter by Booking Date' : 'Filter by Appointment Date'})</span></div>
+                    `;
+
+                    handlePrint('My Booking Collections', ['Booking ID', 'Patient Name', 'Booking Date', 'Appointment Date', 'Fee', 'Payment Mode', 'Doctor'], filteredBookings, (b) => [
+                      b.booking_id,
+                      b.patient_name,
+                      formatDateDMY(b.created_at || '', true),
+                      formatDateDMY(b.date, false),
+                      `₹${b.fee}`,
+                      b.payment_mode,
+                      `Dr. ${b.doctor_name}`
+                    ], extraHtml);
+                  }}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
                 </View>
@@ -800,7 +886,8 @@ export default function SubAdminWalletScreen() {
                   </View>
                   <View style={styles.txDetails}>
                     <Text style={styles.txType}>Patient: {b.patient_name}</Text>
-                    <Text style={styles.txDate}>{formatDateDMY(b.date, false)} - Dr. {b.doctor_name}</Text>
+                    <Text style={styles.txDate}>Booked: {formatDateDMY(b.created_at || '', true)}</Text>
+                    <Text style={styles.txDate}>Appointment: {formatDateDMY(b.date, false)} - Dr. {b.doctor_name}</Text>
                   </View>
                   <View style={styles.txAmountSection}>
                     <Text style={[styles.txAmount, { color: b.payment_mode === 'Cash' ? '#16a34a' : Colors.light.primary }]}>
