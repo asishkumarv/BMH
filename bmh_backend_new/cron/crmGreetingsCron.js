@@ -153,24 +153,59 @@ async function processGreetings(order, tableType) {
     return false; // Retry later when admin configures it
   }
 
-  // Build greetings message content placeholders (Using unicode line separator \u2028 to bypass Meta \n limitation)
-  const itemsTextList = itemsWithGuides.map((item, index) => {
-    let piece = `${index + 1}. ${item.name} (Qty: ${item.qty})`;
-    let details = [];
-    if (item.desc) {
-      details.push(`Instructions: ${item.desc}`);
-    }
-    if (item.video) {
-      details.push(`Video: ${item.video}`);
-    }
-    if (details.length > 0) {
-      piece += `\u2028\u2028 [ ${details.join(' | \u2028\u2028')} ]`;
-    }
-    return piece;
-  });
-  const instructionsText = itemsTextList.join('\u2028\u2028');
+  // Build greetings message content placeholders (Using 17 static template variable placeholders for layout structure)
+  let v3 = "-", v4 = "-", v5 = "-", v6 = "-", v7 = "-", v8 = "-", v9 = "-", v10 = "-", v11 = "-", v12 = "-", v13 = "-", v14 = "-", v15 = "-", v16 = "-", v17 = "-";
 
-  // Send Template message via DoubleTick V2 API
+  if (itemsWithGuides.length > 0) {
+    const item = itemsWithGuides[0];
+    v3 = `1. ${item.name} (Qty: ${item.qty})`;
+    v4 = item.desc ? ` [ Instructions: ${item.desc} | ` : ` [ Instructions: - | `;
+    v5 = item.video ? `Video: ${item.video} ]` : `Video: - ]`;
+  }
+
+  if (itemsWithGuides.length > 1) {
+    const item = itemsWithGuides[1];
+    v6 = `2. ${item.name} (Qty: ${item.qty})`;
+    v7 = item.desc ? ` [ Instructions: ${item.desc} | ` : ` [ Instructions: - | `;
+    v8 = item.video ? `Video: ${item.video} ]` : `Video: - ]`;
+  }
+
+  if (itemsWithGuides.length > 2) {
+    const item = itemsWithGuides[2];
+    v9 = `3. ${item.name} (Qty: ${item.qty})`;
+    v10 = item.desc ? ` [ Instructions: ${item.desc} | ` : ` [ Instructions: - | `;
+    v11 = item.video ? `Video: ${item.video} ]` : `Video: - ]`;
+  }
+
+  if (itemsWithGuides.length > 3) {
+    const item = itemsWithGuides[3];
+    v12 = `4. ${item.name} (Qty: ${item.qty})`;
+    v13 = item.desc ? ` [ Instructions: ${item.desc} | ` : ` [ Instructions: - | `;
+    v14 = item.video ? `Video: ${item.video} ]` : `Video: - ]`;
+  }
+
+  if (itemsWithGuides.length > 4) {
+    // For 5 or more medicines, combine the remaining ones into the last placeholder
+    const item = itemsWithGuides[4];
+    v15 = `5. ${item.name} (Qty: ${item.qty})`;
+    
+    if (itemsWithGuides.length > 5) {
+      const rest = itemsWithGuides.slice(5);
+      const restNames = rest.map((it, idx) => `${idx + 6}. ${it.name} (Qty: ${it.qty})`).join('; ');
+      v15 += `; ${restNames}`;
+      
+      const descs = rest.map(it => it.desc || '-').join(' | ');
+      v16 = ` [ Instructions: ${item.desc || '-'} | ${descs} | `;
+      
+      const videos = rest.map(it => it.video || '-').join(' | ');
+      v17 = `Video: ${item.video || '-'} | ${videos} ]`;
+    } else {
+      v16 = item.desc ? ` [ Instructions: ${item.desc} | ` : ` [ Instructions: - | `;
+      v17 = item.video ? `Video: ${item.video} ]` : `Video: - ]`;
+    }
+  }
+
+  // Send Template message via DoubleTick V2 API using medicine_usage_greetings2
   try {
     await axios.post(
       'https://public.doubletick.io/v2/whatsapp/message/template',
@@ -180,14 +215,28 @@ async function processGreetings(order, tableType) {
             to: cleanPhone,
             from: config.wabaNumber,
             content: {
-              templateName: 'medicine_usage_greetings',
+              templateName: 'medicine_usage_greetings2',
               language: config.defaultLanguage || 'en',
               templateData: {
                 body: {
                   placeholders: [
                     { "1": patientName },
                     { "2": orderNo },
-                    { "3": instructionsText }
+                    { "3": v3 },
+                    { "4": v4 },
+                    { "5": v5 },
+                    { "6": v6 },
+                    { "7": v7 },
+                    { "8": v8 },
+                    { "9": v9 },
+                    { "10": v10 },
+                    { "11": v11 },
+                    { "12": v12 },
+                    { "13": v13 },
+                    { "14": v14 },
+                    { "15": v15 },
+                    { "16": v16 },
+                    { "17": v17 }
                   ]
                 }
               }
