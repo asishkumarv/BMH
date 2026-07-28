@@ -86,8 +86,14 @@ export default function SalesOrder() {
   const [itemMasterVisible, setItemMasterVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   
+  const initialRefNo = Math.floor(Math.random() * 10000);
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = now.getMonth() + 1;
+  const initialIpNo = `001/${yy}/${mm}/${initialRefNo}`;
+
   const [formData, setFormData] = useState({
-    ipNo: "",
+    ipNo: initialIpNo,
     mobileNo: "",
     patientName: "",
     patientAddress: "",
@@ -106,7 +112,7 @@ export default function SalesOrder() {
     dmanCode: "-",
     orderTotal: "0.00",
     orderDiscPer: "0.00",
-    refNo: Math.floor(Math.random() * 10000),
+    refNo: initialRefNo,
     orderId: Math.floor(Math.random() * 1000),
     remark: "",
     urgentFlag: 0,
@@ -216,11 +222,15 @@ export default function SalesOrder() {
       e.preventDefault();
       e.stopPropagation();
       setItems([]);
+      const newRef = Math.floor(Math.random() * 10000);
+      const newNow = new Date();
+      const newYy = newNow.getFullYear().toString().slice(-2);
+      const newMm = newNow.getMonth() + 1;
       setFormData(prev => ({
         ...prev,
-        ipNo: "", mobileNo: "", patientName: "", patientAddress: "", patientEmail: "",
+        ipNo: `001/${newYy}/${newMm}/${newRef}`, mobileNo: "", patientName: "", patientAddress: "", patientEmail: "",
         orderTotal: "0.00", orderDiscPer: "0.00",
-        refNo: Math.floor(Math.random() * 10000), orderId: Math.floor(Math.random() * 1000)
+        refNo: newRef, orderId: Math.floor(Math.random() * 1000)
       }));
     }
   }, []);

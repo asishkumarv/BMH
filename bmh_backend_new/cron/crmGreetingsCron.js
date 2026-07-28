@@ -241,7 +241,7 @@ async function runGreetingsScan() {
 
     // 3. Scan ecogreen_sales_orders (with underscores)
     const res3 = await pool.query(
-      `SELECT id, patient_name, mobile_no, order_no 
+      `SELECT id, patient_name, mobile_no, ip_no as order_no 
        FROM ecogreen_sales_orders 
        WHERE status = 'Delivered' 
          AND crm_greetings_sent IS NOT TRUE 
