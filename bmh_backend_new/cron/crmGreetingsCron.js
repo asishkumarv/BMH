@@ -153,18 +153,22 @@ async function processGreetings(order, tableType) {
     return false; // Retry later when admin configures it
   }
 
-  // Build greetings message content placeholders (No newlines allowed in Meta template variable values)
+  // Build greetings message content placeholders (Using unicode line separator \u2028 to bypass Meta \n limitation)
   const itemsTextList = itemsWithGuides.map((item, index) => {
     let piece = `${index + 1}. ${item.name} (Qty: ${item.qty})`;
     let details = [];
-    if (item.desc) details.push(`Instructions: ${item.desc}`);
-    if (item.video) details.push(`Video: ${item.video}`);
+    if (item.desc) {
+      details.push(`Instructions: ${item.desc}`);
+    }
+    if (item.video) {
+      details.push(`Video: ${item.video}`);
+    }
     if (details.length > 0) {
-      piece += ` [ ${details.join(' | ')} ]`;
+      piece += `\u2028\u2028 [ ${details.join(' | \u2028\u2028')} ]`;
     }
     return piece;
   });
-  const instructionsText = itemsTextList.join('; ');
+  const instructionsText = itemsTextList.join('\u2028\u2028');
 
   // Send Template message via DoubleTick V2 API
   try {
