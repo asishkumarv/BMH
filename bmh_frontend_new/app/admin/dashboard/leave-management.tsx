@@ -8,6 +8,25 @@ import { API_URL } from '@/config';
 import { Settings, User, CalendarDays, CheckCircle2, XCircle, Clock, Save, Building } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
 
+const formatDateToDDMMYYYY = (dateStr: string) => {
+  if (!dateStr) return '';
+  const cleanDate = dateStr.split('T')[0];
+  const parts = cleanDate.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function AdminLeaveManagement() {
   const { isMobile, isDesktop } = useResponsive();
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -267,8 +286,24 @@ export default function AdminLeaveManagement() {
                 <View style={styles.dateRow}>
                   <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
                   <Text style={styles.reqDates}>
-                    {new Date(req.start_date).toLocaleDateString()} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : `- ${new Date(req.end_date).toLocaleDateString()}`}
+                    {formatDateToDDMMYYYY(req.start_date)} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : (req.request_type && req.request_type !== 'leave' ? '' : `- ${formatDateToDDMMYYYY(req.end_date)}`)}
                   </Text>
+                  <View style={{
+                    backgroundColor: req.request_type === 'late_checkin' ? '#e0e7ff' : req.request_type === 'early_checkout' ? '#f5f3ff' : '#f1f5f9',
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    marginLeft: 8
+                  }}>
+                    <Text style={{
+                      fontSize: 10,
+                      fontWeight: '700',
+                      color: req.request_type === 'late_checkin' ? '#4338ca' : req.request_type === 'early_checkout' ? '#6d28d9' : '#475569',
+                      textTransform: 'uppercase'
+                    }}>
+                      {req.request_type === 'late_checkin' ? 'Late Check-in' : req.request_type === 'early_checkout' ? 'Early Checkout' : 'Leave'}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.reqReason}>"{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"</Text>
                 

@@ -7,6 +7,25 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { API_URL } from '../../../config';
 import { useResponsive } from '../../../hooks/useResponsive';
 
+const formatDateToDDMMYYYY = (dateStr: string) => {
+  if (!dateStr) return '';
+  const cleanDate = dateStr.split('T')[0];
+  const parts = cleanDate.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function LeaveManagement() {
   const { isMobile, isDesktop } = useResponsive();
   const [employee, setEmployee] = useState<any>(null);
@@ -35,6 +54,8 @@ export default function LeaveManagement() {
 
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDaySession, setHalfDaySession] = useState<'first_half' | 'second_half'>('first_half');
+  const [requestType, setRequestType] = useState<'leave' | 'late_checkin' | 'early_checkout'>('leave');
+  const [permissionDuration, setPermissionDuration] = useState<'30m' | '1h' | '1.5h'>('30m');
 
   useEffect(() => {
     if (isHalfDay && startDate) {
@@ -128,6 +149,10 @@ export default function LeaveManagement() {
 
   // Multi-month aware cost projection
   useEffect(() => {
+    if (requestType !== 'leave') {
+      setProjection(null);
+      return;
+    }
     if (startDate && endDate && employee && summary) {
       if (startDate > endDate) {
          setProjection(null);
@@ -212,18 +237,19 @@ export default function LeaveManagement() {
   }, [startDate, endDate, isHalfDay, summary, monthlySummaries, holidays, employee]);
 
   const submitRequest = async () => {
-    if (!startDate || !endDate || !reason) {
+    const targetEndDate = requestType === 'leave' ? endDate : startDate;
+    if (!startDate || !targetEndDate || !reason) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
 
-    if (startDate < minDateStr || endDate < minDateStr) {
-      Alert.alert('Error', 'Leaves can only be applied from tomorrow onwards');
-      if (Platform.OS === 'web') window.alert('Leaves can only be applied from tomorrow onwards');
+    if (startDate < minDateStr || targetEndDate < minDateStr) {
+      Alert.alert('Error', 'Requests can only be applied from tomorrow onwards');
+      if (Platform.OS === 'web') window.alert('Requests can only be applied from tomorrow onwards');
       return;
     }
 
-    if (endDate < startDate) {
+    if (requestType === 'leave' && targetEndDate < startDate) {
       Alert.alert('Error', 'End date must be after or equal to start date');
       if (Platform.OS === 'web') window.alert('End date must be after or equal to start date');
       return;
@@ -238,10 +264,11 @@ export default function LeaveManagement() {
           employee_id: employee.id,
           user_type: 'sub_admin',
           start_date: startDate,
-          end_date: endDate,
-          reason,
+          end_date: targetEndDate,
+          reason: requestType === 'leave' ? reason : `[${permissionDuration === '30m' ? '30 Mins' : permissionDuration === '1h' ? '1 Hour' : '1.5 Hours'} Permission] ${reason}`,
           is_half_day: isHalfDay,
           half_day_session: isHalfDay ? halfDaySession : null,
+          request_type: requestType
         }),
       });
       const data = await res.json();
@@ -338,15 +365,72 @@ export default function LeaveManagement() {
         {/* Form Section */}
         <View style={[styles.section, isDesktop && { flex: 1 }]}>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>New Leave Application</Text>
+            <Text style={styles.cardTitle}>New Request Application</Text>
             <View style={styles.alertBox}>
                <Info size={20} color={Colors.light.primary} style={{marginRight: 8}}/>
-               <Text style={styles.alertText}>Your department limits concurrent leaves. Apply early to secure your dates.</Text>
+               <Text style={styles.alertText}>Apply for leaves or permissions. Permissions are capped at 1.5 hours max.</Text>
             </View>
+
+            {/* Application Type Selector */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.label}>Application Type</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                {(['leave', 'late_checkin', 'early_checkout'] as const).map((t) => (
+                  <Pressable
+                    key={t}
+                    onPress={() => {
+                      setRequestType(t);
+                    }}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      borderWidth: 1,
+                      borderColor: requestType === t ? Colors.light.primary : Colors.light.border,
+                      borderRadius: 8,
+                      backgroundColor: requestType === t ? 'rgba(37, 99, 235, 0.1)' : 'white',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: requestType === t ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>
+                      {t === 'leave' ? 'Leave' : t === 'late_checkin' ? 'Late Check-in' : 'Early Checkout'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Duration Selector for Permissions */}
+            {requestType !== 'leave' && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.label}>Permission Duration (Max 1.5 Hours)</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  {(['30m', '1h', '1.5h'] as const).map((d) => (
+                    <Pressable
+                      key={d}
+                      onPress={() => setPermissionDuration(d)}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderWidth: 1,
+                        borderColor: permissionDuration === d ? Colors.light.primary : Colors.light.border,
+                        borderRadius: 8,
+                        backgroundColor: permissionDuration === d ? 'rgba(37, 99, 235, 0.1)' : 'white',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: permissionDuration === d ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>
+                        {d === '30m' ? '30 Mins' : d === '1h' ? '1 Hour' : '1.5 Hours'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
 
             <View style={[styles.formRow, !isDesktop && { flexDirection: 'column', gap: 16 }]}>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Start Date</Text>
+                <Text style={styles.label}>{requestType === 'leave' ? 'Start Date' : 'Date'}</Text>
                 {Platform.OS === 'web' ? (
                   <input
                     type="date"
@@ -385,47 +469,49 @@ export default function LeaveManagement() {
                   </>
                 )}
               </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>End Date</Text>
-                {Platform.OS === 'web' ? (
-                  <input
-                    type="date"
-                    min={startDate || minDateStr}
-                    value={isHalfDay ? startDate : endDate}
-                    disabled={isHalfDay}
-                    onChange={(e: any) => setEndDate(e.target.value)}
-                    style={{...styles.input, backgroundColor: isHalfDay ? '#F1F5F9' : Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
-                  />
-                ) : (
-                  <>
-                    <Pressable onPress={() => { if (!isHalfDay) setShowEndPicker(true); }}>
-                      <View pointerEvents="none">
-                        <TextInput
-                          style={[styles.input, isHalfDay && { backgroundColor: '#F1F5F9' }]}
-                          value={isHalfDay ? startDate : endDate}
-                          editable={false}
-                          placeholder="YYYY-MM-DD"
-                          placeholderTextColor={Colors.light.icon}
+              {requestType === 'leave' && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>End Date</Text>
+                  {Platform.OS === 'web' ? (
+                    <input
+                      type="date"
+                      min={startDate || minDateStr}
+                      value={isHalfDay ? startDate : endDate}
+                      disabled={isHalfDay}
+                      onChange={(e: any) => setEndDate(e.target.value)}
+                      style={{...styles.input, backgroundColor: isHalfDay ? '#F1F5F9' : Colors.light.background, color: Colors.light.text, border: `1px solid ${Colors.light.border}`, boxSizing: 'border-box', width: '100%', fontFamily: 'inherit'}}
+                    />
+                  ) : (
+                    <>
+                      <Pressable onPress={() => { if (!isHalfDay) setShowEndPicker(true); }}>
+                        <View pointerEvents="none">
+                          <TextInput
+                            style={[styles.input, isHalfDay && { backgroundColor: '#F1F5F9' }]}
+                            value={isHalfDay ? startDate : endDate}
+                            editable={false}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={Colors.light.icon}
+                          />
+                        </View>
+                      </Pressable>
+                      {showEndPicker && !isHalfDay && (
+                        <DateTimePicker
+                          value={endDate ? new Date(endDate) : new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={(event: any, date?: Date) => {
+                            setShowEndPicker(Platform.OS === 'ios');
+                            if (date) {
+                              const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                              setEndDate(offsetDate.toISOString().split('T')[0]);
+                            }
+                          }}
                         />
-                      </View>
-                    </Pressable>
-                    {showEndPicker && !isHalfDay && (
-                      <DateTimePicker
-                        value={endDate ? new Date(endDate) : new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={(event: any, date?: Date) => {
-                          setShowEndPicker(Platform.OS === 'ios');
-                          if (date) {
-                            const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-                            setEndDate(offsetDate.toISOString().split('T')[0]);
-                          }
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-              </View>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
             </View>
 
             {/* Half Day Selection */}
@@ -486,7 +572,7 @@ export default function LeaveManagement() {
               )}
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Reason for Leave</Text>
+              <Text style={styles.label}>Reason for Request</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={reason}
@@ -553,11 +639,26 @@ export default function LeaveManagement() {
             requests.map((req) => (
               <View key={req.id} style={styles.requestCard}>
                 <View style={styles.reqHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 2 }} />
                     <Text style={styles.reqDates}>
-                      {new Date(req.start_date).toLocaleDateString()} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : `to ${new Date(req.end_date).toLocaleDateString()}`}
+                      {formatDateToDDMMYYYY(req.start_date)} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : (req.request_type && req.request_type !== 'leave' ? '' : `to ${formatDateToDDMMYYYY(req.end_date)}`)}
                     </Text>
+                    <View style={{
+                      backgroundColor: req.request_type === 'late_checkin' ? '#e0e7ff' : req.request_type === 'early_checkout' ? '#f5f3ff' : '#f1f5f9',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: req.request_type === 'late_checkin' ? '#4338ca' : req.request_type === 'early_checkout' ? '#6d28d9' : '#475569',
+                        textTransform: 'uppercase'
+                      }}>
+                        {req.request_type === 'late_checkin' ? 'Late Check-in' : req.request_type === 'early_checkout' ? 'Early Checkout' : 'Leave'}
+                      </Text>
+                    </View>
                   </View>
                   <View style={[
                     styles.statusBadge, 
@@ -609,8 +710,24 @@ export default function LeaveManagement() {
                 <View style={styles.dateRow}>
                   <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
                   <Text style={styles.reqDates}>
-                    {new Date(req.start_date).toLocaleDateString()} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : `- ${new Date(req.end_date).toLocaleDateString()}`}
+                    {formatDateToDDMMYYYY(req.start_date)} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : (req.request_type && req.request_type !== 'leave' ? '' : `- ${formatDateToDDMMYYYY(req.end_date)}`)}
                   </Text>
+                  <View style={{
+                    backgroundColor: req.request_type === 'late_checkin' ? '#e0e7ff' : req.request_type === 'early_checkout' ? '#f5f3ff' : '#f1f5f9',
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    marginLeft: 8
+                  }}>
+                    <Text style={{
+                      fontSize: 10,
+                      fontWeight: '700',
+                      color: req.request_type === 'late_checkin' ? '#4338ca' : req.request_type === 'early_checkout' ? '#6d28d9' : '#475569',
+                      textTransform: 'uppercase'
+                    }}>
+                      {req.request_type === 'late_checkin' ? 'Late Check-in' : req.request_type === 'early_checkout' ? 'Early Checkout' : 'Leave'}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.reqReason}>
                   "{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"

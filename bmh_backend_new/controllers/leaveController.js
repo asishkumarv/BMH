@@ -165,7 +165,7 @@ exports.updateEmployeeSettings = async (req, res) => {
 // Apply for leave (Employee)
 exports.applyLeave = async (req, res) => {
   try {
-    const { employee_id, user_type = 'employee', start_date, end_date, reason, is_half_day = false, half_day_session = null } = req.body;
+    const { employee_id, user_type = 'employee', start_date, end_date, reason, is_half_day = false, half_day_session = null, request_type = 'leave' } = req.body;
 
     let finalUserType = user_type;
     if (user_type === 'employee') {
@@ -187,43 +187,45 @@ exports.applyLeave = async (req, res) => {
     if (empRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
     const department = empRes.rows[0].department;
 
-    // Check max employees limit for the requested dates
-    const depSetRes = await pool.query('SELECT max_employees_leave_per_day FROM department_leave_settings WHERE department = $1', [department]);
-    const maxLeaves = depSetRes.rows.length > 0 ? depSetRes.rows[0].max_employees_leave_per_day : 9999; // Default large if not set
+    if (request_type === 'leave') {
+      // Check max employees limit for the requested dates
+      const depSetRes = await pool.query('SELECT max_employees_leave_per_day FROM department_leave_settings WHERE department = $1', [department]);
+      const maxLeaves = depSetRes.rows.length > 0 ? depSetRes.rows[0].max_employees_leave_per_day : 9999; // Default large if not set
 
-    // Check active approved leaves overlapping with these dates
-    const overlapRes = await pool.query(`
-      SELECT lr.*, u.department
-      FROM leave_requests lr
-      JOIN (
-        SELECT id, department, 
-               (CASE WHEN role = 'Delivery Boy' OR department = 'Delivery' THEN 'delivery_boy' ELSE 'employee' END) as user_type 
-        FROM employees
-        UNION ALL
-        SELECT id, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'sub_admin' as user_type FROM department_admins
-      ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
-      WHERE u.department = $1 AND lr.status = 'approved'
-        AND (lr.start_date <= $3 AND lr.end_date >= $2)
-    `, [department, start_date, end_date]);
+      // Check active approved leaves overlapping with these dates
+      const overlapRes = await pool.query(`
+        SELECT lr.*, u.department
+        FROM leave_requests lr
+        JOIN (
+          SELECT id, department, 
+                 (CASE WHEN role = 'Delivery Boy' OR department = 'Delivery' THEN 'delivery_boy' ELSE 'employee' END) as user_type 
+          FROM employees
+          UNION ALL
+          SELECT id, (SELECT name FROM departments WHERE id = department_admins.department_id) as department, 'sub_admin' as user_type FROM department_admins
+        ) u ON lr.employee_id = u.id AND lr.user_type = u.user_type
+        WHERE u.department = $1 AND lr.status = 'approved' AND lr.request_type = 'leave'
+          AND (lr.start_date <= $3 AND lr.end_date >= $2)
+      `, [department, start_date, end_date]);
 
-    let overlapCount = 0;
-    overlapRes.rows.forEach(r => {
-      if (r.is_half_day) {
-        overlapCount += 0.5;
-      } else {
-        overlapCount += 1.0;
+      let overlapCount = 0;
+      overlapRes.rows.forEach(r => {
+        if (r.is_half_day) {
+          overlapCount += 0.5;
+        } else {
+          overlapCount += 1.0;
+        }
+      });
+
+      if (overlapCount >= maxLeaves) {
+        return res.status(400).json({ message: 'Leave limit for that date exceeded' });
       }
-    });
-
-    if (overlapCount >= maxLeaves) {
-      return res.status(400).json({ message: 'Leave limit for that date exceeded' });
     }
 
     const query = `
-      INSERT INTO leave_requests (employee_id, user_type, start_date, end_date, reason, is_half_day, half_day_session)
-      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+      INSERT INTO leave_requests (employee_id, user_type, start_date, end_date, reason, is_half_day, half_day_session, request_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
     `;
-    const result = await pool.query(query, [employee_id, finalUserType, start_date, end_date, reason, is_half_day, half_day_session]);
+    const result = await pool.query(query, [employee_id, finalUserType, start_date, end_date, reason, is_half_day, half_day_session, request_type]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error applying for leave:', error);
