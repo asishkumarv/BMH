@@ -148,7 +148,7 @@ exports.createBooking = async (req, res) => {
 // Get bookings (Sub-admin view - no revenue, or Employee view)
 exports.getBookings = async (req, res) => {
   try {
-    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id, exclude_blocked, status, booking_id } = req.query;
+    const { date, department, slot_id, booked_by, doctor_id, patient_name, patient_id, exclude_blocked, status, booking_id, booking_date } = req.query;
     
     let query = `
       SELECT * FROM (
@@ -189,6 +189,10 @@ exports.getBookings = async (req, res) => {
     if (date) {
       params.push(date);
       query += ` AND date = $${params.length}`;
+    }
+    if (booking_date) {
+      params.push(booking_date);
+      query += ` AND created_at::date = $${params.length}`;
     }
     if (department) {
       params.push(department);

@@ -10,6 +10,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import SearchableDropdown from '../../../components/ui/SearchableDropdown';
 // import { COMPANY_LOGO_BASE64 } from './_logoBase64';
 
 export default function PatientBooking() {
@@ -108,11 +109,13 @@ export default function PatientBooking() {
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
   const [bDateFilter, setBDateFilter] = useState('');
+  const [bBookingDateFilter, setBBookingDateFilter] = useState('');
   const [bDoctorFilter, setBDoctorFilter] = useState('');
   const [bPatientFilter, setBPatientFilter] = useState('');
   const [bEmployeeFilter, setBEmployeeFilter] = useState('');
   const [bStatusFilter, setBStatusFilter] = useState('');
   const [showBDatePicker, setShowBDatePicker] = useState(false);
+  const [showBBookingDatePicker, setShowBBookingDatePicker] = useState(false);
 
   // Edit Modal State
   const [editBookingSelected, setEditBookingSelected] = useState<any>(null);
@@ -127,12 +130,13 @@ export default function PatientBooking() {
       fetchAllBookings();
       if (allEmployees.length === 0) fetchAllEmployees();
     }
-  }, [activeTab, bDateFilter, bDoctorFilter, bPatientFilter, bEmployeeFilter, bStatusFilter, user]);
+  }, [activeTab, bDateFilter, bBookingDateFilter, bDoctorFilter, bPatientFilter, bEmployeeFilter, bStatusFilter, user]);
 
   const fetchAllBookings = async () => {
     try {
       let url = `https://napi.bharatmedicalhallplus.com/bookings?exclude_blocked=true`;
       if (bDateFilter) url += `&date=${bDateFilter}`;
+      if (bBookingDateFilter) url += `&booking_date=${bBookingDateFilter}`;
       if (bDoctorFilter) url += `&doctor_id=${bDoctorFilter}`;
       if (bPatientFilter) url += `&patient_name=${bPatientFilter}`;
       if (bEmployeeFilter) url += `&booked_by=${bEmployeeFilter}`;
@@ -209,10 +213,20 @@ export default function PatientBooking() {
 
   const [myBookings, setMyBookings] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState('');
+  const [filterBookingDate, setFilterBookingDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
   const [filterPatient, setFilterPatient] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showBookingDatePicker, setShowBookingDatePicker] = useState(false);
   const [uniqueDoctors, setUniqueDoctors] = useState<any[]>([]);
+
+  const getLocalTodayString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // Reschedule State
   const [rescheduleBookings, setRescheduleBookings] = useState<any[]>([]);
@@ -386,12 +400,13 @@ export default function PatientBooking() {
     if (activeTab === 'My Bookings' && user) {
       fetchMyBookings();
     }
-  }, [activeTab, filterDate, filterDoctor, filterPatient, user]);
+  }, [activeTab, filterDate, filterBookingDate, filterDoctor, filterPatient, user]);
 
   const fetchMyBookings = async () => {
     try {
       let url = `https://napi.bharatmedicalhallplus.com/bookings?booked_by=${user.id}&exclude_blocked=true`;
       if (filterDate) url += `&date=${filterDate}`;
+      if (filterBookingDate) url += `&booking_date=${filterBookingDate}`;
       if (filterDoctor) url += `&doctor_id=${filterDoctor}`;
       if (filterPatient) url += `&patient_name=${filterPatient}`;
       const res = await axios.get(url);
@@ -1267,24 +1282,24 @@ useEffect(() => {
               </View>
             </View>
           
-          <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Patient Name</Text>
-              <TextInput style={[styles.input, {padding: 10}]} value={filterPatient} onChangeText={setFilterPatient} placeholder="Search patient or ID" />
+          <View style={[styles.filterRowCompact, isMobile && { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Patient Name</Text>
+              <TextInput style={styles.inputCompact} value={filterPatient} onChangeText={setFilterPatient} placeholder="Search patient or ID" />
             </View>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Date Filter</Text>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Date Filter</Text>
               {Platform.OS === 'web' ? (
                 <input 
                   type="date"
                   value={filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
-                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, color: '#1e293b' } as any}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, fontSize: 13, color: '#1e293b', width: '100%', height: 40, boxSizing: 'border-box' } as any}
                 />
               ) : (
                 <>
-                  <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-                    <TextInput style={styles.input} value={filterDate} editable={false} placeholder="Select Date" />
+                  <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.inputCompact}>
+                    <Text style={{ fontSize: 13, color: filterDate ? '#1e293b' : '#94a3b8' }}>{filterDate ? filterDate : "Select Date"}</Text>
                   </TouchableOpacity>
                   {showDatePicker && (
                     <DateTimePicker
@@ -1300,25 +1315,58 @@ useEffect(() => {
                 </>
               )}
             </View>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Doctor Filter</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={filterDoctor}
-                  onValueChange={(val) => setFilterDoctor(val)}
-                  style={styles.picker}
+            <View style={styles.filterColCompact}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={styles.labelCompact}>Booking Date</Text>
+                <TouchableOpacity 
+                  style={[styles.todayBadge, filterBookingDate === getLocalTodayString() && styles.todayBadgeActive]} 
+                  onPress={() => setFilterBookingDate(filterBookingDate === getLocalTodayString() ? '' : getLocalTodayString())}
                 >
-                  <Picker.Item label="All Doctors" value="" />
-                  {uniqueDoctors.map((d: any) => (
-                    <Picker.Item key={d.id} label={d.name} value={d.id} />
-                  ))}
-                </Picker>
+                  <Text style={[styles.todayBadgeText, filterBookingDate === getLocalTodayString() && styles.todayBadgeTextActive]}>Today</Text>
+                </TouchableOpacity>
               </View>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  value={filterBookingDate}
+                  onChange={(e) => setFilterBookingDate(e.target.value)}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, fontSize: 13, color: '#1e293b', width: '100%', height: 40, boxSizing: 'border-box' } as any}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setShowBookingDatePicker(true)} style={styles.inputCompact}>
+                    <Text style={{ fontSize: 13, color: filterBookingDate ? '#1e293b' : '#94a3b8' }}>{filterBookingDate ? filterBookingDate : "Select Date"}</Text>
+                  </TouchableOpacity>
+                  {showBookingDatePicker && (
+                    <DateTimePicker
+                      value={filterBookingDate ? new Date(filterBookingDate) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowBookingDatePicker(false);
+                        if (selectedDate) setFilterBookingDate(selectedDate.toISOString().split('T')[0]);
+                      }}
+                    />
+                  )}
+                </>
+              )}
             </View>
-            <View style={[styles.filterCol, {minWidth: 150, justifyContent: 'flex-end'}]}>
-              <TouchableOpacity style={styles.clearBtn} onPress={() => { setFilterDate(''); setFilterDoctor(''); setFilterPatient(''); }}>
-                <Text style={styles.clearBtnText}>Clear Filters</Text>
-              </TouchableOpacity>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Doctor Filter</Text>
+              <SearchableDropdown
+                options={uniqueDoctors.map(d => ({ label: d.name, value: d.id }))}
+                value={filterDoctor}
+                onChange={setFilterDoctor}
+                placeholder="All Doctors"
+                searchPlaceholder="Search doctor..."
+              />
+            </View>
+            <View style={styles.filterColCompact}>
+              <View style={styles.filterActionCol}>
+                <TouchableOpacity style={styles.clearBtnCompact} onPress={() => { setFilterDate(''); setFilterBookingDate(''); setFilterDoctor(''); setFilterPatient(''); }}>
+                  <Text style={styles.clearBtnText}>Clear</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
           
@@ -1330,6 +1378,7 @@ useEffect(() => {
                 <Text style={styles.tableCellHeader}>Patient</Text>
                 <Text style={styles.tableCellHeader}>Doctor</Text>
                 <Text style={styles.tableCellHeader}>Date/Time</Text>
+                <Text style={styles.tableCellHeader}>Booked At</Text>
                 <Text style={styles.tableCellHeader}>PR / Ref</Text>
                 <Text style={styles.tableCellHeader}>Payment</Text>
                 <Text style={styles.tableCellHeader}>Status</Text>
@@ -1350,6 +1399,14 @@ useEffect(() => {
                   <View style={styles.tableCell}>
                     <Text>{new Date(b.date).toLocaleDateString('en-GB')}</Text>
                     <Text style={{fontSize: 12, color: '#64748b'}}>{b.start_time}</Text>
+                  </View>
+                  <View style={styles.tableCell}>
+                    <Text style={{fontSize: 13}}>
+                      {b.created_at ? new Date(b.created_at).toLocaleDateString('en-GB') : '-'}
+                    </Text>
+                    <Text style={{fontSize: 11, color: '#64748b'}}>
+                      {b.created_at ? new Date(b.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''}
+                    </Text>
                   </View>
                   <View style={styles.tableCell}>
                     <Text>{b.pr || '-'}</Text>
@@ -1382,45 +1439,103 @@ useEffect(() => {
               <TouchableOpacity style={styles.exportBtn} onPress={handleExportAllCSV}>
                 <Text style={styles.exportBtnText}>Export CSV</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.clearBtn} onPress={() => { setBDateFilter(''); setBDoctorFilter(''); setBPatientFilter(''); setBEmployeeFilter(''); setBStatusFilter(''); }}>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => { setBDateFilter(''); setBBookingDateFilter(''); setBDoctorFilter(''); setBPatientFilter(''); setBEmployeeFilter(''); setBStatusFilter(''); }}>
                 <Text style={styles.clearBtnText}>Clear Filters</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={[styles.filterRow, isMobile && { flexDirection: 'column' }, {flexWrap: 'wrap'}]}>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Patient Name/Mobile</Text>
-              <TextInput style={styles.input} value={bPatientFilter} onChangeText={setBPatientFilter} placeholder="Search patient" />
+          <View style={[styles.filterRowCompact, isMobile && { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Patient Name/Mobile</Text>
+              <TextInput style={styles.inputCompact} value={bPatientFilter} onChangeText={setBPatientFilter} placeholder="Search patient" />
             </View>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Date Filter</Text>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Date Filter</Text>
               {Platform.OS === 'web' ? (
-                <input type="date" value={bDateFilter} onChange={(e) => setBDateFilter(e.target.value)} style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, color: '#1e293b', width: '100%' } as any} />
+                <input 
+                  type="date" 
+                  value={bDateFilter} 
+                  onChange={(e) => setBDateFilter(e.target.value)} 
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, fontSize: 13, color: '#1e293b', width: '100%', height: 40, boxSizing: 'border-box' } as any} 
+                />
               ) : (
-                <TouchableOpacity onPress={() => setShowBDatePicker(true)}><TextInput style={styles.input} value={bDateFilter} editable={false} placeholder="Select Date" /></TouchableOpacity>
+                <>
+                  <TouchableOpacity onPress={() => setShowBDatePicker(true)} style={styles.inputCompact}>
+                    <Text style={{ fontSize: 13, color: bDateFilter ? '#1e293b' : '#94a3b8' }}>{bDateFilter ? bDateFilter : "Select Date"}</Text>
+                  </TouchableOpacity>
+                  {showBDatePicker && (
+                    <DateTimePicker
+                      value={bDateFilter ? new Date(bDateFilter) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowBDatePicker(false);
+                        if (selectedDate) setBDateFilter(selectedDate.toISOString().split('T')[0]);
+                      }}
+                    />
+                  )}
+                </>
               )}
             </View>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Doctor Filter</Text>
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={bDoctorFilter} onValueChange={setBDoctorFilter} style={styles.picker}>
-                  <Picker.Item label="All Doctors" value="" />
-                  {uniqueDoctors.map((d: any) => (<Picker.Item key={d.id} label={d.name} value={d.id} />))}
-                </Picker>
+            <View style={styles.filterColCompact}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={styles.labelCompact}>Booking Date</Text>
+                <TouchableOpacity 
+                  style={[styles.todayBadge, bBookingDateFilter === getLocalTodayString() && styles.todayBadgeActive]} 
+                  onPress={() => setBBookingDateFilter(bBookingDateFilter === getLocalTodayString() ? '' : getLocalTodayString())}
+                >
+                  <Text style={[styles.todayBadgeText, bBookingDateFilter === getLocalTodayString() && styles.todayBadgeTextActive]}>Today</Text>
+                </TouchableOpacity>
               </View>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  value={bBookingDateFilter}
+                  onChange={(e) => setBBookingDateFilter(e.target.value)}
+                  style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, fontSize: 13, color: '#1e293b', width: '100%', height: 40, boxSizing: 'border-box' } as any}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setShowBBookingDatePicker(true)} style={styles.inputCompact}>
+                    <Text style={{ fontSize: 13, color: bBookingDateFilter ? '#1e293b' : '#94a3b8' }}>{bBookingDateFilter ? bBookingDateFilter : "Select Date"}</Text>
+                  </TouchableOpacity>
+                  {showBBookingDatePicker && (
+                    <DateTimePicker
+                      value={bBookingDateFilter ? new Date(bBookingDateFilter) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowBBookingDatePicker(false);
+                        if (selectedDate) setBBookingDateFilter(selectedDate.toISOString().split('T')[0]);
+                      }}
+                    />
+                  )}
+                </>
+              )}
             </View>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Employee Filter</Text>
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={bEmployeeFilter} onValueChange={setBEmployeeFilter} style={styles.picker}>
-                  <Picker.Item label="All Employees" value="" />
-                  {allEmployees.map((e: any) => (<Picker.Item key={e.id} label={e.full_name} value={e.id} />))}
-                </Picker>
-              </View>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Doctor Filter</Text>
+              <SearchableDropdown
+                options={uniqueDoctors.map(d => ({ label: d.name, value: d.id }))}
+                value={bDoctorFilter}
+                onChange={setBDoctorFilter}
+                placeholder="All Doctors"
+                searchPlaceholder="Search doctor..."
+              />
             </View>
-            <View style={[styles.filterCol, {minWidth: 150}]}>
-              <Text style={styles.label}>Status Filter</Text>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Employee Filter</Text>
+              <SearchableDropdown
+                options={allEmployees.map(e => ({ label: e.full_name, value: e.id }))}
+                value={bEmployeeFilter}
+                onChange={setBEmployeeFilter}
+                placeholder="All Employees"
+                searchPlaceholder="Search employee..."
+              />
+            </View>
+            <View style={styles.filterColCompact}>
+              <Text style={styles.labelCompact}>Status Filter</Text>
               <View style={styles.pickerContainer}>
                 <Picker selectedValue={bStatusFilter} onValueChange={setBStatusFilter} style={styles.picker}>
                   <Picker.Item label="All Status" value="" />
@@ -1439,6 +1554,7 @@ useEffect(() => {
                 <Text style={[styles.tableCellHeader, {flex: 0.5}]}>Token</Text>
                 <Text style={styles.tableCellHeader}>Patient</Text>
                 <Text style={styles.tableCellHeader}>Doctor/Date</Text>
+                <Text style={styles.tableCellHeader}>Booked At</Text>
                 <Text style={styles.tableCellHeader}>Booked By</Text>
                 <Text style={styles.tableCellHeader}>Payment/Status</Text>
                 <Text style={[styles.tableCellHeader, {flex: 0.5, textAlign: 'center'}]}>Actions</Text>
@@ -1517,6 +1633,14 @@ useEffect(() => {
                       <View style={styles.tableCell}>
                         <Text>{b.doctor_name}</Text>
                         <Text style={{fontSize: 12, color: '#64748b'}}>{new Date(b.date).toLocaleDateString('en-GB')} {b.start_time}</Text>
+                      </View>
+                      <View style={styles.tableCell}>
+                        <Text style={{fontSize: 13}}>
+                          {b.created_at ? new Date(b.created_at).toLocaleDateString('en-GB') : '-'}
+                        </Text>
+                        <Text style={{fontSize: 11, color: '#64748b'}}>
+                          {b.created_at ? new Date(b.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''}
+                        </Text>
                       </View>
                       <View style={styles.tableCell}>
                         <Text>{b.booked_by_name}</Text>
@@ -1891,6 +2015,70 @@ const styles = StyleSheet.create({
   picker: { padding: 10, fontSize: 14, color: '#1e293b', ...Platform.select({ web: { outlineWidth: 0 as any, border: 'none', backgroundColor: 'transparent' } }) },
   clearBtn: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#f8fafc' },
   clearBtnText: { color: '#64748b', fontWeight: 'bold' },
+  labelCompact: { fontSize: 11, fontWeight: '600', color: '#475569', marginBottom: 4 },
+  inputCompact: { 
+    backgroundColor: '#f8fafc', 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    borderRadius: 8, 
+    paddingHorizontal: 10, 
+    fontSize: 13, 
+    color: '#1e293b',
+    height: 40,
+    justifyContent: 'center',
+  },
+  todayBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  todayBadgeActive: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  todayBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  todayBadgeTextActive: {
+    color: 'white',
+  },
+  filterRowCompact: { 
+    flexDirection: 'row', 
+    gap: 10, 
+    marginBottom: 20,
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  filterColCompact: { 
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 140,
+    maxWidth: 220,
+  },
+  filterActionCol: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    minWidth: 140,
+    height: 40
+  },
+  clearBtnCompact: { 
+    flex: 1,
+    height: 40,
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc' 
+  },
   tableRowHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0' },
   tableRow: { flexDirection: 'row', padding: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
   tableCellHeader: { flex: 1, minWidth: 100, fontSize: 13, fontWeight: 'bold', color: '#475569' },
