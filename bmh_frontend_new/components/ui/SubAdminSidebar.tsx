@@ -119,6 +119,15 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Store Delivery', icon: Package, route: '/department/dashboard/store-delivery' });
             }
           }
+          
+          if (res.data.success && res.data.settings.item_master_access) {
+            let value = res.data.settings.item_master_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const saId = `SA-${userId}`;
+            if (userId && value[saId] === true) {
+              dynamicNavItems.push({ name: 'Item Master', icon: Package, route: '/department/dashboard/pharmacy/items' });
+            }
+          }
         }
         
         // Build dynamic pharmacy items
@@ -126,7 +135,6 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
         if (hasSalesOrder) {
           subPharmacyItems.push({ name: 'Generate Token', route: '/dashboard/pharmacy/generate-token' });
           subPharmacyItems.push({ name: 'Create Order', route: '/dashboard/pharmacy/create-order' });
-          subPharmacyItems.push({ name: 'Item Master', route: '/dashboard/pharmacy/items' });
           subPharmacyItems.push({ name: 'Stock Details', route: '/dashboard/pharmacy/stock' });
           subPharmacyItems.push({ name: 'Local Customers', route: '/dashboard/pharmacy/customers' });
           subPharmacyItems.push({ name: 'Order Status', route: '/dashboard/pharmacy/order-status' });

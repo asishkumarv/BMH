@@ -1200,6 +1200,10 @@ export default function DeliveryDashboard() {
           <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'All' ? '#fff' : '#1e40af' }}>{orders.length}</Text>
           <Text style={{ fontSize: 10, color: filterState === 'All' ? '#fff' : '#1e40af' }}>Total</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Bus' ? '#8b5cf6' : '#ede9fe', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Bus')}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Bus' ? '#fff' : '#6d28d9' }}>{orders.filter(o => o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus').length}</Text>
+          <Text style={{ fontSize: 10, color: filterState === 'Bus' ? '#fff' : '#6d28d9' }}>Bus</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Pending' ? '#f59e0b' : '#fef3c7', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Pending')}>
           <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase())).length}</Text>
           <Text style={{ fontSize: 10, color: filterState === 'Pending' ? '#fff' : '#b45309' }}>Pending</Text>
@@ -1269,21 +1273,29 @@ export default function DeliveryDashboard() {
             if (filterState === 'Completed') return isCompleted;
             if (filterState === 'Cancelled') return isCancelled;
             if (filterState === 'Pending') return !isCompleted && !isCancelled;
+            if (filterState === 'Bus') return o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus';
             return true;
           }).sort((a, b) => {
-            const aComp = ['delivered', 'completed', 'received'].includes(a.status?.toLowerCase());
-            const bComp = ['delivered', 'completed', 'received'].includes(b.status?.toLowerCase());
-            const aCanc = ['cancelled', 'not available', 'not_available'].includes(a.status?.toLowerCase());
-            const bCanc = ['cancelled', 'not available', 'not_available'].includes(b.status?.toLowerCase());
-            if ((aComp || aCanc) && !(bComp || bCanc)) return 1;
-            if (!(aComp || aCanc) && (bComp || bCanc)) return -1;
+            const getGroup = (order: any) => {
+              const statusLower = order.status?.toLowerCase() || '';
+              const isDeliveredOrCompleted = ['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(statusLower);
+              if (isDeliveredOrCompleted) return 3; // Delivered last
+              const isPickedUp = statusLower === 'picked up' || statusLower === 'out for delivery';
+              if (isPickedUp) return 1; // Picked up first
+              return 2; // Assigned second
+            };
 
-            const aBus = a.delivery_type?.toLowerCase() === 'bus' || a.mode_of_delivery?.toLowerCase() === 'bus';
-            const bBus = b.delivery_type?.toLowerCase() === 'bus' || b.mode_of_delivery?.toLowerCase() === 'bus';
-            if (aBus && !bBus) return -1;
-            if (!aBus && bBus) return 1;
+            const groupA = getGroup(a);
+            const groupB = getGroup(b);
 
-            return 0;
+            if (groupA !== groupB) {
+              return groupA - groupB;
+            }
+
+            const timeA = new Date(a.created_at || 0).getTime();
+            const timeB = new Date(b.created_at || 0).getTime();
+            if (timeA !== timeB) return timeB - timeA;
+            return String(b.id).localeCompare(String(a.id));
           })}
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={renderOrder}

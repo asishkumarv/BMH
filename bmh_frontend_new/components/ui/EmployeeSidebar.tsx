@@ -129,6 +129,15 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
             }
           }
           
+          if (res.data.success && res.data.settings.item_master_access) {
+            let value = res.data.settings.item_master_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const empId = u.id?.toString();
+            if (empId && value[empId] === true) {
+              dynamicNavItems.push({ name: 'Item Master', icon: Package, route: '/employee/dashboard/pharmacy/items' });
+            }
+          }
+          
           let dynamicPharmacyItems = [...BASE_PHARMACY_ITEMS];
           setPharmacyItems(dynamicPharmacyItems);
         }

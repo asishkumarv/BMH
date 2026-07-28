@@ -116,6 +116,18 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched crm_messages table.'))
     .catch(err => console.error('Error creating crm_messages table:', err.message));
 
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS medicine_metadata (
+      c_item_code VARCHAR(100) PRIMARY KEY,
+      video_link TEXT,
+      usage_description TEXT,
+      image_url TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+    .then(() => console.log('Successfully checked/patched medicine_metadata table.'))
+    .catch(err => console.error('Error creating medicine_metadata table:', err.message));
+
   pool.query('ALTER TABLE ecogreenpurchase_orders ADD COLUMN IF NOT EXISTS submitted_to_id VARCHAR(50)')
     .then(() => console.log('Successfully checked/patched submitted_to_id in ecogreenpurchase_orders.'))
     .catch(err => console.error('Error patching ecogreenpurchase_orders (submitted_to_id):', err.message));

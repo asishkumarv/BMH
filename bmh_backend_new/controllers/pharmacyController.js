@@ -737,30 +737,34 @@ exports.getStock = async (req, res) => {
         const search = req.body.search || '';
 
         let queryArgs = [limit, offset];
-        let whereClause = 'WHERE stockbalqty > 0';
+        let whereClause = 'WHERE ecogreen_medicines.stockbalqty > 0';
         let countQueryArgs = [];
 
         if (search) {
-            whereClause += ' AND (itemname ILIKE $3 OR c_item_code ILIKE $3)';
+            whereClause += ' AND (ecogreen_medicines.itemname ILIKE $3 OR ecogreen_medicines.c_item_code ILIKE $3)';
             queryArgs.push(`%${search}%`);
             countQueryArgs.push(`%${search}%`);
         }
 
         const dataQuery = `
             SELECT 
-                id, 
-                c_item_code, 
-                itemname AS "itemName", 
-                itemqtyperbox AS "itemQtyPerBox", 
-                batchno AS "batchNo", 
-                stockbalqty AS "stockBalQty", 
-                expirydate AS "expiryDate", 
-                mrp, 
-                salerate AS "saleRate", 
-                updated_at
+                ecogreen_medicines.id, 
+                ecogreen_medicines.c_item_code, 
+                ecogreen_medicines.itemname AS "itemName", 
+                ecogreen_medicines.itemqtyperbox AS "itemQtyPerBox", 
+                ecogreen_medicines.batchno AS "batchNo", 
+                ecogreen_medicines.stockbalqty AS "stockBalQty", 
+                ecogreen_medicines.expirydate AS "expiryDate", 
+                ecogreen_medicines.mrp, 
+                ecogreen_medicines.salerate AS "saleRate", 
+                ecogreen_medicines.updated_at,
+                meta.video_link,
+                meta.usage_description,
+                meta.image_url
             FROM ecogreen_medicines 
+            LEFT JOIN medicine_metadata meta ON ecogreen_medicines.c_item_code = meta.c_item_code
             ${whereClause}
-            ORDER BY itemname ASC
+            ORDER BY ecogreen_medicines.itemname ASC
             LIMIT $1 OFFSET $2
         `;
 
@@ -787,6 +791,173 @@ exports.getStock = async (req, res) => {
     } catch(err) {
          console.error('Stock fetch error:', err.message);
          res.status(500).json({ error: err.message });
+    }
+};
+
+exports.getMedicines = async (req, res) => {
+    try {
+        const page = parseInt(req.body.page) || 1;
+        const limit = parseInt(req.body.limit) || 20;
+        const offset = (page - 1) * limit;
+        const search = req.body.search || '';
+        const itemCode = req.body.item_code || '';
+        const expiryDate = req.body.expiry_date || '';
+
+        let queryArgs = [limit, offset];
+        let conditions = [];
+        let paramIndex = 3;
+
+        if (search) {
+            conditions.push(`(m.itemname ILIKE $${paramIndex} OR m.c_item_code ILIKE $${paramIndex})`);
+            queryArgs.push(`%${search}%`);
+            paramIndex++;
+        }
+
+        if (itemCode) {
+            conditions.push(`m.c_item_code ILIKE $${paramIndex}`);
+            queryArgs.push(`%${itemCode}%`);
+            paramIndex++;
+        }
+
+        if (expiryDate) {
+            conditions.push(`m.expirydate ILIKE $${paramIndex}`);
+            queryArgs.push(`%${expiryDate}%`);
+            paramIndex++;
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+        const dataQuery = `
+            SELECT 
+                m.id, 
+                m.c_item_code, 
+                m.itemname AS "itemName", 
+                m.itemqtyperbox AS "itemQtyPerBox", 
+                m.batchno AS "batchNo", 
+                m.stockbalqty AS "stockBalQty", 
+                m.expirydate AS "expiryDate", 
+                m.mrp, 
+                m.salerate AS "saleRate", 
+                m.updated_at,
+                meta.video_link,
+                meta.usage_description,
+                meta.image_url
+            FROM ecogreen_medicines m
+            LEFT JOIN medicine_metadata meta ON m.c_item_code = meta.c_item_code
+            ${whereClause}
+            ORDER BY m.itemname ASC
+            LIMIT $1 OFFSET $2
+        `;
+
+        const countQuery = `
+            SELECT COUNT(*) 
+            FROM ecogreen_medicines m
+            ${whereClause}
+        `;
+
+        const countQueryArgs = queryArgs.slice(2);
+
+        const [dataResult, countResult] = await Promise.all([
+            pool.query(dataQuery, queryArgs),
+            pool.query(countQuery, countQueryArgs)
+        ]);
+
+        const totalItems = parseInt(countResult.rows[0].count, 10);
+        const totalPages = Math.ceil(totalItems / limit);
+
+        return res.status(200).json({ 
+            success: true,
+            data: dataResult.rows, 
+            pagination: {
+                currentPage: page,
+                totalPages,
+                totalItems,
+                itemsPerPage: limit
+            }
+        });
+    } catch(err) {
+         console.error('Fetch medicines error:', err.message);
+         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.updateMedicine = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { id } = req.params;
+        const {
+            itemName,
+            itemQtyPerBox,
+            batchNo,
+            stockBalQty,
+            expiryDate,
+            mrp,
+            saleRate,
+            video_link,
+            usage_description,
+            image_url
+        } = req.body;
+
+        // 1. Update ecogreen_medicines
+        const updateMedicineQuery = `
+            UPDATE ecogreen_medicines
+            SET 
+                itemName = $1,
+                itemQtyPerBox = $2,
+                batchNo = $3,
+                stockBalQty = $4,
+                expiryDate = $5,
+                mrp = $6,
+                saleRate = $7,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $8
+            RETURNING c_item_code
+        `;
+        const medResult = await client.query(updateMedicineQuery, [
+            itemName,
+            parseInt(itemQtyPerBox) || 1,
+            batchNo,
+            parseFloat(stockBalQty) || 0,
+            expiryDate,
+            parseFloat(mrp) || 0,
+            parseFloat(saleRate) || 0,
+            id
+        ]);
+
+        if (medResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, message: 'Medicine not found' });
+        }
+
+        const c_item_code = medResult.rows[0].c_item_code;
+
+        // 2. Upsert medicine_metadata
+        const upsertMetadataQuery = `
+            INSERT INTO medicine_metadata (c_item_code, video_link, usage_description, image_url, updated_at)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+            ON CONFLICT (c_item_code)
+            DO UPDATE SET
+                video_link = EXCLUDED.video_link,
+                usage_description = EXCLUDED.usage_description,
+                image_url = EXCLUDED.image_url,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+        await client.query(upsertMetadataQuery, [
+            c_item_code,
+            video_link || null,
+            usage_description || null,
+            image_url || null
+        ]);
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Medicine updated successfully' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Update medicine error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
     }
 };
 

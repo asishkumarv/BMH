@@ -380,6 +380,9 @@ export default function LeaveManagement() {
                     key={t}
                     onPress={() => {
                       setRequestType(t);
+                      if (t !== 'leave') {
+                        setIsHalfDay(false);
+                      }
                     }}
                     style={{
                       paddingVertical: 10,
@@ -515,62 +518,64 @@ export default function LeaveManagement() {
             </View>
 
             {/* Half Day Selection */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-              <Pressable 
-                onPress={() => {
-                  setIsHalfDay(!isHalfDay);
-                }} 
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <View style={{
-                  width: 20,
-                  height: 20,
-                  borderWidth: 2,
-                  borderColor: Colors.light.primary,
-                  borderRadius: 4,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 8,
-                  backgroundColor: isHalfDay ? Colors.light.primary : 'transparent'
-                }}>
-                  {isHalfDay && <View style={{ width: 10, height: 10, backgroundColor: 'white', borderRadius: 2 }} />}
-                </View>
-                <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '500' }}>Apply for Half Day</Text>
-              </Pressable>
+            {requestType === 'leave' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                <Pressable 
+                  onPress={() => {
+                    setIsHalfDay(!isHalfDay);
+                  }} 
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
+                  <View style={{
+                    width: 20,
+                    height: 20,
+                    borderWidth: 2,
+                    borderColor: Colors.light.primary,
+                    borderRadius: 4,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 8,
+                    backgroundColor: isHalfDay ? Colors.light.primary : 'transparent'
+                  }}>
+                    {isHalfDay && <View style={{ width: 10, height: 10, backgroundColor: 'white', borderRadius: 2 }} />}
+                  </View>
+                  <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '500' }}>Apply for Half Day</Text>
+                </Pressable>
 
-              {isHalfDay && (
-                <View style={{ flex: 1, flexDirection: 'row', gap: 8, minWidth: 200 }}>
-                  <Pressable 
-                    onPress={() => setHalfDaySession('first_half')}
-                    style={{
-                      flex: 1,
-                      padding: 10,
-                      borderWidth: 1,
-                      borderColor: halfDaySession === 'first_half' ? Colors.light.primary : Colors.light.border,
-                      borderRadius: 8,
-                      backgroundColor: halfDaySession === 'first_half' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, color: halfDaySession === 'first_half' ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>First Half</Text>
-                  </Pressable>
-                  <Pressable 
-                    onPress={() => setHalfDaySession('second_half')}
-                    style={{
-                      flex: 1,
-                      padding: 10,
-                      borderWidth: 1,
-                      borderColor: halfDaySession === 'second_half' ? Colors.light.primary : Colors.light.border,
-                      borderRadius: 8,
-                      backgroundColor: halfDaySession === 'second_half' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, color: halfDaySession === 'second_half' ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>Second Half</Text>
-                  </Pressable>
-                </View>
-              )}
-            </View>
+                {isHalfDay && (
+                  <View style={{ flex: 1, flexDirection: 'row', gap: 8, minWidth: 200 }}>
+                    <Pressable 
+                      onPress={() => setHalfDaySession('first_half')}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderWidth: 1,
+                        borderColor: halfDaySession === 'first_half' ? Colors.light.primary : Colors.light.border,
+                        borderRadius: 8,
+                        backgroundColor: halfDaySession === 'first_half' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: halfDaySession === 'first_half' ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>First Half</Text>
+                    </Pressable>
+                    <Pressable 
+                      onPress={() => setHalfDaySession('second_half')}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderWidth: 1,
+                        borderColor: halfDaySession === 'second_half' ? Colors.light.primary : Colors.light.border,
+                        borderRadius: 8,
+                        backgroundColor: halfDaySession === 'second_half' ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: halfDaySession === 'second_half' ? Colors.light.primary : Colors.light.text, fontWeight: '600' }}>Second Half</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Reason for Request</Text>
               <TextInput

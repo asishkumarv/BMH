@@ -12,5 +12,7 @@ router.post('/customers', pharmacyController.getCustomers);
 router.post('/purchase-order', pharmacyController.getPurchaseOrder);
 router.get('/order-status', pharmacyController.getOrderStatus);
 router.get('/webhooks', pharmacyController.getWebhooks);
+router.post('/medicines-list', pharmacyController.getMedicines);
+router.put('/medicines/:id', pharmacyController.updateMedicine);
 
 module.exports = router;

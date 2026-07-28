@@ -12,6 +12,7 @@ export default function AdminSettings() {
   const [peonAssignmentAccess, setPeonAssignmentAccess] = useState<Record<string, boolean>>({});
   const [crmAccess, setCrmAccess] = useState<Record<string, boolean>>({});
   const [storeDeliveryAccess, setStoreDeliveryAccess] = useState<Record<string, boolean>>({});
+  const [itemMasterAccess, setItemMasterAccess] = useState<Record<string, boolean>>({});
   
   const [doubleTickApiKey, setDoubleTickApiKey] = useState('');
   const [doubleTickWaba, setDoubleTickWaba] = useState('');
@@ -63,6 +64,7 @@ export default function AdminSettings() {
       setPeonAssignmentAccess(parseSetting('peon_assignment_access'));
       setCrmAccess(parseSetting('crm_access'));
       setStoreDeliveryAccess(parseSetting('store_delivery_access'));
+      setItemMasterAccess(parseSetting('item_master_access'));
       
       const configVal = parseSetting('doubletick_config');
       setDoubleTickApiKey(configVal.apiKey || '');
@@ -205,6 +207,7 @@ export default function AdminSettings() {
         {renderCard('Order Assign Access', 'Control which employees have access to view and assign deliveries for all orders on the Order Assign page.', 'Order Assign Access')}
         {renderCard('Granular CRM & Bulk Messaging Access', 'Control which Employees and Sub-Admins can access the WhatsApp CRM and send customer notifications.', 'CRM Access')}
         {renderCard('Store Delivery Access', 'Control which Employees and Sub-Admins can pick up and deliver store orders on the Store Delivery page.', 'Store Delivery Access')}
+        {renderCard('Item Master Access', 'Control which Employees and Sub-Admins can view and edit the database Item Master medicines list.', 'Item Master Access')}
 
         {/* DoubleTick Configuration Section */}
         <View style={styles.card}>
@@ -259,6 +262,7 @@ export default function AdminSettings() {
       {renderAccessList('Order Assign Access', 'order_assign_access', orderAssignAccess, setOrderAssignAccess)}
       {renderAccessList('CRM Access', 'crm_access', crmAccess, setCrmAccess)}
       {renderAccessList('Store Delivery Access', 'store_delivery_access', storeDeliveryAccess, setStoreDeliveryAccess)}
+      {renderAccessList('Item Master Access', 'item_master_access', itemMasterAccess, setItemMasterAccess)}
     </View>
   );
 }

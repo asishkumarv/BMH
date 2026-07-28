@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Search, ShoppingCart, Plus, Minus, Pill } from 'lucide-react-native';
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, Image, Linking, ScrollView } from 'react-native';
+import { Search, ShoppingCart, Plus, Minus, Pill, X, Film, FileText } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useResponsive } from '../../hooks/useResponsive';
 
@@ -12,6 +12,7 @@ export default function MedicineStoreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
   
   // Cart is managed locally for simplicity, though a global state/context would be better for a full app.
   // We'll store it in localStorage on web to pass to the cart page.
@@ -136,13 +137,19 @@ export default function MedicineStoreScreen() {
           const cartItem = cart[item.c_item_code];
           return (
             <View style={[styles.card, { width: isMobile ? '47%' : '23%' }]}>
-              <View style={styles.imagePlaceholder}>
-                <Pill color="#94A3B8" size={32} />
-              </View>
-              <View style={styles.cardInfo}>
-                <Text style={styles.itemName} numberOfLines={2}>{item.itemName}</Text>
-                <Text style={styles.itemDesc} numberOfLines={1}>Exp: {item.expiryDate}</Text>
-              </View>
+              <TouchableOpacity onPress={() => setSelectedProduct(item)} style={{ flex: 1 }}>
+                <View style={styles.imagePlaceholder}>
+                  {item.image_url ? (
+                    <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%', borderRadius: 12 }} resizeMode="cover" />
+                  ) : (
+                    <Pill color="#94A3B8" size={32} />
+                  )}
+                </View>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.itemName} numberOfLines={2}>{item.itemName}</Text>
+                  <Text style={styles.itemDesc} numberOfLines={1}>Exp: {item.expiryDate}</Text>
+                </View>
+              </TouchableOpacity>
               
               <View style={styles.cardFooter}>
                 <Text style={styles.itemPrice}>₹{item.saleRate}</Text>
@@ -169,6 +176,90 @@ export default function MedicineStoreScreen() {
           );
         }}
       />
+
+      {/* Product Details Modal */}
+      {selectedProduct && (
+        <Modal visible={!!selectedProduct} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Product Details</Text>
+                <TouchableOpacity onPress={() => setSelectedProduct(null)}>
+                  <X size={24} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <View style={styles.modalImageContainer}>
+                  {selectedProduct.image_url ? (
+                    <Image source={{ uri: selectedProduct.image_url }} style={styles.modalImage} resizeMode="contain" />
+                  ) : (
+                    <View style={styles.modalNoImage}>
+                      <Pill color="#94A3B8" size={64} />
+                      <Text style={{ marginTop: 12, color: '#94A3B8' }}>No Image Available</Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text style={styles.modalItemName}>{selectedProduct.itemName}</Text>
+                <Text style={styles.modalItemCode}>Item Code: {selectedProduct.c_item_code}</Text>
+
+                <View style={styles.infoGrid}>
+                  <View style={styles.infoCol}>
+                    <Text style={styles.infoLabel}>Expiry Date</Text>
+                    <Text style={styles.infoValue}>{selectedProduct.expiryDate || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.infoCol}>
+                    <Text style={styles.infoLabel}>Batch No</Text>
+                    <Text style={styles.infoValue}>{selectedProduct.batchNo || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.infoCol}>
+                    <Text style={styles.infoLabel}>Qty/Box</Text>
+                    <Text style={styles.infoValue}>{selectedProduct.itemQtyPerBox || '1'} Units</Text>
+                  </View>
+                </View>
+
+                <View style={styles.priceRow}>
+                  <View>
+                    <Text style={styles.infoLabel}>Maximum Retail Price (MRP)</Text>
+                    <Text style={styles.modalMrp}>₹{selectedProduct.mrp}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.infoLabel}>Our Special Price</Text>
+                    <Text style={styles.modalSaleRate}>₹{selectedProduct.saleRate}</Text>
+                  </View>
+                </View>
+
+                {selectedProduct.usage_description ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>How to Use / Usage Instructions</Text>
+                    <Text style={styles.detailSectionText}>{selectedProduct.usage_description}</Text>
+                  </View>
+                ) : null}
+
+                {selectedProduct.video_link ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Video Guide & Demonstration</Text>
+                    <TouchableOpacity 
+                      style={styles.videoBtn}
+                      onPress={() => Linking.openURL(selectedProduct.video_link)}
+                    >
+                      <Film size={18} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={styles.videoBtnText}>Watch Usage Video</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedProduct(null)}>
+                  <Text style={styles.closeBtnText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -324,5 +415,164 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     fontWeight: 'bold',
     color: '#0F172A'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 550,
+    maxHeight: '90%',
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalImageContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalNoImage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalItemName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  modalItemCode: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 20,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  infoCol: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 16,
+  },
+  modalMrp: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#64748B',
+    textDecorationLine: 'line-through',
+  },
+  modalSaleRate: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  detailSection: {
+    marginBottom: 20,
+  },
+  detailSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  detailSectionText: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  videoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F172A',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  videoBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    alignItems: 'flex-end',
+  },
+  closeBtn: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  closeBtnText: {
+    color: '#475569',
+    fontWeight: '700',
+    fontSize: 14,
   }
 });
