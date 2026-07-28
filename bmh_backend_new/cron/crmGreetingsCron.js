@@ -153,19 +153,18 @@ async function processGreetings(order, tableType) {
     return false; // Retry later when admin configures it
   }
 
-  // Build greetings message content placeholders
-  let instructionsText = '';
-  itemsWithGuides.forEach((item, index) => {
-    instructionsText += `${index + 1}. ${item.name} (Qty: ${item.qty})\n`;
-    if (item.desc) {
-      instructionsText += `   Instructions: ${item.desc}\n`;
+  // Build greetings message content placeholders (No newlines allowed in Meta template variable values)
+  const itemsTextList = itemsWithGuides.map((item, index) => {
+    let piece = `${index + 1}. ${item.name} (Qty: ${item.qty})`;
+    let details = [];
+    if (item.desc) details.push(`Instructions: ${item.desc}`);
+    if (item.video) details.push(`Video: ${item.video}`);
+    if (details.length > 0) {
+      piece += ` [ ${details.join(' | ')} ]`;
     }
-    if (item.video) {
-      instructionsText += `   Video: ${item.video}\n`;
-    }
-    instructionsText += `\n`;
+    return piece;
   });
-  instructionsText = instructionsText.trim();
+  const instructionsText = itemsTextList.join('; ');
 
   // Send Template message via DoubleTick V2 API
   try {
@@ -182,9 +181,9 @@ async function processGreetings(order, tableType) {
               templateData: {
                 body: {
                   placeholders: [
-                    patientName,
-                    orderNo,
-                    instructionsText
+                    { "1": patientName },
+                    { "2": orderNo },
+                    { "3": instructionsText }
                   ]
                 }
               }
@@ -221,9 +220,7 @@ async function runGreetingsScan() {
        FROM ecogreen_sales_invoices 
        WHERE status = 'Delivered' 
          AND crm_greetings_sent IS NOT TRUE 
-         AND created_at >= $1
-       LIMIT 10`,
-      [serviceStartTime]
+       LIMIT 10`
     );
     for (const order of res1.rows) {
       const success = await processGreetings(order, 'ecogreen_sales_invoices');
@@ -238,9 +235,7 @@ async function runGreetingsScan() {
        FROM ecogreensales_invoices 
        WHERE status = 'Delivered' 
          AND crm_greetings_sent IS NOT TRUE 
-         AND created_at >= $1
-       LIMIT 10`,
-      [serviceStartTime]
+       LIMIT 10`
     );
     for (const order of res2.rows) {
       const success = await processGreetings(order, 'ecogreensales_invoices');
@@ -255,9 +250,7 @@ async function runGreetingsScan() {
        FROM ecogreen_sales_orders 
        WHERE status = 'Delivered' 
          AND crm_greetings_sent IS NOT TRUE 
-         AND created_at >= $1
-       LIMIT 10`,
-      [serviceStartTime]
+       LIMIT 10`
     );
     for (const order of res3.rows) {
       const success = await processGreetings(order, 'ecogreen_sales_orders');
@@ -272,9 +265,7 @@ async function runGreetingsScan() {
        FROM ecogreensales_orders 
        WHERE status = 'Delivered' 
          AND crm_greetings_sent IS NOT TRUE 
-         AND created_at >= $1
-       LIMIT 10`,
-      [serviceStartTime]
+       LIMIT 10`
     );
     for (const order of res4.rows) {
       const success = await processGreetings(order, 'ecogreensales_orders');
