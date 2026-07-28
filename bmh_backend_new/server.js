@@ -283,6 +283,22 @@ app.listen(PORT, () => {
   pool.query("ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS payment_re_edited_by VARCHAR(255)").catch(e => console.error(e.message));
   pool.query("ALTER TABLE manual_orders ADD COLUMN IF NOT EXISTS payment_re_edited_by VARCHAR(255)").catch(e => console.error(e.message));
 
+  pool.query("ALTER TABLE ecogreen_sales_invoices ADD COLUMN IF NOT EXISTS crm_greetings_sent BOOLEAN DEFAULT FALSE").then(() => {
+    pool.query("UPDATE ecogreen_sales_invoices SET crm_greetings_sent = TRUE WHERE crm_greetings_sent IS NULL").catch(e => {});
+  }).catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS crm_greetings_sent BOOLEAN DEFAULT FALSE").then(() => {
+    pool.query("UPDATE ecogreensales_invoices SET crm_greetings_sent = TRUE WHERE crm_greetings_sent IS NULL").catch(e => {});
+  }).catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS crm_greetings_sent BOOLEAN DEFAULT FALSE").then(() => {
+    pool.query("UPDATE ecogreen_sales_orders SET crm_greetings_sent = TRUE WHERE crm_greetings_sent IS NULL").catch(e => {});
+  }).catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS crm_greetings_sent BOOLEAN DEFAULT FALSE").then(() => {
+    pool.query("UPDATE ecogreensales_orders SET crm_greetings_sent = TRUE WHERE crm_greetings_sent IS NULL").catch(e => {});
+  }).catch(e => console.error(e.message));
+
   // ecogreensales_invoices modifications
   pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending'").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS delivered_by_id INTEGER").catch(e => console.error(e.message));
@@ -473,6 +489,14 @@ app.listen(PORT, () => {
     startSalesInvoiceCron();
   } catch (err) {
     console.error("Failed to start sales invoice sync cron:", err.message);
+  }
+
+  // Initialize CRM Greetings Background Sync
+  try {
+    const { startCrmGreetingsCron } = require('./cron/crmGreetingsCron');
+    startCrmGreetingsCron();
+  } catch (err) {
+    console.error("Failed to start CRM greetings scan cron:", err.message);
   }
 
   // Initialize and Seed Doctor Schedules DB Table
