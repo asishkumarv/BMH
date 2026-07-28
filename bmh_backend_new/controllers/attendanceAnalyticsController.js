@@ -528,9 +528,9 @@ exports.getDashboardAttendanceStats = async (req, res) => {
     `);
 
     const leaveRes = await pool.query(`
-      SELECT employee_id, user_type, start_date, end_date, status, is_half_day 
+      SELECT employee_id, user_type, start_date, end_date, status, is_half_day, reason 
       FROM leave_requests 
-      WHERE status = 'approved' AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
+      WHERE LOWER(status) = 'approved' AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
     `);
 
     // Index today's attendance and leaves
@@ -632,7 +632,8 @@ exports.getDashboardAttendanceStats = async (req, res) => {
       };
 
       if (leave || (att && att.status === 'Leave')) {
-        item.status = 'On Leave';
+        item.status = 'In Leave';
+        item.deviation = leave ? leave.reason : null;
         categories.on_leave.count++;
         categories.on_leave[targetListKey].push(item);
       } else if (att && att.check_in) {

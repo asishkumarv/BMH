@@ -6,7 +6,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks } from 'lucide-react-native';
+import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks, AlertTriangle, CalendarRange } from 'lucide-react-native';
 import LeaveManagement from './leave-management';
 
 export default function EmployeeDashboardScreen() {
@@ -21,6 +21,9 @@ export default function EmployeeDashboardScreen() {
   const [summary, setSummary] = useState<any>(null);
   const [activeWorkingHours, setActiveWorkingHours] = useState<string>('0h 0m');
   const [cameraMessage, setCameraMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
+  const [absentList, setAbsentList] = useState<any[]>([]);
+  const [leaveList, setLeaveList] = useState<any[]>([]);
+  const [loadingStats, setLoadingStats] = useState(false);
   const cameraRef = useRef<any>(null);
 
   // Animation values
@@ -48,6 +51,7 @@ export default function EmployeeDashboardScreen() {
         const parsedUser = JSON.parse(userStr);
         setUser(parsedUser);
         fetchSummary(parsedUser.id);
+        fetchAbsentLeaveStats();
       }
     };
     loadUser();
@@ -63,6 +67,30 @@ export default function EmployeeDashboardScreen() {
       }
     } catch (err) {
       console.log("Error fetching personal attendance", err);
+    }
+  };
+
+  const fetchAbsentLeaveStats = async () => {
+    setLoadingStats(true);
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/attendance/dashboard-stats');
+      if (res.data.success && res.data.stats) {
+        const stats = res.data.stats;
+        const absent = [
+          ...(stats.absent?.employees || []),
+          ...(stats.absent?.sub_admins || [])
+        ];
+        const leaves = [
+          ...(stats.on_leave?.employees || []),
+          ...(stats.on_leave?.sub_admins || [])
+        ];
+        setAbsentList(absent);
+        setLeaveList(leaves);
+      }
+    } catch (error) {
+      console.error('Error fetching absent/leave stats', error);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -328,6 +356,73 @@ export default function EmployeeDashboardScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* Leaves & Absences Widget */}
+        <View style={styles.statsListSection}>
+          <Text style={styles.sectionTitle}>Today's Leaves & Absences</Text>
+          {loadingStats ? (
+            <ActivityIndicator color={Colors.light.primary} size="small" style={{ margin: 20 }} />
+          ) : (
+            <View style={[styles.statsListGrid, !isDesktop && styles.statsListGridMobile]}>
+              {/* Leaves card */}
+              <View style={styles.statsListCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <CalendarRange size={20} color="#d97706" />
+                  <Text style={styles.statsCardHeaderTitle}>In Leave ({leaveList.length})</Text>
+                </View>
+                <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+                  <View style={{ gap: 10 }}>
+                    {leaveList.map((item, i) => (
+                      <View key={`leave-${i}`} style={styles.statusRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.employeeNameText}>{item.name}</Text>
+                          <Text style={styles.employeeRoleText}>{item.role} • {item.department}</Text>
+                          {item.deviation ? (
+                            <Text style={{ fontSize: 11, color: '#b45309', fontStyle: 'italic', marginTop: 2 }}>
+                              Reason: {item.deviation}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: '#fef3c7' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#d97706' }]}>In Leave</Text>
+                        </View>
+                      </View>
+                    ))}
+                    {leaveList.length === 0 && (
+                      <Text style={styles.emptyText}>No one is in leave today.</Text>
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
+
+              {/* Absents card */}
+              <View style={styles.statsListCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <AlertTriangle size={20} color="#dc2626" />
+                  <Text style={styles.statsCardHeaderTitle}>Absent ({absentList.length})</Text>
+                </View>
+                <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+                  <View style={{ gap: 10 }}>
+                    {absentList.map((item, i) => (
+                      <View key={`absent-${i}`} style={styles.statusRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.employeeNameText}>{item.name}</Text>
+                          <Text style={styles.employeeRoleText}>{item.role} • {item.department}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: '#fee2e2' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#dc2626' }]}>Absent</Text>
+                        </View>
+                      </View>
+                    ))}
+                    {absentList.length === 0 && (
+                      <Text style={styles.emptyText}>No absentees today.</Text>
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          )}
+        </View>
       </View>
       </ScrollView>
     </View>
@@ -357,5 +452,67 @@ const styles = StyleSheet.create({
   allDoneSub: { fontSize: 16, color: '#6b7280', marginTop: 8 },
   cameraOverlay: { position: 'absolute', bottom: 40, width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20 },
   captureBtn: { backgroundColor: Colors.light.primary, paddingVertical: 15, paddingHorizontal: 30, borderRadius: 30, elevation: 5 },
-  captureBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  captureBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  statsListSection: { 
+    marginTop: 24, 
+    backgroundColor: '#ffffff', 
+    padding: 32, 
+    borderRadius: 24, 
+    shadowColor: '#cbd5e1', 
+    shadowOpacity: 0.4, 
+    shadowRadius: 15, 
+    shadowOffset: {width: 0, height: 10}, 
+    elevation: 5 
+  },
+  statsListGrid: {
+    flexDirection: 'row',
+    gap: 24,
+    marginTop: 16
+  },
+  statsListGridMobile: {
+    flexDirection: 'column'
+  },
+  statsListCard: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  statsCardHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#334155'
+  },
+  statusRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9'
+  },
+  employeeNameText: { fontSize: 13, fontWeight: '600', color: '#1e293b' },
+  employeeRoleText: { fontSize: 11, color: '#64748b', marginTop: 1 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  emptyText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    paddingHorizontal: 12,
+    paddingVertical: 4
+  }
 });

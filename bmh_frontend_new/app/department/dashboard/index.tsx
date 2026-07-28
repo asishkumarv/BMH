@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, TouchableOpacity, Alert, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
-import { Users, FileText, CheckCircle, Clock, Sun, Moon, Utensils, CheckCircle2 } from 'lucide-react-native';
+import { Users, FileText, CheckCircle, Clock, Sun, Moon, Utensils, CheckCircle2, AlertTriangle, CalendarRange } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -22,6 +22,9 @@ export default function SubAdminDashboard() {
   });
 
   const [summary, setSummary] = useState<any>(null);
+  const [absentList, setAbsentList] = useState<any[]>([]);
+  const [leaveList, setLeaveList] = useState<any[]>([]);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
@@ -58,6 +61,7 @@ export default function SubAdminDashboard() {
             setUser(parsedUser);
             fetchSummary(parsedUser.id);
             fetchMetrics(parsedUser.department_id);
+            fetchAbsentLeaveStats();
           }
       } catch (error) {
         console.error('Initialization error', error);
@@ -68,6 +72,30 @@ export default function SubAdminDashboard() {
     
     initialize();
   }, []);
+
+  const fetchAbsentLeaveStats = async () => {
+    setLoadingStats(true);
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/attendance/dashboard-stats');
+      if (res.data.success && res.data.stats) {
+        const stats = res.data.stats;
+        const absent = [
+          ...(stats.absent?.employees || []),
+          ...(stats.absent?.sub_admins || [])
+        ];
+        const leaves = [
+          ...(stats.on_leave?.employees || []),
+          ...(stats.on_leave?.sub_admins || [])
+        ];
+        setAbsentList(absent);
+        setLeaveList(leaves);
+      }
+    } catch (error) {
+      console.error('Error fetching absent/leave stats', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const fetchMetrics = async (departmentId: number) => {
     try {
@@ -310,6 +338,62 @@ export default function SubAdminDashboard() {
               <Text style={styles.placeholderText}>Task metrics visualization</Text>
             </View>
           </View>
+
+          <View style={[styles.chartCard, { flex: 1.5 }]}>
+            <Text style={styles.cardTitle}>Today's Leaves & Absences</Text>
+            <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+              {loadingStats ? (
+                <ActivityIndicator color={Colors.light.primary} size="small" style={{ margin: 20 }} />
+              ) : (
+                <View style={{ gap: 12 }}>
+                  {/* Leaves Section */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <CalendarRange size={16} color="#d97706" />
+                    <Text style={styles.subSectionTitle}>In Leave ({leaveList.length})</Text>
+                  </View>
+                  {leaveList.map((item, i) => (
+                    <View key={`leave-${i}`} style={styles.statusRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.employeeNameText}>{item.name}</Text>
+                        <Text style={styles.employeeRoleText}>{item.role} • {item.department}</Text>
+                        {item.deviation ? (
+                          <Text style={{ fontSize: 11, color: '#b45309', fontStyle: 'italic', marginTop: 2 }}>
+                            Reason: {item.deviation}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: '#fef3c7' }]}>
+                        <Text style={[styles.statusBadgeText, { color: '#d97706' }]}>In Leave</Text>
+                      </View>
+                    </View>
+                  ))}
+                  {leaveList.length === 0 && (
+                    <Text style={styles.emptyText}>No one is in leave today.</Text>
+                  )}
+
+                  {/* Absents Section */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 4 }}>
+                    <AlertTriangle size={16} color="#dc2626" />
+                    <Text style={styles.subSectionTitle}>Absent ({absentList.length})</Text>
+                  </View>
+                  {absentList.map((item, i) => (
+                    <View key={`absent-${i}`} style={styles.statusRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.employeeNameText}>{item.name}</Text>
+                        <Text style={styles.employeeRoleText}>{item.role} • {item.department}</Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: '#fee2e2' }]}>
+                        <Text style={[styles.statusBadgeText, { color: '#dc2626' }]}>Absent</Text>
+                      </View>
+                    </View>
+                  ))}
+                  {absentList.length === 0 && (
+                    <Text style={styles.emptyText}>No absentees today.</Text>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+          </View>
         </View>
 
       </ScrollView>
@@ -438,5 +522,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   captureBtn: { backgroundColor: Colors.light.primary, paddingVertical: 15, paddingHorizontal: 30, borderRadius: 30, elevation: 5, alignItems: 'center' },
-  captureBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  captureBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  subSectionTitle: { fontSize: 13, fontWeight: '700', color: '#475569' },
+  statusRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9'
+  },
+  employeeNameText: { fontSize: 13, fontWeight: '600', color: '#1e293b' },
+  employeeRoleText: { fontSize: 11, color: '#64748b', marginTop: 1 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  emptyText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    paddingHorizontal: 12,
+    paddingVertical: 4
+  }
 });
