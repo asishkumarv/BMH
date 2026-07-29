@@ -393,3 +393,62 @@ exports.getAllHandovers = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+exports.getWalletHistory = async (req, res) => {
+  try {
+    const { employee_id } = req.params; // e.g. "EMP-1" or "SA-20"
+    const numericId = employee_id.replace('EMP-', '').replace('SA-', '');
+
+    // 1. Handovers
+    const handoversQuery = `
+      SELECT ch.*, 
+             COALESCE(f.full_name, d_f.full_name, s_f.full_name, 'Unknown') as from_name,
+             COALESCE(t.full_name, d_t.full_name, s_t.full_name, 'Unknown') as to_name
+      FROM cash_handovers ch
+      LEFT JOIN employees f ON ch.from_employee_id = f.id::text OR ch.from_employee_id = 'EMP-' || f.id::text
+      LEFT JOIN department_admins d_f ON ch.from_employee_id = 'SA-' || d_f.id::text OR ch.from_employee_id = d_f.id::text
+      LEFT JOIN super_admins s_f ON ch.from_employee_id = 'ADMIN-' || s_f.id::text
+      LEFT JOIN employees t ON ch.to_employee_id = t.id::text OR ch.to_employee_id = 'EMP-' || t.id::text
+      LEFT JOIN department_admins d_t ON ch.to_employee_id = 'SA-' || d_t.id::text OR ch.to_employee_id = d_t.id::text
+      LEFT JOIN super_admins s_t ON ch.to_employee_id = 'ADMIN-' || s_t.id::text
+      WHERE ch.from_employee_id = $1 OR ch.to_employee_id = $1
+         OR ch.from_employee_id = $2 OR ch.to_employee_id = $2
+      ORDER BY ch.created_at DESC
+    `;
+    const handoversRes = await pool.query(handoversQuery, [employee_id, numericId]);
+
+    // 2. Bookings
+    const bookingsQuery = `
+      SELECT pb.id, pb.booking_date, pb.booking_time, pb.amount, pb.payment_status, pb.payment_method, pb.created_at,
+             p.name as patient_name
+      FROM patient_bookings pb
+      LEFT JOIN patients p ON pb.patient_id = p.id
+      WHERE (pb.payment_method = 'Cash' OR pb.payment_method = 'cash')
+        AND (pb.created_by_id = $1 OR pb.created_by_id = $2)
+      ORDER BY pb.created_at DESC
+    `;
+    const bookingsRes = await pool.query(bookingsQuery, [employee_id, numericId]);
+
+    // 3. Orders
+    const ordersQuery = `
+      SELECT mo.id, mo.order_no, mo.invoice_no, mo.amount, mo.paid_amount, mo.payment_mode, mo.order_date, mo.status, mo.created_at, mo.customer_name
+      FROM manual_orders mo
+      WHERE (mo.payment_mode = 'Cash' OR mo.payment_mode = 'cash')
+        AND (mo.created_by_id = $1 OR mo.created_by_id = $2)
+      ORDER BY mo.created_at DESC
+    `;
+    const ordersRes = await pool.query(ordersQuery, [employee_id, numericId]);
+
+    res.json({
+      success: true,
+      data: {
+        handovers: handoversRes.rows,
+        bookings: bookingsRes.rows,
+        orders: ordersRes.rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching wallet history:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching wallet history' });
+  }
+};

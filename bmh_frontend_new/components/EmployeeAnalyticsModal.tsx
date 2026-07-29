@@ -410,7 +410,6 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                       <View style={styles.tableHeaderRow}>
                         <Text style={styles.tableCellHeader}>Date</Text>
                         <Text style={styles.tableCellHeader}>Break Details</Text>
-                        <Text style={[styles.tableCellHeader, { flex: 2 }]}>Images</Text>
                       </View>
                       {data.history.filter((row: any) => row.breaks && row.breaks.length > 0).length === 0 ? (
                         <Text style={{ textAlign: 'center', color: '#6b7280', marginVertical: 20 }}>No break logs found for this period.</Text>
@@ -427,20 +426,6 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                                   <Text style={{ fontSize: 12, color: '#4b5563' }}>
                                     {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </Text>
-                                </View>
-                              ))}
-                            </View>
-                            <View style={[styles.tableCell, { flex: 2, flexDirection: 'row', gap: 10, flexWrap: 'wrap' }]}>
-                              {row.breaks.map((b: any, bi: number) => (
-                                <View key={bi} style={{ alignItems: 'center', gap: 4 }}>
-                                  {b.image_url ? (
-                                    <Image source={{ uri: b.image_url }} style={styles.breakImage} />
-                                  ) : (
-                                    <View style={styles.breakImagePlaceholder}>
-                                      <Text style={{ fontSize: 9, color: '#94a3b8' }}>No Image</Text>
-                                    </View>
-                                  )}
-                                  <Text style={{ fontSize: 9, color: '#64748b' }}>{b.break_type === 'Break In' ? 'In Image' : 'Out Image'}</Text>
                                 </View>
                               ))}
                             </View>

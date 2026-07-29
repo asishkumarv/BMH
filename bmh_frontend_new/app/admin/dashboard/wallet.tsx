@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Alert, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users, HandCoins } from 'lucide-react-native';
 import axios from 'axios';
+import * as Print from 'expo-print';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -25,6 +26,19 @@ export default function AdminWalletScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [peers, setPeers] = useState<Peer[]>([]);
+
+  // Search & Filter state for cash holdings table
+  const [searchNameQuery, setSearchNameQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'All' | 'Sub Admin' | 'Employee'>('All');
+
+  // Details Modal state
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [employeeHistory, setEmployeeHistory] = useState<any>({ handovers: [], bookings: [], orders: [] });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [modalActiveTab, setModalActiveTab] = useState<'handovers' | 'bookings' | 'orders'>('handovers');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -82,12 +96,240 @@ export default function AdminWalletScreen() {
         setStats(statsRes.data.data);
       }
       if (balancesRes.data.success) {
-        setWalletBalances(balancesRes.data.data);
+        // Sort by cash_in_hand high to low
+        const sorted = (balancesRes.data.data || []).sort((a: any, b: any) => parseFloat(b.cash_in_hand || '0') - parseFloat(a.cash_in_hand || '0'));
+        setWalletBalances(sorted);
       }
     } catch (error) {
       console.error('Error fetching admin wallet:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openEmployeeDetails = async (employee: any) => {
+    setSelectedEmployee(employee);
+    setDetailsModalVisible(true);
+    setHistoryLoading(true);
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setModalActiveTab('handovers');
+    try {
+      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/wallet/history/${employee.employee_id}`);
+      if (res.data.success) {
+        setEmployeeHistory(res.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const filterDataByDate = (list: any[], dateField: string) => {
+    return list.filter(item => {
+      const itemDateStr = item[dateField] ? item[dateField].split('T')[0] : '';
+      if (!itemDateStr) return true;
+      if (filterStartDate && itemDateStr < filterStartDate) return false;
+      if (filterEndDate && itemDateStr > filterEndDate) return false;
+      return true;
+    });
+  };
+
+  const filteredHandovers = filterDataByDate(employeeHistory.handovers || [], 'created_at');
+  const filteredBookings = filterDataByDate(employeeHistory.bookings || [], 'created_at');
+  const filteredOrders = filterDataByDate(employeeHistory.orders || [], 'created_at');
+
+  const filteredBalances = walletBalances.filter(item => {
+    const name = item.full_name || '';
+    const empId = item.employee_id || '';
+    const matchesSearch = name.toLowerCase().includes(searchNameQuery.toLowerCase()) || 
+                          empId.toLowerCase().includes(searchNameQuery.toLowerCase());
+    
+    const roleLower = (item.role || '').toLowerCase();
+    const isSubAdmin = roleLower.includes('sub_admin') || roleLower.includes('sub admin');
+    
+    const matchesRole = roleFilter === 'All' || 
+                        (roleFilter === 'Sub Admin' && isSubAdmin) || 
+                        (roleFilter === 'Employee' && !isSubAdmin);
+    return matchesSearch && matchesRole;
+  });
+
+  const handleExportModalCSV = () => {
+    if (!selectedEmployee) return;
+    let csvContent = "";
+    let filename = `${selectedEmployee.full_name.replace(/\s+/g, '_')}_Wallet_Details`;
+    
+    if (modalActiveTab === 'handovers') {
+      csvContent = "Date,From,To,Amount,Status\n";
+      filteredHandovers.forEach(h => {
+        csvContent += `"${new Date(h.created_at).toLocaleString()}","${h.from_name}","${h.to_name}",${h.amount},"${h.status}"\n`;
+      });
+      filename += "_Handovers.csv";
+    } else if (modalActiveTab === 'bookings') {
+      csvContent = "Booking ID,Date,Patient,Amount,Status\n";
+      filteredBookings.forEach(b => {
+        csvContent += `${b.id},"${new Date(b.created_at).toLocaleString()}","${b.patient_name || 'N/A'}",${b.amount},"${b.payment_status}"\n`;
+      });
+      filename += "_Bookings.csv";
+    } else {
+      csvContent = "Order No,Date,Customer,Amount,Paid Amount,Status\n";
+      filteredOrders.forEach(o => {
+        csvContent += `"${o.order_no || 'N/A'}","${o.order_date || 'N/A'}","${o.customer_name || 'N/A'}",${o.amount},${o.paid_amount},"${o.status}"\n`;
+      });
+      filename += "_Orders.csv";
+    }
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      Alert.alert('Notice', 'CSV export is supported on Web.');
+    }
+  };
+
+  const handlePrintModalPDF = async () => {
+    if (!selectedEmployee) return;
+    
+    let rowsHtml = "";
+    let title = "";
+    
+    if (modalActiveTab === 'handovers') {
+      title = "Cash Handovers Transaction History";
+      rowsHtml = `
+        <thead>
+          <tr>
+            <th>Date/Time</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredHandovers.map(h => `
+            <tr>
+              <td>${new Date(h.created_at).toLocaleString()}</td>
+              <td>${h.from_name}</td>
+              <td>${h.to_name}</td>
+              <td>₹${h.amount}</td>
+              <td>${h.status}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+    } else if (modalActiveTab === 'bookings') {
+      title = "Bookings Cash Collection History";
+      rowsHtml = `
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Date/Time</th>
+            <th>Patient</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredBookings.map(b => `
+            <tr>
+              <td>#${b.id}</td>
+              <td>${new Date(b.created_at).toLocaleString()}</td>
+              <td>${b.patient_name || 'N/A'}</td>
+              <td>₹${b.amount}</td>
+              <td>${b.payment_status}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+    } else {
+      title = "Orders Cash Collection History";
+      rowsHtml = `
+        <thead>
+          <tr>
+            <th>Order No</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Amount</th>
+            <th>Paid</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredOrders.map(o => `
+            <tr>
+              <td>${o.order_no || 'N/A'}</td>
+              <td>${o.order_date ? new Date(o.order_date).toLocaleDateString() : 'N/A'}</td>
+              <td>${o.customer_name || 'N/A'}</td>
+              <td>₹${o.amount}</td>
+              <td>₹${o.paid_amount}</td>
+              <td>${o.status}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+    }
+
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            .header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; }
+            .header h1 { margin: 0; color: #1e3a8a; }
+            .emp-info { font-size: 14px; margin-top: 10px; color: #475569; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-size: 12px; }
+            th { background-color: #f8fafc; }
+            .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${title}</h1>
+            <div class="emp-info">
+              <strong>Employee:</strong> ${selectedEmployee.full_name} (${selectedEmployee.employee_id}) <br/>
+              <strong>Role:</strong> ${selectedEmployee.role} | <strong>Department:</strong> ${selectedEmployee.department || 'N/A'} <br/>
+              <strong>Filters:</strong> ${filterStartDate || 'All'} to ${filterEndDate || 'Today'}
+            </div>
+          </div>
+          <table>
+            ${rowsHtml}
+          </table>
+          <div class="footer">
+            Generated on ${new Date().toLocaleString()} | Bharat Medical Hall Plus
+          </div>
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.open();
+        iframe.contentDocument?.write(html);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+          document.body.removeChild(iframe);
+        }, 500);
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (err) {
+      console.error('Error printing PDF', err);
     }
   };
 
@@ -210,6 +452,35 @@ export default function AdminWalletScreen() {
               <Users size={20} color={Colors.light.text} />
               <Text style={[styles.sectionTitle, { marginBottom: 0, marginLeft: 8 }]}>Sub-Admin & Employee Cash Holdings</Text>
             </View>
+
+            {/* Search and Dropdown Filter */}
+            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              <TextInput
+                style={{ flex: 1, minWidth: 200, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 }}
+                placeholder="Search by employee/sub admin name or ID..."
+                value={searchNameQuery}
+                onChangeText={setSearchNameQuery}
+              />
+              {Platform.OS === 'web' ? (
+                <select
+                  value={roleFilter}
+                  onChange={(e: any) => setRoleFilter(e.target.value as any)}
+                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${Colors.light.border}`, fontSize: 14, outline: 'none', height: 38, cursor: 'pointer' }}
+                >
+                  <option value="All">All Roles</option>
+                  <option value="Sub Admin">Sub Admins Only</option>
+                  <option value="Employee">Employees Only</option>
+                </select>
+              ) : (
+                <TextInput
+                  style={{ width: 120, borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 }}
+                  placeholder="Role (All/Sub/Emp)"
+                  value={roleFilter}
+                  onChangeText={(val: any) => setRoleFilter(val)}
+                />
+              )}
+            </View>
+
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Name / ID</Text>
@@ -217,8 +488,8 @@ export default function AdminWalletScreen() {
                 <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>Department</Text>
                 <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Cash in Hand</Text>
               </View>
-              {walletBalances.map((item, idx) => (
-                <View key={idx} style={styles.tableRow}>
+              {filteredBalances.map((item, idx) => (
+                <Pressable key={idx} style={styles.tableRow} onPress={() => openEmployeeDetails(item)}>
                   <View style={{ flex: 2 }}>
                     <Text style={{ fontWeight: '500', color: Colors.light.text }}>{item.full_name}</Text>
                     <Text style={{ fontSize: 12, color: Colors.light.icon }}>{item.employee_id}</Text>
@@ -228,9 +499,9 @@ export default function AdminWalletScreen() {
                   <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#059669' }]}>
                     ₹{item.cash_in_hand}
                   </Text>
-                </View>
+                </Pressable>
               ))}
-              {walletBalances.length === 0 && (
+              {filteredBalances.length === 0 && (
                 <Text style={{ padding: 16, textAlign: 'center', color: Colors.light.icon }}>No balances found.</Text>
               )}
             </View>
@@ -313,6 +584,185 @@ export default function AdminWalletScreen() {
                 {submitting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.modalSubmitText}>Submit</Text>}
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={detailsModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 800, maxHeight: '90%' }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <View>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.light.text }}>
+                  {selectedEmployee?.full_name || 'Loading...'}
+                </Text>
+                <Text style={{ fontSize: 14, color: Colors.light.icon }}>
+                  {selectedEmployee?.role} • {selectedEmployee?.department || 'N/A'} ({selectedEmployee?.employee_id})
+                </Text>
+              </View>
+              <Pressable style={{ padding: 8 }} onPress={() => setDetailsModalVisible(false)}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ef4444' }}>Close</Text>
+              </Pressable>
+            </View>
+
+            {/* Date Filters & Export/Print Actions */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+              {Platform.OS === 'web' ? (
+                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600' }}>From:</Text>
+                  <input 
+                    type="date" 
+                    value={filterStartDate} 
+                    onChange={(e: any) => setFilterStartDate(e.target.value)} 
+                    style={{ padding: 8, borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                  <Text style={{ fontSize: 14, fontWeight: '600' }}>To:</Text>
+                  <input 
+                    type="date" 
+                    value={filterEndDate} 
+                    onChange={(e: any) => setFilterEndDate(e.target.value)} 
+                    style={{ padding: 8, borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', flex: 1 }}>
+                  <TextInput
+                    style={{ flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 8 }}
+                    placeholder="Start (YYYY-MM-DD)"
+                    value={filterStartDate}
+                    onChangeText={setFilterStartDate}
+                  />
+                  <TextInput
+                    style={{ flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 8 }}
+                    placeholder="End (YYYY-MM-DD)"
+                    value={filterEndDate}
+                    onChangeText={setFilterEndDate}
+                  />
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable 
+                  style={{ backgroundColor: '#10b981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }} 
+                  onPress={handleExportModalCSV}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Export CSV</Text>
+                </Pressable>
+                <Pressable 
+                  style={{ backgroundColor: '#3b82f6', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }} 
+                  onPress={handlePrintModalPDF}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Print PDF</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Modal Tabs */}
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', marginBottom: 15 }}>
+              <Pressable 
+                style={[{ paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' }, modalActiveTab === 'handovers' && { borderBottomColor: '#3b82f6' }]} 
+                onPress={() => setModalActiveTab('handovers')}
+              >
+                <Text style={[{ fontSize: 15, color: '#64748b' }, modalActiveTab === 'handovers' && { color: '#3b82f6', fontWeight: '700' }]}>
+                  Handovers
+                </Text>
+              </Pressable>
+              <Pressable 
+                style={[{ paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' }, modalActiveTab === 'bookings' && { borderBottomColor: '#3b82f6' }]} 
+                onPress={() => setModalActiveTab('bookings')}
+              >
+                <Text style={[{ fontSize: 15, color: '#64748b' }, modalActiveTab === 'bookings' && { color: '#3b82f6', fontWeight: '700' }]}>
+                  Bookings
+                </Text>
+              </Pressable>
+              <Pressable 
+                style={[{ paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' }, modalActiveTab === 'orders' && { borderBottomColor: '#3b82f6' }]} 
+                onPress={() => setModalActiveTab('orders')}
+              >
+                <Text style={[{ fontSize: 15, color: '#64748b' }, modalActiveTab === 'orders' && { color: '#3b82f6', fontWeight: '700' }]}>
+                  Orders
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Tab content table */}
+            {historyLoading ? (
+              <ActivityIndicator size="large" color="#3b82f6" style={{ marginVertical: 40 }} />
+            ) : (
+              <ScrollView style={{ flex: 1 }}>
+                {modalActiveTab === 'handovers' && (
+                  <View style={styles.table}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Date/Time</Text>
+                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>From ➔ To</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Amount</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
+                    </View>
+                    {filteredHandovers.map((h, i) => (
+                      <View key={i} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{new Date(h.created_at).toLocaleString()}</Text>
+                        <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{h.from_name} ➔ {h.to_name}</Text>
+                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{h.amount}</Text>
+                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{h.status}</Text>
+                      </View>
+                    ))}
+                    {filteredHandovers.length === 0 && (
+                      <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No handovers found.</Text>
+                    )}
+                  </View>
+                )}
+
+                {modalActiveTab === 'bookings' && (
+                  <View style={styles.table}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>ID</Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Date/Time</Text>
+                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Patient</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Amount</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
+                    </View>
+                    {filteredBookings.map((b, i) => (
+                      <View key={i} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, { flex: 1, fontSize: 13 }]}>#{b.id}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{new Date(b.created_at).toLocaleString()}</Text>
+                        <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{b.patient_name || 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.2, textAlign: 'right', fontWeight: '700' }]}>₹{b.amount}</Text>
+                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13, color: '#10b981' }]}>{b.payment_status}</Text>
+                      </View>
+                    ))}
+                    {filteredBookings.length === 0 && (
+                      <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No bookings found.</Text>
+                    )}
+                  </View>
+                )}
+
+                {modalActiveTab === 'orders' && (
+                  <View style={styles.table}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600' }]}>Order No</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600' }]}>Date</Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Customer</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Total</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Paid</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
+                    </View>
+                    {filteredOrders.map((o, i) => (
+                      <View key={i} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{o.order_no || 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{o.order_date ? new Date(o.order_date).toLocaleDateString() : 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{o.customer_name || 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700' }]}>₹{o.amount}</Text>
+                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{o.paid_amount}</Text>
+                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{o.status}</Text>
+                      </View>
+                    ))}
+                    {filteredOrders.length === 0 && (
+                      <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No orders found.</Text>
+                    )}
+                  </View>
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

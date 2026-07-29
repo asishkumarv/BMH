@@ -17,5 +17,6 @@ router.post('/handover/request', walletController.requestHandover);
 router.post('/handover/accept', walletController.acceptHandover);
 router.get('/handovers/all', walletController.getAllHandovers);
 router.get('/handovers/:employee_id', walletController.getHandovers);
+router.get('/history/:employee_id', walletController.getWalletHistory);
 
 module.exports = router;
