@@ -420,13 +420,14 @@ exports.getWalletHistory = async (req, res) => {
     // 2. Bookings
     const bookingsParams = [];
     let bookingsQueryStr = `
-      SELECT pb.id, ds.date as booking_date, ds.start_time as booking_time, ds.fee as amount, 
+      SELECT pb.id, ds.date as booking_date, ds.start_time, ds.end_time, ds.fee as amount, 
              pb.status as payment_status, pb.payment_mode as payment_method, pb.created_at,
-             p.name as patient_name
+             p.name as patient_name, d.full_name as doctor_name
       FROM patient_bookings pb
       JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
       LEFT JOIN patients p ON pb.patient_id = p.id
-      WHERE (pb.payment_mode = 'Cash' OR pb.payment_mode = 'cash')
+      WHERE 1=1
     `;
     const num = parseInt(numericId);
     if (!isNaN(num)) {
@@ -442,8 +443,7 @@ exports.getWalletHistory = async (req, res) => {
     const ordersQuery = `
       SELECT mo.id, mo.order_no, mo.invoice_no, mo.amount, mo.paid_amount, mo.payment_mode, mo.order_date, mo.status, mo.created_at, mo.customer_name
       FROM manual_orders mo
-      WHERE (mo.payment_mode = 'Cash' OR mo.payment_mode = 'cash')
-        AND (mo.created_by_id = $1 OR mo.created_by_id = $2)
+      WHERE (mo.created_by_id = $1 OR mo.created_by_id = $2)
       ORDER BY mo.created_at DESC
     `;
     const ordersRes = await pool.query(ordersQuery, [employee_id, numericId]);

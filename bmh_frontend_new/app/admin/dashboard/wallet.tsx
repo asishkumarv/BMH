@@ -10,6 +10,49 @@ import { useResponsive } from '../../../hooks/useResponsive';
 type Peer = { id: string; full_name: string; };
 type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; };
 
+const formatDateTimeToDDMMYYYY = (dateStr: string) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const displayHours = String(hours).padStart(2, '0');
+    return `${day}-${month}-${year} ${displayHours}:${minutes} ${ampm}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
+const formatDateOnlyToDDMMYYYY = (dateStr: string) => {
+  if (!dateStr) return '';
+  try {
+    const cleanDate = dateStr.split('T')[0].split(' ')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else {
+        return `${parts[0]}-${parts[1]}-${parts[2]}`;
+      }
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function AdminWalletScreen() {
   const { isDesktop } = useResponsive();
 
@@ -200,9 +243,23 @@ export default function AdminWalletScreen() {
     
     let rowsHtml = "";
     let title = "";
+    let summaryHtml = "";
+    
+    const presentCashInHand = parseFloat(selectedEmployee.cash_in_hand || '0').toFixed(2);
     
     if (modalActiveTab === 'handovers') {
       title = "Cash Handovers Transaction History";
+      let totalHandoversAmt = 0;
+      filteredHandovers.forEach(h => {
+        totalHandoversAmt += parseFloat(h.amount || '0');
+      });
+      summaryHtml = `
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
+          <strong>Present Cash in Hand of Employee:</strong> ₹${presentCashInHand}<br/>
+          <strong>Total Handover Transactions:</strong> ${filteredHandovers.length}<br/>
+          <strong>Total Handover Amount:</strong> ₹${totalHandoversAmt.toFixed(2)}
+        </div>
+      `;
       rowsHtml = `
         <thead>
           <tr>
@@ -216,23 +273,49 @@ export default function AdminWalletScreen() {
         <tbody>
           ${filteredHandovers.map(h => `
             <tr>
-              <td>${new Date(h.created_at).toLocaleString()}</td>
+              <td>${formatDateTimeToDDMMYYYY(h.created_at)}</td>
               <td>${h.from_name}</td>
               <td>${h.to_name}</td>
-              <td>₹${h.amount}</td>
+              <td>₹${parseFloat(h.amount).toFixed(2)}</td>
               <td>${h.status}</td>
             </tr>
           `).join('')}
         </tbody>
       `;
     } else if (modalActiveTab === 'bookings') {
-      title = "Bookings Cash Collection History";
+      title = "Bookings Cash & Online Collection History";
+      let totalAmountVal = 0;
+      let cashAmountVal = 0;
+      let onlineAmountVal = 0;
+      
+      filteredBookings.forEach(b => {
+        const amt = parseFloat(b.amount || '0');
+        totalAmountVal += amt;
+        const method = (b.payment_method || '').toLowerCase();
+        if (method === 'cash') {
+          cashAmountVal += amt;
+        } else {
+          onlineAmountVal += amt;
+        }
+      });
+      
+      summaryHtml = `
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
+          <strong>Present Cash in Hand of Employee:</strong> ₹${presentCashInHand}<br/>
+          <strong>Total Bookings:</strong> ${filteredBookings.length}<br/>
+          <strong>Total Bookings Amount:</strong> ₹${totalAmountVal.toFixed(2)}<br/>
+          <span style="color: #059669; font-weight: bold;">Cash Amount Collected:</span> ₹${cashAmountVal.toFixed(2)}<br/>
+          <span style="color: #2563eb; font-weight: bold;">Online Amount:</span> ₹${onlineAmountVal.toFixed(2)}
+        </div>
+      `;
+      
       rowsHtml = `
         <thead>
           <tr>
             <th>Booking ID</th>
             <th>Date/Time</th>
-            <th>Patient</th>
+            <th>Patient Details</th>
+            <th>Payment Mode</th>
             <th>Amount</th>
             <th>Status</th>
           </tr>
@@ -241,24 +324,54 @@ export default function AdminWalletScreen() {
           ${filteredBookings.map(b => `
             <tr>
               <td>#${b.id}</td>
-              <td>${new Date(b.created_at).toLocaleString()}</td>
-              <td>${b.patient_name || 'N/A'}</td>
-              <td>₹${b.amount}</td>
+              <td>${formatDateTimeToDDMMYYYY(b.created_at)}</td>
+              <td>
+                <strong>${b.patient_name || 'N/A'}</strong><br/>
+                <span style="font-size: 11px; color: #475569;">Doc: Dr. ${b.doctor_name || 'N/A'} | Slot: ${b.start_time ? b.start_time.substring(0, 5) : ''} - ${b.end_time ? b.end_time.substring(0, 5) : ''}</span>
+              </td>
+              <td>${b.payment_method}</td>
+              <td>₹${parseFloat(b.amount).toFixed(2)}</td>
               <td>${b.payment_status}</td>
             </tr>
           `).join('')}
         </tbody>
       `;
     } else {
-      title = "Orders Cash Collection History";
+      title = "Orders Cash & Online Collection History";
+      let totalAmountVal = 0;
+      let cashAmountVal = 0;
+      let onlineAmountVal = 0;
+      
+      filteredOrders.forEach(o => {
+        const amt = parseFloat(o.paid_amount || o.amount || '0');
+        totalAmountVal += amt;
+        const mode = (o.payment_mode || '').toLowerCase();
+        if (mode === 'cash') {
+          cashAmountVal += amt;
+        } else {
+          onlineAmountVal += amt;
+        }
+      });
+      
+      summaryHtml = `
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
+          <strong>Present Cash in Hand of Employee:</strong> ₹${presentCashInHand}<br/>
+          <strong>Total Orders:</strong> ${filteredOrders.length}<br/>
+          <strong>Total Orders Amount:</strong> ₹${totalAmountVal.toFixed(2)}<br/>
+          <span style="color: #059669; font-weight: bold;">Cash Amount Collected:</span> ₹${cashAmountVal.toFixed(2)}<br/>
+          <span style="color: #2563eb; font-weight: bold;">Online Amount:</span> ₹${onlineAmountVal.toFixed(2)}
+        </div>
+      `;
+      
       rowsHtml = `
         <thead>
           <tr>
             <th>Order No</th>
             <th>Date</th>
             <th>Customer</th>
-            <th>Amount</th>
-            <th>Paid</th>
+            <th>Payment Mode</th>
+            <th>Total Amount</th>
+            <th>Paid Amount</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -266,10 +379,11 @@ export default function AdminWalletScreen() {
           ${filteredOrders.map(o => `
             <tr>
               <td>${o.order_no || 'N/A'}</td>
-              <td>${o.order_date ? new Date(o.order_date).toLocaleDateString() : 'N/A'}</td>
+              <td>${formatDateOnlyToDDMMYYYY(o.order_date || o.created_at)}</td>
               <td>${o.customer_name || 'N/A'}</td>
-              <td>₹${o.amount}</td>
-              <td>₹${o.paid_amount}</td>
+              <td>${o.payment_mode || 'N/A'}</td>
+              <td>₹${parseFloat(o.amount || '0').toFixed(2)}</td>
+              <td>₹${parseFloat(o.paid_amount || '0').toFixed(2)}</td>
               <td>${o.status}</td>
             </tr>
           `).join('')}
@@ -283,8 +397,9 @@ export default function AdminWalletScreen() {
           <style>
             body { font-family: sans-serif; padding: 20px; }
             .header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; }
-            .header h1 { margin: 0; color: #1e3a8a; }
-            .emp-info { font-size: 14px; margin-top: 10px; color: #475569; }
+            .header h1 { margin: 0; color: #1e3a8a; text-align: center; }
+            .header h3 { margin: 5px 0 0 0; color: #475569; text-align: center; }
+            .emp-info { font-size: 14px; margin-top: 15px; color: #334155; line-height: 1.5; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-size: 12px; }
             th { background-color: #f8fafc; }
@@ -293,13 +408,17 @@ export default function AdminWalletScreen() {
         </head>
         <body>
           <div class="header">
-            <h1>${title}</h1>
+            <h1>Bharat Medical Hall</h1>
+            <h3>${title}</h3>
             <div class="emp-info">
               <strong>Employee:</strong> ${selectedEmployee.full_name} (${selectedEmployee.employee_id}) <br/>
               <strong>Role:</strong> ${selectedEmployee.role} | <strong>Department:</strong> ${selectedEmployee.department || 'N/A'} <br/>
               <strong>Filters:</strong> ${filterStartDate || 'All'} to ${filterEndDate || 'Today'}
             </div>
           </div>
+          
+          ${summaryHtml}
+
           <table>
             ${rowsHtml}
           </table>
@@ -700,7 +819,7 @@ export default function AdminWalletScreen() {
                     </View>
                     {filteredHandovers.map((h, i) => (
                       <View key={i} style={styles.tableRow}>
-                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{new Date(h.created_at).toLocaleString()}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(h.created_at)}</Text>
                         <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{h.from_name} ➔ {h.to_name}</Text>
                         <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{h.amount}</Text>
                         <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{h.status}</Text>
@@ -717,15 +836,21 @@ export default function AdminWalletScreen() {
                     <View style={styles.tableHeader}>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600' }]}>ID</Text>
                       <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Date/Time</Text>
-                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Patient</Text>
+                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Patient / Doctor / Slot</Text>
                       <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Amount</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
                     </View>
                     {filteredBookings.map((b, i) => (
                       <View key={i} style={styles.tableRow}>
                         <Text style={[styles.tableCell, { flex: 1, fontSize: 13 }]}>#{b.id}</Text>
-                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{new Date(b.created_at).toLocaleString()}</Text>
-                        <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{b.patient_name || 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(b.created_at)}</Text>
+                        <View style={{ flex: 2, justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>{b.patient_name || 'N/A'}</Text>
+                          <Text style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>Doc: Dr. {b.doctor_name || 'N/A'}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+                            Slot: {b.start_time ? b.start_time.substring(0, 5) : ''} - {b.end_time ? b.end_time.substring(0, 5) : ''}
+                          </Text>
+                        </View>
                         <Text style={[styles.tableCell, { flex: 1.2, textAlign: 'right', fontWeight: '700' }]}>₹{b.amount}</Text>
                         <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13, color: '#10b981' }]}>{b.payment_status}</Text>
                       </View>
@@ -749,7 +874,7 @@ export default function AdminWalletScreen() {
                     {filteredOrders.map((o, i) => (
                       <View key={i} style={styles.tableRow}>
                         <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{o.order_no || 'N/A'}</Text>
-                        <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{o.order_date ? new Date(o.order_date).toLocaleDateString() : 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{formatDateOnlyToDDMMYYYY(o.order_date || o.created_at)}</Text>
                         <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{o.customer_name || 'N/A'}</Text>
                         <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700' }]}>₹{o.amount}</Text>
                         <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{o.paid_amount}</Text>
