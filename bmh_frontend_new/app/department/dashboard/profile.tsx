@@ -112,6 +112,7 @@ export default function SubAdminProfileScreen() {
       department_id: user.department_id || '',
       mobile: user.mobile || pd.mobile || '',
       emergencyContact: pd.emergencyContact || '',
+      dob: user.dob || pd.dob || '',
       age: pd.age || '',
       bloodGroup: pd.bloodGroup || '',
       aadhaar: pd.aadhaar || '',
@@ -225,6 +226,11 @@ export default function SubAdminProfileScreen() {
               <View><Text style={styles.label}>Email</Text><TextInput style={styles.modalInput} value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} /></View>
               <View><Text style={styles.label}>Mobile Number</Text><TextInput style={styles.modalInput} value={editForm.mobile} onChangeText={(t) => setEditForm({...editForm, mobile: t})} /></View>
               <View><Text style={styles.label}>Emergency Contact</Text><TextInput style={styles.modalInput} value={editForm.emergencyContact} onChangeText={(t) => setEditForm({...editForm, emergencyContact: t})} /></View>
+              <View><Text style={styles.label}>Date of Birth (DOB)</Text>
+                {Platform.OS === 'web' ? (
+                  <input type="date" style={{ padding: 14, borderRadius: 8, borderColor: '#e2e8f0', borderWidth: 1, backgroundColor: 'white', width: '100%', outline: 'none', fontFamily: 'inherit' }} value={editForm.dob} onChange={(e) => setEditForm({...editForm, dob: e.target.value})} />
+                ) : <TextInput style={styles.modalInput} placeholder="YYYY-MM-DD" value={editForm.dob} onChangeText={(t) => setEditForm({...editForm, dob: t})} />}
+              </View>
               <View><Text style={styles.label}>Age</Text><TextInput style={styles.modalInput} value={editForm.age} onChangeText={(t) => setEditForm({...editForm, age: t})} /></View>
               <View><Text style={styles.label}>Blood Group</Text><TextInput style={styles.modalInput} value={editForm.bloodGroup} onChangeText={(t) => setEditForm({...editForm, bloodGroup: t})} /></View>
               
@@ -308,6 +314,7 @@ export default function SubAdminProfileScreen() {
             <View style={styles.infoSection}>
               <View style={styles.infoRow}><Mail size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Email</Text><Text style={styles.infoVal}>{user.email}</Text></View>
               <View style={styles.infoRow}><Phone size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Mobile</Text><Text style={styles.infoVal}>{user.mobile || pd.phone || pd.mobile || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>DOB</Text><Text style={styles.infoVal}>{user.dob || pd.dob || 'N/A'}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Blood Group</Text><Text style={styles.infoVal}>{pd.bloodGroup || 'N/A'}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Emergency</Text><Text style={styles.infoVal}>{pd.emergencyContact || 'N/A'}</Text></View>
             </View>

@@ -24,15 +24,21 @@ exports.getEmployeesByDepartment = async (req, res) => {
 
 exports.addEmployee = async (req, res) => {
   try {
-    let { full_name, email, password, department, role, profile_data } = req.body;
+    let { full_name, email, password, department, role, profile_data, dob } = req.body;
     if (email) email = email.toLowerCase();
 
     const mobile = profile_data && profile_data.mobile ? profile_data.mobile : null;
     
-    // Remove mobile from profile_data so it isn't stored twice (since it has its own column)
+    // Remove mobile and dob from profile_data so they aren't stored twice (since they have their own columns)
     const storedProfileData = profile_data ? { ...profile_data } : null;
     if (storedProfileData && storedProfileData.mobile) {
       delete storedProfileData.mobile;
+    }
+    if (!dob && storedProfileData && storedProfileData.dob) {
+      dob = storedProfileData.dob;
+    }
+    if (storedProfileData && storedProfileData.dob) {
+      delete storedProfileData.dob;
     }
 
     // Generate Employee ID
@@ -42,8 +48,8 @@ exports.addEmployee = async (req, res) => {
     const employee_id = `EMP-${deptCode}-${num}`;
 
     const insertResult = await pool.query(
-      'INSERT INTO employees (full_name, email, password, department, role, status, profile_data, mobile, employee_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [full_name, email, password, department, role, 'pending', storedProfileData ? JSON.stringify(storedProfileData) : null, mobile, employee_id]
+      'INSERT INTO employees (full_name, email, password, department, role, status, profile_data, mobile, employee_id, dob) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [full_name, email, password, department, role, 'pending', storedProfileData ? JSON.stringify(storedProfileData) : null, mobile, employee_id, dob]
     );
 
     res.status(201).json({ success: true, data: insertResult.rows[0] });

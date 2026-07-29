@@ -201,6 +201,7 @@ export default function EmployeesScreen() {
       <View style={[styles.tableRow, styles.tableHeader]}>
         <Text style={[styles.cell, { flex: 2, fontWeight: '700', color: Colors.light.icon }]}>Name</Text>
         {isDesktop && <Text style={[styles.cell, { flex: 2.5, fontWeight: '700', color: Colors.light.icon }]}>Email</Text>}
+        {isDesktop && <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>DOB</Text>}
         <Text style={[styles.cell, { flex: 1.5, fontWeight: '700', color: Colors.light.icon }]}>Department</Text>
         <Text style={[styles.cell, { flex: 1, fontWeight: '700', color: Colors.light.icon }]}>Role</Text>
         <Text style={[styles.cell, { width: 180, fontWeight: '700', color: Colors.light.icon }]}>Status</Text>
@@ -219,7 +220,7 @@ export default function EmployeesScreen() {
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={styles.adminName} numberOfLines={1}>{item.full_name}</Text>
             <Text style={styles.adminEmail} numberOfLines={1}>{item.department} • {item.role}</Text>
-            <Text style={styles.adminEmail} numberOfLines={1}>{item.email}</Text>
+            <Text style={styles.adminEmail} numberOfLines={1}>{item.email} • DOB: {(item as any).dob || 'N/A'}</Text>
           </View>
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
@@ -264,6 +265,7 @@ export default function EmployeesScreen() {
       <View style={styles.tableRow}>
         <Text style={[styles.cell, { flex: 2, fontWeight: '600' }]}>{item.full_name}</Text>
         {isDesktop && <Text style={[styles.cell, { flex: 2.5, color: Colors.light.icon }]}>{item.email}</Text>}
+        {isDesktop && <Text style={[styles.cell, { flex: 1.5, color: Colors.light.icon }]}>{(item as any).dob || 'N/A'}</Text>}
         <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
         <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
         <View style={{ width: 180, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -502,6 +504,7 @@ export default function EmployeesScreen() {
                     <Text style={styles.sectionLabel}>Personal & Identification</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Email:</Text><Text style={styles.profileVal}>{selectedEmployee.email}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Mobile:</Text><Text style={styles.profileVal}>{(selectedEmployee as any).mobile || pd.mobile || 'N/A'}</Text></View>
+                    <View style={styles.profileRow}><Text style={styles.profileKey}>DOB:</Text><Text style={styles.profileVal}>{(selectedEmployee as any).dob || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Age/Blood:</Text><Text style={styles.profileVal}>{pd.age || 'N/A'} yrs / {pd.bloodGroup || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Emergency Contact:</Text><Text style={styles.profileVal}>{pd.emergencyContact || 'N/A'}</Text></View>
 

@@ -235,6 +235,15 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched payment_txn_id column in wallet_transactions table.'))
     .catch(err => console.error('Error patching wallet_transactions table (payment_txn_id):', err.message));
 
+  // Add DOB column to employees and department_admins
+  pool.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS dob VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched dob column in employees table.'))
+    .catch(err => console.error('Error patching employees table (dob):', err.message));
+
+  pool.query('ALTER TABLE department_admins ADD COLUMN IF NOT EXISTS dob VARCHAR(255)')
+    .then(() => console.log('Successfully checked/patched dob column in department_admins table.'))
+    .catch(err => console.error('Error patching department_admins table (dob):', err.message));
+
   // ecogreensales_orders modifications
   pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN pharmacy TYPE TEXT').catch(e => console.error(e.message));
   pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN patient_address TYPE TEXT').catch(e => console.error(e.message));

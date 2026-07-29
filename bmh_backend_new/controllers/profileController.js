@@ -56,7 +56,7 @@ exports.getPendingRequests = async (req, res) => {
     // Enrich the data with user name, email, and current profile_data
     const enrichedData = await Promise.all(result.rows.map(async (request) => {
       let tableName = request.user_type === 'sub_admin' ? 'department_admins' : 'employees';
-      let userQuery = `SELECT full_name, email, profile_data FROM ${tableName} WHERE id = $1`;
+      let userQuery = `SELECT * FROM ${tableName} WHERE id = $1`;
       
       try {
         const userResult = await pool.query(userQuery, [request.user_id]);
@@ -65,6 +65,13 @@ exports.getPendingRequests = async (req, res) => {
           let currentProfileData = {};
           if (user.profile_data) {
              currentProfileData = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+          }
+          // Merge other column values into currentProfileData
+          const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email', 'department', 'department_id', 'role', 'dob'];
+          for (const col of basicColumns) {
+            if (user[col] !== undefined) {
+              currentProfileData[col] = user[col];
+            }
           }
           return {
             ...request,
@@ -113,7 +120,7 @@ exports.reviewProfileUpdate = async (req, res) => {
       }
       
       // Update basic columns if they exist in the payload
-      const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email', 'department', 'department_id', 'role'];
+      const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email', 'department', 'department_id', 'role', 'dob'];
       let setClauses = [];
       let params = [];
       let paramIndex = 1;

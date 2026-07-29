@@ -39,7 +39,8 @@ async function initDB() {
         password VARCHAR(255) NOT NULL,
         department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
         status VARCHAR(50) DEFAULT 'approved',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        dob VARCHAR(255)
       );
     `);
 
@@ -61,7 +62,8 @@ async function initDB() {
         break_in VARCHAR(255),
         break_out VARCHAR(255),
         weekly_off_days VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        dob VARCHAR(255)
       );
     `);
 

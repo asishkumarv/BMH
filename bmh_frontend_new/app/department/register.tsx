@@ -30,6 +30,7 @@ export default function SubAdminRegisterScreen() {
   // Extended Profile State
   const [mobile, setMobile] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
+  const [dob, setDob] = useState('');
   const [age, setAge] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
   const [aadhaar, setAadhaar] = useState('');
@@ -152,6 +153,7 @@ export default function SubAdminRegisterScreen() {
         department_id: selectedDept,
         mobile,
         image: photo,
+        dob,
         schedule_in: shiftIn || '09:00',
         schedule_out: shiftOut || '17:00',
         break_in: breakStart || '13:00',
@@ -161,7 +163,7 @@ export default function SubAdminRegisterScreen() {
         blood_group: bloodGroup,
         address: permAddr1,
         profile_data: {
-          emergencyContact, age, aadhaar, pan, esi, manager, salary, empType, jobDesc, tempAddr1, tempCity, tempState, permCity, permState, ifsc, bankName, branch,
+          emergencyContact, age, aadhaar, pan, esi, manager, salary, empType, jobDesc, tempAddr1, tempCity, tempState, permCity, permState, ifsc, bankName, branch, dob,
           joiningDate: new Date().toISOString().split('T')[0]
         }
       });
@@ -261,6 +263,14 @@ export default function SubAdminRegisterScreen() {
                   <View style={styles.inputGroup}><Text style={styles.label}>Mobile Number *</Text><TextInput style={styles.input} placeholder="10-digit Mobile" placeholderTextColor="#94A3B8" value={mobile} onChangeText={setMobile} />
                     {errors.mobile ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.mobile}</Text> : null}</View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Emergency Contact</Text><TextInput style={styles.input} placeholder="Family Contact" placeholderTextColor="#94A3B8" value={emergencyContact} onChangeText={setEmergencyContact} /></View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Date of Birth (DOB)</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="date" style={styles.webInput} value={dob} onChange={(e) => setDob(e.target.value)} />
+                    ) : (
+                      <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor="#94A3B8" value={dob} onChangeText={setDob} />
+                    )}
+                  </View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Age *</Text><TextInput style={styles.input} placeholder="Years" placeholderTextColor="#94A3B8" value={age} onChangeText={setAge} />
                     {errors.age ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.age}</Text> : null}</View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Blood Group</Text><TextInput style={styles.input} placeholder="O+" placeholderTextColor="#94A3B8" value={bloodGroup} onChangeText={setBloodGroup} /></View>

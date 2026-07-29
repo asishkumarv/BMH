@@ -30,6 +30,7 @@ export default function EmployeeRegisterScreen() {
   // Extended Profile State
   const [mobile, setMobile] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
+  const [dob, setDob] = useState('');
   const [age, setAge] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
   const [aadhaar, setAadhaar] = useState('');
@@ -150,7 +151,7 @@ export default function EmployeeRegisterScreen() {
       const selectedRoleObj = roles.find(r => String(r.id) === String(selectedRole));
 
       const profile_data = {
-        mobile, emergencyContact, age, bloodGroup, aadhaar, pan, esi, manager, salary, empType, jobDesc, shiftIn, shiftOut, breakStart, breakEnd, tempAddr1, tempCity, tempState, permAddr1, permCity, permState, ifsc, bankName, branch, accountNo, photo
+        mobile, emergencyContact, age, bloodGroup, aadhaar, pan, esi, manager, salary, empType, jobDesc, shiftIn, shiftOut, breakStart, breakEnd, tempAddr1, tempCity, tempState, permAddr1, permCity, permState, ifsc, bankName, branch, accountNo, photo, dob
       };
 
       const res = await axios.post('https://napi.bharatmedicalhallplus.com/employees', {
@@ -159,7 +160,8 @@ export default function EmployeeRegisterScreen() {
         password,
         department: selectedDeptObj?.name || selectedDept,
         role: selectedRoleObj?.name || selectedRole,
-        profile_data
+        profile_data,
+        dob
       });
       if (res.data.success) {
         setSuccessMessage('Successfully registered! You can login after admin approval.');
@@ -255,6 +257,14 @@ export default function EmployeeRegisterScreen() {
                   <View style={styles.inputGroup}><Text style={styles.label}>Mobile Number *</Text><TextInput style={styles.input} placeholder="10-digit Mobile" placeholderTextColor="#94A3B8" value={mobile} onChangeText={setMobile} />
                     {errors.mobile ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.mobile}</Text> : null}</View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Emergency Contact</Text><TextInput style={styles.input} placeholder="Family Contact" placeholderTextColor="#94A3B8" value={emergencyContact} onChangeText={setEmergencyContact} /></View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Date of Birth (DOB)</Text>
+                    {Platform.OS === 'web' ? (
+                      <input type="date" style={styles.webInput} value={dob} onChange={(e) => setDob(e.target.value)} />
+                    ) : (
+                      <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor="#94A3B8" value={dob} onChangeText={setDob} />
+                    )}
+                  </View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Age *</Text><TextInput style={styles.input} placeholder="Years" placeholderTextColor="#94A3B8" value={age} onChangeText={setAge} />
                     {errors.age ? <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>{errors.age}</Text> : null}</View>
                   <View style={styles.inputGroup}><Text style={styles.label}>Blood Group</Text><TextInput style={styles.input} placeholder="O+" placeholderTextColor="#94A3B8" value={bloodGroup} onChangeText={setBloodGroup} /></View>

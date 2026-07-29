@@ -30,7 +30,7 @@ exports.addAdmin = async (req, res) => {
     let { 
       full_name, email, password, department_id, 
       mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days,
-      bank_account, blood_group, address, profile_data 
+      bank_account, blood_group, address, profile_data, dob
     } = req.body;
     if (email) email = email.toLowerCase();
     
@@ -39,15 +39,23 @@ exports.addAdmin = async (req, res) => {
     if (blood_group) finalProfileData.blood_group = blood_group;
     if (address) finalProfileData.address = address;
 
+    if (!dob && finalProfileData && finalProfileData.dob) {
+      dob = finalProfileData.dob;
+    }
+    if (finalProfileData && finalProfileData.dob) {
+      delete finalProfileData.dob;
+    }
+
     const insertResult = await pool.query(
       `INSERT INTO department_admins (
         full_name, email, password, department_id, status, 
-        mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days, profile_data
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days, profile_data, dob
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
       [
         full_name, email, password, department_id, 'pending',
         mobile, image, schedule_in, schedule_out, break_in, break_out, weekly_off_days,
-        Object.keys(finalProfileData).length > 0 ? JSON.stringify(finalProfileData) : null
+        Object.keys(finalProfileData).length > 0 ? JSON.stringify(finalProfileData) : null,
+        dob
       ]
     );
 
