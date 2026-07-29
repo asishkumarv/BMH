@@ -207,10 +207,13 @@ export default function EmployeeTasksScreen() {
 
   const handleDirectRejectSubmit = async () => {
     if (!directRejectTask) return;
+    if (!directRejectText || directRejectText.trim().length < 6) {
+      return Alert.alert('Error', 'Rejection reason is required and must be at least 6 characters.');
+    }
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${directRejectTask.id}/status`, {
         status: 'rejected',
-        rejection_reason: directRejectText || '',
+        rejection_reason: directRejectText,
         notes: directRejectTask.notes || '',
         updater_type: 'employee',
         updater_id: empUser.id
@@ -230,6 +233,11 @@ export default function EmployeeTasksScreen() {
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
+    if (newStatus === 'rejected') {
+      if (!rejectionReason || rejectionReason.trim().length < 6) {
+        return Alert.alert('Error', 'Rejection reason is required and must be at least 6 characters.');
+      }
+    }
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
@@ -774,7 +782,7 @@ export default function EmployeeTasksScreen() {
               </View>
               <TextInput
                 style={[styles.input, { height: 100, textAlignVertical: 'top', marginVertical: 15, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 }]}
-                placeholder="Enter rejection reason (optional)..."
+                placeholder="Enter rejection reason (compulsory, minimum 6 characters)..."
                 value={directRejectText}
                 onChangeText={setDirectRejectText}
                 multiline

@@ -23,6 +23,12 @@ export default function OrderAssignScreen() {
   const [storeDeliveryFleet, setStoreDeliveryFleet] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Orders');
+
+  // Today Stats States
+  const [manualStats, setManualStats] = useState({ total: 0, assigned: 0, delivered: 0 });
+  const [salesStats, setSalesStats] = useState({ total: 0, assigned: 0, delivered: 0 });
+  const [poStats, setPoStats] = useState({ total: 0, assigned: 0, delivered: 0 });
+  const [allStats, setAllStats] = useState({ total: 0, assigned: 0, delivered: 0 });
   
   // Assignment Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -89,6 +95,47 @@ export default function OrderAssignScreen() {
       if (storeRes.data && storeRes.data.success) {
         setStoreDeliveryFleet(storeRes.data.data);
       }
+
+      // Calculate today stats
+      const today = new Date();
+      const offset = today.getTimezoneOffset();
+      const localToday = new Date(today.getTime() - (offset*60*1000));
+      const todayStr = localToday.toISOString().split('T')[0];
+
+      const [todayRes, manualRes] = await Promise.all([
+        axios.get(`https://napi.bharatmedicalhallplus.com/admin/all-orders-for-assignment?fromDate=${todayStr}&toDate=${todayStr}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/manual-orders?fromDate=${todayStr}&toDate=${todayStr}&limit=200`)
+      ]);
+
+      const todayAllOrders = (todayRes.data && todayRes.data.data) || [];
+      const todayManuals = (manualRes.data && manualRes.data.data) || [];
+
+      // 1. Manual Orders Stats
+      const manTotal = todayManuals.length;
+      const manAssigned = todayManuals.filter(o => o.delivery_boy_id).length;
+      const manDelivered = todayManuals.filter(o => o.status === 'Delivered' || o.status === 'Completed').length;
+      setManualStats({ total: manTotal, assigned: manAssigned, delivered: manDelivered });
+
+      // 2. Sales Orders Stats
+      const todaySales = todayAllOrders.filter(o => o.type === 'sales_order' || o.type === 'online_order' || o.type === 'sales_invoice');
+      const salesTotal = todaySales.length;
+      const salesAssigned = todaySales.filter(o => o.delivery_boy_id).length;
+      const salesDelivered = todaySales.filter(o => o.status === 'Delivered' || o.status === 'Completed').length;
+      setSalesStats({ total: salesTotal, assigned: salesAssigned, delivered: salesDelivered });
+
+      // 3. Purchase Orders Stats
+      const todayPOs = todayAllOrders.filter(o => o.type === 'purchase_order');
+      const poTotal = todayPOs.length;
+      const poAssigned = todayPOs.filter(o => o.delivery_boy_id).length;
+      const poDelivered = todayPOs.filter(o => o.status === 'Delivered' || o.status === 'Completed').length;
+      setPoStats({ total: poTotal, assigned: poAssigned, delivered: poDelivered });
+
+      // 4. All Stats
+      setAllStats({
+        total: manTotal + salesTotal + poTotal,
+        assigned: manAssigned + salesAssigned + poAssigned,
+        delivered: manDelivered + salesDelivered + poDelivered
+      });
     } catch (err) {
       console.error('Error fetching data:', err.message || err);
     } finally {
@@ -316,19 +363,28 @@ export default function OrderAssignScreen() {
   return (
     <View style={styles.container}>
       <View style={{ marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
           <TouchableOpacity onPress={() => setActiveTab('All Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'All Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-            <Text style={{fontWeight: activeTab === 'All Orders' ? 'bold' : 'normal', color: activeTab === 'All Orders' ? '#4338ca' : '#64748b'}}>All Orders</Text>
+            <Text style={{fontWeight: activeTab === 'All Orders' ? 'bold' : 'normal', color: activeTab === 'All Orders' ? '#4338ca' : '#64748b', fontSize: 13}}>
+              All Orders ({allStats.total} | {allStats.assigned} | {allStats.delivered})
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setActiveTab('Manual Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Manual Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-            <Text style={{fontWeight: activeTab === 'Manual Orders' ? 'bold' : 'normal', color: activeTab === 'Manual Orders' ? '#4338ca' : '#64748b'}}>Manual Orders</Text>
+            <Text style={{fontWeight: activeTab === 'Manual Orders' ? 'bold' : 'normal', color: activeTab === 'Manual Orders' ? '#4338ca' : '#64748b', fontSize: 13}}>
+              Manual Orders ({manualStats.total} | {manualStats.assigned} | {manualStats.delivered})
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setActiveTab('Sales Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Sales Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-            <Text style={{fontWeight: activeTab === 'Sales Orders' ? 'bold' : 'normal', color: activeTab === 'Sales Orders' ? '#4338ca' : '#64748b'}}>Sales Orders</Text>
+            <Text style={{fontWeight: activeTab === 'Sales Orders' ? 'bold' : 'normal', color: activeTab === 'Sales Orders' ? '#4338ca' : '#64748b', fontSize: 13}}>
+              Sales Orders ({salesStats.total} | {salesStats.assigned} | {salesStats.delivered})
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setActiveTab('Purchase Orders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Purchase Orders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
-            <Text style={{fontWeight: activeTab === 'Purchase Orders' ? 'bold' : 'normal', color: activeTab === 'Purchase Orders' ? '#4338ca' : '#64748b'}}>Purchase Orders</Text>
+            <Text style={{fontWeight: activeTab === 'Purchase Orders' ? 'bold' : 'normal', color: activeTab === 'Purchase Orders' ? '#4338ca' : '#64748b', fontSize: 13}}>
+              Purchase Orders ({poStats.total} | {poStats.assigned} | {poStats.delivered})
+            </Text>
           </TouchableOpacity>
+          <Text style={{ fontSize: 11, color: '#94a3b8', marginLeft: 16 }}>(Today's Total | Assigned | Delivered)</Text>
         </ScrollView>
       </View>
 

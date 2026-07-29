@@ -266,10 +266,13 @@ export default function EmployeeTasksScreen() {
 
   const handleDirectRejectSubmit = async () => {
     if (!directRejectTask) return;
+    if (!directRejectText || directRejectText.trim().length < 6) {
+      return Alert.alert('Error', 'Rejection reason is required and must be at least 6 characters.');
+    }
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${directRejectTask.id}/status`, {
         status: 'rejected',
-        rejection_reason: directRejectText || '',
+        rejection_reason: directRejectText,
         notes: directRejectTask.notes || '',
         updater_type: 'employee',
         updater_id: empUser.id
@@ -289,6 +292,11 @@ export default function EmployeeTasksScreen() {
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
+    if (newStatus === 'rejected') {
+      if (!rejectionReason || rejectionReason.trim().length < 6) {
+        return Alert.alert('Error', 'Rejection reason is required and must be at least 6 characters.');
+      }
+    }
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${selectedTask.id}/status`, {
         status: newStatus,
@@ -435,7 +443,8 @@ export default function EmployeeTasksScreen() {
   const matchesStat = (t: any) => {
     if (selectedStatFilter === 'all') return true;
     if (selectedStatFilter === 'completed') return t.status === 'completed';
-    if (selectedStatFilter === 'pending') return !['completed', 'terminated'].includes(t.status);
+    if (selectedStatFilter === 'pending') return !['completed', 'terminated', 'rejected'].includes(t.status);
+    if (selectedStatFilter === 'rejected') return t.status === 'rejected';
     if (selectedStatFilter === 'High') return t.priority === 'High';
     if (selectedStatFilter === 'Moderate') return t.priority === 'Moderate' || !t.priority;
     if (selectedStatFilter === 'Low') return t.priority === 'Low';
@@ -453,22 +462,26 @@ export default function EmployeeTasksScreen() {
     const completedFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.status === 'completed').length;
     const completedOverall = tabTasks.filter(t => t.status === 'completed').length;
     
-    const pendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && !['completed', 'terminated'].includes(t.status)).length;
-    const pendingOverall = tabTasks.filter(t => !['completed', 'terminated'].includes(t.status)).length;
+    const pendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const pendingOverall = tabTasks.filter(t => !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+
+    const rejectedFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.status === 'rejected').length;
+    const rejectedOverall = tabTasks.filter(t => t.status === 'rejected').length;
     
-    const highPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'High' && !['completed', 'terminated'].includes(t.status)).length;
+    const highPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'High' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const highOverall = tabTasks.filter(t => t.priority === 'High').length;
     
-    const moderatePendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated'].includes(t.status)).length;
+    const moderatePendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const moderateOverall = tabTasks.filter(t => t.priority === 'Moderate' || !t.priority).length;
     
-    const lowPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'Low' && !['completed', 'terminated'].includes(t.status)).length;
+    const lowPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'Low' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const lowOverall = tabTasks.filter(t => t.priority === 'Low').length;
     
     return {
       total: { filtered: totalFiltered, overall: totalOverall },
       completed: { filtered: completedFiltered, overall: completedOverall },
       pending: { filtered: pendingFiltered, overall: pendingOverall },
+      rejected: { filtered: rejectedFiltered, overall: rejectedOverall },
       high: { filtered: highPendingFiltered, overall: highOverall },
       moderate: { filtered: moderatePendingFiltered, overall: moderateOverall },
       low: { filtered: lowPendingFiltered, overall: lowOverall }
@@ -663,6 +676,19 @@ export default function EmployeeTasksScreen() {
               <Text style={styles.statLabel}>Pending</Text>
               <Text style={styles.statValue}>{stats.pending.filtered}</Text>
               <Text style={styles.statSubValue}>Total: {stats.pending.overall}</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[
+                styles.statCard, 
+                { borderLeftColor: '#DC2626' },
+                selectedStatFilter === 'rejected' && { borderColor: '#DC2626', borderWidth: 2, backgroundColor: '#fef2f2' }
+              ]}
+              onPress={() => handleStatCardPress('rejected')}
+            >
+              <Text style={styles.statLabel}>Rejected</Text>
+              <Text style={styles.statValue}>{stats.rejected.filtered}</Text>
+              <Text style={styles.statSubValue}>Total: {stats.rejected.overall}</Text>
             </Pressable>
 
             <Pressable 
@@ -1406,7 +1432,7 @@ export default function EmployeeTasksScreen() {
               </View>
               <TextInput
                 style={[styles.input, { height: 100, textAlignVertical: 'top', marginVertical: 15, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8 }]}
-                placeholder="Enter rejection reason (optional)..."
+                placeholder="Enter rejection reason (compulsory, minimum 6 characters)..."
                 value={directRejectText}
                 onChangeText={setDirectRejectText}
                 multiline

@@ -908,23 +908,44 @@ export default function PurchaseOrdersScreen() {
 
       {/* Assignment Filters (All, Pending, Assigned, Delivered, Not Available) */}
       <View style={styles.statusChipsRow}>
-        {['All', 'Pending', 'Assigned', 'Delivered', 'Not Available'].map((status) => (
-          <TouchableOpacity
-            key={status}
-            onPress={() => setAssignmentFilter(status)}
-            style={[
-              styles.statusChip,
-              assignmentFilter === status && styles.statusChipActive
-            ]}
-          >
-            <Text style={[
-              styles.statusChipText,
-              assignmentFilter === status && styles.statusChipTextActive
-            ]}>
-              {status}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {(() => {
+          const today = new Date();
+          const offset = today.getTimezoneOffset();
+          const localToday = new Date(today.getTime() - (offset*60*1000));
+          const todayStr = localToday.toISOString().split('T')[0];
+
+          const todayPOs = orders.filter(o => {
+            if (!o.created_at && !o.createdatetime) return false;
+            const dStr = (o.created_at || o.createdatetime).split('T')[0];
+            return dStr === todayStr;
+          });
+
+          const statsObj = {
+            All: todayPOs.length,
+            Pending: todayPOs.filter(o => o.status !== 'Assigned' && o.status !== 'Delivered' && o.status !== 'Completed' && o.status !== 'Not Available' && o.status !== 'Cancelled').length,
+            Assigned: todayPOs.filter(o => o.status === 'Assigned').length,
+            Delivered: todayPOs.filter(o => o.status === 'Delivered' || o.status === 'Completed').length,
+            'Not Available': todayPOs.filter(o => o.status === 'Not Available' || o.status === 'Cancelled').length
+          };
+
+          return ['All', 'Pending', 'Assigned', 'Delivered', 'Not Available'].map((status) => (
+            <TouchableOpacity
+              key={status}
+              onPress={() => setAssignmentFilter(status)}
+              style={[
+                styles.statusChip,
+                assignmentFilter === status && styles.statusChipActive
+              ]}
+            >
+              <Text style={[
+                styles.statusChipText,
+                assignmentFilter === status && styles.statusChipTextActive
+              ]}>
+                {status} ({statsObj[status as keyof typeof statsObj] || 0})
+              </Text>
+            </TouchableOpacity>
+          ));
+        })()}
       </View>
 
       <View style={isDesktop ? styles.tableContainer : { flex: 1, minHeight: 400 }}>

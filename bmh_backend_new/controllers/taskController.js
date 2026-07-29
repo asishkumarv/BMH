@@ -159,6 +159,12 @@ exports.updateTaskStatus = async (req, res) => {
     const { id } = req.params;
     const { status, rejection_reason, notes, updater_type, updater_id } = req.body;
 
+    if (status === 'rejected') {
+      if (!rejection_reason || typeof rejection_reason !== 'string' || rejection_reason.trim().length < 6) {
+        return res.status(200).json({ success: false, message: 'Rejection reason is required and must be at least 6 characters.' });
+      }
+    }
+
     // Check attendance for updater (if employee or department admin)
     const isCheckedIn = await checkCheckedIn(updater_id, updater_type);
     if (!isCheckedIn) {
