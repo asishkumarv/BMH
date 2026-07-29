@@ -18,6 +18,28 @@ type Employee = {
   profile_data?: string;
 };
 
+const formatDateToDDMMYYYY = (dateStr: string | null) => {
+  if (!dateStr) return 'N/A';
+  const match = dateStr.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  const matchIso = dateStr.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (matchIso) {
+    return `${matchIso[3]}-${matchIso[2]}-${matchIso[1]}`;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+  } catch (e) {}
+  return dateStr;
+};
+
 type Department = { id: string; name: string; };
 type Role = { id: string; name: string; departmentId: string; };
 
@@ -220,7 +242,7 @@ export default function EmployeesScreen() {
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={styles.adminName} numberOfLines={1}>{item.full_name}</Text>
             <Text style={styles.adminEmail} numberOfLines={1}>{item.department} • {item.role}</Text>
-            <Text style={styles.adminEmail} numberOfLines={1}>{item.email} • DOB: {(item as any).dob || 'N/A'}</Text>
+            <Text style={styles.adminEmail} numberOfLines={1}>{item.email} • DOB: {formatDateToDDMMYYYY((item as any).dob)}</Text>
           </View>
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
@@ -265,7 +287,7 @@ export default function EmployeesScreen() {
       <View style={styles.tableRow}>
         <Text style={[styles.cell, { flex: 2, fontWeight: '600' }]}>{item.full_name}</Text>
         {isDesktop && <Text style={[styles.cell, { flex: 2.5, color: Colors.light.icon }]}>{item.email}</Text>}
-        {isDesktop && <Text style={[styles.cell, { flex: 1.5, color: Colors.light.icon }]}>{(item as any).dob || 'N/A'}</Text>}
+        {isDesktop && <Text style={[styles.cell, { flex: 1.5, color: Colors.light.icon }]}>{formatDateToDDMMYYYY((item as any).dob)}</Text>}
         <Text style={[styles.cell, { flex: 1.5 }]}>{item.department}</Text>
         <Text style={[styles.cell, { flex: 1 }]}>{item.role}</Text>
         <View style={{ width: 180, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -504,7 +526,7 @@ export default function EmployeesScreen() {
                     <Text style={styles.sectionLabel}>Personal & Identification</Text>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Email:</Text><Text style={styles.profileVal}>{selectedEmployee.email}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Mobile:</Text><Text style={styles.profileVal}>{(selectedEmployee as any).mobile || pd.mobile || 'N/A'}</Text></View>
-                    <View style={styles.profileRow}><Text style={styles.profileKey}>DOB:</Text><Text style={styles.profileVal}>{(selectedEmployee as any).dob || 'N/A'}</Text></View>
+                    <View style={styles.profileRow}><Text style={styles.profileKey}>DOB:</Text><Text style={styles.profileVal}>{formatDateToDDMMYYYY((selectedEmployee as any).dob)}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Age/Blood:</Text><Text style={styles.profileVal}>{pd.age || 'N/A'} yrs / {pd.bloodGroup || 'N/A'}</Text></View>
                     <View style={styles.profileRow}><Text style={styles.profileKey}>Emergency Contact:</Text><Text style={styles.profileVal}>{pd.emergencyContact || 'N/A'}</Text></View>
 

@@ -334,7 +334,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
         CASE WHEN a.image_url IS NOT NULL AND a.image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_in') ELSE NULL END as check_in_image,
         CASE WHEN a.checkout_image_url IS NOT NULL AND a.checkout_image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_out') ELSE NULL END as check_out_image,
         (
-          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC'))
+          SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'image_url', bl.image_url))
           FROM break_logs bl
           WHERE bl.employee_id = a.employee_id AND DATE(bl.timestamp) = a.date
         ) as breaks

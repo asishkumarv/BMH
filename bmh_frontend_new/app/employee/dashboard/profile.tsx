@@ -11,6 +11,28 @@ import { Modal } from 'react-native';
 import CustomDropdown from '../../../components/ui/CustomDropdown';
 import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 
+const formatDateToDDMMYYYY = (dateStr: string | null) => {
+  if (!dateStr) return 'N/A';
+  const match = dateStr.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  const matchIso = dateStr.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (matchIso) {
+    return `${matchIso[3]}-${matchIso[2]}-${matchIso[1]}`;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+  } catch (e) {}
+  return dateStr;
+};
+
 export default function EmployeeProfileScreen() {
   const { isMobile } = useResponsive();
   const [user, setUser] = useState<any>(null);
@@ -386,7 +408,7 @@ export default function EmployeeProfileScreen() {
             <View style={styles.infoSection}>
               <View style={styles.infoRow}><Mail size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Email</Text><Text style={styles.infoVal}>{user.email}</Text></View>
               <View style={styles.infoRow}><Phone size={16} color={Colors.light.icon} /><Text style={styles.infoLabel}>Mobile</Text><Text style={styles.infoVal}>{pd.mobile || 'N/A'}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>DOB</Text><Text style={styles.infoVal}>{user.dob || pd.dob || 'N/A'}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>DOB</Text><Text style={styles.infoVal}>{formatDateToDDMMYYYY(user.dob || pd.dob)}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Blood Group</Text><Text style={styles.infoVal}>{pd.bloodGroup || 'N/A'}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Emergency</Text><Text style={styles.infoVal}>{pd.emergencyContact || 'N/A'}</Text></View>
             </View>

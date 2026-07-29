@@ -5,6 +5,7 @@ import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { API_URL } from '@/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Settings, User, CalendarDays, CheckCircle2, XCircle, Clock, Save, Building } from 'lucide-react-native';
 import { useResponsive } from '../../../hooks/useResponsive';
 
@@ -136,10 +137,21 @@ export default function AdminLeaveManagement() {
 
   const updateStatus = async (id: number, status: string) => {
     try {
+      const adminStr = Platform.OS === 'web' 
+        ? localStorage.getItem('superAdminUser')
+        : await AsyncStorage.getItem('superAdminUser');
+      const admin = adminStr ? JSON.parse(adminStr) : { id: 1, full_name: 'Super Admin' };
+
       const res = await fetch(`${API_URL}/leave/request/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ 
+          status,
+          approved_by_id: admin.id || 1,
+          approved_by_type: 'super_admin',
+          approved_by_name: admin.full_name || admin.name || 'Super Admin',
+          approved_by_dept: 'Management'
+        })
       });
       if (res.ok) {
         Alert.alert('Success', `Leave request ${status}`);

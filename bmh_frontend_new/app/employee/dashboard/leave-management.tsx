@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { CalendarDays, Send, Clock, CheckCircle2, XCircle, Info } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, Pressable, TextInput, Alert, ActivityIndicator, Modal } from 'react-native';
+import { CalendarDays, Send, Clock, CheckCircle2, XCircle, Info, X } from 'lucide-react-native';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -46,9 +46,13 @@ export default function LeaveManagement() {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  
+  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+  const [selectedStatsCard, setSelectedStatsCard] = useState<'leaves' | 'late' | 'early' | null>(null);
 
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDaySession, setHalfDaySession] = useState<'first_half' | 'second_half'>('first_half');
@@ -102,6 +106,12 @@ export default function LeaveManagement() {
         const data = await holRes.json();
         setHolidays(data);
       }
+      
+      const analyticsRes = await fetch(`${API_URL}/attendance/employee-analytics?employeeId=${emp.id}&userType=employee`);
+      if (analyticsRes.ok) {
+        const aData = await analyticsRes.json();
+        setAttendanceHistory(aData.history || []);
+      }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
     } finally {
@@ -139,6 +149,45 @@ export default function LeaveManagement() {
     return tomorrow.toISOString().split('T')[0];
   };
   const minDateStr = getTomorrowString();
+
+  const getAbsentDaysList = () => {
+    if (!employee) return [];
+    const now = new Date();
+    const year = now.getFullYear();
+    const monthIndex = now.getMonth();
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const attendedDays = new Set(attendanceHistory.map(r => new Date(r.date).getDate()));
+    const holidaySet = new Set(holidays.map(h => new Date(h.date).getDate()));
+    const list = [];
+    const limitDay = now.getDate();
+    for (let day = 1; day <= limitDay; day++) {
+      const dateObj = new Date(year, monthIndex, day);
+      const dayOfWeek = dateObj.getDay();
+      const isSunday = (dayOfWeek === 0);
+      const isHoliday = holidaySet.has(day);
+      if (!isSunday && !isHoliday && !attendedDays.has(day)) {
+        const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isAuthorized = requests.some(req => {
+          const start = req.start_date.split('T')[0];
+          const end = req.end_date.split('T')[0];
+          return req.status === 'approved' && req.request_type === 'leave' && dateStr >= start && dateStr <= end;
+        });
+        list.push({
+          date: dateStr,
+          status: isAuthorized ? 'Approved Leave' : 'Unauthorized'
+        });
+      }
+    }
+    return list;
+  };
+
+  const getLateCheckinsList = () => {
+    return attendanceHistory.filter(r => r.late_checkin_mins > 0);
+  };
+
+  const getEarlyCheckoutsList = () => {
+    return attendanceHistory.filter(r => r.early_checkout_mins > 0);
+  };
 
   // Multi-month aware cost projection
   useEffect(() => {
@@ -229,7 +278,7 @@ export default function LeaveManagement() {
     }
   }, [startDate, endDate, isHalfDay, summary, monthlySummaries, holidays, employee]);
 
-  const submitRequest = async () => {
+  const handlePreSubmit = () => {
     const targetEndDate = requestType === 'leave' ? endDate : startDate;
     if (!startDate || !targetEndDate || !reason) {
       Alert.alert('Error', 'Please fill all fields');
@@ -248,7 +297,13 @@ export default function LeaveManagement() {
       return;
     }
 
+    setShowConfirmModal(true);
+  };
+
+  const executeSubmitRequest = async () => {
+    setShowConfirmModal(false);
     setSubmitting(true);
+    const targetEndDate = requestType === 'leave' ? endDate : startDate;
     try {
       const res = await fetch(`${API_URL}/leave/request`, {
         method: 'POST',
@@ -294,6 +349,83 @@ export default function LeaveManagement() {
 
   return (
     <ScrollView style={[styles.container, !isDesktop && { padding: 16 }]}>
+      <Modal visible={showConfirmModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Request Submission</Text>
+            
+            <View style={{ marginVertical: 16, gap: 8 }}>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Type: <Text style={{ fontWeight: '700' }}>{requestType === 'leave' ? 'Leave' : requestType === 'late_checkin' ? 'Late Check-in' : 'Early Checkout'}</Text>
+              </Text>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Dates: <Text style={{ fontWeight: '700' }}>{formatDateToDDMMYYYY(startDate)} {requestType === 'leave' && !isHalfDay && `to ${formatDateToDDMMYYYY(endDate)}`}</Text>
+              </Text>
+              {isHalfDay && (
+                <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                  Session: <Text style={{ fontWeight: '700' }}>{halfDaySession === 'first_half' ? 'First Half' : 'Second Half'}</Text>
+                </Text>
+              )}
+              {requestType !== 'leave' && (
+                <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                  Duration: <Text style={{ fontWeight: '700' }}>{permissionDuration === '30m' ? '30 Mins' : permissionDuration === '1h' ? '1 Hour' : '1.5 Hours'}</Text>
+                </Text>
+              )}
+            </View>
+
+            {requestType === 'leave' && projection ? (
+              <View style={{ backgroundColor: '#f8fafc', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 12 }}>Salary Cut Calculation</Text>
+                <Text style={{ fontSize: 14, color: '#475569', marginBottom: 4 }}>Total Requested Days: {projection.days}</Text>
+                {projection.penalizedDays > 0 ? (
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 14, color: '#475569' }}>Unpaid Days: {projection.penalizedDays}</Text>
+                    {projection.salaryPerDay > 0 && (
+                      <Text style={{ fontSize: 14, color: '#475569' }}>
+                        Salary Deduction: {projection.penalizedDays} × ₹{projection.salaryPerDay.toFixed(2)} = ₹{projection.salaryDeduction.toFixed(2)}
+                      </Text>
+                    )}
+                    {projection.penaltyRate > 0 && (
+                      <Text style={{ fontSize: 14, color: '#475569' }}>
+                        Extra Penalty: {projection.penalizedDays} × ₹{projection.penaltyRate.toFixed(2)} = ₹{projection.penaltyDeduction.toFixed(2)}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.light.error, marginTop: 8 }}>
+                      Total Deduction: ₹{projection.totalDeduction.toFixed(2)}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.primary, marginTop: 4 }}>
+                    Within free limit. No salary cut! 🎉
+                  </Text>
+                )}
+              </View>
+            ) : requestType !== 'leave' ? (
+              <View style={{ backgroundColor: '#f8fafc', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.primary }}>
+                  Permission Request: Within limits, no direct deduction.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Pressable 
+                style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#f1f5f9' }} 
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={{ color: '#475569', fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: Colors.light.primary }} 
+                onPress={executeSubmitRequest}
+              >
+                <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>Proceed & Submit</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.headerRow}>
         <View style={styles.iconContainer}>
           <CalendarDays size={28} color={Colors.light.primary} />
@@ -304,20 +436,109 @@ export default function LeaveManagement() {
         </View>
       </View>
 
+      {/* Stats Details Popup Modal */}
+      <Modal visible={selectedStatsCard !== null} transparent animationType="fade" onRequestClose={() => setSelectedStatsCard(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={styles.modalTitle}>
+                {selectedStatsCard === 'leaves' ? 'Absent Days Breakdown' : selectedStatsCard === 'late' ? 'Late Check-ins Breakdown' : 'Early Check-outs Breakdown'}
+              </Text>
+              <Pressable onPress={() => setSelectedStatsCard(null)}>
+                <X color="#6b7280" size={24} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              {selectedStatsCard === 'leaves' && (
+                <View style={{ gap: 10 }}>
+                  {getAbsentDaysList().length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No absent days this month.</Text>
+                  ) : (
+                    getAbsentDaysList().map((item, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                        <Text style={{ fontWeight: '600', color: Colors.light.text }}>{formatDateToDDMMYYYY(item.date)}</Text>
+                        <Text style={{ 
+                          fontWeight: '700', 
+                          color: item.status === 'Approved Leave' ? '#059669' : '#EF4444',
+                          backgroundColor: item.status === 'Approved Leave' ? '#D1FAE5' : '#FEE2E2',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          fontSize: 12
+                        }}>
+                          {item.status}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {selectedStatsCard === 'late' && (
+                <View style={{ gap: 10 }}>
+                  {getLateCheckinsList().length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No late check-ins this month.</Text>
+                  ) : (
+                    getLateCheckinsList().map((item, idx) => (
+                      <View key={idx} style={{ padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 4 }}>
+                        <Text style={{ fontWeight: '600', color: Colors.light.text }}>{formatDateToDDMMYYYY(item.date)}</Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}>
+                          Check In: {item.check_in ? new Date(item.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}>
+                          Shift In: {item.shiftIn || '--'}
+                        </Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#ef4444' }}>
+                          Late by: {item.late_checkin_mins} mins
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {selectedStatsCard === 'early' && (
+                <View style={{ gap: 10 }}>
+                  {getEarlyCheckoutsList().length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No early check-outs this month.</Text>
+                  ) : (
+                    getEarlyCheckoutsList().map((item, idx) => (
+                      <View key={idx} style={{ padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 4 }}>
+                        <Text style={{ fontWeight: '600', color: Colors.light.text }}>{formatDateToDDMMYYYY(item.date)}</Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}>
+                          Check Out: {item.check_out ? new Date(item.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}>
+                          Shift Out: {item.shiftOut || '--'}
+                        </Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#f59e0b' }}>
+                          Early by: {item.early_checkout_mins} mins
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {summary && (
         <View style={[styles.summaryRow, !isDesktop && { flexDirection: 'column' }]}>
-          <View style={styles.summaryCard}>
+          <Pressable style={styles.summaryCard} onPress={() => setSelectedStatsCard('leaves')}>
              <Text style={styles.summaryVal}>{summary.usage.leaves} <Text style={styles.summaryLimit}>/ {summary.limits.leaves}</Text></Text>
              <Text style={styles.summaryLabel}>Leaves This Month</Text>
-          </View>
-          <View style={styles.summaryCard}>
+          </Pressable>
+          <Pressable style={styles.summaryCard} onPress={() => setSelectedStatsCard('late')}>
              <Text style={styles.summaryVal}>{summary.usage.late_checkins} <Text style={styles.summaryLimit}>/ {summary.limits.late_checkins}</Text></Text>
              <Text style={styles.summaryLabel}>Late Check-ins</Text>
-          </View>
-          <View style={styles.summaryCard}>
+          </Pressable>
+          <Pressable style={styles.summaryCard} onPress={() => setSelectedStatsCard('early')}>
              <Text style={styles.summaryVal}>{summary.usage.early_checkouts} <Text style={styles.summaryLimit}>/ {summary.limits.early_checkouts}</Text></Text>
              <Text style={styles.summaryLabel}>Early Check-outs</Text>
-          </View>
+          </Pressable>
         </View>
       )}
 
@@ -583,7 +804,7 @@ export default function LeaveManagement() {
             )}
             <Pressable 
               style={[styles.submitButton, submitting && { opacity: 0.7 }]} 
-              onPress={submitRequest}
+              onPress={handlePreSubmit}
               disabled={submitting}
             >
               <Send size={18} color="white" style={{ marginRight: 8 }} />
@@ -693,4 +914,7 @@ const styles = StyleSheet.create({
   projectionBox: { backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' },
   projectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 },
   projectionText: { fontSize: 14, color: Colors.light.text, marginBottom: 4 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '90%', maxWidth: 500, backgroundColor: 'white', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.light.text, marginBottom: 12 },
 });

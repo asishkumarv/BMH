@@ -24,6 +24,17 @@ interface Props {
 export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, userType = 'employee' }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'attendance' | 'absent' | 'breaks'>('attendance');
+
+  const monthsList = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const yearsList = [2024, 2025, 2026, 2027];
 
   const formatMins = (mins: number) => {
     if (!mins) return '';
@@ -75,19 +86,78 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
     if (visible && employeeId) {
       fetchAnalytics();
     }
-  }, [visible, employeeId]);
+  }, [visible, employeeId, selectedMonth, selectedYear]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${employeeId}&userType=${userType}`);
+      const firstDay = new Date(selectedYear, selectedMonth, 1);
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+      
+      const offsetFirst = new Date(firstDay.getTime() - (firstDay.getTimezoneOffset() * 60000));
+      const offsetLast = new Date(lastDay.getTime() - (lastDay.getTimezoneOffset() * 60000));
+      
+      const start = offsetFirst.toISOString().split('T')[0];
+      const end = offsetLast.toISOString().split('T')[0];
+
+      const [res, leaveRes, holidayRes] = await Promise.all([
+        axios.get(`https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${employeeId}&userType=${userType}&startDate=${start}&endDate=${end}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/leave/requests?employee_id=${employeeId}${userType === 'sub_admin' ? '&user_type=sub_admin' : ''}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/holidays`)
+      ]);
+
       if (res.data.success) {
         setData(res.data);
+        setLeaveRequests(leaveRes.data || []);
+        setHolidays(holidayRes.data || []);
       }
     } catch (error) {
       console.error(error);
     }
     setLoading(false);
+  };
+
+  const getAbsentDaysList = () => {
+    if (!data || !data.history) return [];
+    
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const attendedDays = new Set((data.history || []).map((r: any) => new Date(r.date).getDate()));
+    const holidaySet = new Set((holidays || []).map((h: any) => new Date(h.date).getDate()));
+    
+    const list = [];
+    const now = new Date();
+    const isCurrentPeriod = (now.getMonth() === selectedMonth && now.getFullYear() === selectedYear);
+    const limitDay = isCurrentPeriod ? now.getDate() : daysInMonth;
+
+    for (let day = 1; day <= limitDay; day++) {
+      const dateObj = new Date(selectedYear, selectedMonth, day);
+      const dayOfWeek = dateObj.getDay();
+      
+      const isSunday = (dayOfWeek === 0);
+      const isHoliday = holidaySet.has(day);
+
+      if (!isSunday && !isHoliday && !attendedDays.has(day)) {
+        const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // Check authorization
+        const matchedRequest = leaveRequests.find((req: any) => {
+          const start = req.start_date.split('T')[0];
+          const end = req.end_date.split('T')[0];
+          return req.status === 'approved' && req.request_type === 'leave' && dateStr >= start && dateStr <= end;
+        });
+
+        list.push({
+          date: dateStr,
+          status: matchedRequest ? 'Approved Leave' : 'Unauthorized',
+          approvedBy: matchedRequest ? {
+            name: matchedRequest.approved_by_name,
+            type: matchedRequest.approved_by_type === 'super_admin' ? 'Super Admin' : 'Sub Admin',
+            department: matchedRequest.approved_by_dept
+          } : null
+        });
+      }
+    }
+    return list;
   };
 
   const exportEmployeeData = async () => {
@@ -136,6 +206,34 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
               <X size={24} color="#6b7280" />
             </TouchableOpacity>
           </View>
+          
+          {Platform.OS === 'web' ? (
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingBottom: 15, backgroundColor: 'white', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Filter Period:</Text>
+              <select
+                value={selectedMonth}
+                onChange={(e: any) => setSelectedMonth(parseInt(e.target.value))}
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', backgroundColor: 'white', color: '#374151', fontSize: 14, outline: 'none' }}
+              >
+                {monthsList.map((m, idx) => (
+                  <option key={idx} value={idx}>{m}</option>
+                ))}
+              </select>
+              <select
+                value={selectedYear}
+                onChange={(e: any) => setSelectedYear(parseInt(e.target.value))}
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', backgroundColor: 'white', color: '#374151', fontSize: 14, outline: 'none' }}
+              >
+                {yearsList.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingBottom: 15, backgroundColor: 'white', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, color: '#374151', fontWeight: '600' }}>Period: {monthsList[selectedMonth]} {selectedYear}</Text>
+            </View>
+          )}
 
           {loading ? (
             <View style={{ padding: 40, alignItems: 'center' }}>
@@ -150,6 +248,16 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                   <Text style={styles.statValue}>{data.analytics.avgWorkHours}h</Text>
                   <Text style={styles.statLabel}>Avg Work Hours</Text>
                 </View>
+                <TouchableOpacity 
+                  style={[styles.statCard, activeTab === 'breaks' && { borderColor: '#3b82f6', borderWidth: 2 }]} 
+                  onPress={() => setActiveTab('breaks')}
+                >
+                  <Clock size={24} color="#3b82f6" />
+                  <Text style={styles.statValue}>
+                    {data.analytics.avgBreakMins ? (data.analytics.avgBreakMins / 60).toFixed(1) : '0.0'}h
+                  </Text>
+                  <Text style={styles.statLabel}>Avg Break Hours</Text>
+                </TouchableOpacity>
                 <View style={styles.statCard}>
                   <CheckCircle size={24} color="#10b981" />
                   <Text style={styles.statValue}>{data.analytics.earlyCheckInPercent}%</Text>
@@ -165,84 +273,184 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                   <Text style={styles.statValue}>{data.analytics.currentMonthWorkHours || '0m'}</Text>
                   <Text style={styles.statLabel}>Month Work Hours</Text>
                 </View>
-                <View style={styles.statCard}>
+                <TouchableOpacity 
+                  style={[styles.statCard, activeTab === 'attendance' && { borderColor: '#10b981', borderWidth: 2 }]} 
+                  onPress={() => setActiveTab('attendance')}
+                >
                   <CheckCircle size={24} color="#059669" />
-                  <Text style={styles.statValue}>{data.analytics.currentMonthDaysPresent || 0}d</Text>
+                  <Text style={styles.statValue}>{data.history?.length || 0}d</Text>
                   <Text style={styles.statLabel}>Month Days Present</Text>
-                </View>
-              </View>
-
-              {/* History Table */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Attendance History</Text>
-                <TouchableOpacity style={styles.exportBtn} onPress={exportEmployeeData}>
-                  <Download size={16} color="white" style={{ marginRight: 5 }} />
-                  <Text style={styles.exportText}>Export</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.statCard, activeTab === 'absent' && { borderColor: '#ef4444', borderWidth: 2 }]} 
+                  onPress={() => setActiveTab('absent')}
+                >
+                  <AlertTriangle size={24} color="#ef4444" />
+                  <Text style={styles.statValue}>{getAbsentDaysList().length}d</Text>
+                  <Text style={styles.statLabel}>Month Days Absent</Text>
                 </TouchableOpacity>
               </View>
-              
-              {(data?.employee?.shiftIn || data?.employee?.breakStart) ? (
-                <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 15 }}>
-                  {data?.employee?.shiftIn ? (
-                    <View style={{ backgroundColor: '#eff6ff', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#bfdbfe' }}>
-                      <Text style={{ fontSize: 12, color: '#1e40af', fontWeight: '600' }}>
-                        Shift Time: {data.employee.shiftIn} - {data.employee.shiftOut || '-'}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {data?.employee?.breakStart ? (
-                    <View style={{ backgroundColor: '#fff7ed', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#fed7aa' }}>
-                      <Text style={{ fontSize: 12, color: '#9a3412', fontWeight: '600' }}>
-                        Break Time: {data.employee.breakStart} - {data.employee.breakEnd || '-'}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
 
-              <View style={{ padding: 20, paddingTop: 0 }}>
-                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                  <View style={{ minWidth: 800, width: '100%' }}>
-                    <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
-                      <Text style={styles.tableCellHeader}>Date</Text>
-                      <Text style={styles.tableCellHeader}>Check In</Text>
-                      <Text style={styles.tableCellHeader}>Check Out</Text>
-                      <Text style={styles.tableCellHeader}>Worked</Text>
-                      <Text style={[styles.tableCellHeader, { flex: 1.2 }]}>Deviation</Text>
-                      <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
-                    </View>
-                    {data.history.map((row: any, idx: number) => (
-                      <View key={idx} style={styles.tableRow}>
-                        <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
-                          {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
-                          {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
-                        </View>
-                        <Text style={styles.tableCell}>{formatDateToDDMMYYYY(row.date)}</Text>
-                        <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-                        <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
-                        <Text style={[styles.tableCell, { fontWeight: '600' }]}>{getWorkedHours(row)}</Text>
-                        <View style={[styles.tableCell, { flex: 1.2, justifyContent: 'center' }]}>
-                          {row.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(row.late_checkin_mins)}</Text> : null}
-                          {row.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(row.early_checkout_mins)}</Text> : null}
-                          {row.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(row.extra_break_mins)}</Text> : null}
-                          {(!row.late_checkin_mins && !row.early_checkout_mins && !row.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
-                        </View>
-                        <View style={[styles.tableCell, { flex: 2, justifyContent: 'center' }]}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#1f2937', marginBottom: 4 }}>Total: {getBreakDuration(row)}</Text>
-                          {row.breaks && row.breaks.length > 0 ? (
-                            row.breaks.map((b: any, bi: number) => (
-                              <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
-                                {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                              </Text>
-                            ))
-                          ) : null}
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
+              {/* History Table or Absent List */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {activeTab === 'attendance' ? 'Attendance History' : activeTab === 'absent' ? 'Absent Days History' : 'Break Logs History'}
+                </Text>
+                {activeTab === 'attendance' && (
+                  <TouchableOpacity style={styles.exportBtn} onPress={exportEmployeeData}>
+                    <Download size={16} color="white" style={{ marginRight: 5 }} />
+                    <Text style={styles.exportText}>Export</Text>
+                  </TouchableOpacity>
+                )}
               </View>
+              
+              {activeTab === 'attendance' ? (
+                <>
+                  {(data?.employee?.shiftIn || data?.employee?.breakStart) ? (
+                    <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 15 }}>
+                      {data?.employee?.shiftIn ? (
+                        <View style={{ backgroundColor: '#eff6ff', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#bfdbfe' }}>
+                          <Text style={{ fontSize: 12, color: '#1e40af', fontWeight: '600' }}>
+                            Shift Time: {data.employee.shiftIn} - {data.employee.shiftOut || '-'}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {data?.employee?.breakStart ? (
+                        <View style={{ backgroundColor: '#fff7ed', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#fed7aa' }}>
+                          <Text style={{ fontSize: 12, color: '#9a3412', fontWeight: '600' }}>
+                            Break Time: {data.employee.breakStart} - {data.employee.breakEnd || '-'}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  <View style={{ padding: 20, paddingTop: 0 }}>
+                    <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                      <View style={{ minWidth: 800, width: '100%' }}>
+                        <View style={styles.tableHeaderRow}>
+                          <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>In</Text>
+                          <Text style={styles.tableCellHeader}>Date</Text>
+                          <Text style={styles.tableCellHeader}>Check In</Text>
+                          <Text style={styles.tableCellHeader}>Check Out</Text>
+                          <Text style={styles.tableCellHeader}>Worked</Text>
+                          <Text style={[styles.tableCellHeader, { flex: 1.2 }]}>Deviation</Text>
+                          <Text style={[styles.tableCellHeader, { flex: 2 }]}>Breaks</Text>
+                        </View>
+                        {data.history.map((row: any, idx: number) => (
+                          <View key={idx} style={styles.tableRow}>
+                            <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
+                              {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
+                              {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+                            </View>
+                            <Text style={styles.tableCell}>{formatDateToDDMMYYYY(row.date)}</Text>
+                            <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+                            <Text style={styles.tableCell}>{row.check_out ? new Date(row.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
+                            <Text style={[styles.tableCell, { fontWeight: '600' }]}>{getWorkedHours(row)}</Text>
+                            <View style={[styles.tableCell, { flex: 1.2, justifyContent: 'center' }]}>
+                              {row.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(row.late_checkin_mins)}</Text> : null}
+                              {row.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(row.early_checkout_mins)}</Text> : null}
+                              {row.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(row.extra_break_mins)}</Text> : null}
+                              {(!row.late_checkin_mins && !row.early_checkout_mins && !row.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+                            </View>
+                            <View style={[styles.tableCell, { flex: 2, justifyContent: 'center' }]}>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#1f2937', marginBottom: 4 }}>Total: {getBreakDuration(row)}</Text>
+                              {row.breaks && row.breaks.length > 0 ? (
+                                row.breaks.map((b: any, bi: number) => (
+                                  <Text key={bi} style={{ fontSize: 12, color: '#4b5563' }}>
+                                    {b.break_type}: {new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                  </Text>
+                                ))
+                              ) : null}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                </>
+              ) : activeTab === 'absent' ? (
+                <View style={{ padding: 20, paddingTop: 0 }}>
+                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                    <View style={{ minWidth: 800, width: '100%' }}>
+                      <View style={styles.tableHeaderRow}>
+                        <Text style={styles.tableCellHeader}>Absent Date</Text>
+                        <Text style={styles.tableCellHeader}>Status</Text>
+                        <Text style={styles.tableCellHeader}>Details</Text>
+                      </View>
+                      {getAbsentDaysList().length === 0 ? (
+                        <Text style={{ textAlign: 'center', color: '#6b7280', marginVertical: 20 }}>No absent days found for this period.</Text>
+                      ) : (
+                        getAbsentDaysList().map((item, idx) => (
+                          <View key={idx} style={styles.tableRow}>
+                            <Text style={styles.tableCell}>{formatDateToDDMMYYYY(item.date)}</Text>
+                            <Text style={[styles.tableCell, { 
+                              fontWeight: 'bold', 
+                              color: item.status === 'Approved Leave' ? '#10b981' : '#ef4444' 
+                            }]}>
+                              {item.status}
+                            </Text>
+                            <Text style={styles.tableCell}>
+                              {item.status === 'Approved Leave' 
+                                ? (item.approvedBy && item.approvedBy.name 
+                                    ? `Authorized Leave (Approved by ${item.approvedBy.type}: ${item.approvedBy.name} [${item.approvedBy.department || ''}])` 
+                                    : 'Authorized Leave (Approved by Sub Admin)')
+                                : 'Unauthorized Absence'}
+                            </Text>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  </ScrollView>
+                </View>
+              ) : (
+                <View style={{ padding: 20, paddingTop: 0 }}>
+                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                    <View style={{ minWidth: 800, width: '100%' }}>
+                      <View style={styles.tableHeaderRow}>
+                        <Text style={styles.tableCellHeader}>Date</Text>
+                        <Text style={styles.tableCellHeader}>Break Details</Text>
+                        <Text style={[styles.tableCellHeader, { flex: 2 }]}>Images</Text>
+                      </View>
+                      {data.history.filter((row: any) => row.breaks && row.breaks.length > 0).length === 0 ? (
+                        <Text style={{ textAlign: 'center', color: '#6b7280', marginVertical: 20 }}>No break logs found for this period.</Text>
+                      ) : (
+                        data.history.filter((row: any) => row.breaks && row.breaks.length > 0).map((row: any, idx: number) => (
+                          <View key={idx} style={styles.tableRow}>
+                            <Text style={styles.tableCell}>{formatDateToDDMMYYYY(row.date)}</Text>
+                            <View style={styles.tableCell}>
+                              {row.breaks.map((b: any, bi: number) => (
+                                <View key={bi} style={{ marginVertical: 4 }}>
+                                  <Text style={{ fontSize: 13, fontWeight: '700', color: b.break_type === 'Break In' ? '#3b82f6' : '#10b981' }}>
+                                    {b.break_type}
+                                  </Text>
+                                  <Text style={{ fontSize: 12, color: '#4b5563' }}>
+                                    {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                            <View style={[styles.tableCell, { flex: 2, flexDirection: 'row', gap: 10, flexWrap: 'wrap' }]}>
+                              {row.breaks.map((b: any, bi: number) => (
+                                <View key={bi} style={{ alignItems: 'center', gap: 4 }}>
+                                  {b.image_url ? (
+                                    <Image source={{ uri: b.image_url }} style={styles.breakImage} />
+                                  ) : (
+                                    <View style={styles.breakImagePlaceholder}>
+                                      <Text style={{ fontSize: 9, color: '#94a3b8' }}>No Image</Text>
+                                    </View>
+                                  )}
+                                  <Text style={{ fontSize: 9, color: '#64748b' }}>{b.break_type === 'Break In' ? 'In Image' : 'Out Image'}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
             </ScrollView>
           ) : (
             <View style={{ padding: 40, alignItems: 'center' }}>
@@ -339,5 +547,7 @@ const styles = StyleSheet.create({
   },
   tableCell: { flex: 1, color: '#1f2937', fontSize: 14, justifyContent: 'center' },
   thumb: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'white' },
-  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' }
+  thumbPlaceholder: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e5e7eb', borderWidth: 2, borderColor: 'white' },
+  breakImage: { width: 60, height: 60, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  breakImagePlaceholder: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }
 });

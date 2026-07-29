@@ -294,12 +294,18 @@ exports.getRequests = async (req, res) => {
 exports.updateRequestStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, approved_by_id, approved_by_type, approved_by_name, approved_by_dept } = req.body;
     const query = `
-      UPDATE leave_requests SET status = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2 RETURNING *;
+      UPDATE leave_requests SET 
+        status = $1, 
+        approved_by_id = $2, 
+        approved_by_type = $3, 
+        approved_by_name = $4, 
+        approved_by_dept = $5, 
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $6 RETURNING *;
     `;
-    const result = await pool.query(query, [status, id]);
+    const result = await pool.query(query, [status, approved_by_id, approved_by_type, approved_by_name, approved_by_dept, id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Request not found' });
     res.status(200).json(result.rows[0]);
   } catch (error) {

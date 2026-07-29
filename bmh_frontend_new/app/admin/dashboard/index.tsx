@@ -1,9 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, TouchableOpacity, Modal, Image } from 'react-native';
-import { Users, UserPlus, FileText, CheckCircle, Building, Clock, IndianRupee, CreditCard, Banknote, HandCoins, UserX, AlertCircle, X, Download } from 'lucide-react-native';
+import { Users, UserPlus, FileText, CheckCircle, Building, Clock, IndianRupee, CreditCard, Banknote, HandCoins, UserX, AlertCircle, X, Download, Gift } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+
+const isBirthdayToday = (dobStr: string | null) => {
+  if (!dobStr) return false;
+  const today = new Date();
+  const todayMonth = today.getMonth() + 1; // 1-12
+  const todayDate = today.getDate(); // 1-31
+
+  let birthMonth = 0;
+  let birthDate = 0;
+
+  if (dobStr.includes('-')) {
+    const parts = dobStr.split('-');
+    if (parts.length >= 3) {
+      if (parts[0].length === 4) {
+        birthMonth = parseInt(parts[1], 10);
+        birthDate = parseInt(parts[2], 10);
+      } else {
+        birthMonth = parseInt(parts[1], 10);
+        birthDate = parseInt(parts[0], 10);
+      }
+    }
+  } else if (dobStr.includes('/')) {
+    const parts = dobStr.split('/');
+    if (parts.length >= 3) {
+      if (parts[2].length === 4) {
+        birthMonth = parseInt(parts[0], 10);
+        birthDate = parseInt(parts[1], 10);
+      } else {
+        birthMonth = parseInt(parts[1], 10);
+        birthDate = parseInt(parts[2], 10);
+      }
+    }
+  }
+  return birthMonth === todayMonth && birthDate === todayDate;
+};
+
+const formatDateToDDMMYYYY = (dateStr: string | null) => {
+  if (!dateStr) return 'N/A';
+  const match = dateStr.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  const matchIso = dateStr.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (matchIso) {
+    return `${matchIso[3]}-${matchIso[2]}-${matchIso[1]}`;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+  } catch (e) {}
+  return dateStr;
+};
 
 export default function AdminDashboard() {
   const { isDesktop } = useResponsive();
@@ -29,6 +86,11 @@ export default function AdminDashboard() {
   const [attStats, setAttStats] = useState<any>(null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [modalTab, setModalTab] = useState<'employees' | 'sub_admins'>('employees');
+  
+  const [birthdaysToday, setBirthdaysToday] = useState<{
+    employees: any[];
+    sub_admins: any[];
+  }>({ employees: [], sub_admins: [] });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,6 +116,44 @@ export default function AdminDashboard() {
           subAdmins: admins.length,
           departments: depts.length,
           pendingApprovals: pendingEmps + pendingAdmins
+        });
+
+        // Filter today's birthdays
+        const bdayEmps = emps.filter((e: any) => {
+          let pd: any = {};
+          if (e.profile_data) {
+            try { pd = typeof e.profile_data === 'string' ? JSON.parse(e.profile_data) : e.profile_data; } catch (err) {}
+          }
+          const dobVal = e.dob || pd.dob;
+          return isBirthdayToday(dobVal);
+        });
+
+        const bdayAdmins = admins.map((a: any) => ({
+          ...a,
+          role: 'Sub Admin',
+          department: depts.find((d: any) => String(d.id) === String(a.department_id))?.name || 'Unknown'
+        })).filter((a: any) => {
+          let pd: any = {};
+          if (a.profile_data) {
+            try { pd = typeof a.profile_data === 'string' ? JSON.parse(a.profile_data) : a.profile_data; } catch (err) {}
+          }
+          const dobVal = a.dob || pd.dob;
+          return isBirthdayToday(dobVal);
+        });
+
+        setBirthdaysToday({
+          employees: bdayEmps.map((e: any) => ({
+            ...e,
+            name: e.full_name,
+            role: e.role || 'Staff',
+            department: e.department || 'General'
+          })),
+          sub_admins: bdayAdmins.map((a: any) => ({
+            ...a,
+            name: a.full_name,
+            role: 'Sub Admin',
+            department: a.department || 'General'
+          }))
         });
 
         if (revRes.data.success) {
@@ -97,24 +197,31 @@ export default function AdminDashboard() {
       case 'absent': return 'Absent Today';
       case 'late_checkin': return 'Late Check-ins';
       case 'early_checkin': return 'Early Check-ins';
+      case 'birthdays_today': return "Today's Birthdays";
       default: return 'Details';
     }
   };
 
   const handleExportPopupCSV = () => {
-    if (!selectedCard || !attStats) return;
-    const data = attStats[selectedCard]?.[modalTab] || [];
+    if (!selectedCard) return;
+    const data = selectedCard === 'birthdays_today' ? birthdaysToday[modalTab] : attStats?.[selectedCard]?.[modalTab] || [];
     if (data.length === 0) return;
     
     let csvContent = `"${getCardTitle(selectedCard)} - ${modalTab === 'employees' ? 'Employees' : 'Sub Admins'} - ${new Date().toLocaleDateString()}"\n\n`;
-    csvContent += 'ID,Name,Role,Email,Mobile,Department,Shift,Check In,Check Out,Deviation/Status\n';
-
-    data.forEach((r: any) => {
-      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : '-';
-      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : '-';
-      const devOrStat = r.deviation || r.status || '';
-      csvContent += `"${r.id}","${r.name}","${r.role}","${r.email || ''}","${r.mobile}","${r.department}","${r.shift}","${checkIn}","${checkOut}","${devOrStat}"\n`;
-    });
+    if (selectedCard === 'birthdays_today') {
+      csvContent += 'ID,Name,Role,Email,Mobile,Department,DOB\n';
+      data.forEach((r: any) => {
+        csvContent += `"${r.id}","${r.name || r.full_name}","${r.role}","${r.email || ''}","${r.mobile || r.phone}","${r.department}","${r.dob || ''}"\n`;
+      });
+    } else {
+      csvContent += 'ID,Name,Role,Email,Mobile,Department,Shift,Check In,Check Out,Deviation/Status\n';
+      data.forEach((r: any) => {
+        const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : '-';
+        const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : '-';
+        const devOrStat = r.deviation || r.status || '';
+        csvContent += `"${r.id}","${r.name}","${r.role}","${r.email || ''}","${r.mobile}","${r.department}","${r.shift}","${checkIn}","${checkOut}","${devOrStat}"\n`;
+      });
+    }
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -124,6 +231,8 @@ export default function AdminDashboard() {
     a.click();
   };
 
+  const birthdaysCount = birthdaysToday.employees.length + birthdaysToday.sub_admins.length;
+
   const ATTENDANCE_CARDS = [
     { key: 'total_checkin', label: 'Total Check-in Today', value: (attStats?.total_checkin?.count ?? 0).toString(), icon: CheckCircle, color: '#10B981' },
     { key: 'on_leave', label: 'On Leave Today', value: (attStats?.on_leave?.count ?? 0).toString(), icon: FileText, color: '#3B82F6' },
@@ -131,6 +240,7 @@ export default function AdminDashboard() {
     { key: 'absent', label: 'Absent Today', value: (attStats?.absent?.count ?? 0).toString(), icon: UserX, color: '#EF4444' },
     { key: 'late_checkin', label: 'Late Check-ins', value: (attStats?.late_checkin?.count ?? 0).toString(), icon: AlertCircle, color: '#D97706' },
     { key: 'early_checkin', label: 'Early Check-ins', value: (attStats?.early_checkin?.count ?? 0).toString(), icon: CheckCircle, color: '#059669' },
+    { key: 'birthdays_today', label: "Today's Birthdays", value: birthdaysCount.toString(), icon: Gift, color: '#EC4899' },
   ];
 
   const STATS_DATA = [
@@ -176,6 +286,15 @@ export default function AdminDashboard() {
                 </View>
                 <Text style={styles.statValue}>{card.value}</Text>
                 <Text style={styles.statLabel}>{card.label}</Text>
+                {card.key === 'birthdays_today' && birthdaysCount > 0 && (
+                  <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }}>
+                    {[...birthdaysToday.employees, ...birthdaysToday.sub_admins].map((b, idx) => (
+                      <Text key={idx} style={{ fontSize: 13, fontWeight: '600', color: '#EC4899', marginTop: 4 }}>
+                        🎂 {b.name} ({b.department} - {b.role})
+                      </Text>
+                    ))}
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -266,7 +385,7 @@ export default function AdminDashboard() {
                     onPress={() => setModalTab('employees')}
                   >
                     <Text style={[styles.modalToggleText, modalTab === 'employees' && styles.modalToggleTextActive]}>
-                      Employees ({attStats?.[selectedCard]?.employees?.length || 0})
+                      Employees ({selectedCard === 'birthdays_today' ? birthdaysToday.employees.length : (attStats?.[selectedCard]?.employees?.length || 0)})
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
@@ -274,7 +393,7 @@ export default function AdminDashboard() {
                     onPress={() => setModalTab('sub_admins')}
                   >
                     <Text style={[styles.modalToggleText, modalTab === 'sub_admins' && styles.modalToggleTextActive]}>
-                      Sub Admins ({attStats?.[selectedCard]?.sub_admins?.length || 0})
+                      Sub Admins ({selectedCard === 'birthdays_today' ? birthdaysToday.sub_admins.length : (attStats?.[selectedCard]?.sub_admins?.length || 0)})
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -293,49 +412,62 @@ export default function AdminDashboard() {
                     <View style={styles.tableRowHeader}>
                       <Text style={[styles.tableCellHeader, { width: 220 }]}>Name / Contact</Text>
                       <Text style={[styles.tableCellHeader, { width: 140 }]}>Department</Text>
-                      <Text style={[styles.tableCellHeader, { width: 130 }]}>Shift</Text>
-                      <Text style={[styles.tableCellHeader, { width: 100 }]}>Check In</Text>
-                      <Text style={[styles.tableCellHeader, { width: 100 }]}>Check Out</Text>
-                      <Text style={[styles.tableCellHeader, { width: 110 }]}>Status/Deviation</Text>
+                      <Text style={[styles.tableCellHeader, { width: 130 }]}>{selectedCard === 'birthdays_today' ? 'Role' : 'Shift'}</Text>
+                      <Text style={[styles.tableCellHeader, { width: 100 }]}>{selectedCard === 'birthdays_today' ? 'DOB' : 'Check In'}</Text>
+                      <Text style={[styles.tableCellHeader, { width: 100 }]}>{selectedCard === 'birthdays_today' ? 'Occasion' : 'Check Out'}</Text>
+                      <Text style={[styles.tableCellHeader, { width: 110 }]}>{selectedCard === 'birthdays_today' ? 'Status' : 'Status/Deviation'}</Text>
                     </View>
 
-                    {((attStats?.[selectedCard]?.[modalTab]) || []).length === 0 ? (
+                    {((selectedCard === 'birthdays_today' ? birthdaysToday[modalTab] : attStats?.[selectedCard]?.[modalTab]) || []).length === 0 ? (
                       <View style={{ padding: 32, alignItems: 'center' }}>
                         <Text style={{ color: '#64748b', fontSize: 15, fontWeight: '500' }}>No records found.</Text>
                       </View>
                     ) : (
-                      (attStats?.[selectedCard]?.[modalTab] || []).map((emp: any, i: number) => (
+                      ((selectedCard === 'birthdays_today' ? birthdaysToday[modalTab] : attStats?.[selectedCard]?.[modalTab]) || []).map((emp: any, i: number) => (
                         <View key={i} style={styles.tableRow}>
                           {/* Name / Contact with Thumbnail */}
                           <View style={[styles.tableCellView, { width: 220, flexDirection: 'row', alignItems: 'center' }]}>
-                            {emp.image ? (
-                              <Image source={{ uri: emp.image }} style={styles.thumb} />
+                            {emp.image || (emp.profile_data && typeof emp.profile_data === 'string' && JSON.parse(emp.profile_data).photo) || (emp.profile_data && emp.profile_data.photo) ? (
+                              <Image source={{ uri: emp.image || (typeof emp.profile_data === 'string' ? JSON.parse(emp.profile_data).photo : emp.profile_data.photo) }} style={styles.thumb} />
                             ) : (
                               <View style={styles.thumbPlaceholder}>
-                                <Text style={styles.avatarText}>{(emp.name || '?').charAt(0).toUpperCase()}</Text>
+                                <Text style={styles.avatarText}>{(emp.name || emp.full_name || '?').charAt(0).toUpperCase()}</Text>
                               </View>
                             )}
                             <View>
-                              <Text style={{ fontWeight: '700', color: Colors.light.text, fontSize: 14 }}>{emp.name}</Text>
-                              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{emp.mobile}</Text>
+                              <Text style={{ fontWeight: '700', color: Colors.light.text, fontSize: 14 }}>{emp.name || emp.full_name}</Text>
+                              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{emp.mobile || emp.phone || (emp.profile_data && typeof emp.profile_data === 'string' && JSON.parse(emp.profile_data).mobile) || (emp.profile_data && emp.profile_data.mobile) || 'N/A'}</Text>
                             </View>
                           </View>
                           
                           {/* Department */}
                           <Text style={[styles.tableCell, { width: 140 }]}>{emp.department}</Text>
                           
-                          {/* Shift */}
-                          <Text style={[styles.tableCell, { width: 130 }]}>{emp.shift}</Text>
+                          {/* Shift or Role */}
+                          <Text style={[styles.tableCell, { width: 130 }]}>{selectedCard === 'birthdays_today' ? emp.role : emp.shift}</Text>
                           
-                          {/* Check In */}
-                          <Text style={[styles.tableCell, { width: 100 }]}>{formatTime(emp.check_in)}</Text>
+                          {/* Check In or DOB */}
+                          <Text style={[styles.tableCell, { width: 100 }]}>{selectedCard === 'birthdays_today' ? formatDateToDDMMYYYY(emp.dob || (emp.profile_data && typeof emp.profile_data === 'string' && JSON.parse(emp.profile_data).dob) || (emp.profile_data && emp.profile_data.dob)) : formatTime(emp.check_in)}</Text>
                           
-                          {/* Check Out */}
-                          <Text style={[styles.tableCell, { width: 100 }]}>{formatTime(emp.check_out)}</Text>
+                          {/* Check Out or Today */}
+                          <Text style={[styles.tableCell, { width: 100 }]}>{selectedCard === 'birthdays_today' ? 'Today' : formatTime(emp.check_out)}</Text>
                           
                           {/* Deviation/Status */}
                           <View style={[styles.tableCellView, { width: 110 }]}>
-                            {emp.deviation ? (
+                            {selectedCard === 'birthdays_today' ? (
+                              <Text style={{ 
+                                fontSize: 12, 
+                                fontWeight: '700', 
+                                color: '#EC4899',
+                                backgroundColor: '#FCE7F3',
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                alignSelf: 'flex-start'
+                              }}>
+                                Birthday 🎂
+                              </Text>
+                            ) : emp.deviation ? (
                               <Text style={{ 
                                 fontSize: 12, 
                                 fontWeight: '700', 

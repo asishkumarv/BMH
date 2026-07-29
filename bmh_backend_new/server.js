@@ -244,6 +244,12 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched dob column in department_admins table.'))
     .catch(err => console.error('Error patching department_admins table (dob):', err.message));
 
+  // Add approved_by columns to leave_requests for tracking approval details
+  pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_id INTEGER').catch(e => console.error(e.message));
+  pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_type VARCHAR(50)').catch(e => console.error(e.message));
+  pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(255)').catch(e => console.error(e.message));
+  pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_dept VARCHAR(255)').catch(e => console.error(e.message));
+
   // ecogreensales_orders modifications
   pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN pharmacy TYPE TEXT').catch(e => console.error(e.message));
   pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN patient_address TYPE TEXT').catch(e => console.error(e.message));
