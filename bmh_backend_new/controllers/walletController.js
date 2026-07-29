@@ -418,16 +418,25 @@ exports.getWalletHistory = async (req, res) => {
     const handoversRes = await pool.query(handoversQuery, [employee_id, numericId]);
 
     // 2. Bookings
-    const bookingsQuery = `
-      SELECT pb.id, pb.booking_date, pb.booking_time, pb.amount, pb.payment_status, pb.payment_method, pb.created_at,
+    const bookingsParams = [];
+    let bookingsQueryStr = `
+      SELECT pb.id, ds.date as booking_date, ds.start_time as booking_time, ds.fee as amount, 
+             pb.status as payment_status, pb.payment_mode as payment_method, pb.created_at,
              p.name as patient_name
       FROM patient_bookings pb
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
       LEFT JOIN patients p ON pb.patient_id = p.id
-      WHERE (pb.payment_method = 'Cash' OR pb.payment_method = 'cash')
-        AND (pb.created_by_id = $1 OR pb.created_by_id = $2)
-      ORDER BY pb.created_at DESC
+      WHERE (pb.payment_mode = 'Cash' OR pb.payment_mode = 'cash')
     `;
-    const bookingsRes = await pool.query(bookingsQuery, [employee_id, numericId]);
+    const num = parseInt(numericId);
+    if (!isNaN(num)) {
+      bookingsQueryStr += ` AND pb.booked_by = $1`;
+      bookingsParams.push(num);
+    } else {
+      bookingsQueryStr += ` AND 1=0`;
+    }
+    bookingsQueryStr += ` ORDER BY pb.created_at DESC`;
+    const bookingsRes = await pool.query(bookingsQueryStr, bookingsParams);
 
     // 3. Orders
     const ordersQuery = `
