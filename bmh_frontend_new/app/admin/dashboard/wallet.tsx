@@ -8,7 +8,7 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
 type Peer = { id: string; full_name: string; };
-type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; };
+type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; customer_name?: string; };
 
 const formatDateTimeToDDMMYYYY = (dateStr: string) => {
   if (!dateStr) return '';
@@ -206,7 +206,8 @@ export default function AdminWalletScreen() {
     if (modalActiveTab === 'handovers') {
       csvContent = "Date,From,To,Amount,Status\n";
       filteredHandovers.forEach(h => {
-        csvContent += `"${new Date(h.created_at).toLocaleString()}","${h.from_name}","${h.to_name}",${h.amount},"${h.status}"\n`;
+        const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
+        csvContent += `"${new Date(h.created_at).toLocaleString()}","${h.from_name}","${receiver}",${h.amount},"${h.status}"\n`;
       });
       filename += "_Handovers.csv";
     } else if (modalActiveTab === 'bookings') {
@@ -271,15 +272,18 @@ export default function AdminWalletScreen() {
           </tr>
         </thead>
         <tbody>
-          ${filteredHandovers.map(h => `
-            <tr>
-              <td>${formatDateTimeToDDMMYYYY(h.created_at)}</td>
-              <td>${h.from_name}</td>
-              <td>${h.to_name}</td>
-              <td>₹${parseFloat(h.amount).toFixed(2)}</td>
-              <td>${h.status}</td>
-            </tr>
-          `).join('')}
+          ${filteredHandovers.map(h => {
+            const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
+            return `
+              <tr>
+                <td>${formatDateTimeToDDMMYYYY(h.created_at)}</td>
+                <td>${h.from_name}</td>
+                <td>${receiver}</td>
+                <td>₹${parseFloat(h.amount).toFixed(2)}</td>
+                <td>${h.status}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       `;
     } else if (modalActiveTab === 'bookings') {
@@ -817,14 +821,17 @@ export default function AdminWalletScreen() {
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Amount</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
                     </View>
-                    {filteredHandovers.map((h, i) => (
-                      <View key={i} style={styles.tableRow}>
-                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(h.created_at)}</Text>
-                        <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{h.from_name} ➔ {h.to_name}</Text>
-                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{h.amount}</Text>
-                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{h.status}</Text>
-                      </View>
-                    ))}
+                    {filteredHandovers.map((h, i) => {
+                      const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
+                      return (
+                        <View key={i} style={styles.tableRow}>
+                          <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(h.created_at)}</Text>
+                          <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{h.from_name} ➔ {receiver}</Text>
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{h.amount}</Text>
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{h.status}</Text>
+                        </View>
+                      );
+                    })}
                     {filteredHandovers.length === 0 && (
                       <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No handovers found.</Text>
                     )}

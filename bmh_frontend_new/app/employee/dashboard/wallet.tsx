@@ -11,7 +11,7 @@ import * as Print from 'expo-print';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 type Transaction = { id: string; type: string; amount: string; note: string; status: string; created_at: string; payment_mode?: string; payment_txn_id?: string; order_no?: string; invoice_no?: string; customer_name?: string; customer_phone?: string; delivery_method?: string; cash_amount?: string; online_amount?: string; credit_amount?: string; };
-type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; note?: string; credit_amount?: string; };
+type Handover = { id: string; from_name: string; to_name: string; from_employee_id: string; to_employee_id: string; amount: string; status: string; created_at: string; from_role?: string; from_department?: string; to_role?: string; to_department?: string; note?: string; credit_amount?: string; customer_name?: string; };
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
 type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; created_at?: string; };
 
@@ -894,12 +894,21 @@ export default function EmployeeWalletScreen() {
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(filteredHandovers, 'Handover_History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Credit Amt', 'Status', 'Note'], (h) => {
                     const isOut = h.from_employee_id == employeeId;
+                    const targetName = isOut 
+                      ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+                      : `${h.from_name} (${h.from_employee_id})`;
+                    const targetRole = isOut 
+                      ? (h.to_employee_id ? h.to_role || '' : 'Patient') 
+                      : h.from_role || '';
+                    const targetDept = isOut 
+                      ? (h.to_employee_id ? h.to_department || '' : 'Clinical') 
+                      : h.from_department || '';
                     return [
                       formatDateDMY(h.created_at, true),
                       isOut ? 'Handed Over' : 'Received',
-                      isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
-                      isOut ? h.to_role || '' : h.from_role || '',
-                      isOut ? h.to_department || '' : h.from_department || '',
+                      targetName,
+                      targetRole,
+                      targetDept,
                       `₹${h.amount}`,
                       `₹${h.credit_amount || '0.00'}`,
                       h.status,
@@ -910,12 +919,21 @@ export default function EmployeeWalletScreen() {
                   </Pressable>
                   <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Handover History', ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Amount', 'Credit Amt', 'Status', 'Note'], filteredHandovers, (h) => {
                     const isOut = h.from_employee_id == employeeId;
+                    const targetName = isOut 
+                      ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+                      : `${h.from_name} (${h.from_employee_id})`;
+                    const targetRole = isOut 
+                      ? (h.to_employee_id ? h.to_role || '' : 'Patient') 
+                      : h.from_role || '';
+                    const targetDept = isOut 
+                      ? (h.to_employee_id ? h.to_department || '' : 'Clinical') 
+                      : h.from_department || '';
                     return [
                       formatDateDMY(h.created_at, true),
                       isOut ? 'Handed Over' : 'Received',
-                      isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
-                      isOut ? h.to_role || '' : h.from_role || '',
-                      isOut ? h.to_department || '' : h.from_department || '',
+                      targetName,
+                      targetRole,
+                      targetDept,
                       `₹${h.amount}`,
                       `₹${h.credit_amount || '0.00'}`,
                       h.status,
@@ -930,10 +948,18 @@ export default function EmployeeWalletScreen() {
                 <View key={h.id} style={styles.txCard}>
                   <View style={styles.txDetails}>
                     <Text style={styles.txType}>
-                      {h.from_employee_id == employeeId ? `Handed to ${h.to_name} (${h.to_employee_id})` : `Received from ${h.from_name} (${h.from_employee_id})`}
+                      {h.from_employee_id == employeeId 
+                        ? (h.to_employee_id 
+                            ? `Handed to ${h.to_name} (${h.to_employee_id})` 
+                            : `Handed to ${h.customer_name || 'Patient'}`)
+                        : `Received from ${h.from_name} (${h.from_employee_id})`}
                     </Text>
                     <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>
-                      {h.from_employee_id == employeeId ? `${h.to_role} • ${h.to_department}` : `${h.from_role} • ${h.from_department}`}
+                      {h.from_employee_id == employeeId 
+                        ? (h.to_employee_id 
+                            ? `${h.to_role} • ${h.to_department}` 
+                            : `Patient • Clinical`)
+                        : `${h.from_role} • ${h.from_department}`}
                     </Text>
                     <Text style={styles.txDate}>{formatDateDMY(h.created_at, true)}</Text>
                     {h.note ? <Text style={styles.txNote}>{h.note}</Text> : null}

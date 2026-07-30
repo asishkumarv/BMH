@@ -546,8 +546,8 @@ exports.cancelBooking = async (req, res) => {
       }
       await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2 OR employee_id = $3', [booking.fee, cancelled_by_id, `EMP-${cancelled_by_id}`]);
       await pool.query(
-        'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status) VALUES ($1, $2, $3, $4, $5)',
-        [cancelled_by_id, null, booking.fee, `Patient Refund (Cash) to ${booking.patient_name || booking.patient_id} for token ID ${booking.id}`, 'Accepted']
+        'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status, customer_name) VALUES ($1, $2, $3, $4, $5, $6)',
+        [cancelled_by_id, null, booking.fee, `Patient Refund (Cash) to ${booking.patient_name || booking.patient_id} for token ID ${booking.id}`, 'Accepted', booking.patient_name || 'Patient']
       );
     } else if (refund_type === 'Online') {
       if (!refund_tnx) {
@@ -626,8 +626,8 @@ exports.processRefund = async (req, res) => {
 
       await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2 OR employee_id = $3', [refundAmount, target_employee_id, `EMP-${target_employee_id}`]);
       await pool.query(
-        'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status) VALUES ($1, $2, $3, $4, $5)',
-        [target_employee_id, null, refundAmount, `Patient Refund (Cash) to ${cancelRecord.patient_name || cancelRecord.patient_id} for cancelled booking ID ${cancelRecord.original_booking_id}`, 'Accepted']
+        'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status, customer_name) VALUES ($1, $2, $3, $4, $5, $6)',
+        [target_employee_id, null, refundAmount, `Patient Refund (Cash) to ${cancelRecord.patient_name || cancelRecord.patient_id} for cancelled booking ID ${cancelRecord.original_booking_id}`, 'Accepted', cancelRecord.patient_name || 'Patient']
       );
     } else if (refund_type === 'Online') {
       if (!refund_tnx) {
