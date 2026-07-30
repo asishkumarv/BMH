@@ -636,7 +636,7 @@ export default function EmployeeWalletScreen() {
                   <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(allowanceTransactions, 'Allowance_History', ['Date', 'Type', 'Amount', 'Note', 'Status'], (tx) => [
                     formatDateDMY(tx.created_at, true),
                     tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
-                    `₹${tx.amount}`,
+                    tx.amount,
                     tx.note || '',
                     tx.status
                   ])}>
@@ -909,8 +909,8 @@ export default function EmployeeWalletScreen() {
                       targetName,
                       targetRole,
                       targetDept,
-                      `₹${h.amount}`,
-                      `₹${h.credit_amount || '0.00'}`,
+                      h.amount,
+                      h.credit_amount || '0.00',
                       h.status,
                       h.note || ''
                     ];

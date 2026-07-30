@@ -132,7 +132,8 @@ exports.updateOrderStatus = async (req, res) => {
                       updatedOrder.payment_mode === 'Online' || 
                       updatedOrder.payment_mode === 'Split';
 
-        if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivery_boy_id) {
+        const isBus = String(updatedOrder.delivery_type || updatedOrder.delivery_method || '').toLowerCase() === 'bus';
+        if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivery_boy_id && !isBus) {
           const txCheck = await pool.query(
             'SELECT * FROM wallet_transactions WHERE order_no = $1 OR (invoice_no = $2 AND invoice_no <> \'\')',
             [(updatedOrder.order_id || updatedOrder.id || '').toString(), '']
@@ -429,7 +430,8 @@ exports.updateOrderDetails = async (req, res) => {
 
         const isDelivered = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered';
 
-        if (isDelivered && isPOD) {
+        const isBus = String(updatedOrder.delivery_type || updatedOrder.delivery_method || '').toLowerCase() === 'bus';
+        if (isDelivered && isPOD && !isBus) {
           // Identify updater ID for wallet collections
           let updaterId = modified_by_id || updatedOrder.delivery_boy_id;
           if (updaterId) {

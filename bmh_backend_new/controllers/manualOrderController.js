@@ -538,7 +538,8 @@ exports.updateOrder = async (req, res) => {
                   updatedOrder.payment_mode === 'Online' || 
                   updatedOrder.payment_mode === 'Split';
 
-    if (updatedOrder.status === 'Delivered' && isPOD && updatedOrder.delivery_boy_id) {
+    const isBus = String(updatedOrder.mode_of_delivery || '').toLowerCase() === 'bus';
+    if (updatedOrder.status === 'Delivered' && isPOD && updatedOrder.delivery_boy_id && !isBus) {
       let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
       if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
         targetEmployeeId = 'SA-' + targetEmployeeId;

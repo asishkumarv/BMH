@@ -417,7 +417,8 @@ router.put('/:id/status', async (req, res) => {
                   updatedOrder.payment_mode === 'Online' || 
                   updatedOrder.payment_mode === 'Split';
 
-    if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivered_by_id) {
+    const isBus = String(updatedOrder.delivery_type || '').toLowerCase() === 'bus';
+    if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivered_by_id && !isBus) {
       let targetEmployeeId = updatedOrder.delivered_by_id.toString();
       if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
         targetEmployeeId = 'SA-' + targetEmployeeId;

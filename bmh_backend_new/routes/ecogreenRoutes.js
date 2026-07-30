@@ -3113,7 +3113,8 @@ router.put('/sales-orders/details/:id', async (req, res) => {
 
     const isDelivered = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered';
 
-    if (isDelivered && isPOD) {
+    const isBus = String(updatedOrder.delivery_type || '').toLowerCase() === 'bus';
+    if (isDelivered && isPOD && !isBus) {
       let updaterId = req.body.modified_by_id || updatedOrder.delivery_boy_id;
       if (updaterId) {
         let targetEmployeeId = updaterId.toString();

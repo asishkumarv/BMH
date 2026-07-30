@@ -165,29 +165,55 @@ export default function EmployeeWalletScreen() {
         `"Date Range:","${startDate || 'All'} to ${endDate || 'All'}"`,
       ];
 
+      let handoverCsvRows: string[] = [];
+
       if (filename === 'Order_Collections') {
-        const totalAmt = data.reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
-        const totalCash = data.filter(tx => tx.payment_mode === 'Cash').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
-        const totalOnline = data.filter(tx => tx.payment_mode === 'Online').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const totalCash = data.reduce((acc, tx) => {
+          const val = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || '0') : 0);
+          return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+        const totalOnline = data.reduce((acc, tx) => {
+          const val = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || '0') : 0);
+          return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+        const totalAmt = totalCash + totalOnline;
         const numDelivered = data.length;
         const numBus = data.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('bus')).length;
         const numLocal = data.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('local')).length;
         const numSchedule = data.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('sched')).length;
 
-        headerRows.push(`"Total Amount:","₹${totalAmt.toFixed(2)}"`);
-        headerRows.push(`"Total Cash Collections:","₹${totalCash.toFixed(2)}"`);
-        headerRows.push(`"Total Online Collections:","₹${totalOnline.toFixed(2)}"`);
+        headerRows.push(`"Total Amount:","${totalAmt.toFixed(2)}"`);
+        headerRows.push(`"Total Cash Collections:","${totalCash.toFixed(2)}"`);
+        headerRows.push(`"Total Online Collections:","${totalOnline.toFixed(2)}"`);
+        headerRows.push(`"Present Cash In Hand:","${parseFloat(cashInHand || '0').toFixed(2)}"`);
         headerRows.push(`"No of Orders Delivered:","${numDelivered}"`);
         headerRows.push(`"No of Bus Orders:","${numBus}"`);
         headerRows.push(`"No of Local Orders:","${numLocal}"`);
         headerRows.push(`"No of Schedule Orders:","${numSchedule}"`);
+
+        handoverCsvRows.push('');
+        handoverCsvRows.push('"Cash Handover History"');
+        handoverCsvRows.push('"Date/Time","Type","Target Person","Amount","Status","Note"');
+        
+        filteredHandovers.forEach(h => {
+          const isOut = h.from_employee_id == employeeId;
+          const targetName = isOut 
+            ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+            : `${h.from_name} (${h.from_employee_id})`;
+          const type = isOut ? 'Handed Over' : 'Received';
+          const formattedDate = new Date(h.created_at).toLocaleString().replace(/"/g, '""');
+          handoverCsvRows.push(`"${formattedDate}","${type}","${targetName.replace(/"/g, '""')}",${parseFloat(h.amount).toFixed(2)},"${h.status}","${(h.note || '').replace(/"/g, '""')}"`);
+        });
+        if (filteredHandovers.length === 0) {
+          handoverCsvRows.push('"No handovers found in this date range."');
+        }
       }
 
       headerRows.push(``);
       headerRows.push(headers.map(h => `"${h}"`).join(','));
 
       const dataRows = data.map(item => rowMapper(item).map(val => `"${String(val).replace(/"/g, '""')}"`).join(','));
-      const csvContent = [...headerRows, ...dataRows].join('\n');
+      const csvContent = [...headerRows, ...dataRows, ...handoverCsvRows].join('\n');
 
       if (Platform.OS === 'web') {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -219,10 +245,17 @@ export default function EmployeeWalletScreen() {
       }).join('');
 
       let summaryHtml = '';
+      let handoversHtml = '';
       if (title === 'My Order Collections') {
-        const totalAmt = rows.reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
-        const totalCash = rows.filter(tx => tx.payment_mode === 'Cash').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
-        const totalOnline = rows.filter(tx => tx.payment_mode === 'Online').reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+        const totalCash = rows.reduce((acc, tx) => {
+          const val = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || '0') : 0);
+          return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+        const totalOnline = rows.reduce((acc, tx) => {
+          const val = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || '0') : 0);
+          return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+        const totalAmt = totalCash + totalOnline;
         const numDelivered = rows.length;
         const numBus = rows.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('bus')).length;
         const numLocal = rows.filter(tx => String(tx.delivery_method || '').toLowerCase().includes('local')).length;
@@ -238,10 +271,56 @@ export default function EmployeeWalletScreen() {
               <div><strong>No of Bus Orders:</strong> ${numBus}</div>
               <div><strong>Total Online Collections:</strong> ₹${totalOnline.toFixed(2)}</div>
               <div><strong>No of Local Orders:</strong> ${numLocal}</div>
+              <div><strong>Present Cash In Hand:</strong> ₹${parseFloat(cashInHand || '0').toFixed(2)}</div>
               <div><strong>No of Schedule Orders:</strong> ${numSchedule}</div>
             </div>
           </div>
         `;
+
+        if (filteredHandovers.length > 0) {
+          const handoverRows = filteredHandovers.map(h => {
+            const isOut = h.from_employee_id == employeeId;
+            const targetName = isOut 
+              ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+              : `${h.from_name} (${h.from_employee_id})`;
+            const type = isOut ? 'Handed Over' : 'Received';
+            const formattedDate = new Date(h.created_at).toLocaleString();
+            return `
+              <tr>
+                <td>${formattedDate}</td>
+                <td>${type}</td>
+                <td>${targetName}</td>
+                <td>₹${parseFloat(h.amount).toFixed(2)}</td>
+                <td>${h.status}</td>
+                <td>${h.note || ''}</td>
+              </tr>
+            `;
+          }).join('');
+
+          handoversHtml = `
+            <h2 style="margin-top: 40px; color: #0f172a; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">Cash Handover History</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>Type</th>
+                  <th>Target Person</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${handoverRows}
+              </tbody>
+            </table>
+          `;
+        } else {
+          handoversHtml = `
+            <h2 style="margin-top: 40px; color: #0f172a; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">Cash Handover History</h2>
+            <p style="font-size: 14px; color: #64748b; margin-top: 10px;">No handovers found in this date range.</p>
+          `;
+        }
       }
 
       const htmlContent = `
@@ -278,6 +357,7 @@ export default function EmployeeWalletScreen() {
                 ${tableRowsHtml}
               </tbody>
             </table>
+            ${handoversHtml}
           </body>
         </html>
       `;
@@ -755,10 +835,10 @@ export default function EmployeeWalletScreen() {
                         tx.customer_name || '--',
                         tx.customer_phone || '--',
                         tx.delivery_method || '--',
-                        `₹${cAmt.toFixed(2)}`,
-                        `₹${oAmt.toFixed(2)}`,
-                        `₹${crAmt.toFixed(2)}`,
-                        `₹${(parseFloat(tx.amount || 0)).toFixed(2)}`
+                        cAmt.toFixed(2),
+                        oAmt.toFixed(2),
+                        crAmt.toFixed(2),
+                        (parseFloat(tx.amount || 0)).toFixed(2)
                       ];
                     }
                   )}>
@@ -910,20 +990,29 @@ export default function EmployeeWalletScreen() {
                     ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Status', 'Note'], 
                     (h) => {
                       const isOut = h.from_employee_id == employeeId;
+                      const targetName = isOut 
+                        ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+                        : `${h.from_name} (${h.from_employee_id})`;
+                      const targetRole = isOut 
+                        ? (h.to_employee_id ? h.to_role || '' : 'Patient') 
+                        : h.from_role || '';
+                      const targetDept = isOut 
+                        ? (h.to_employee_id ? h.to_department || '' : 'Clinical') 
+                        : h.from_department || '';
                       return [
                         formatDateDMY(h.created_at, true),
                         isOut ? 'Handed Over' : 'Received',
-                        isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
-                        isOut ? h.to_role || '' : h.from_role || '',
-                        isOut ? h.to_department || '' : h.from_department || '',
+                        targetName,
+                        targetRole,
+                        targetDept,
                         h.invoice_no || '--',
                         h.order_no || '--',
                         h.customer_name || '--',
                         h.customer_phone || '--',
                         h.delivery_method || '--',
-                        `₹${h.amount}`,
-                        `₹${h.online_amount || '0.00'}`,
-                        `₹${h.credit_amount || '0.00'}`,
+                        h.amount,
+                        h.online_amount || '0.00',
+                        h.credit_amount || '0.00',
                         h.status,
                         h.note || ''
                       ];

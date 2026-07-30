@@ -484,7 +484,8 @@ router.put('/:id/status', async (req, res) => {
                   updatedOrder.payment_mode === 'Online' || 
                   updatedOrder.payment_mode === 'Split';
 
-    if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivery_boy_id) {
+    const isBus = String(updatedOrder.delivery_type || '').toLowerCase() === 'bus';
+    if ((updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered') && isPOD && updatedOrder.delivery_boy_id && !isBus) {
       let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
       if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
         targetEmployeeId = 'SA-' + targetEmployeeId;
@@ -654,7 +655,8 @@ router.put('/:id/update', async (req, res) => {
 
     const isDelivered = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'Delivered';
 
-    if (isDelivered && isPOD) {
+    const isBus = String(updatedOrder.delivery_type || '').toLowerCase() === 'bus';
+    if (isDelivered && isPOD && !isBus) {
       let updaterId = modified_by_id || updatedOrder.delivery_boy_id;
       if (updaterId) {
         let targetEmployeeId = updaterId.toString();
