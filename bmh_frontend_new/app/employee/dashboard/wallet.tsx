@@ -362,7 +362,7 @@ export default function EmployeeWalletScreen() {
   });
 
   const allowanceTransactions = filteredTransactions.filter(tx => 
-    tx.type !== 'cash_collection' && tx.type !== 'online_collection' && tx.type !== 'split_collection'
+    tx.type !== 'cash_collection' && tx.type !== 'online_collection' && tx.type !== 'split_collection' && tx.type !== 'cash_handover' && tx.type !== 'online_refund'
   ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const collectedTransactions = filteredTransactions.filter(tx => 

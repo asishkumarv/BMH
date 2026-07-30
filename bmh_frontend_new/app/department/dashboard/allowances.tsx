@@ -224,6 +224,7 @@ export default function SubAdminAllowancesScreen() {
     if (historyFilterType === 'Requests' && t.type !== 'allocation_request') return false;
     if (historyFilterType === 'Allocations' && t.type !== 'allocation_granted') return false;
     if (historyFilterType === 'Usage' && t.type !== 'usage') return false;
+    if (historyFilterType === 'All' && t.type !== 'allocation_request' && t.type !== 'allocation_granted' && t.type !== 'usage') return false;
     return true;
   });
 

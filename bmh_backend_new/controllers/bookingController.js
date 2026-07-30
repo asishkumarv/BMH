@@ -545,10 +545,19 @@ exports.cancelBooking = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Insufficient cash in hand to process refund.' });
       }
       await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2 OR employee_id = $3', [booking.fee, cancelled_by_id, `EMP-${cancelled_by_id}`]);
-      await pool.query('INSERT INTO wallet_transactions (employee_id, type, amount, note, status) VALUES ($1, $2, $3, $4, $5)', [cancelled_by_id, 'usage', booking.fee, `Refund to token cancel to patient ${booking.patient_name || booking.patient_id} and token id ${booking.id}`, 'completed']);
-    } else if (refund_type === 'Online' && !refund_tnx) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ success: false, message: 'Transaction ID is required for online refunds' });
+      await pool.query(
+        'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status) VALUES ($1, $2, $3, $4, $5)',
+        [cancelled_by_id, null, booking.fee, `Patient Refund (Cash) to ${booking.patient_name || booking.patient_id} for token ID ${booking.id}`, 'Accepted']
+      );
+    } else if (refund_type === 'Online') {
+      if (!refund_tnx) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'Transaction ID is required for online refunds' });
+      }
+      await pool.query(
+        'INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode, payment_txn_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [cancelled_by_id, 'online_refund', booking.fee, `Patient Refund (Online) to ${booking.patient_name || booking.patient_id} for token ID ${booking.id}`, 'completed', 'Online', refund_tnx]
+      );
     }
 
     // Insert into cancelled table
@@ -595,11 +604,12 @@ exports.processRefund = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Already refunded' });
     }
 
+    const target_employee_id = cancelRecord.cancelled_by_id || processed_by_id;
+    const refundAmount = parseFloat(cancelRecord.fee);
+
     if (refund_type === 'Cash') {
       // Find employee wallet
       // The cash refund should be deducted from the employee who cancelled the token
-      const target_employee_id = cancelRecord.cancelled_by_id || processed_by_id;
-
       let empWalletRes = await pool.query('SELECT cash_in_hand FROM employee_wallets WHERE employee_id = $1 OR employee_id = $2', [target_employee_id, `EMP-${target_employee_id}`]);
       
       if (empWalletRes.rowCount === 0) {
@@ -608,7 +618,6 @@ exports.processRefund = async (req, res) => {
       }
       
       const currentCash = parseFloat(empWalletRes.rows[0].cash_in_hand);
-      const refundAmount = parseFloat(cancelRecord.fee);
 
       if (currentCash < refundAmount) {
         await pool.query('ROLLBACK');
@@ -616,6 +625,19 @@ exports.processRefund = async (req, res) => {
       }
 
       await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2 OR employee_id = $3', [refundAmount, target_employee_id, `EMP-${target_employee_id}`]);
+      await pool.query(
+        'INSERT INTO cash_handovers (from_employee_id, to_employee_id, amount, note, status) VALUES ($1, $2, $3, $4, $5)',
+        [target_employee_id, null, refundAmount, `Patient Refund (Cash) to ${cancelRecord.patient_name || cancelRecord.patient_id} for cancelled booking ID ${cancelRecord.original_booking_id}`, 'Accepted']
+      );
+    } else if (refund_type === 'Online') {
+      if (!refund_tnx) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'Transaction ID is required for online refunds' });
+      }
+      await pool.query(
+        'INSERT INTO wallet_transactions (employee_id, type, amount, note, status, payment_mode, payment_txn_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [target_employee_id, 'online_refund', refundAmount, `Patient Refund (Online) to ${cancelRecord.patient_name || cancelRecord.patient_id} for cancelled booking ID ${cancelRecord.original_booking_id}`, 'completed', 'Online', refund_tnx]
+      );
     }
 
     await pool.query(`

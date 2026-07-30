@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image, TouchableWithoutFeedback } from 'react-native';
 import { Plus, Search, MoreVertical, Shield, Building, User } from 'lucide-react-native';
 import axios from 'axios';
+import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { API_URL } from '../../../config';
@@ -40,6 +43,25 @@ const formatDateToDDMMYYYY = (dateStr: string | null) => {
   return dateStr;
 };
 
+const formatTimeTo12Hr = (timeStr: string | null | undefined) => {
+  if (!timeStr || timeStr === 'N/A') return 'N/A';
+  const trimmed = timeStr.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) {
+    if (trimmed.toLowerCase().includes('am') || trimmed.toLowerCase().includes('pm')) {
+      return trimmed;
+    }
+    return trimmed;
+  }
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${strHours}:${minutes} ${ampm}`;
+};
+
 type Department = { id: string; name: string; };
 type Role = { id: string; name: string; departmentId: string; };
 
@@ -69,6 +91,11 @@ export default function EmployeesScreen() {
   const [selectedUserType, setSelectedUserType] = useState('employee');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Department filter states
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
+  const [deptSearchQuery, setDeptSearchQuery] = useState('');
+  const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+
   // Edit Profile States
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editSalary, setEditSalary] = useState('');
@@ -80,6 +107,7 @@ export default function EmployeesScreen() {
 
   useEffect(() => {
     const fetchEmployees = async () => {
+      setLoading(true);
       try {
         const [empRes, adminRes, deptRes, roleRes] = await Promise.all([
           axios.get('https://napi.bharatmedicalhallplus.com/employees'),
@@ -206,15 +234,341 @@ export default function EmployeesScreen() {
     return departments.find(d => String(d.id) === String(deptId))?.name || 'Unknown';
   };
 
-  const getFilteredEmployees = () => {
-    if (!searchQuery) return employees;
-    const query = searchQuery.toLowerCase();
-    return employees.filter(emp => {
-      return (
-        emp.full_name?.toLowerCase().includes(query) ||
-        emp.email?.toLowerCase().includes(query)
-      );
+  const getFullDetails = (item: any) => {
+    let pd: any = {};
+    if (item.profile_data) {
+      if (typeof item.profile_data === 'string') {
+        try {
+          pd = JSON.parse(item.profile_data);
+        } catch (e) {
+          console.error(e);
+        }
+      } else if (typeof item.profile_data === 'object') {
+        pd = item.profile_data;
+      }
+    }
+
+    const id = item.employee_id || item.id || 'N/A';
+    const fullName = item.full_name || 'N/A';
+    const email = item.email || 'N/A';
+    const mobile = item.mobile || pd.mobile || 'N/A';
+    const dob = formatDateToDDMMYYYY(item.dob);
+    const department = item.department || 'N/A';
+    const role = item.role || 'N/A';
+    const status = item.status || 'N/A';
+
+    // Personal/Identification
+    const age = pd.age || 'N/A';
+    const bloodGroup = pd.bloodGroup || item.blood_group || pd.blood_group || 'N/A';
+    const emergencyContact = pd.emergencyContact || 'N/A';
+
+    // Statutory/Compliance
+    const aadhaar = pd.aadhaar || 'N/A';
+    const pan = pd.pan || 'N/A';
+    const esi = pd.esi || 'N/A';
+
+    // Payroll/Banking
+    const salary = pd.salary || 'N/A';
+    const bankName = pd.bankName || pd.bank_account?.bankName || 'N/A';
+    const accountNo = pd.accountNo || pd.bank_account?.accountNo || 'N/A';
+    const ifsc = pd.ifsc || pd.bank_account?.ifsc || 'N/A';
+    const branch = pd.branch || pd.bank_account?.branch || 'N/A';
+
+    // Operations/Shifts
+    const manager = pd.manager || 'N/A';
+    const shiftIn = item.schedule_in || pd.shiftIn || 'N/A';
+    const shiftOut = item.schedule_out || pd.shiftOut || 'N/A';
+    const breakStart = item.break_in || pd.breakStart || 'N/A';
+    const breakEnd = item.break_out || pd.breakEnd || 'N/A';
+    const weeklyOff = item.weekly_off_days || pd.weeklyOff || 'N/A';
+
+    return {
+      id, fullName, email, mobile, dob, department, role, status,
+      age, bloodGroup, emergencyContact, aadhaar, pan, esi,
+      salary, bankName, accountNo, ifsc, branch, manager,
+      shiftIn, shiftOut, breakStart, breakEnd, weeklyOff
+    };
+  };
+
+  const csvEscape = (val: string | number) => {
+    const str = String(val === null || val === undefined ? '' : val);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const formatCsvText = (val: string | number) => {
+    const str = String(val === null || val === undefined ? '' : val).trim();
+    if (str === 'N/A' || str === '') return str;
+    if (/^\d+$/.test(str)) {
+      return `="${str}"`;
+    }
+    return str;
+  };
+
+  const handleExportCSV = async () => {
+    const filtered = getFilteredEmployees();
+    if (!filtered || filtered.length === 0) {
+      Alert.alert('Info', 'No records to export.');
+      return;
+    }
+
+    const headers = [
+      'ID', 'Full Name', 'Email', 'Mobile', 'DOB', 'Department', 'Role', 'Status',
+      'Age', 'Blood Group', 'Emergency Contact', 'Aadhaar ID', 'PAN Card', 'ESI ID',
+      'Base Salary', 'Bank Name', 'Account No', 'IFSC', 'Branch', 'Manager',
+      'Shift In', 'Shift Out', 'Break Start', 'Break End', 'Weekly Off Days'
+    ];
+
+    let csvContent = headers.map(csvEscape).join(',') + '\n';
+
+    filtered.forEach(emp => {
+      const details = getFullDetails(emp);
+      const row = [
+        details.id, details.fullName, details.email, formatCsvText(details.mobile), details.dob, details.department, details.role, details.status,
+        details.age, details.bloodGroup, formatCsvText(details.emergencyContact), formatCsvText(details.aadhaar), details.pan, details.esi,
+        details.salary, details.bankName, formatCsvText(details.accountNo), details.ifsc, details.branch, details.manager,
+        details.shiftIn, details.shiftOut, details.breakStart, details.breakEnd, details.weeklyOff
+      ];
+      csvContent += row.map(csvEscape).join(',') + '\n';
     });
+
+    const filename = `${selectedUserType === 'employee' ? 'employees' : 'sub_admins'}_export.csv`;
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', filename);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } else {
+      try {
+        const uri = (FileSystem as any).documentDirectory + filename;
+        await (FileSystem as any).writeAsStringAsync(uri, csvContent, { encoding: (FileSystem as any).EncodingType.UTF8 });
+        await Sharing.shareAsync(uri);
+      } catch (err) {
+        console.error('CSV Export error:', err);
+        Alert.alert('Error', 'Failed to share/save CSV export.');
+      }
+    }
+  };
+
+  const handlePrintEmployees = async () => {
+    const filtered = getFilteredEmployees();
+    if (!filtered || filtered.length === 0) {
+      Alert.alert('Info', 'No records to print.');
+      return;
+    }
+
+    const cardsHtml = filtered.map(emp => {
+      const d = getFullDetails(emp);
+      return `
+        <div class="employee-card">
+          <div class="employee-header">
+            <div>
+              <h2 class="employee-title">${d.fullName}</h2>
+              <div class="employee-meta">${d.role} &bull; ${d.department}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: bold; color: #1e3a8a;">ID: ${d.id}</div>
+              <div style="font-size: 12px; color: ${d.status === 'approved' ? '#059669' : '#d97706'}; font-weight: bold; text-transform: uppercase;">
+                Status: ${d.status}
+              </div>
+            </div>
+          </div>
+          <div class="details-grid">
+            <div class="details-section">
+              <div class="section-title">Personal & Contact</div>
+              <div class="info-row"><span class="info-label">Email:</span><span class="info-value">${d.email}</span></div>
+              <div class="info-row"><span class="info-label">Mobile:</span><span class="info-value">${d.mobile}</span></div>
+              <div class="info-row"><span class="info-label">DOB:</span><span class="info-value">${d.dob}</span></div>
+              <div class="info-row"><span class="info-label">Age:</span><span class="info-value">${d.age} yrs</span></div>
+              <div class="info-row"><span class="info-label">Blood Group:</span><span class="info-value">${d.bloodGroup}</span></div>
+              <div class="info-row"><span class="info-label">Emergency Contact:</span><span class="info-value">${d.emergencyContact}</span></div>
+            </div>
+            <div class="details-section">
+              <div class="section-title">Statutory & Compliance</div>
+              <div class="info-row"><span class="info-label">Aadhaar ID:</span><span class="info-value">${d.aadhaar}</span></div>
+              <div class="info-row"><span class="info-label">PAN Card:</span><span class="info-value">${d.pan}</span></div>
+              <div class="info-row"><span class="info-label">ESI ID:</span><span class="info-value">${d.esi}</span></div>
+            </div>
+            <div class="details-section">
+              <div class="section-title">Payroll & Banking</div>
+              <div class="info-row"><span class="info-label">Base Salary:</span><span class="info-value">${d.salary !== 'N/A' ? '₹' + d.salary : 'N/A'}</span></div>
+              <div class="info-row"><span class="info-label">Bank Name:</span><span class="info-value">${d.bankName}</span></div>
+              <div class="info-row"><span class="info-label">Account No:</span><span class="info-value">${d.accountNo}</span></div>
+              <div class="info-row"><span class="info-label">IFSC / Branch:</span><span class="info-value">${d.ifsc} / ${d.branch}</span></div>
+            </div>
+            <div class="details-section">
+              <div class="section-title">Operations & Shifts</div>
+              <div class="info-row"><span class="info-label">Manager:</span><span class="info-value">${d.manager}</span></div>
+              <div class="info-row"><span class="info-label">Shift Time:</span><span class="info-value">${d.shiftIn !== 'N/A' && d.shiftOut !== 'N/A' ? `${formatTimeTo12Hr(d.shiftIn)} - ${formatTimeTo12Hr(d.shiftOut)}` : 'N/A'}</span></div>
+              <div class="info-row"><span class="info-label">Break Window:</span><span class="info-value">${d.breakStart !== 'N/A' && d.breakEnd !== 'N/A' ? `${formatTimeTo12Hr(d.breakStart)} - ${formatTimeTo12Hr(d.breakEnd)}` : 'N/A'}</span></div>
+              <div class="info-row"><span class="info-label">Weekly Off:</span><span class="info-value">${d.weeklyOff}</span></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Staff Report</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #334155;
+              margin: 0;
+              padding: 20px;
+              background-color: #fff;
+            }
+            h1 {
+              text-align: center;
+              color: #1e3a8a;
+              margin-bottom: 5px;
+              font-size: 24px;
+            }
+            .report-meta {
+              text-align: center;
+              color: #64748b;
+              margin-bottom: 25px;
+              font-size: 14px;
+            }
+            .employee-card {
+              border: 1px solid #e2e8f0;
+              border-radius: 12px;
+              padding: 20px;
+              margin-bottom: 25px;
+              background-color: #fff;
+              page-break-inside: avoid;
+              box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            }
+            .employee-header {
+              border-bottom: 2px solid #3b82f6;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+            }
+            .employee-title {
+              margin: 0;
+              font-size: 18px;
+              color: #0f172a;
+            }
+            .employee-meta {
+              font-size: 13px;
+              color: #64748b;
+              margin-top: 4px;
+            }
+            .details-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+            }
+            @media (max-width: 600px) {
+              .details-grid {
+                grid-template-columns: 1fr;
+              }
+            }
+            .details-section {
+              background: #f8fafc;
+              padding: 12px 16px;
+              border-radius: 8px;
+              border: 1px solid #e2e8f0;
+            }
+            .section-title {
+              font-weight: 700;
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #64748b;
+              margin-bottom: 10px;
+              border-bottom: 1px solid #e2e8f0;
+              padding-bottom: 4px;
+              letter-spacing: 0.5px;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+              margin-bottom: 6px;
+              line-height: 1.4;
+            }
+            .info-label {
+              color: #64748b;
+              font-weight: 500;
+            }
+            .info-value {
+              color: #0f172a;
+              font-weight: 600;
+              text-align: right;
+              max-width: 65%;
+              word-break: break-all;
+            }
+            @media print {
+              body { padding: 0; }
+              .employee-card {
+                box-shadow: none;
+                border: 1px solid #cbd5e1;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Bharat Medical Hall - ${selectedUserType === 'employee' ? 'Employees' : 'Sub Admins'} Report</h1>
+          <div class="report-meta">
+            Generated on: ${new Date().toLocaleDateString('en-GB')} &bull; Filtered by Department: ${selectedDeptFilter === 'all' ? 'All' : selectedDeptFilter}
+          </div>
+          ${cardsHtml}
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.write(htmlContent);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 250);
+      } else {
+        if (typeof Print !== 'undefined') {
+          await Print.printAsync({ html: htmlContent });
+        }
+      }
+    } catch (err) {
+      console.error('Print error:', err);
+      Alert.alert('Error', 'Failed to print report.');
+    }
+  };
+
+  const getFilteredEmployees = () => {
+    let result = employees;
+
+    if (selectedDeptFilter !== 'all') {
+      result = result.filter(emp => emp.department === selectedDeptFilter);
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(emp => {
+        return (
+          emp.full_name?.toLowerCase().includes(query) ||
+          emp.email?.toLowerCase().includes(query)
+        );
+      });
+    }
+
+    return result;
   };
 
   const renderHeader = () => {
@@ -357,32 +711,99 @@ export default function EmployeesScreen() {
       </View>
 
       <View style={styles.card}>
-        <View style={styles.toolbar}>
-          <View style={styles.searchBox}>
-            <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
-            <TextInput
+        <View style={[styles.toolbar, { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1, minWidth: 280 }}>
+            <View style={styles.searchBox}>
+              <Search size={20} color={Colors.light.icon} style={styles.searchIcon} />
+              <TextInput
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: Colors.light.text,
+                  padding: 0,
+                  height: '100%',
+                  ...Platform.select({
+                    web: {
+                      outlineWidth: 0,
+                    } as any
+                  })
+                }}
+                placeholder="Search by name or email..."
+                placeholderTextColor={Colors.light.icon}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery ? (
+                <Pressable onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                  <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <Pressable
               style={{
-                flex: 1,
-                fontSize: 15,
-                color: Colors.light.text,
-                padding: 0,
-                height: '100%',
-                ...Platform.select({
-                  web: {
-                    outlineWidth: 0,
-                  } as any
-                })
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: Colors.light.background,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: selectedDeptFilter !== 'all' ? Colors.light.primary : 'transparent',
+                height: 46,
               }}
-              placeholder="Search by name or email..."
-              placeholderTextColor={Colors.light.icon}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery ? (
-              <Pressable onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
-                <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
-              </Pressable>
-            ) : null}
+              onPress={() => setIsDeptDropdownOpen(true)}
+            >
+              <Building size={18} color={selectedDeptFilter !== 'all' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 15, color: selectedDeptFilter !== 'all' ? Colors.light.primary : Colors.light.text, fontWeight: selectedDeptFilter !== 'all' ? '600' : '400' }}>
+                {selectedDeptFilter === 'all' ? 'All Departments' : `Dept: ${selectedDeptFilter}`}
+              </Text>
+              {selectedDeptFilter !== 'all' && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedDeptFilter('all');
+                  }}
+                  style={{ marginLeft: 8, padding: 2 }}
+                >
+                  <Text style={{ color: Colors.light.primary, fontWeight: 'bold' }}>✕</Text>
+                </Pressable>
+              )}
+            </Pressable>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#EFF6FF',
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderRadius: 8,
+                gap: 8,
+                height: 46,
+              }}
+              onPress={handleExportCSV}
+            >
+              <Text style={{ color: Colors.light.primary, fontWeight: '600', fontSize: 14 }}>Export CSV</Text>
+            </Pressable>
+
+            <Pressable
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#EFF6FF',
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderRadius: 8,
+                gap: 8,
+                height: 46,
+              }}
+              onPress={handlePrintEmployees}
+            >
+              <Text style={{ color: Colors.light.primary, fontWeight: '600', fontSize: 14 }}>Print Report</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -676,6 +1097,104 @@ export default function EmployeesScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Department Filter Modal */}
+      <Modal visible={isDeptDropdownOpen} transparent animationType="fade" onRequestClose={() => setIsDeptDropdownOpen(false)}>
+        <TouchableWithoutFeedback onPress={() => setIsDeptDropdownOpen(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalContent, { maxHeight: '60%', width: 400 }]}>
+                <Text style={styles.modalTitle}>Select Department</Text>
+                
+                <View style={[styles.searchBox, { maxWidth: '100%', marginBottom: 16, backgroundColor: '#f1f5f9' }]}>
+                  <Search size={18} color={Colors.light.icon} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 14,
+                      color: Colors.light.text,
+                      padding: 0,
+                      height: 40,
+                      ...Platform.select({
+                        web: { outlineWidth: 0 } as any
+                      })
+                    }}
+                    placeholder="Search department..."
+                    placeholderTextColor={Colors.light.icon}
+                    value={deptSearchQuery}
+                    onChangeText={setDeptSearchQuery}
+                  />
+                  {deptSearchQuery ? (
+                    <Pressable onPress={() => setDeptSearchQuery('')} style={{ padding: 4 }}>
+                      <Text style={{ color: Colors.light.icon, fontSize: 14 }}>✕</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                <FlatList
+                  data={[
+                    { id: 'all', name: 'All Departments' },
+                    ...departments.filter(d => d.name.toLowerCase().includes(deptSearchQuery.toLowerCase()))
+                  ]}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={({ pressed }) => [
+                        {
+                          paddingVertical: 12,
+                          paddingHorizontal: 16,
+                          borderRadius: 8,
+                          backgroundColor: selectedDeptFilter === item.name || (selectedDeptFilter === 'all' && item.id === 'all')
+                            ? '#EFF6FF'
+                            : pressed ? '#F8FAFC' : 'transparent',
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 4
+                        }
+                      ]}
+                      onPress={() => {
+                        setSelectedDeptFilter(item.id === 'all' ? 'all' : item.name);
+                        setIsDeptDropdownOpen(false);
+                        setDeptSearchQuery('');
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          color: selectedDeptFilter === item.name || (selectedDeptFilter === 'all' && item.id === 'all')
+                            ? Colors.light.primary
+                            : Colors.light.text,
+                          fontWeight: selectedDeptFilter === item.name || (selectedDeptFilter === 'all' && item.id === 'all')
+                            ? '700'
+                            : '500'
+                        }}
+                      >
+                        {item.name}
+                      </Text>
+                      {(selectedDeptFilter === item.name || (selectedDeptFilter === 'all' && item.id === 'all')) && (
+                        <Text style={{ color: Colors.light.primary, fontWeight: 'bold' }}>✓</Text>
+                      )}
+                    </Pressable>
+                  )}
+                  style={{ flexGrow: 1 }}
+                  ListEmptyComponent={
+                    <Text style={{ color: Colors.light.icon, fontStyle: 'italic', padding: 16, textAlign: 'center' }}>
+                      No departments found
+                    </Text>
+                  }
+                />
+
+                <View style={[styles.modalActions, { marginTop: 16 }]}>
+                  <Pressable style={styles.cancelBtn} onPress={() => { setIsDeptDropdownOpen(false); setDeptSearchQuery(''); }}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
     </View>
