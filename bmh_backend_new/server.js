@@ -382,7 +382,9 @@ app.listen(PORT, () => {
     'delivery_method VARCHAR(100)',
     'cash_amount NUMERIC(10, 2) DEFAULT 0',
     'online_amount NUMERIC(10, 2) DEFAULT 0',
-    'credit_amount NUMERIC(10, 2) DEFAULT 0'
+    'credit_amount NUMERIC(10, 2) DEFAULT 0',
+    'from_post_balance NUMERIC(10, 2)',
+    'to_post_balance NUMERIC(10, 2)'
   ];
   handoverCols.forEach(col => {
     pool.query(`ALTER TABLE cash_handovers ADD COLUMN IF NOT EXISTS ${col}`)

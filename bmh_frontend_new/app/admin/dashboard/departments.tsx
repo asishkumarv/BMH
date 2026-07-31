@@ -29,6 +29,7 @@ export default function DepartmentsScreen() {
   const [adding, setAdding] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'employee' | 'consultant'>('employee');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Edit states
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -466,16 +467,48 @@ export default function DepartmentsScreen() {
             </Pressable>
           </View>
 
+          {/* Search bar */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#FFF',
+            borderWidth: 1,
+            borderColor: Colors.light.border,
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            marginBottom: 20,
+            height: 48
+          }}>
+            <Search size={20} color={Colors.light.icon} style={{ marginRight: 8 }} />
+            <TextInput
+              style={{
+                flex: 1,
+                fontSize: 15,
+                color: Colors.light.text,
+                paddingVertical: 8,
+                ...Platform.select({
+                  web: { outlineStyle: 'none' } as any
+                })
+              } as any}
+              placeholder="Search department name..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
           <FlatList
-            data={departments.filter(d => (d.type || 'employee') === activeTab)}
+            data={departments.filter(d => 
+              (d.type || 'employee') === activeTab &&
+              d.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Building size={48} color={Colors.light.border} />
-                <Text style={styles.emptyTitle}>No Departments</Text>
-                <Text style={styles.emptyDesc}>Click "Add Department" to create one.</Text>
+                <Text style={styles.emptyTitle}>No Departments Found</Text>
+                <Text style={styles.emptyDesc}>Try searching for a different name or add a new department.</Text>
               </View>
             }
           />

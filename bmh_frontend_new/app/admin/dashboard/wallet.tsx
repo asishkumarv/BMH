@@ -79,7 +79,7 @@ export default function AdminWalletScreen() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [employeeHistory, setEmployeeHistory] = useState<any>({ handovers: [], bookings: [], orders: [] });
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [modalActiveTab, setModalActiveTab] = useState<'handovers' | 'bookings' | 'orders'>('handovers');
+  const [modalActiveTab, setModalActiveTab] = useState<'ledger' | 'handovers' | 'bookings' | 'orders'>('ledger');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
 
@@ -156,7 +156,7 @@ export default function AdminWalletScreen() {
     setHistoryLoading(true);
     setFilterStartDate('');
     setFilterEndDate('');
-    setModalActiveTab('handovers');
+    setModalActiveTab('ledger');
     try {
       const res = await axios.get(`https://napi.bharatmedicalhallplus.com/wallet/history/${employee.employee_id}`);
       if (res.data.success) {
@@ -179,9 +179,175 @@ export default function AdminWalletScreen() {
     });
   };
 
-  const filteredHandovers = filterDataByDate(employeeHistory.handovers || [], 'created_at');
+  // Helper to compile cash ledger entries chronologically for selected employee in modal
+  const buildModalCashLedger = () => {
+    if (!selectedEmployee) return { openingBalance: 0, ledger: [] };
+    const entries: any[] = [];
+
+    // Add Cash Bookings
+    const bookingsArr = Array.isArray(employeeHistory.bookings) ? employeeHistory.bookings : [];
+    bookingsArr.forEach((b: any) => {
+      const isCash = b.payment_mode === 'Cash' || b.payment_method === 'Cash' || (!b.payment_mode && b.payment_method !== 'Online');
+      if (isCash) {
+        const amt = parseFloat(b.amount || b.fee || '0');
+        if (amt > 0) {
+          entries.push({
+            id: `booking-${b.id || b.booking_id}`,
+            dateStr: b.created_at || b.date,
+            particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
+            roleDept: 'Patient • Clinical',
+            debit: '-',
+            credit: `₹${amt.toFixed(2)}`,
+            amount: amt,
+            type: 'credit',
+            status: 'Accepted'
+          });
+        }
+      }
+    });
+
+    // Add Cash Order Collections
+    const ordersArr = Array.isArray(employeeHistory.orders) ? employeeHistory.orders : [];
+    ordersArr.forEach((tx: any) => {
+      const isCash = tx.payment_mode === 'Cash' || tx.payment_method === 'Cash' || tx.cash_amount !== undefined;
+      const cashVal = tx.cash_amount !== undefined && tx.cash_amount !== null 
+        ? parseFloat(tx.cash_amount) 
+        : (isCash ? parseFloat(tx.amount || tx.paid_amount || '0') : 0);
+      if (cashVal > 0) {
+        entries.push({
+          id: `order-${tx.id || tx.order_no}`,
+          dateStr: tx.created_at || tx.order_date,
+          particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
+          roleDept: tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection',
+          debit: '-',
+          credit: `₹${cashVal.toFixed(2)}`,
+          amount: cashVal,
+          type: 'credit',
+          status: 'Accepted'
+        });
+      }
+    });
+
+    // Add Handovers
+    const handoversArr = Array.isArray(employeeHistory.handovers) ? employeeHistory.handovers : [];
+    handoversArr.forEach((h: any) => {
+      const isOut = h.from_employee_id == selectedEmployee.employee_id;
+      const targetName = isOut 
+        ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+        : `${h.from_name} (${h.from_employee_id})`;
+      const targetRoleDept = isOut 
+        ? (h.to_employee_id ? `${h.to_role || ''} • ${h.to_department || ''}` : 'Patient • Clinical') 
+        : `${h.from_role || ''} • ${h.from_department || ''}`;
+      
+      const amt = parseFloat(h.amount || '0');
+      
+      if (isOut) {
+        entries.push({
+          id: `handover-${h.id}`,
+          dateStr: h.created_at,
+          particulars: `Handed Cash to ${targetName}`,
+          roleDept: targetRoleDept,
+          debit: h.status === 'Accepted' ? `₹${amt.toFixed(2)}` : '-',
+          credit: '-',
+          amount: amt,
+          type: 'debit',
+          status: h.status,
+          note: h.note,
+          postBalance: h.from_post_balance !== null && h.from_post_balance !== undefined ? `₹${parseFloat(h.from_post_balance).toFixed(2)}` : null
+        });
+      } else {
+        entries.push({
+          id: `handover-${h.id}`,
+          dateStr: h.created_at,
+          particulars: `Received Cash from ${targetName}`,
+          roleDept: targetRoleDept,
+          debit: '-',
+          credit: h.status === 'Accepted' ? `₹${amt.toFixed(2)}` : '-',
+          amount: amt,
+          type: 'credit',
+          status: h.status,
+          note: h.note,
+          postBalance: h.to_post_balance !== null && h.to_post_balance !== undefined ? `₹${parseFloat(h.to_post_balance).toFixed(2)}` : null
+        });
+      }
+    });
+
+    // Sort chronologically (oldest first)
+    entries.sort((a: any, b: any) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+
+    // Calculate running balance from the beginning of time
+    let balanceAccumulator = 0;
+    const entriesWithRunningBalance = entries.map((entry: any) => {
+      if (entry.status === 'Accepted') {
+        if (entry.type === 'credit') {
+          balanceAccumulator += entry.amount;
+        } else {
+          balanceAccumulator -= entry.amount;
+        }
+      }
+      return {
+        ...entry,
+        runningBalanceVal: balanceAccumulator,
+        runningBalance: `₹${balanceAccumulator.toFixed(2)}`
+      };
+    });
+
+    // Apply filters and calculate opening balance
+    let openingBalance = 0;
+    const filteredEntries: any[] = [];
+
+    entriesWithRunningBalance.forEach((entry: any) => {
+      const entryDate = entry.dateStr ? entry.dateStr.split('T')[0] : '';
+      if (filterStartDate && entryDate < filterStartDate) {
+        if (entry.status === 'Accepted') {
+          if (entry.type === 'credit') {
+            openingBalance += entry.amount;
+          } else {
+            openingBalance -= entry.amount;
+          }
+        }
+      } else if (filterEndDate && entryDate > filterEndDate) {
+        // filter out
+      } else {
+        filteredEntries.push(entry);
+      }
+    });
+
+    return {
+      openingBalance,
+      ledger: filteredEntries
+    };
+  };
+
+  const { openingBalance: cashOpeningBalance, ledger: cashLedger } = buildModalCashLedger();
+
   const filteredBookings = filterDataByDate(employeeHistory.bookings || [], 'created_at');
   const filteredOrders = filterDataByDate(employeeHistory.orders || [], 'created_at');
+
+  const modalHandoversBase = filterDataByDate(employeeHistory.handovers || [], 'created_at');
+  const sortedModalHandoversOldest = [...modalHandoversBase].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  let modalCashRunning = 0;
+  const computedModalHandovers = sortedModalHandoversOldest.map((h: any) => {
+    const isOut = h.from_employee_id == selectedEmployee?.employee_id;
+    let credit = '-';
+    let debit = '-';
+    if (h.status === 'Accepted') {
+      if (isOut) {
+        debit = `₹${h.amount}`;
+        modalCashRunning -= Number(h.amount);
+      } else {
+        credit = `₹${h.amount}`;
+        modalCashRunning += Number(h.amount);
+      }
+    }
+    return {
+      ...h,
+      credit,
+      debit,
+      runningBalance: `₹${modalCashRunning.toFixed(2)}`
+    };
+  });
+  const filteredHandovers = [...computedModalHandovers].reverse();
 
   const filteredBalances = walletBalances.filter(item => {
     const name = item.full_name || '';
@@ -203,11 +369,20 @@ export default function AdminWalletScreen() {
     let csvContent = "";
     let filename = `${selectedEmployee.full_name.replace(/\s+/g, '_')}_Wallet_Details`;
     
-    if (modalActiveTab === 'handovers') {
-      csvContent = "Date,From,To,Amount,Status\n";
-      filteredHandovers.forEach(h => {
-        const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
-        csvContent += `"${new Date(h.created_at).toLocaleString()}","${h.from_name}","${receiver}",${h.amount},"${h.status}"\n`;
+    if (modalActiveTab === 'ledger') {
+      csvContent = "Date,Particulars,Staff/Details,Debit (Withdrawal),Credit (Deposit),Balance\n";
+      csvContent += `"Opening Balance","Opening Balance","-","-","-","₹${cashOpeningBalance.toFixed(2)}"\n`;
+      cashLedger.forEach(item => {
+        csvContent += `"${formatDateTimeToDDMMYYYY(item.dateStr)}","${item.particulars}${item.note ? ` (${item.note})` : ''}","${item.roleDept}","${item.debit}","${item.credit}","${item.runningBalance}"\n`;
+      });
+      csvContent += `"Closing Balance","Closing Balance","-","-","-","₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}"\n`;
+      filename += "_Ledger.csv";
+    } else if (modalActiveTab === 'handovers') {
+      // Return reverse list of computed ledger handovers or raw history handovers
+      const mHandovers = cashLedger.filter(item => item.id.startsWith('handover-')).reverse();
+      csvContent = "Date,Particulars,Debit (Withdrawal),Credit (Deposit),Balance\n";
+      mHandovers.forEach(h => {
+        csvContent += `"${formatDateTimeToDDMMYYYY(h.dateStr)}","${h.particulars}${h.note ? ` (${h.note})` : ''}","${h.debit}","${h.credit}","${h.runningBalance}"\n`;
       });
       filename += "_Handovers.csv";
     } else if (modalActiveTab === 'bookings') {
@@ -248,39 +423,108 @@ export default function AdminWalletScreen() {
     
     const presentCashInHand = parseFloat(selectedEmployee.cash_in_hand || '0').toFixed(2);
     
-    if (modalActiveTab === 'handovers') {
+    if (modalActiveTab === 'ledger') {
+      title = "Cash Account Ledger / Pass Book";
+      summaryHtml = `
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
+          <strong>Present Cash in Hand of Employee:</strong> ₹${presentCashInHand}<br/>
+          <strong>Opening Balance:</strong> ₹${cashOpeningBalance.toFixed(2)}<br/>
+          <strong>Closing Balance:</strong> ₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
+        </div>
+      `;
+      rowsHtml = `
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Particulars (Narration)</th>
+            <th>Staff/Details</th>
+            <th style="text-align: right; color: #ef4444;">Debit (-)</th>
+            <th style="text-align: right; color: #10b981;">Credit (+)</th>
+            <th style="text-align: right;">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>-</td>
+            <td><strong>Opening Balance</strong></td>
+            <td>-</td>
+            <td style="text-align: right;">-</td>
+            <td style="text-align: right;">-</td>
+            <td style="text-align: right; font-weight: bold;">₹${cashOpeningBalance.toFixed(2)}</td>
+          </tr>
+          ${cashLedger.map(item => `
+            <tr>
+              <td>${formatDateTimeToDDMMYYYY(item.dateStr)}</td>
+              <td>
+                <strong>${item.particulars}</strong>
+                ${item.note ? `<br/><span style="font-size: 10px; color: #64748b;">Note: ${item.note}</span>` : ''}
+                ${item.postBalance ? `<br/><span style="font-size: 10px; color: #059669; font-weight: bold;">Logged Balance: ${item.postBalance}</span>` : ''}
+                ${item.status !== 'Accepted' ? `<br/><span style="font-size: 10px; font-weight: bold; color: ${item.status === 'Pending' ? '#b45309' : '#b91c1c'}; text-transform: uppercase;">${item.status}</span>` : ''}
+              </td>
+              <td>${item.roleDept}</td>
+              <td style="text-align: right; color: #ef4444;">${item.debit}</td>
+              <td style="text-align: right; color: #10b981;">${item.credit}</td>
+              <td style="text-align: right; font-weight: bold;">${item.status === 'Accepted' ? item.runningBalance : '-'}</td>
+            </tr>
+          `).join('')}
+          <tr style="background-color: #f8fafc; font-weight: bold;">
+            <td>-</td>
+            <td>Closing Balance</td>
+            <td>-</td>
+            <td style="text-align: right;">-</td>
+            <td style="text-align: right;">-</td>
+            <td style="text-align: right; color: #10b981; font-weight: 800;">₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}</td>
+          </tr>
+        </tbody>
+      `;
+    } else if (modalActiveTab === 'handovers') {
       title = "Cash Handovers Transaction History";
-      let totalHandoversAmt = 0;
+      let totalHandoverReceived = 0;
+      let totalHandoverPaid = 0;
       filteredHandovers.forEach(h => {
-        totalHandoversAmt += parseFloat(h.amount || '0');
+        const isOut = h.from_employee_id == selectedEmployee.employee_id;
+        if (h.status === 'Accepted') {
+          if (isOut) {
+            totalHandoverPaid += parseFloat(h.amount || '0');
+          } else {
+            totalHandoverReceived += parseFloat(h.amount || '0');
+          }
+        }
       });
       summaryHtml = `
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
           <strong>Present Cash in Hand of Employee:</strong> ₹${presentCashInHand}<br/>
           <strong>Total Handover Transactions:</strong> ${filteredHandovers.length}<br/>
-          <strong>Total Handover Amount:</strong> ₹${totalHandoversAmt.toFixed(2)}
+          <span style="color: #ef4444; font-weight: bold;">Total Handed Over (Debit):</span> ₹${totalHandoverPaid.toFixed(2)}<br/>
+          <span style="color: #10b981; font-weight: bold;">Total Received (Credit):</span> ₹${totalHandoverReceived.toFixed(2)}
         </div>
       `;
       rowsHtml = `
         <thead>
           <tr>
             <th>Date/Time</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Amount</th>
-            <th>Status</th>
+            <th>Particulars</th>
+            <th style="text-align: right; color: #ef4444;">Debit (-)</th>
+            <th style="text-align: right; color: #10b981;">Credit (+)</th>
+            <th style="text-align: right;">Balance</th>
           </tr>
         </thead>
         <tbody>
           ${filteredHandovers.map(h => {
+            const isOut = h.from_employee_id == selectedEmployee.employee_id;
             const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
+            const particulars = isOut ? `Handed to ${receiver}` : `Received from ${h.from_name}`;
             return `
               <tr>
                 <td>${formatDateTimeToDDMMYYYY(h.created_at)}</td>
-                <td>${h.from_name}</td>
-                <td>${receiver}</td>
-                <td>₹${parseFloat(h.amount).toFixed(2)}</td>
-                <td>${h.status}</td>
+                <td>
+                  ${particulars}
+                  ${h.note ? `<br/><span style="font-size: 10px; color: #64748b;">Note: ${h.note}</span>` : ''}
+                  ${h.status !== 'Accepted' ? `<br/><span style="font-size: 10px; font-weight: bold; color: ${h.status === 'Pending' ? '#b45309' : '#b91c1c'};">${h.status}</span>` : ''}
+                </td>
+                <td style="text-align: right; color: #ef4444;">${isOut && h.status === 'Accepted' ? `₹${parseFloat(h.amount).toFixed(2)}` : '-'}</td>
+                <td style="text-align: right; color: #10b981;">${!isOut && h.status === 'Accepted' ? `₹${parseFloat(h.amount).toFixed(2)}` : '-'}</td>
+                <td style="text-align: right; font-weight: bold;">${h.status === 'Accepted' ? h.runningBalance : '-'}</td>
               </tr>
             `;
           }).join('')}
@@ -399,6 +643,7 @@ export default function AdminWalletScreen() {
       <html>
         <head>
           <style>
+            @page { size: portrait; margin: 10mm; }
             body { font-family: sans-serif; padding: 20px; }
             .header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; }
             .header h1 { margin: 0; color: #1e3a8a; text-align: center; }
@@ -783,6 +1028,14 @@ export default function AdminWalletScreen() {
             {/* Modal Tabs */}
             <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', marginBottom: 15 }}>
               <Pressable 
+                style={[{ paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' }, modalActiveTab === 'ledger' && { borderBottomColor: '#3b82f6' }]} 
+                onPress={() => setModalActiveTab('ledger')}
+              >
+                <Text style={[{ fontSize: 15, color: '#64748b' }, modalActiveTab === 'ledger' && { color: '#3b82f6', fontWeight: '700' }]}>
+                  Cash Ledger
+                </Text>
+              </Pressable>
+              <Pressable 
                 style={[{ paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 2, borderBottomColor: 'transparent' }, modalActiveTab === 'handovers' && { borderBottomColor: '#3b82f6' }]} 
                 onPress={() => setModalActiveTab('handovers')}
               >
@@ -813,22 +1066,109 @@ export default function AdminWalletScreen() {
               <ActivityIndicator size="large" color="#3b82f6" style={{ marginVertical: 40 }} />
             ) : (
               <ScrollView style={{ flex: 1 }}>
+                {modalActiveTab === 'ledger' && (
+                  <View style={styles.table}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Date & Time</Text>
+                      <Text style={[styles.tableCell, { flex: 2.5, fontWeight: '600' }]}>Particulars (Narration)</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600' }]}>Staff/Details</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right', color: '#ef4444' }]}>Debit (-)</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right', color: '#22c55e' }]}>Credit (+)</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Balance</Text>
+                    </View>
+
+                    {/* Opening Balance Row */}
+                    <View style={styles.tableRow}>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13, color: '#64748b' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 2.5, fontSize: 13, fontWeight: '700', color: '#475569' }]}>Opening Balance</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#64748b' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }]}>₹{cashOpeningBalance.toFixed(2)}</Text>
+                    </View>
+
+                    {cashLedger.length === 0 ? (
+                      <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No collections or handovers in this range.</Text>
+                    ) : (
+                      cashLedger.map((item: any) => {
+                        const isPending = item.status !== 'Accepted';
+                        return (
+                          <View key={item.id} style={styles.tableRow}>
+                            <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(item.dateStr)}</Text>
+                            <View style={{ flex: 2.5 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>{item.particulars}</Text>
+                              {item.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.note}</Text> : null}
+                              {item.postBalance && (
+                                <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600', marginTop: 2 }}>
+                                  Logged Balance: {item.postBalance}
+                                </Text>
+                              )}
+                              {isPending && (
+                                <View style={{ alignSelf: 'flex-start', backgroundColor: item.status === 'Pending' ? '#fef08a' : '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: item.status === 'Pending' ? '#854d0e' : '#991b1b', textTransform: 'uppercase' }}>{item.status}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={[styles.tableCell, { flex: 1.2, fontSize: 12 }]}>{item.roleDept}</Text>
+                            <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#ef4444' }]}>{item.debit}</Text>
+                            <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#22c55e' }]}>{item.credit}</Text>
+                            <Text style={[styles.tableCell, { flex: 1.2, textAlign: 'right', fontWeight: '700', color: Colors.light.text }]}>
+                              {isPending ? '-' : item.runningBalance}
+                            </Text>
+                          </View>
+                        );
+                      })
+                    )}
+
+                    {/* Closing Balance Row */}
+                    <View style={[styles.tableRow, { backgroundColor: '#f8fafc', borderTopWidth: 2, borderTopColor: '#cbd5e1' }]}>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13, color: '#64748b' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 2.5, fontSize: 13, fontWeight: '700', color: '#0f172a' }]}>Closing Balance</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#64748b' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }]}>
+                        ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
                 {modalActiveTab === 'handovers' && (
                   <View style={styles.table}>
                     <View style={styles.tableHeader}>
                       <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Date/Time</Text>
-                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>From ➔ To</Text>
-                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Amount</Text>
-                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
+                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Particulars</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right', color: '#ef4444' }]}>Debit (-)</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right', color: '#22c55e' }]}>Credit (+)</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Balance</Text>
                     </View>
                     {filteredHandovers.map((h, i) => {
+                      const isOut = h.from_employee_id == selectedEmployee?.employee_id;
                       const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
                       return (
                         <View key={i} style={styles.tableRow}>
                           <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(h.created_at)}</Text>
-                          <Text style={[styles.tableCell, { flex: 2, fontSize: 13 }]}>{h.from_name} ➔ {receiver}</Text>
-                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{h.amount}</Text>
-                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{h.status}</Text>
+                          <View style={{ flex: 2 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>
+                              {isOut ? `Handed to ${receiver}` : `Received from ${h.from_name}`}
+                            </Text>
+                            {h.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{h.note}</Text> : null}
+                            {h.status !== 'Accepted' && (
+                              <View style={{ alignSelf: 'flex-start', backgroundColor: h.status === 'Pending' ? '#fef08a' : '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: h.status === 'Pending' ? '#854d0e' : '#991b1b', textTransform: 'uppercase' }}>{h.status}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#ef4444' }]}>
+                            {isOut && h.status === 'Accepted' ? `₹${h.amount}` : '-'}
+                          </Text>
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#22c55e' }]}>
+                            {!isOut && h.status === 'Accepted' ? `₹${h.amount}` : '-'}
+                          </Text>
+                          <Text style={[styles.tableCell, { flex: 1.2, textAlign: 'right', fontWeight: '700', color: Colors.light.text }]}>
+                            {h.status === 'Accepted' ? h.runningBalance : '-'}
+                          </Text>
                         </View>
                       );
                     })}

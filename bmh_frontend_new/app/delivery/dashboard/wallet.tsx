@@ -49,9 +49,11 @@ type Handover = {
   delivery_method?: string;
   cash_amount?: string;
   online_amount?: string;
+  from_post_balance?: string | null;
+  to_post_balance?: string | null;
 };
 type Peer = { id: string; full_name: string; email: string; role: string; department: string; };
-type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; };
+type Booking = { booking_id: string; token_number: number; patient_name: string; date: string; fee: string; payment_mode: string; doctor_name: string; created_at?: string; };
 
 export default function EmployeeWalletScreen() {
   const { isDesktop } = useResponsive();
@@ -236,7 +238,7 @@ export default function EmployeeWalletScreen() {
     }
   };
 
-  const handlePrint = async (title: string, headers: string[], rows: any[], rowMapper: (item: any) => string[]) => {
+  const handlePrint = async (title: string, headers: string[], rows: any[], rowMapper: (item: any) => string[], extraHtml?: string) => {
     try {
       const tableHeadersHtml = headers.map(h => `<th>${h}</th>`).join('');
       const tableRowsHtml = rows.map(row => {
@@ -244,7 +246,7 @@ export default function EmployeeWalletScreen() {
         return `<tr>${cells}</tr>`;
       }).join('');
 
-      let summaryHtml = '';
+      let summaryHtml = extraHtml || '';
       let handoversHtml = '';
       if (title === 'My Order Collections') {
         const totalCash = rows.reduce((acc, tx) => {
@@ -327,6 +329,7 @@ export default function EmployeeWalletScreen() {
         <html>
           <head>
             <style>
+              @page { size: portrait; margin: 10mm; }
               body { font-family: sans-serif; padding: 20px; color: #334155; }
               h1 { color: #0f172a; margin-bottom: 5px; text-align: center; font-size: 24px; }
               .meta-section { margin-top: 15px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
@@ -540,21 +543,206 @@ export default function EmployeeWalletScreen() {
     return true;
   });
 
-  const allowanceTransactions = filteredTransactions.filter(tx => 
+  const rawAllowanceTransactions = filteredTransactions.filter(tx => 
     tx.type !== 'cash_collection' && tx.type !== 'online_collection' && tx.type !== 'split_collection'
-  );
+  ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  let allowanceRunning = 0;
+  const computedAllowanceTransactions = rawAllowanceTransactions.map(tx => {
+    let credit = '-';
+    let debit = '-';
+    if (tx.status === 'completed') {
+      if (tx.type === 'usage') {
+        debit = `₹${tx.amount}`;
+        allowanceRunning -= Number(tx.amount);
+      } else {
+        credit = `₹${tx.amount}`;
+        allowanceRunning += Number(tx.amount);
+      }
+    }
+    return {
+      ...tx,
+      credit,
+      debit,
+      runningBalance: `₹${allowanceRunning.toFixed(2)}`
+    };
+  });
+  const allowanceTransactions = [...computedAllowanceTransactions].reverse();
 
   const collectedTransactions = filteredTransactions.filter(tx => 
     tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection'
   );
 
-  const filteredHandovers = handovers.filter(h => {
+  // Helper to compile cash ledger entries chronologically
+  const buildCashLedger = () => {
+    const entries: any[] = [];
+
+    // Add Cash Bookings (if any)
+    const bookingsArr = (typeof bookings !== 'undefined' && Array.isArray(bookings)) ? bookings : [];
+    bookingsArr.forEach((b: any) => {
+      if (b.payment_mode === 'Cash') {
+        const amt = parseFloat(b.fee || '0');
+        if (amt > 0) {
+          entries.push({
+            id: `booking-${b.booking_id || b.token_number}`,
+            dateStr: b.created_at || b.date,
+            particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
+            roleDept: 'Patient • Clinical',
+            debit: '-',
+            credit: `₹${amt.toFixed(2)}`,
+            amount: amt,
+            type: 'credit',
+            status: 'Accepted'
+          });
+        }
+      }
+    });
+
+    // Add Cash Order Collections
+    transactions.forEach((tx: any) => {
+      if (tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection') {
+        const cashVal = tx.cash_amount !== undefined && tx.cash_amount !== null 
+          ? parseFloat(tx.cash_amount) 
+          : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || '0') : 0);
+        if (cashVal > 0) {
+          entries.push({
+            id: `order-${tx.id}`,
+            dateStr: tx.created_at,
+            particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
+            roleDept: tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection',
+            debit: '-',
+            credit: `₹${cashVal.toFixed(2)}`,
+            amount: cashVal,
+            type: 'credit',
+            status: 'Accepted'
+          });
+        }
+      }
+    });
+
+    // Add Handovers
+    handovers.forEach((h: any) => {
+      const isOut = h.from_employee_id == employeeId;
+      const targetName = isOut 
+        ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+        : `${h.from_name} (${h.from_employee_id})`;
+      const targetRoleDept = isOut 
+        ? (h.to_employee_id ? `${h.to_role || ''} • ${h.to_department || ''}` : 'Patient • Clinical') 
+        : `${h.from_role || ''} • ${h.from_department || ''}`;
+      
+      const amt = parseFloat(h.amount || '0');
+      
+      if (isOut) {
+        entries.push({
+          id: `handover-${h.id}`,
+          dateStr: h.created_at,
+          particulars: `Handed Cash to ${targetName}`,
+          roleDept: targetRoleDept,
+          debit: h.status === 'Accepted' ? `₹${amt.toFixed(2)}` : '-',
+          credit: '-',
+          amount: amt,
+          type: 'debit',
+          status: h.status,
+          note: h.note,
+          postBalance: h.from_post_balance !== null && h.from_post_balance !== undefined ? `₹${parseFloat(h.from_post_balance).toFixed(2)}` : null
+        });
+      } else {
+        entries.push({
+          id: `handover-${h.id}`,
+          dateStr: h.created_at,
+          particulars: `Received Cash from ${targetName}`,
+          roleDept: targetRoleDept,
+          debit: '-',
+          credit: h.status === 'Accepted' ? `₹${amt.toFixed(2)}` : '-',
+          amount: amt,
+          type: 'credit',
+          status: h.status,
+          note: h.note,
+          postBalance: h.to_post_balance !== null && h.to_post_balance !== undefined ? `₹${parseFloat(h.to_post_balance).toFixed(2)}` : null
+        });
+      }
+    });
+
+    // Sort chronologically (oldest first)
+    entries.sort((a: any, b: any) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+
+    // Calculate running balance from the beginning of time
+    let balanceAccumulator = 0;
+    const entriesWithRunningBalance = entries.map((entry: any) => {
+      if (entry.status === 'Accepted') {
+        if (entry.type === 'credit') {
+          balanceAccumulator += entry.amount;
+        } else {
+          balanceAccumulator -= entry.amount;
+        }
+      }
+      return {
+        ...entry,
+        runningBalanceVal: balanceAccumulator,
+        runningBalance: `₹${balanceAccumulator.toFixed(2)}`
+      };
+    });
+
+    // Apply filters and calculate opening balance
+    let openingBalance = 0;
+    const filteredEntries: any[] = [];
+
+    entriesWithRunningBalance.forEach((entry: any) => {
+      const entryDate = entry.dateStr ? entry.dateStr.split('T')[0] : '';
+      if (startDate && entryDate < startDate) {
+        if (entry.status === 'Accepted') {
+          if (entry.type === 'credit') {
+            openingBalance += entry.amount;
+          } else {
+            openingBalance -= entry.amount;
+          }
+        }
+      } else if (endDate && entryDate > endDate) {
+        // filter out
+      } else {
+        filteredEntries.push(entry);
+      }
+    });
+
+    return {
+      openingBalance,
+      ledger: filteredEntries
+    };
+  };
+
+  const { openingBalance: cashOpeningBalance, ledger: cashLedger } = buildCashLedger();
+
+  // For compatibility with exportToCSV and handlePrint
+  const rawHandovers = handovers.filter((h: any) => {
     if (!h.created_at) return true;
     const hDate = new Date(h.created_at).toISOString().split('T')[0];
     if (startDate && hDate < startDate) return false;
     if (endDate && hDate > endDate) return false;
     return true;
+  }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  let cashRunning = 0;
+  const computedHandovers = rawHandovers.map((h: any) => {
+    const isOut = h.from_employee_id == employeeId;
+    let credit = '-';
+    let debit = '-';
+    if (h.status === 'Accepted') {
+      if (isOut) {
+        debit = `₹${h.amount}`;
+        cashRunning -= Number(h.amount);
+      } else {
+        credit = `₹${h.amount}`;
+        cashRunning += Number(h.amount);
+      }
+    }
+    return {
+      ...h,
+      credit,
+      debit,
+      runningBalance: `₹${cashRunning.toFixed(2)}`
+    };
   });
+  const filteredHandovers = [...computedHandovers].reverse();
 
   // Collected cash/online calculations
   const totalCashBooked = collectedTransactions.reduce((acc, tx) => {
@@ -741,51 +929,69 @@ export default function EmployeeWalletScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Transaction History</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(allowanceTransactions, 'Allowance_History', ['Date', 'Type', 'Amount', 'Note', 'Status'], (tx) => [
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(allowanceTransactions, 'Allowance_History', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'], (tx) => [
                     formatDateDMY(tx.created_at, true),
-                    tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
-                    `₹${tx.amount}`,
-                    tx.note || '',
-                    tx.status
+                    `${tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}${tx.note ? ` (${tx.note})` : ''}`,
+                    tx.type === 'usage' ? `₹${tx.amount}` : '-',
+                    tx.type === 'allocation_granted' ? `₹${tx.amount}` : '-',
+                    tx.runningBalance
                   ])}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Allowance Transaction History', ['Date', 'Type', 'Amount', 'Note', 'Status'], allowanceTransactions, (tx) => [
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Allowance Transaction History', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'], allowanceTransactions, (tx) => [
                     formatDateDMY(tx.created_at, true),
-                    tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_granted' ? 'Granted' : 'Requested',
-                    `₹${tx.amount}`,
-                    tx.note || '',
-                    tx.status
+                    `${tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}${tx.note ? ` (${tx.note})` : ''}`,
+                    tx.type === 'usage' ? `₹${tx.amount}` : '-',
+                    tx.type === 'allocation_granted' ? `₹${tx.amount}` : '-',
+                    tx.runningBalance
                   ])}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
                 </View>
               </View>
-              {allowanceTransactions.map(tx => (
-                <View key={tx.id} style={styles.txCard}>
-                  <View style={[styles.txIconWrapper, { backgroundColor: tx.type === 'usage' ? '#fee2e2' : '#dcfce7' }]}>
-                    {tx.type === 'usage' ? <ArrowUpRight size={20} color="#ef4444" /> : <ArrowDownRight size={20} color="#22c55e" />}
+              <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                <View style={{ minWidth: isDesktop ? '100%' : 600, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
+                  <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
+                    <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
+                    <Text style={{ flex: 2.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
+                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
+                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
+                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
                   </View>
-                  <View style={styles.txDetails}>
-                    <Text style={styles.txType}>
-                      {tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}
-                    </Text>
-                    <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
-                    {tx.note ? <Text style={styles.txNote}>{tx.note}</Text> : null}
-                  </View>
-                  <View style={styles.txAmountSection}>
-                    <Text style={[styles.txAmount, { color: tx.type === 'usage' ? '#ef4444' : '#22c55e' }]}>
-                      {tx.type === 'usage' ? '-' : '+'}₹{tx.amount}
-                    </Text>
-                    <Text style={[styles.txStatus, { 
-                      color: tx.status === 'completed' ? '#22c55e' : tx.status === 'pending' ? '#eab308' : '#ef4444',
-                      backgroundColor: tx.status === 'completed' ? '#dcfce7' : tx.status === 'pending' ? '#fef08a' : '#fee2e2'
-                    }]}>
-                      {tx.status}
-                    </Text>
-                  </View>
+                  {allowanceTransactions.length === 0 ? (
+                    <Text style={{ padding: 16, textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No transactions recorded.</Text>
+                  ) : (
+                    allowanceTransactions.map((tx: any) => {
+                      const isPending = tx.status === 'pending';
+                      return (
+                        <View key={tx.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#f1f5f9', padding: 12, alignItems: 'center' }}>
+                          <Text style={{ flex: 1.5, fontSize: 13, color: '#334155' }}>{formatDateDMY(tx.created_at, true)}</Text>
+                          <View style={{ flex: 2.5 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>
+                              {tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}
+                            </Text>
+                            {tx.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{tx.note}</Text> : null}
+                            {isPending && (
+                              <View style={{ alignSelf: 'flex-start', backgroundColor: '#fef08a', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#854d0e', textTransform: 'uppercase' }}>Pending</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={{ flex: 1, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>
+                            {tx.type === 'usage' ? `₹${tx.amount}` : '-'}
+                          </Text>
+                          <Text style={{ flex: 1, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>
+                            {tx.type === 'allocation_granted' ? `₹${tx.amount}` : '-'}
+                          </Text>
+                          <Text style={{ flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
+                            {tx.runningBalance}
+                          </Text>
+                        </View>
+                      );
+                    })
+                  )}
                 </View>
-              ))}
+              </ScrollView>
             </>
           ) : (
             <>
@@ -815,289 +1021,98 @@ export default function EmployeeWalletScreen() {
               </View>
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
-                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }} onPress={() => setIsBookingsExpanded(!isBookingsExpanded)}>
-                  <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>My Order Collections</Text>
-                  {isBookingsExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
-                </Pressable>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Cash Account Ledger</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(
-                    collectedTransactions, 
-                    'Order_Collections', 
-                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Total'], 
-                    (tx) => {
-                      const cAmt = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || 0) : 0);
-                      const oAmt = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || 0) : 0);
-                      const crAmt = tx.credit_amount !== undefined && tx.credit_amount !== null ? parseFloat(tx.credit_amount) : 0;
-                      return [
-                        formatDateDMY(tx.created_at, true),
-                        tx.invoice_no || '--',
-                        tx.order_no || '--',
-                        tx.customer_name || '--',
-                        tx.customer_phone || '--',
-                        tx.delivery_method || '--',
-                        cAmt.toFixed(2),
-                        oAmt.toFixed(2),
-                        crAmt.toFixed(2),
-                        (parseFloat(tx.amount || 0)).toFixed(2)
-                      ];
-                    }
-                  )}>
+                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(cashLedger, 'Cash_Ledger', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'], (item) => [
+                    formatDateDMY(item.dateStr, true),
+                    `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
+                    item.debit,
+                    item.credit,
+                    item.runningBalance
+                  ])}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint(
-                    'My Order Collections', 
-                    ['Date', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Total'], 
-                    collectedTransactions, 
-                    (tx) => {
-                      const cAmt = tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) : (tx.payment_mode === 'Cash' ? parseFloat(tx.amount || 0) : 0);
-                      const oAmt = tx.online_amount !== undefined && tx.online_amount !== null ? parseFloat(tx.online_amount) : (tx.payment_mode === 'Online' ? parseFloat(tx.amount || 0) : 0);
-                      const crAmt = tx.credit_amount !== undefined && tx.credit_amount !== null ? parseFloat(tx.credit_amount) : 0;
-                      return [
-                        formatDateDMY(tx.created_at, true),
-                        tx.invoice_no || '--',
-                        tx.order_no || '--',
-                        tx.customer_name || '--',
-                        tx.customer_phone || '--',
-                        tx.delivery_method || '--',
-                        `₹${cAmt.toFixed(2)}`,
-                        `₹${oAmt.toFixed(2)}`,
-                        `₹${crAmt.toFixed(2)}`,
-                        `₹${(parseFloat(tx.amount || 0)).toFixed(2)}`
-                      ];
-                    }
-                  )}>
+                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint('Cash Ledger', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'], cashLedger, (item) => [
+                    formatDateDMY(item.dateStr, true),
+                    `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
+                    item.debit,
+                    item.credit,
+                    item.runningBalance
+                  ], `<div class="meta-row"><span class="meta-label">Opening Balance:</span><span>₹${cashOpeningBalance.toFixed(2)}</span></div>`)}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
                 </View>
               </View>
-              {isBookingsExpanded && collectedTransactions.map(tx => (
-                <View key={tx.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
-                      <View style={[
-                        styles.txIconWrapper, 
-                        { 
-                          backgroundColor: tx.payment_mode === 'Cash' ? '#dcfce7' : (tx.payment_mode === 'Online' ? '#e0f2fe' : '#f3e8ff') 
-                        }
-                      ]}>
-                        {tx.payment_mode === 'Cash' ? (
-                          <Banknote size={20} color="#16a34a" />
-                        ) : tx.payment_mode === 'Online' ? (
-                          <RefreshCcw size={20} color={Colors.light.primary} />
-                        ) : (
-                          <ShieldCheck size={20} color="#8b5cf6" />
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.txType, { fontWeight: '700' }]} numberOfLines={1}>{tx.note || 'Order Collection'}</Text>
-                        <Text style={styles.txDate}>{formatDateDMY(tx.created_at, true)}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.txAmountSection}>
-                      <Text style={[
-                        styles.txAmount, 
-                        { 
-                          color: tx.payment_mode === 'Cash' ? '#16a34a' : (tx.payment_mode === 'Online' ? Colors.light.primary : '#7c3aed') 
-                        }
-                      ]}>
-                        +₹{tx.amount || 0}
-                      </Text>
-                      <Text style={[
-                        styles.txStatus, 
-                        { 
-                          color: tx.payment_mode === 'Cash' ? '#166534' : (tx.payment_mode === 'Online' ? '#075985' : '#5b21b6'), 
-                          backgroundColor: tx.payment_mode === 'Cash' ? '#dcfce7' : (tx.payment_mode === 'Online' ? '#e0f2fe' : '#f3e8ff') 
-                        }
-                      ]}>
-                        {tx.payment_mode || 'Cash'}
-                      </Text>
-                    </View>
+
+              <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                <View style={{ minWidth: isDesktop ? '100%' : 700, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
+                  <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
+                    <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
+                    <Text style={{ flex: 2.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
+                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Staff/Details</Text>
+                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
+                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
+                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
                   </View>
 
-                  <View style={{ marginTop: 12, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Order No:</Text> {tx.order_no || '--'}</Text>
-                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Invoice No:</Text> {tx.invoice_no || '--'}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Customer:</Text> {tx.customer_name || '--'}</Text>
-                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Phone:</Text> {tx.customer_phone || '--'}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-                      <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Method:</Text> {tx.delivery_method || '--'}</Text>
-                      <Text style={{ fontSize: 13, color: '#475569' }}>
-                        <Text style={{ fontWeight: '600' }}>Cash:</Text> {tx.cash_amount !== undefined && tx.cash_amount !== null ? `₹${parseFloat(tx.cash_amount).toFixed(2)}` : (tx.payment_mode === 'Cash' ? `₹${parseFloat(tx.amount || '0').toFixed(2)}` : '₹0.00')} | <Text style={{ fontWeight: '600' }}>Online:</Text> {tx.online_amount !== undefined && tx.online_amount !== null ? `₹${parseFloat(tx.online_amount).toFixed(2)}` : (tx.payment_mode === 'Online' ? `₹${parseFloat(tx.amount || '0').toFixed(2)}` : '₹0.00')}
-                      </Text>
-                    </View>
-                    {tx.credit_amount !== undefined && tx.credit_amount !== null && parseFloat(tx.credit_amount) > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 }}>
-                        <Text style={{ fontSize: 13, color: '#b45309', fontWeight: '600' }}>
-                          Credit (Unpaid): ₹{parseFloat(tx.credit_amount).toFixed(2)}
-                        </Text>
-                      </View>
-                    )}
+                  {/* Opening Balance Row */}
+                  <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12, backgroundColor: '#fafafa', alignItems: 'center' }}>
+                    <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 2.5, fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
+                    <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>₹{cashOpeningBalance.toFixed(2)}</Text>
                   </View>
 
-                  {(tx.cash_amount !== undefined && tx.cash_amount !== null ? parseFloat(tx.cash_amount) > 0 : tx.payment_mode === 'Cash') && (
-                    <Pressable 
-                      style={{ 
-                        marginTop: 12, 
-                        backgroundColor: '#16a34a', 
-                        paddingVertical: 8, 
-                        paddingHorizontal: 12, 
-                        borderRadius: 6, 
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6
-                      }}
-                      onPress={() => {
-                        const targetCash = tx.cash_amount !== undefined && tx.cash_amount !== null ? tx.cash_amount : (tx.amount || '0');
-                        const targetOnline = tx.online_amount !== undefined && tx.online_amount !== null ? tx.online_amount : '0';
-                        setAmount(String(targetCash));
-                        setOrderNo(tx.order_no || '');
-                        setInvoiceNo(tx.invoice_no || '');
-                        setCustomerName(tx.customer_name || '');
-                        setCustomerPhone(tx.customer_phone || '');
-                        setDeliveryMethod(tx.delivery_method || '');
-                        setCashAmount(String(targetCash));
-                        setOnlineAmount(String(targetOnline));
-                        setNote(`Handover for Order ${tx.order_no || tx.id}`);
-                        setHandoverModalVisible(true);
-                      }}
-                    >
-                      <HandCoins size={16} color="#FFF" />
-                      <Text style={{ fontSize: 13, color: '#FFF', fontWeight: '600' }}>Handover This Order's Cash</Text>
-                    </Pressable>
+                  {cashLedger.length === 0 ? (
+                    <View style={{ padding: 24, alignItems: 'center' }}>
+                      <Text style={{ color: '#64748b', fontStyle: 'italic' }}>No collections or handovers in this range.</Text>
+                    </View>
+                  ) : (
+                    cashLedger.map((item: any) => {
+                      const isPending = item.status !== 'Accepted';
+                      return (
+                        <View key={item.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#f1f5f9', padding: 12, alignItems: 'center' }}>
+                          <Text style={{ flex: 1.5, fontSize: 13, color: '#334155' }}>{formatDateDMY(item.dateStr, true)}</Text>
+                          <View style={{ flex: 2.5 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>{item.particulars}</Text>
+                            {item.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.note}</Text> : null}
+                            {item.postBalance && (
+                              <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600', marginTop: 2 }}>
+                                Logged Balance: {item.postBalance}
+                              </Text>
+                            )}
+                            {isPending && (
+                              <View style={{ alignSelf: 'flex-start', backgroundColor: item.status === 'Pending' ? '#fef08a' : '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: item.status === 'Pending' ? '#854d0e' : '#991b1b', textTransform: 'uppercase' }}>{item.status}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={{ flex: 1.2, fontSize: 12, color: '#64748b' }}>{item.roleDept}</Text>
+                          <Text style={{ flex: 1, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>{item.debit}</Text>
+                          <Text style={{ flex: 1, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>{item.credit}</Text>
+                          <Text style={{ flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
+                            {isPending ? '-' : item.runningBalance}
+                          </Text>
+                        </View>
+                      );
+                    })
                   )}
-                </View>
-              ))}
-              {!isBookingsExpanded && collectedTransactions.length > 0 && (
-                <Pressable onPress={() => setIsBookingsExpanded(true)} style={{ padding: 12, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Show {collectedTransactions.length} Order Collections</Text>
-                </Pressable>
-              )}
 
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 }}>
-                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }} onPress={() => setIsHandoversExpanded(!isHandoversExpanded)}>
-                  <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text }}>Handover History</Text>
-                  {isHandoversExpanded ? <ChevronUp size={20} color={Colors.light.text} /> : <ChevronDown size={20} color={Colors.light.text} />}
-                </Pressable>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={styles.actionIconButton} onPress={() => exportToCSV(
-                    filteredHandovers, 
-                    'Handover_History', 
-                    ['Date', 'Type', 'Target Person', 'Role', 'Department', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Status', 'Note'], 
-                    (h) => {
-                      const isOut = h.from_employee_id == employeeId;
-                      const targetName = isOut 
-                        ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
-                        : `${h.from_name} (${h.from_employee_id})`;
-                      const targetRole = isOut 
-                        ? (h.to_employee_id ? h.to_role || '' : 'Patient') 
-                        : h.from_role || '';
-                      const targetDept = isOut 
-                        ? (h.to_employee_id ? h.to_department || '' : 'Clinical') 
-                        : h.from_department || '';
-                      return [
-                        formatDateDMY(h.created_at, true),
-                        isOut ? 'Handed Over' : 'Received',
-                        targetName,
-                        targetRole,
-                        targetDept,
-                        h.invoice_no || '--',
-                        h.order_no || '--',
-                        h.customer_name || '--',
-                        h.customer_phone || '--',
-                        h.delivery_method || '--',
-                        h.amount,
-                        h.online_amount || '0.00',
-                        h.credit_amount || '0.00',
-                        h.status,
-                        h.note || ''
-                      ];
-                    }
-                  )}>
-                    <Text style={styles.actionIconText}>CSV</Text>
-                  </Pressable>
-                  <Pressable style={styles.actionIconButton} onPress={() => handlePrint(
-                    'Handover History', 
-                    ['Date', 'Type', 'Target Person', 'Invoice No', 'Order No', 'Customer Name', 'Phone', 'Method', 'Cash Amt', 'Online Amt', 'Credit Amt', 'Status', 'Note'], 
-                    filteredHandovers, 
-                    (h) => {
-                      const isOut = h.from_employee_id == employeeId;
-                      return [
-                        formatDateDMY(h.created_at, true),
-                        isOut ? 'Handed Over' : 'Received',
-                        isOut ? `${h.to_name} (${h.to_employee_id})` : `${h.from_name} (${h.from_employee_id})`,
-                        h.invoice_no || '--',
-                        h.order_no || '--',
-                        h.customer_name || '--',
-                        h.customer_phone || '--',
-                        h.delivery_method || '--',
-                        `₹${h.amount}`,
-                        `₹${h.online_amount || '0.00'}`,
-                        `₹${h.credit_amount || '0.00'}`,
-                        h.status,
-                        h.note || ''
-                      ];
-                    }
-                  )}>
-                    <Text style={styles.actionIconText}>Print</Text>
-                  </Pressable>
-                </View>
-              </View>
-              {isHandoversExpanded && filteredHandovers.map(h => (
-                <View key={h.id} style={[styles.txCard, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.txType, { fontWeight: '700' }]}>
-                        {h.from_employee_id == employeeId ? `Handed to ${h.to_name} (${h.to_employee_id})` : `Received from ${h.from_name} (${h.from_employee_id})`}
-                      </Text>
-                      <Text style={{fontSize: 12, color: '#475569', marginTop: 2}}>
-                        {h.from_employee_id == employeeId ? `${h.to_role} • ${h.to_department}` : `${h.from_role} • ${h.from_department}`}
-                      </Text>
-                      <Text style={styles.txDate}>{formatDateDMY(h.created_at, true)}</Text>
-                      {h.note ? <Text style={[styles.txNote, { marginTop: 4, fontStyle: 'italic' }]}>Note: {h.note}</Text> : null}
-                    </View>
-                    <View style={styles.txAmountSection}>
-                      <Text style={[styles.txAmount, { color: h.from_employee_id == employeeId ? '#ef4444' : '#16a34a' }]}>
-                        {h.from_employee_id == employeeId ? '-' : '+'}₹{h.amount}
-                      </Text>
-                      <Text style={[styles.txStatus, { 
-                        color: h.status === 'Accepted' ? '#22c55e' : h.status === 'Pending' ? '#eab308' : '#ef4444',
-                        backgroundColor: h.status === 'Accepted' ? '#dcfce7' : h.status === 'Pending' ? '#fef08a' : '#fee2e2'
-                      }]}>
-                        {h.status}
-                      </Text>
-                    </View>
+                  {/* Closing Balance Row */}
+                  <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#cbd5e1', padding: 12, backgroundColor: '#f8fafc', alignItems: 'center' }}>
+                    <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 2.5, fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Closing Balance</Text>
+                    <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1.2, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }}>
+                      ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
+                    </Text>
                   </View>
-
-                  {(h.order_no || h.invoice_no) && (
-                    <View style={{ marginTop: 12, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Order No:</Text> {h.order_no || '--'}</Text>
-                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Invoice No:</Text> {h.invoice_no || '--'}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Customer:</Text> {h.customer_name || '--'}</Text>
-                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Phone:</Text> {h.customer_phone || '--'}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-                        <Text style={{ fontSize: 13, color: '#475569' }}><Text style={{ fontWeight: '600' }}>Method:</Text> {h.delivery_method || '--'}</Text>
-                        <Text style={{ fontSize: 13, color: '#475569' }}>
-                          <Text style={{ fontWeight: '600' }}>Cash Amount:</Text> ₹{h.amount} {h.online_amount && Number(h.online_amount) > 0 ? `| Online Amount: ₹${h.online_amount}` : ''}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
                 </View>
-              ))}
-              {!isHandoversExpanded && filteredHandovers.length > 0 && (
-                <Pressable onPress={() => setIsHandoversExpanded(true)} style={{ padding: 12, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                  <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Show {filteredHandovers.length} Handover Records</Text>
-                </Pressable>
-              )}
+              </ScrollView>
             </>
           )}
 

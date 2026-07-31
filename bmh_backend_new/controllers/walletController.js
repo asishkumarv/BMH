@@ -222,21 +222,23 @@ exports.requestHandover = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient cash in hand' });
     }
 
+    // Deduct immediately so they can't double-handover
+    const wUpdate = await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2 RETURNING cash_in_hand', [amount, from_employee_id]);
+    const fromPostBalance = wUpdate.rows[0] ? parseFloat(wUpdate.rows[0].cash_in_hand) : 0;
+
     const result = await pool.query(
       `INSERT INTO cash_handovers (
         from_employee_id, to_employee_id, amount, note, status,
         order_no, invoice_no, customer_name, customer_phone, delivery_method,
-        cash_amount, online_amount, credit_amount
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        cash_amount, online_amount, credit_amount, from_post_balance
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
       [
         from_employee_id, to_employee_id, amount, note || null, 'Pending',
         order_no || '', invoice_no || '', customer_name || '', customer_phone || '', delivery_method || '',
-        parseFloat(cash_amount || 0), parseFloat(online_amount || 0), parseFloat(credit_amount || 0)
+        parseFloat(cash_amount || 0), parseFloat(online_amount || 0), parseFloat(credit_amount || 0),
+        fromPostBalance
       ]
     );
-
-    // Deduct immediately so they can't double-handover
-    await pool.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand - $1 WHERE employee_id = $2', [amount, from_employee_id]);
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -262,14 +264,20 @@ exports.acceptHandover = async (req, res) => {
       if (action === 'Accepted') {
         // Add cash to receiver
         const wCheck = await client.query('SELECT id FROM employee_wallets WHERE employee_id = $1', [handover.to_employee_id]);
+        let toPostBalance = 0;
         if (wCheck.rowCount === 0) {
-          await client.query('INSERT INTO employee_wallets (employee_id, cash_in_hand, balance) VALUES ($1, $2, 0)', [handover.to_employee_id, handover.amount]);
+          const wIns = await client.query('INSERT INTO employee_wallets (employee_id, cash_in_hand, balance) VALUES ($1, $2, 0) RETURNING cash_in_hand', [handover.to_employee_id, handover.amount]);
+          toPostBalance = parseFloat(wIns.rows[0].cash_in_hand);
         } else {
-          await client.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [handover.amount, handover.to_employee_id]);
+          const wUp = await client.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1, updated_at = CURRENT_TIMESTAMP WHERE employee_id = $2 RETURNING cash_in_hand', [handover.amount, handover.to_employee_id]);
+          toPostBalance = parseFloat(wUp.rows[0].cash_in_hand);
         }
+        await client.query('UPDATE cash_handovers SET to_post_balance = $1 WHERE id = $2', [toPostBalance, id]);
       } else {
         // Return cash to sender
-        await client.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1 WHERE employee_id = $2', [handover.amount, handover.from_employee_id]);
+        const wUp = await client.query('UPDATE employee_wallets SET cash_in_hand = cash_in_hand + $1, updated_at = CURRENT_TIMESTAMP WHERE employee_id = $2 RETURNING cash_in_hand', [handover.amount, handover.from_employee_id]);
+        const fromPostBalance = parseFloat(wUp.rows[0].cash_in_hand);
+        await client.query('UPDATE cash_handovers SET from_post_balance = $1 WHERE id = $2', [fromPostBalance, id]);
       }
 
       await client.query('COMMIT');
