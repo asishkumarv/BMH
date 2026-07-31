@@ -190,20 +190,22 @@ export default function AdminWalletScreen() {
       const amt = parseFloat(b.amount || b.fee || '0');
       if (amt > 0) {
         const isCash = b.payment_mode === 'Cash' || b.payment_method === 'Cash';
-        entries.push({
-          id: `booking-${b.id || b.booking_id}`,
-          dateStr: b.created_at || b.date,
-          particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
-          roleDept: `Patient • Clinical [${isCash ? 'Cash' : 'Online'}]`,
-          debit: '-',
-          credit: `₹${amt.toFixed(2)}`,
-          amount: amt,
-          cashAmount: isCash ? amt : 0,
-          onlineAmount: !isCash ? amt : 0,
-          type: 'credit',
-          status: 'Accepted',
-          paymentMode: isCash ? 'Cash' : 'Online'
-        });
+        if (isCash) {
+          entries.push({
+            id: `booking-${b.id || b.booking_id}`,
+            dateStr: b.created_at || b.date,
+            particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
+            roleDept: `Patient • Clinical [Cash]`,
+            debit: '-',
+            credit: `₹${amt.toFixed(2)}`,
+            amount: amt,
+            cashAmount: amt,
+            onlineAmount: 0,
+            type: 'credit',
+            status: 'Accepted',
+            paymentMode: 'Cash'
+          });
+        }
       }
     });
 
@@ -217,15 +219,15 @@ export default function AdminWalletScreen() {
         ? parseFloat(tx.online_amount) 
         : (tx.payment_mode === 'Online' || tx.payment_method === 'Online' || tx.type === 'online_collection' ? parseFloat(tx.amount || tx.paid_amount || '0') : 0);
       
-      const totalVal = cashVal + onlineVal;
-      if (totalVal > 0) {
+      const statusLower = (tx.status || '').toLowerCase();
+      const isDelivered = ['delivered', 'completed', 'received'].includes(statusLower);
+
+      if (isDelivered && cashVal > 0) {
         let label = '';
         if (cashVal > 0 && onlineVal > 0) {
           label = `Split: Cash ₹${cashVal.toFixed(2)} + Online ₹${onlineVal.toFixed(2)}`;
-        } else if (cashVal > 0) {
-          label = `Cash ₹${cashVal.toFixed(2)}`;
         } else {
-          label = `Online ₹${onlineVal.toFixed(2)}`;
+          label = `Cash ₹${cashVal.toFixed(2)}`;
         }
 
         entries.push({
@@ -234,13 +236,13 @@ export default function AdminWalletScreen() {
           particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
           roleDept: `${tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection'} [${label}]`,
           debit: '-',
-          credit: `₹${totalVal.toFixed(2)}`,
-          amount: totalVal,
+          credit: `₹${cashVal.toFixed(2)}`,
+          amount: cashVal,
           cashAmount: cashVal,
           onlineAmount: onlineVal,
           type: 'credit',
           status: 'Accepted',
-          paymentMode: cashVal > 0 && onlineVal > 0 ? 'Split' : (cashVal > 0 ? 'Cash' : 'Online')
+          paymentMode: cashVal > 0 && onlineVal > 0 ? 'Split' : 'Cash'
         });
       }
     });

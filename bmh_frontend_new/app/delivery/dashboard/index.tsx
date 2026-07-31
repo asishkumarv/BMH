@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated, RefreshControl, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert, Modal, TextInput, ScrollView, Animated, RefreshControl, SafeAreaView, Pressable } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -7,6 +7,7 @@ import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import { MapPin, Phone, User, CheckCircle, Clock, Package, Navigation, Camera as CameraIcon, Sun, Moon, Coffee, FileText, X } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors } from '../../../constants/Colors';
 import CrossPlatformMap from './CrossPlatformMap';
 
@@ -110,6 +111,8 @@ export default function DeliveryDashboard() {
   // Reschedule State hooks
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
   const [currentRiderAvailable, setCurrentRiderAvailable] = useState(false);
@@ -123,7 +126,8 @@ export default function DeliveryDashboard() {
   const [gpsLoading, setGpsLoading] = useState(false);
 
   // New State
-  const [filterState, setFilterState] = useState('All');
+  const [filterState, setFilterState] = useState('PendingTotal');
+  const [statsExpanded, setStatsExpanded] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [routeModalVisible, setRouteModalVisible] = useState(false);
   const [routeToggle, setRouteToggle] = useState<'All' | 'Assigned' | 'PickedUp'>('All');
@@ -411,13 +415,14 @@ export default function DeliveryDashboard() {
 
   useEffect(() => {
     let interval: any;
-    if (user) {
+    const isModalOpen = updateModalVisible || otpModalVisible || busModalVisible || submissionModalVisible || gpsModalVisible || routeModalVisible;
+    if (user && !isModalOpen) {
       interval = setInterval(() => {
         fetchOrders(user.id);
       }, 5000); // Check every 5 seconds
     }
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, updateModalVisible, otpModalVisible, busModalVisible, submissionModalVisible, gpsModalVisible, routeModalVisible]);
 
   useEffect(() => {
     const init = async () => {
@@ -606,6 +611,8 @@ export default function DeliveryDashboard() {
     const mm = String(now.getMinutes()).padStart(2, '0');
     setRescheduleDate(`${YYYY}-${MM}-${DD}`);
     setRescheduleTime(`${hh}:${mm}`);
+    setShowDatePicker(false);
+    setShowTimePicker(false);
     setAvailabilityChecked(false);
     setAvailabilityLoading(false);
     setAvailableRiders([]);
@@ -1284,29 +1291,64 @@ export default function DeliveryDashboard() {
         </View>
       </View>
 
+      {/* Collapsible Stats Header */}
+      <TouchableOpacity 
+        style={{ 
+          flexDirection: 'row', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          paddingHorizontal: 15, 
+          paddingVertical: 10, 
+          backgroundColor: '#f8fafc',
+          borderBottomWidth: 1,
+          borderBottomColor: '#e2e8f0',
+          marginBottom: 10
+        }} 
+        onPress={() => setStatsExpanded(!statsExpanded)}
+      >
+        <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#475569' }}>📊 Delivery Stats Overview</Text>
+        <Text style={{ fontSize: 11, color: '#64748b', fontWeight: 'bold' }}>{statsExpanded ? '▼ Hide' : '▲ Show'}</Text>
+      </TouchableOpacity>
+
       {/* Stats Widget */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 15, marginBottom: 15, gap: 8, flexWrap: 'wrap' }}>
-        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'All' ? '#3b82f6' : '#e0e7ff', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('All')}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'All' ? '#fff' : '#1e40af' }}>{orders.length}</Text>
-          <Text style={{ fontSize: 10, color: filterState === 'All' ? '#fff' : '#1e40af' }}>Total</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Bus' ? '#8b5cf6' : '#ede9fe', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Bus')}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Bus' ? '#fff' : '#6d28d9' }}>{orders.filter(o => o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus').length}</Text>
-          <Text style={{ fontSize: 10, color: filterState === 'Bus' ? '#fff' : '#6d28d9' }}>Bus</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Pending' ? '#f59e0b' : '#fef3c7', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Pending')}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Pending' ? '#fff' : '#b45309' }}>{orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase())).length}</Text>
-          <Text style={{ fontSize: 10, color: filterState === 'Pending' ? '#fff' : '#b45309' }}>Pending</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Completed' ? '#10b981' : '#d1fae5', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Completed')}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Completed' ? '#fff' : '#047857' }}>{orders.filter(o => ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase())).length}</Text>
-          <Text style={{ fontSize: 10, color: filterState === 'Completed' ? '#fff' : '#047857' }}>Completed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, minWidth: '22%', backgroundColor: filterState === 'Cancelled' ? '#ef4444' : '#fee2e2', padding: 12, borderRadius: 12, alignItems: 'center' }} onPress={() => setFilterState('Cancelled')}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: filterState === 'Cancelled' ? '#fff' : '#b91c1c' }}>{orders.filter(o => ['cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase())).length}</Text>
-          <Text style={{ fontSize: 10, color: filterState === 'Cancelled' ? '#fff' : '#b91c1c' }} numberOfLines={1}>Cancelled</Text>
-        </TouchableOpacity>
-      </View>
+      {statsExpanded && (
+        <View style={{ flexDirection: 'row', paddingHorizontal: 15, marginBottom: 15, gap: 6, flexWrap: 'wrap' }}>
+          <TouchableOpacity style={{ flex: 1, minWidth: '30%', backgroundColor: filterState === 'PendingTotal' ? '#F59E0B' : '#FEF3C7', padding: 8, borderRadius: 10, alignItems: 'center' }} onPress={() => setFilterState('PendingTotal')}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: filterState === 'PendingTotal' ? '#fff' : '#B45309' }}>
+              {orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase())).length}
+            </Text>
+            <Text style={{ fontSize: 8, fontWeight: '700', color: filterState === 'PendingTotal' ? '#fff' : '#B45309' }} numberOfLines={1}>Total Pending</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={{ flex: 1, minWidth: '30%', backgroundColor: filterState === 'PendingBus' ? '#8B5CF6' : '#EDE9FE', padding: 8, borderRadius: 10, alignItems: 'center' }} onPress={() => setFilterState('PendingBus')}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: filterState === 'PendingBus' ? '#fff' : '#6D28D9' }}>
+              {orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase()) && (o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus')).length}
+            </Text>
+            <Text style={{ fontSize: 8, fontWeight: '700', color: filterState === 'PendingBus' ? '#fff' : '#6D28D9' }} numberOfLines={1}>Bus Pending</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{ flex: 1, minWidth: '30%', backgroundColor: filterState === 'PendingLocal' ? '#3B82F6' : '#E0E7FF', padding: 8, borderRadius: 10, alignItems: 'center' }} onPress={() => setFilterState('PendingLocal')}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: filterState === 'PendingLocal' ? '#fff' : '#1E40AF' }}>
+              {orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase()) && !(o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus') && o.type !== 'purchase_order').length}
+            </Text>
+            <Text style={{ fontSize: 8, fontWeight: '700', color: filterState === 'PendingLocal' ? '#fff' : '#1E40AF' }} numberOfLines={1}>Local Pending</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{ flex: 1, minWidth: '45%', backgroundColor: filterState === 'PendingPO' ? '#EC4899' : '#FCE7F3', padding: 8, borderRadius: 10, alignItems: 'center' }} onPress={() => setFilterState('PendingPO')}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: filterState === 'PendingPO' ? '#fff' : '#BE185D' }}>
+              {orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase()) && o.type === 'purchase_order').length}
+            </Text>
+            <Text style={{ fontSize: 8, fontWeight: '700', color: filterState === 'PendingPO' ? '#fff' : '#BE185D' }} numberOfLines={1}>PO Pending</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{ flex: 1, minWidth: '45%', backgroundColor: filterState === 'PendingSchedule' ? '#06B6D4' : '#ECFEFF', padding: 8, borderRadius: 10, alignItems: 'center' }} onPress={() => setFilterState('PendingSchedule')}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: filterState === 'PendingSchedule' ? '#fff' : '#0891B2' }}>
+              {orders.filter(o => !['delivered', 'completed', 'received', 'cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase()) && (o.is_scheduled === true || o.is_scheduled === 'true' || o.mode_of_delivery === 'Schedule Delivery')).length}
+            </Text>
+            <Text style={{ fontSize: 8, fontWeight: '700', color: filterState === 'PendingSchedule' ? '#fff' : '#0891B2' }} numberOfLines={1}>Schedule Pending</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Route Planner / Shortest Path Segmented Widget */}
       <View style={{ backgroundColor: '#fff', padding: 15, marginHorizontal: 15, marginBottom: 15, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
@@ -1360,10 +1402,23 @@ export default function DeliveryDashboard() {
           data={orders.filter(o => {
             const isCompleted = ['delivered', 'completed', 'received'].includes(o.status?.toLowerCase());
             const isCancelled = ['cancelled', 'not available', 'not_available'].includes(o.status?.toLowerCase());
-            if (filterState === 'Completed') return isCompleted;
-            if (filterState === 'Cancelled') return isCancelled;
-            if (filterState === 'Pending') return !isCompleted && !isCancelled;
-            if (filterState === 'Bus') return o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus';
+            const isPending = !isCompleted && !isCancelled;
+
+            if (filterState === 'PendingTotal') {
+              return isPending;
+            }
+            if (filterState === 'PendingBus') {
+              return isPending && (o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus');
+            }
+            if (filterState === 'PendingLocal') {
+              return isPending && !(o.delivery_type?.toLowerCase() === 'bus' || o.mode_of_delivery?.toLowerCase() === 'bus') && o.type !== 'purchase_order';
+            }
+            if (filterState === 'PendingPO') {
+              return isPending && o.type === 'purchase_order';
+            }
+            if (filterState === 'PendingSchedule') {
+              return isPending && (o.is_scheduled === true || o.is_scheduled === 'true' || o.mode_of_delivery === 'Schedule Delivery');
+            }
             return true;
           }).sort((a, b) => {
             const getGroup = (order: any) => {
@@ -1675,29 +1730,111 @@ export default function DeliveryDashboard() {
               </View>
             )}
 
-            {updateActionType === 'reschedule' && (
-              <View style={{ gap: 12 }}>
-                <Text style={styles.label}>Reschedule Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={rescheduleDate}
-                  onChangeText={(val) => {
-                    setRescheduleDate(val);
-                    setAvailabilityChecked(false);
-                  }}
-                  placeholder="e.g. 2026-07-31"
-                />
-
-                <Text style={styles.label}>Reschedule Time (HH:MM - 24hr format)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={rescheduleTime}
-                  onChangeText={(val) => {
-                    setRescheduleTime(val);
-                    setAvailabilityChecked(false);
-                  }}
-                  placeholder="e.g. 14:30"
-                />
+             {updateActionType === 'reschedule' && (
+               <View style={{ gap: 12 }}>
+                 <Text style={styles.label}>Reschedule Date</Text>
+                 {Platform.OS === 'web' ? (
+                   <input
+                     type="date"
+                     value={rescheduleDate}
+                     onChange={(e: any) => {
+                       setRescheduleDate(e.target.value);
+                       setAvailabilityChecked(false);
+                     }}
+                     style={{
+                       height: 45,
+                       border: '1px solid ' + Colors.light.border,
+                       borderRadius: 8,
+                       paddingLeft: 12,
+                       paddingRight: 12,
+                       marginBottom: 12,
+                       fontSize: 15,
+                       backgroundColor: 'white',
+                       width: '100%',
+                       boxSizing: 'border-box',
+                       fontFamily: 'inherit'
+                     }}
+                   />
+                 ) : (
+                   <>
+                     <Pressable 
+                       style={[styles.input, { justifyContent: 'center', height: 45 }]} 
+                       onPress={() => setShowDatePicker(true)}
+                     >
+                       <Text style={{ fontSize: 15, color: rescheduleDate ? '#000' : '#aaa' }}>
+                         {rescheduleDate || 'Select Date (YYYY-MM-DD)'}
+                       </Text>
+                     </Pressable>
+                     {showDatePicker && (
+                       <DateTimePicker
+                         value={rescheduleDate ? new Date(rescheduleDate + 'T12:00:00') : new Date()}
+                         mode="date"
+                         display="default"
+                         onChange={(event: any, selectedDate?: Date) => {
+                           setShowDatePicker(Platform.OS === 'ios');
+                           if (selectedDate) {
+                             const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
+                             setRescheduleDate(offsetDate.toISOString().split('T')[0]);
+                             setAvailabilityChecked(false);
+                           }
+                         }}
+                       />
+                     )}
+                   </>
+                 )}
+ 
+                 <Text style={styles.label}>Reschedule Time</Text>
+                 {Platform.OS === 'web' ? (
+                   <input
+                     type="time"
+                     value={rescheduleTime}
+                     onChange={(e: any) => {
+                       setRescheduleTime(e.target.value);
+                       setAvailabilityChecked(false);
+                     }}
+                     style={{
+                       height: 45,
+                       border: '1px solid ' + Colors.light.border,
+                       borderRadius: 8,
+                       paddingLeft: 12,
+                       paddingRight: 12,
+                       marginBottom: 12,
+                       fontSize: 15,
+                       backgroundColor: 'white',
+                       width: '100%',
+                       boxSizing: 'border-box',
+                       fontFamily: 'inherit'
+                     }}
+                   />
+                 ) : (
+                   <>
+                     <Pressable 
+                       style={[styles.input, { justifyContent: 'center', height: 45 }]} 
+                       onPress={() => setShowTimePicker(true)}
+                     >
+                       <Text style={{ fontSize: 15, color: rescheduleTime ? '#000' : '#aaa' }}>
+                         {rescheduleTime || 'Select Time (HH:MM)'}
+                       </Text>
+                     </Pressable>
+                     {showTimePicker && (
+                       <DateTimePicker
+                         value={rescheduleTime ? new Date(`2026-01-01T${rescheduleTime.includes(':') && rescheduleTime.split(':').length === 2 ? rescheduleTime + ':00' : rescheduleTime}`) : new Date()}
+                         mode="time"
+                         is24Hour={true}
+                         display="default"
+                         onChange={(event: any, selectedTime?: Date) => {
+                           setShowTimePicker(Platform.OS === 'ios');
+                           if (selectedTime) {
+                             const hh = String(selectedTime.getHours()).padStart(2, '0');
+                             const mm = String(selectedTime.getMinutes()).padStart(2, '0');
+                             setRescheduleTime(`${hh}:${mm}`);
+                             setAvailabilityChecked(false);
+                           }
+                         }}
+                       />
+                     )}
+                   </>
+                 )}
 
                 {!availabilityChecked ? (
                   <TouchableOpacity

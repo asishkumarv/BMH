@@ -583,21 +583,23 @@ export default function EmployeeWalletScreen() {
       const amt = parseFloat(b.fee || '0');
       if (amt > 0) {
         const isCash = b.payment_mode === 'Cash';
-        entries.push({
-          id: `booking-${b.booking_id || b.token_number}`,
-          dateStr: b.created_at || b.date,
-          particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
-          roleDept: `Patient • Clinical [${isCash ? 'Cash' : 'Online'}]`,
-          debit: '-',
-          credit: `₹${amt.toFixed(2)}`,
-          amount: amt,
-          cashAmount: isCash ? amt : 0,
-          onlineAmount: !isCash ? amt : 0,
-          creditAmount: 0,
-          type: 'credit',
-          status: 'Accepted',
-          paymentMode: isCash ? 'Cash' : 'Online'
-        });
+        if (isCash) {
+          entries.push({
+            id: `booking-${b.booking_id || b.token_number}`,
+            dateStr: b.created_at || b.date,
+            particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
+            roleDept: `Patient • Clinical [Cash]`,
+            debit: '-',
+            credit: `₹${amt.toFixed(2)}`,
+            amount: amt,
+            cashAmount: amt,
+            onlineAmount: 0,
+            creditAmount: 0,
+            type: 'credit',
+            status: 'Accepted',
+            paymentMode: 'Cash'
+          });
+        }
       }
     });
 
@@ -614,11 +616,10 @@ export default function EmployeeWalletScreen() {
           ? parseFloat(tx.credit_amount)
           : (tx.payment_mode === 'Credit' || tx.payment_mode === 'Unpaid' ? parseFloat(tx.amount || '0') : 0);
         
-        const totalVal = cashVal + onlineVal + creditVal;
-        if (totalVal > 0) {
+        if (cashVal > 0) {
           let label = '';
           const parts = [];
-          if (cashVal > 0) parts.push(`Cash ₹${cashVal.toFixed(2)}`);
+          parts.push(`Cash ₹${cashVal.toFixed(2)}`);
           if (onlineVal > 0) parts.push(`Online ₹${onlineVal.toFixed(2)}`);
           if (creditVal > 0) parts.push(`Credit ₹${creditVal.toFixed(2)}`);
           label = parts.join(' + ');
@@ -629,8 +630,8 @@ export default function EmployeeWalletScreen() {
             particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
             roleDept: `${tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection'} [${label}]`,
             debit: '-',
-            credit: `₹${totalVal.toFixed(2)}`,
-            amount: totalVal,
+            credit: `₹${cashVal.toFixed(2)}`,
+            amount: cashVal,
             cashAmount: cashVal,
             onlineAmount: onlineVal,
             creditAmount: creditVal,
@@ -1166,81 +1167,195 @@ export default function EmployeeWalletScreen() {
                 </View>
               </View>
 
-              <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                <View style={{ minWidth: isDesktop ? '100%' : 750, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
-                  <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
-                    <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
-                    <Text style={{ flex: 2.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
-                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Staff/Details</Text>
-                    <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
-                    <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
-                    <Text style={{ flex: 1.0, fontWeight: '700', fontSize: 13, color: '#f59e0b', textAlign: 'right' }}>Credit (Unpaid)</Text>
-                    <Text style={{ flex: 1.1, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
-                  </View>
-
-                  {/* Closing Balance Row (Shown first on screen: latest at top) */}
-                  <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12, backgroundColor: '#f8fafc', alignItems: 'center' }}>
-                    <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 2.2, fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Closing Balance</Text>
-                    <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1.0, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1.1, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }}>
+              {!isDesktop ? (
+                // Mobile Card List Layout
+                <View style={{ gap: 12, marginBottom: 16 }}>
+                  {/* Closing Balance Card */}
+                  <View style={{
+                    backgroundColor: '#f8fafc',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#cbd5e1',
+                    padding: 14,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <View>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e293b' }}>Closing Balance</Text>
+                      <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Current Wallet State</Text>
+                    </View>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#16a34a' }}>
                       ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
                     </Text>
                   </View>
 
                   {cashLedger.length === 0 ? (
-                    <View style={{ padding: 24, alignItems: 'center' }}>
+                    <View style={{ padding: 24, alignItems: 'center', backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
                       <Text style={{ color: '#64748b', fontStyle: 'italic' }}>No collections or handovers in this range.</Text>
                     </View>
                   ) : (
                     [...cashLedger].reverse().map((item: any) => {
                       const isPending = item.status !== 'Accepted';
+                      const isDebit = item.debit !== '-';
+                      const isCredit = item.credit !== '-';
+                      const isUnpaid = !!item.creditAmount && parseFloat(item.creditAmount) > 0;
+
+                      let amtText = '';
+                      let amtColor = '#64748b';
+
+                      if (isDebit) {
+                        amtText = `-${item.debit}`;
+                        amtColor = '#ef4444';
+                      } else if (isCredit) {
+                        amtText = `+${item.credit}`;
+                        amtColor = '#22c55e';
+                      } else if (isUnpaid) {
+                        amtText = `₹${parseFloat(item.creditAmount).toFixed(2)}`;
+                        amtColor = '#f59e0b';
+                      }
+
                       return (
-                        <View key={item.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#f1f5f9', padding: 12, alignItems: 'center' }}>
-                          <Text style={{ flex: 1.5, fontSize: 13, color: '#334155' }}>{formatDateDMY(item.dateStr, true)}</Text>
-                          <View style={{ flex: 2.2 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>{item.particulars}</Text>
-                            {item.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.note}</Text> : null}
-                            {item.postBalance && (
-                              <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600', marginTop: 2 }}>
-                                Logged Balance: {item.postBalance}
+                        <View key={item.id} style={{
+                          backgroundColor: 'white',
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#e2e8f0',
+                          padding: 14,
+                          gap: 8
+                        }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a', lineHeight: 18 }} numberOfLines={2}>
+                                {item.particulars}
                               </Text>
-                            )}
-                            {isPending && (
-                              <View style={{ alignSelf: 'flex-start', backgroundColor: item.status === 'Pending' ? '#fef08a' : '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: item.status === 'Pending' ? '#854d0e' : '#991b1b', textTransform: 'uppercase' }}>{item.status}</Text>
-                              </View>
-                            )}
+                              <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                                📅 {formatDateDMY(item.dateStr, true)}
+                              </Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={{ fontSize: 14, fontWeight: '800', color: amtColor }}>
+                                {amtText}
+                              </Text>
+                              {isUnpaid && <Text style={{ fontSize: 9, color: '#f59e0b', fontWeight: '600', marginTop: 2 }}>Unpaid</Text>}
+                            </View>
                           </View>
-                          <Text style={{ flex: 1.2, fontSize: 12, color: '#64748b' }}>{item.roleDept}</Text>
-                          <Text style={{ flex: 0.9, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>{item.debit}</Text>
-                          <Text style={{ flex: 0.9, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>{item.credit}</Text>
-                          <Text style={{ flex: 1.0, fontSize: 13, color: '#f59e0b', textAlign: 'right', fontWeight: '500' }}>
-                            {item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-'}
-                          </Text>
-                          <Text style={{ flex: 1.1, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
-                            {item.runningBalance}
-                          </Text>
+
+                          <View style={{ height: 1, backgroundColor: '#f1f5f9', marginVertical: 2 }} />
+
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View>
+                              <Text style={{ fontSize: 11, color: '#64748b' }}>Staff / Details: <Text style={{ color: '#334155', fontWeight: '600' }}>{item.roleDept || '-'}</Text></Text>
+                              {item.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Note: <Text style={{ color: '#334155' }}>{item.note}</Text></Text> : null}
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={{ fontSize: 11, color: '#64748b' }}>Balance: <Text style={{ color: '#0f172a', fontWeight: '700' }}>{item.runningBalance}</Text></Text>
+                            </View>
+                          </View>
+
+                          {isPending && (
+                            <View style={{ alignSelf: 'flex-start', backgroundColor: item.status === 'Pending' ? '#fef08a' : '#fee2e2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: item.status === 'Pending' ? '#854d0e' : '#991b1b', textTransform: 'uppercase' }}>{item.status}</Text>
+                            </View>
+                          )}
                         </View>
                       );
                     })
                   )}
 
-                  {/* Opening Balance Row (Shown last on screen: oldest at bottom) */}
-                  <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#cbd5e1', padding: 12, backgroundColor: '#fafafa', alignItems: 'center' }}>
-                    <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 2.2, fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
-                    <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1.0, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1.1, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>₹{cashOpeningBalance.toFixed(2)}</Text>
+                  {/* Opening Balance Card */}
+                  <View style={{
+                    backgroundColor: '#fafafa',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#cbd5e1',
+                    padding: 14,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569' }}>₹{cashOpeningBalance.toFixed(2)}</Text>
                   </View>
                 </View>
-              </ScrollView>
+              ) : (
+                // Desktop Table Layout
+                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                  <View style={{ minWidth: isDesktop ? '100%' : 750, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
+                      <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
+                      <Text style={{ flex: 2.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
+                      <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Staff/Details</Text>
+                      <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
+                      <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
+                      <Text style={{ flex: 1.0, fontWeight: '700', fontSize: 13, color: '#f59e0b', textAlign: 'right' }}>Credit (Unpaid)</Text>
+                      <Text style={{ flex: 1.1, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
+                    </View>
+
+                    {/* Closing Balance Row (Shown first on screen: latest at top) */}
+                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12, backgroundColor: '#f8fafc', alignItems: 'center' }}>
+                      <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
+                      <Text style={{ flex: 2.2, fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Closing Balance</Text>
+                      <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
+                      <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                      <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                      <Text style={{ flex: 1.0, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                      <Text style={{ flex: 1.1, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }}>
+                        ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
+                      </Text>
+                    </View>
+
+                    {cashLedger.length === 0 ? (
+                      <View style={{ padding: 24, alignItems: 'center' }}>
+                        <Text style={{ color: '#64748b', fontStyle: 'italic' }}>No collections or handovers in this range.</Text>
+                      </View>
+                    ) : (
+                      [...cashLedger].reverse().map((item: any) => {
+                        const isPending = item.status !== 'Accepted';
+                        return (
+                          <View key={item.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#f1f5f9', padding: 12, alignItems: 'center' }}>
+                            <Text style={{ flex: 1.5, fontSize: 13, color: '#334155' }}>{formatDateDMY(item.dateStr, true)}</Text>
+                            <View style={{ flex: 2.2 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>{item.particulars}</Text>
+                              {item.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.note}</Text> : null}
+                              {item.postBalance && (
+                                <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600', marginTop: 2 }}>
+                                  Logged Balance: {item.postBalance}
+                                </Text>
+                              )}
+                              {isPending && (
+                                <View style={{ alignSelf: 'flex-start', backgroundColor: item.status === 'Pending' ? '#fef08a' : '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: item.status === 'Pending' ? '#854d0e' : '#991b1b', textTransform: 'uppercase' }}>{item.status}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={{ flex: 1.2, fontSize: 12, color: '#64748b' }}>{item.roleDept}</Text>
+                            <Text style={{ flex: 0.9, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>{item.debit}</Text>
+                            <Text style={{ flex: 0.9, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>{item.credit}</Text>
+                            <Text style={{ flex: 1.0, fontSize: 13, color: '#f59e0b', textAlign: 'right', fontWeight: '500' }}>
+                              {item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-'}
+                            </Text>
+                            <Text style={{ flex: 1.1, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
+                              {item.runningBalance}
+                            </Text>
+                          </View>
+                        );
+                      })
+                    )}
+
+                    {/* Opening Balance Row (Shown last on screen: oldest at bottom) */}
+                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#cbd5e1', padding: 12, backgroundColor: '#fafafa', alignItems: 'center' }}>
+                      <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
+                      <Text style={{ flex: 2.2, fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
+                      <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
+                      <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                      <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                      <Text style={{ flex: 1.0, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                      <Text style={{ flex: 1.1, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>₹{cashOpeningBalance.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                </ScrollView>
+              )}
             </>
           )}
 

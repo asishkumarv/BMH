@@ -456,19 +456,24 @@ exports.getWalletHistory = async (req, res) => {
         mo.invoice_no::varchar as invoice_no, 
         mo.amount::numeric as amount, 
         mo.paid_amount::numeric as paid_amount,
-        mo.payment_mode::varchar as payment_mode, 
-        mo.pod_payment_mode::varchar as pod_payment_mode,
-        COALESCE(mo.cash_amount, 0)::numeric as cash_amount,
-        COALESCE(mo.online_amount, 0)::numeric as online_amount,
-        COALESCE(mo.credit_amount, 0)::numeric as credit_amount,
+        COALESCE(wt.payment_mode, mo.pod_payment_mode, mo.payment_mode)::varchar as payment_mode, 
+        COALESCE(wt.payment_mode, mo.pod_payment_mode, mo.payment_mode)::varchar as pod_payment_mode,
+        COALESCE(wt.cash_amount, mo.cash_amount, 0)::numeric as cash_amount,
+        COALESCE(wt.online_amount, mo.online_amount, 0)::numeric as online_amount,
+        COALESCE(wt.credit_amount, mo.credit_amount, 0)::numeric as credit_amount,
         mo.order_date::date as order_date, 
         mo.status::varchar as status, 
-        mo.created_at::timestamp as created_at, 
+        COALESCE(wt.created_at, mo.delivered_at, mo.created_at)::timestamp as created_at, 
         mo.delivered_at::timestamp as delivered_at,
         mo.customer_name::varchar as customer_name, 
         mo.address::text as address,
-        'manual_order'::varchar as order_source
+        'manual_order'::varchar as order_source,
+        mo.mode_of_delivery::varchar as delivery_method
       FROM manual_orders mo
+      LEFT JOIN wallet_transactions wt ON 
+        (wt.order_no = mo.order_no OR wt.order_no = mo.id::varchar) 
+        AND (wt.employee_id = $1 OR wt.employee_id = $2)
+        AND wt.type IN ('cash_collection', 'online_collection', 'split_collection')
       WHERE mo.delivery_boy_id = $1 OR mo.delivery_boy_id = $2
          OR mo.created_by_id = $1 OR mo.created_by_id = $2
 
@@ -480,19 +485,24 @@ exports.getWalletHistory = async (req, res) => {
         NULL::varchar as invoice_no,
         oo.total_amount::numeric as amount,
         oo.total_amount::numeric as paid_amount,
-        oo.pod_payment_mode::varchar as payment_mode,
-        oo.pod_payment_mode::varchar as pod_payment_mode,
-        COALESCE(oo.cash_amount, 0)::numeric as cash_amount,
-        COALESCE(oo.online_amount, 0)::numeric as online_amount,
-        COALESCE(oo.credit_amount, 0)::numeric as credit_amount,
+        COALESCE(wt.payment_mode, oo.pod_payment_mode)::varchar as payment_mode,
+        COALESCE(wt.payment_mode, oo.pod_payment_mode)::varchar as pod_payment_mode,
+        COALESCE(wt.cash_amount, oo.cash_amount, 0)::numeric as cash_amount,
+        COALESCE(wt.online_amount, oo.online_amount, 0)::numeric as online_amount,
+        COALESCE(wt.credit_amount, oo.credit_amount, 0)::numeric as credit_amount,
         oo.created_at::date as order_date,
         oo.status::varchar as status, 
-        oo.created_at::timestamp as created_at, 
+        COALESCE(wt.created_at, oo.delivered_at, oo.created_at)::timestamp as created_at, 
         oo.delivered_at::timestamp as delivered_at,
         oo.patient_name::varchar as customer_name,
         oo.manual_address::text as address,
-        'online_order'::varchar as order_source
+        'online_order'::varchar as order_source,
+        'Local'::varchar as delivery_method
       FROM online_orders oo
+      LEFT JOIN wallet_transactions wt ON 
+        (wt.order_no = oo.id::varchar) 
+        AND (wt.employee_id = $1 OR wt.employee_id = $2)
+        AND wt.type IN ('cash_collection', 'online_collection', 'split_collection')
       WHERE oo.delivery_boy_id::text = $1 OR oo.delivery_boy_id::text = $2
 
       UNION ALL
@@ -503,19 +513,24 @@ exports.getWalletHistory = async (req, res) => {
         so.invoice_id::varchar as invoice_no,
         so.total_price::numeric as amount,
         so.total_price::numeric as paid_amount,
-        so.pod_payment_mode::varchar as payment_mode,
-        so.pod_payment_mode::varchar as pod_payment_mode,
-        COALESCE(so.cash_amount, 0)::numeric as cash_amount,
-        COALESCE(so.online_amount, 0)::numeric as online_amount,
-        COALESCE(so.credit_amount, 0)::numeric as credit_amount,
+        COALESCE(wt.payment_mode, so.pod_payment_mode)::varchar as payment_mode,
+        COALESCE(wt.payment_mode, so.pod_payment_mode)::varchar as pod_payment_mode,
+        COALESCE(wt.cash_amount, so.cash_amount, 0)::numeric as cash_amount,
+        COALESCE(wt.online_amount, so.online_amount, 0)::numeric as online_amount,
+        COALESCE(wt.credit_amount, so.credit_amount, 0)::numeric as credit_amount,
         so.created_at::date as order_date,
         so.status::varchar as status, 
-        so.created_at::timestamp as created_at, 
+        COALESCE(wt.created_at, so.delivered_at, so.created_at)::timestamp as created_at, 
         so.delivered_at::timestamp as delivered_at,
         so.patient_name::varchar as customer_name,
         so.patient_address::text as address,
-        'sales_order'::varchar as order_source
+        'sales_order'::varchar as order_source,
+        so.delivery_type::varchar as delivery_method
       FROM ecogreensales_orders so
+      LEFT JOIN wallet_transactions wt ON 
+        (wt.order_no = so.order_no OR wt.order_no = so.id::varchar) 
+        AND (wt.employee_id = $1 OR wt.employee_id = $2)
+        AND wt.type IN ('cash_collection', 'online_collection', 'split_collection')
       WHERE so.delivery_boy_id::text = $1 OR so.delivery_boy_id::text = $2
 
       ORDER BY created_at DESC
