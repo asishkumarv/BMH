@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import axios from 'axios';
 import { MapPin, User, Package, RefreshCw, X, Eye, CheckCircle, Navigation, Clock, Calendar, Download, Printer } from 'lucide-react-native';
 import CustomTimePicker from '../../../components/ui/CustomTimePicker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import 'leaflet/dist/leaflet.css';
@@ -212,7 +212,7 @@ export default function DeliveryFleetScreen() {
       } else {
         const filename = `${(selectedBoy?.full_name || 'Rider').replace(/\s+/g, '_')}_Delivery_Orders`;
         const path = `${(FileSystem as any).documentDirectory}${filename}.csv`;
-        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: (FileSystem as any).EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
         await Sharing.shareAsync(path);
       }
     } catch (e: any) {

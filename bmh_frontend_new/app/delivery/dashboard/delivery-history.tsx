@@ -4,7 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { Calendar, Package, MapPin, CheckCircle, Clock, Download, Printer } from 'lucide-react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 
@@ -166,7 +166,7 @@ export default function DeliveryHistoryScreen() {
         document.body.removeChild(link);
       } else {
         const path = `${(FileSystem as any).documentDirectory}Delivery_History.csv`;
-        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: (FileSystem as any).EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
         await Sharing.shareAsync(path);
       }
     } catch (e: any) {

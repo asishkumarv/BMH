@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Activi
 import {  Users, Calendar, Clock, HeartPulse, CreditCard, CheckCircle, Printer, Search, User, Edit, XCircle , RefreshCcw } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
@@ -463,7 +463,7 @@ export default function PatientBooking() {
       // @ts-ignore
       const uri = FileSystem.documentDirectory + "all_bookings_report.csv";
       // @ts-ignore
-      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: 'utf8' });
       await Sharing.shareAsync(uri);
     }
   };
@@ -662,7 +662,7 @@ export default function PatientBooking() {
       // @ts-ignore
       const uri = FileSystem.documentDirectory + "my_bookings.csv";
       // @ts-ignore
-      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: 'utf8' });
       await Sharing.shareAsync(uri);
     }
   };

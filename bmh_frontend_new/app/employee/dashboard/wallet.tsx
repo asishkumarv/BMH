@@ -5,7 +5,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,6 +18,16 @@ type Booking = { booking_id: string; token_number: number; patient_name: string;
 export default function EmployeeWalletScreen() {
   const { isDesktop } = useResponsive();
   const [activeTab, setActiveTab] = useState<'Allowance' | 'Cash'>('Allowance');
+  const [tabLoading, setTabLoading] = useState(false);
+
+  const handleTabChange = (tab: 'Allowance' | 'Cash') => {
+    if (tab === activeTab) return;
+    setTabLoading(true);
+    setTimeout(() => {
+      setActiveTab(tab);
+      setTabLoading(false);
+    }, 100);
+  };
 
   // Accordion Expand/Collapse States
   const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
@@ -112,7 +122,7 @@ export default function EmployeeWalletScreen() {
     }
   };
 
-  const exportToCSV = async (data: any[], filename: string, headers: string[], rowMapper: (item: any) => string[]) => {
+  const exportToCSV = async (data: any[], filename: string, headers: string[], rowMapper: (item: any) => string[], extraHeaderRows: string[] = []) => {
     try {
       const headerRows = [
         `"Bharat Medical Hall"`,
@@ -120,6 +130,7 @@ export default function EmployeeWalletScreen() {
         `"Department:","${user?.department || 'N/A'}"`,
         `"Role:","${user?.role || 'Employee'}"`,
         `"Date Range:","${startDate || 'All'} to ${endDate || 'All'}"`,
+        ...extraHeaderRows,
         ``,
         headers.map(h => `"${h}"`).join(',')
       ];
@@ -140,7 +151,7 @@ export default function EmployeeWalletScreen() {
         // @ts-ignore
         const path = `${FileSystem.documentDirectory}${filename}.csv`;
         // @ts-ignore
-        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
         await Sharing.shareAsync(path);
       }
     } catch (e: any) {
@@ -410,29 +421,31 @@ export default function EmployeeWalletScreen() {
   const buildCashLedger = () => {
     const entries: any[] = [];
 
-    // Add Bookings
+    // Add Bookings (Cash only)
     bookings.forEach((b: any) => {
       const amt = parseFloat(b.fee || '0');
       if (amt > 0) {
         const isCash = b.payment_mode === 'Cash';
-        entries.push({
-          id: `booking-${b.booking_id || b.token_number}`,
-          dateStr: b.created_at || b.date,
-          particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
-          roleDept: `Patient • Clinical [${isCash ? 'Cash' : 'Online'}]`,
-          debit: '-',
-          credit: `₹${amt.toFixed(2)}`,
-          amount: amt,
-          cashAmount: isCash ? amt : 0,
-          onlineAmount: !isCash ? amt : 0,
-          type: 'credit',
-          status: 'Accepted',
-          paymentMode: isCash ? 'Cash' : 'Online'
-        });
+        if (isCash) {
+          entries.push({
+            id: `booking-${b.booking_id || b.token_number}`,
+            dateStr: b.created_at || b.date,
+            particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
+            roleDept: `Patient • Clinical [Cash]`,
+            debit: '-',
+            credit: `₹${amt.toFixed(2)}`,
+            amount: amt,
+            cashAmount: amt,
+            onlineAmount: 0,
+            type: 'credit',
+            status: 'Accepted',
+            paymentMode: 'Cash'
+          });
+        }
       }
     });
 
-    // Add Order Collections
+    // Add Order Collections (Cash portion > 0 only)
     transactions.forEach((tx: any) => {
       if (tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection') {
         const cashVal = tx.cash_amount !== undefined && tx.cash_amount !== null 
@@ -442,15 +455,12 @@ export default function EmployeeWalletScreen() {
           ? parseFloat(tx.online_amount) 
           : (tx.payment_mode === 'Online' || tx.type === 'online_collection' ? parseFloat(tx.amount || '0') : 0);
         
-        const totalVal = cashVal + onlineVal;
-        if (totalVal > 0) {
+        if (cashVal > 0) {
           let label = '';
           if (cashVal > 0 && onlineVal > 0) {
             label = `Split: Cash ₹${cashVal.toFixed(2)} + Online ₹${onlineVal.toFixed(2)}`;
-          } else if (cashVal > 0) {
-            label = `Cash ₹${cashVal.toFixed(2)}`;
           } else {
-            label = `Online ₹${onlineVal.toFixed(2)}`;
+            label = `Cash ₹${cashVal.toFixed(2)}`;
           }
 
           entries.push({
@@ -459,13 +469,13 @@ export default function EmployeeWalletScreen() {
             particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
             roleDept: `${tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection'} [${label}]`,
             debit: '-',
-            credit: `₹${totalVal.toFixed(2)}`,
-            amount: totalVal,
+            credit: `₹${cashVal.toFixed(2)}`,
+            amount: cashVal,
             cashAmount: cashVal,
             onlineAmount: onlineVal,
             type: 'credit',
             status: 'Accepted',
-            paymentMode: cashVal > 0 && onlineVal > 0 ? 'Split' : (cashVal > 0 ? 'Cash' : 'Online')
+            paymentMode: cashVal > 0 && onlineVal > 0 ? 'Split' : 'Cash'
           });
         }
       }
@@ -601,7 +611,9 @@ export default function EmployeeWalletScreen() {
     };
   };
 
-  const { openingBalance: cashOpeningBalance, ledger: cashLedger } = buildCashLedger();
+  const { openingBalance: cashOpeningBalance, ledger: cashLedger } = React.useMemo(() => {
+    return buildCashLedger();
+  }, [bookings, transactions, handovers, cashInHand, startDate, endDate]);
 
   // Bookings calculations
   const totalCashBooked = filteredBookings.filter(b => b.payment_mode === 'Cash').reduce((acc, b) => acc + Number(b.fee || 0), 0);
@@ -658,19 +670,22 @@ export default function EmployeeWalletScreen() {
           <Text style={styles.subtitle}>Manage allowances and collected cash.</Text>
         </View>
         <View style={styles.headerButtons}>
-          <Pressable style={[styles.tabBtn, activeTab === 'Allowance' && styles.tabBtnActive]} onPress={() => setActiveTab('Allowance')}>
+          <Pressable style={[styles.tabBtn, activeTab === 'Allowance' && styles.tabBtnActive]} onPress={() => handleTabChange('Allowance')}>
             <Wallet size={18} color={activeTab === 'Allowance' ? '#FFF' : Colors.light.primary} />
             <Text style={[styles.tabBtnText, activeTab === 'Allowance' && styles.tabBtnTextActive]}>Allowances</Text>
           </Pressable>
-          <Pressable style={[styles.tabBtn, activeTab === 'Cash' && styles.tabBtnActive]} onPress={() => setActiveTab('Cash')}>
+          <Pressable style={[styles.tabBtn, activeTab === 'Cash' && styles.tabBtnActive]} onPress={() => handleTabChange('Cash')}>
             <Banknote size={18} color={activeTab === 'Cash' ? '#FFF' : Colors.light.primary} />
             <Text style={[styles.tabBtnText, activeTab === 'Cash' && styles.tabBtnTextActive]}>Cash Collections</Text>
           </Pressable>
         </View>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
+      {loading || tabLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 40, gap: 12 }}>
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+          {tabLoading && <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Loading collections...</Text>}
+        </View>
       ) : (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           <View style={styles.filterCard}>
@@ -896,13 +911,13 @@ export default function EmployeeWalletScreen() {
                 </View>
               </View>
               <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                <View style={{ minWidth: isDesktop ? '100%' : 600, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
+                <View style={{ width: isDesktop ? '100%' : 800, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
                   <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
-                    <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
-                    <Text style={{ flex: 2.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
-                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
-                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
-                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
+                    <Text style={{ flex: 1.8, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
+                    <Text style={{ flex: 3.0, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
+                    <Text style={{ flex: 1.4, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
+                    <Text style={{ flex: 1.4, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
+                    <Text style={{ flex: 1.6, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
                   </View>
                   {allowanceTransactions.length === 0 ? (
                     <Text style={{ padding: 16, textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No transactions recorded.</Text>
@@ -911,8 +926,8 @@ export default function EmployeeWalletScreen() {
                       const isPending = tx.status === 'pending';
                       return (
                         <View key={tx.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#f1f5f9', padding: 12, alignItems: 'center' }}>
-                          <Text style={{ flex: 1.5, fontSize: 13, color: '#334155' }}>{formatDateDMY(tx.created_at, true)}</Text>
-                          <View style={{ flex: 2.5 }}>
+                          <Text style={{ flex: 1.8, fontSize: 13, color: '#334155' }}>{formatDateDMY(tx.created_at, true)}</Text>
+                          <View style={{ flex: 3.0 }}>
                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>
                               {tx.type === 'usage' ? 'Usage Logged' : tx.type === 'allocation_granted' ? 'Allocation Granted' : 'Allocation Requested'}
                             </Text>
@@ -923,13 +938,13 @@ export default function EmployeeWalletScreen() {
                               </View>
                             )}
                           </View>
-                          <Text style={{ flex: 1, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>
+                          <Text style={{ flex: 1.4, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>
                             {tx.type === 'usage' ? `₹${tx.amount}` : '-'}
                           </Text>
-                          <Text style={{ flex: 1, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>
+                          <Text style={{ flex: 1.4, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>
                             {tx.type === 'allocation_granted' ? `₹${tx.amount}` : '-'}
                           </Text>
-                          <Text style={{ flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
+                          <Text style={{ flex: 1.6, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
                             {tx.runningBalance}
                           </Text>
                         </View>
@@ -993,13 +1008,23 @@ export default function EmployeeWalletScreen() {
                       credit: '-',
                       runningBalance: `₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}`
                     });
-                    exportToCSV(printRows, 'Cash_Ledger', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'], (item) => [
-                      item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
-                      `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
-                      item.debit,
-                      item.credit,
-                      item.runningBalance
-                    ]);
+                    exportToCSV(
+                      printRows,
+                      'Cash_Ledger',
+                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'],
+                      (item) => [
+                        item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
+                        `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
+                        item.debit,
+                        item.credit,
+                        item.runningBalance
+                      ],
+                      [
+                        `"Present Cash in Hand:","₹${parseFloat(cashInHand || '0').toFixed(2)}"`,
+                        `"Filter Cash Collections:","₹${ledgerCashCollected.toFixed(2)}"`,
+                        `"Filter Online Collections:","₹${ledgerOnlineCollected.toFixed(2)}"`
+                      ]
+                    );
                   }}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
@@ -1022,13 +1047,21 @@ export default function EmployeeWalletScreen() {
                       credit: '-',
                       runningBalance: `₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}`
                     });
-                    handlePrint('Cash Ledger', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'], printRows, (item) => [
-                      item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
-                      `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
-                      item.debit,
-                      item.credit,
-                      item.runningBalance
-                    ]);
+                    handlePrint(
+                      'Cash Ledger',
+                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Balance'],
+                      printRows,
+                      (item) => [
+                        item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
+                        `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
+                        item.debit,
+                        item.credit,
+                        item.runningBalance
+                      ],
+                      `<div class="meta-row"><span class="meta-label">Present Cash in Hand:</span><span>₹${parseFloat(cashInHand || '0').toFixed(2)}</span></div>
+                       <div class="meta-row"><span class="meta-label">Filter Cash Collections:</span><span>₹${ledgerCashCollected.toFixed(2)}</span></div>
+                       <div class="meta-row"><span class="meta-label">Filter Online Collections:</span><span>₹${ledgerOnlineCollected.toFixed(2)}</span></div>`
+                    );
                   }}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>
@@ -1036,24 +1069,24 @@ export default function EmployeeWalletScreen() {
               </View>
 
               <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                <View style={{ minWidth: isDesktop ? '100%' : 700, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
+                <View style={{ width: isDesktop ? '100%' : 950, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
                   <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
-                    <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
-                    <Text style={{ flex: 2.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
-                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Staff/Details</Text>
-                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
-                    <Text style={{ flex: 1, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
-                    <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
+                    <Text style={{ flex: 1.8, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
+                    <Text style={{ flex: 2.8, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
+                    <Text style={{ flex: 2.0, fontWeight: '700', fontSize: 13, color: '#475569' }}>Staff/Details</Text>
+                    <Text style={{ flex: 1.4, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
+                    <Text style={{ flex: 1.4, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
+                    <Text style={{ flex: 1.6, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
                   </View>
 
                   {/* Closing Balance Row (Shown first on screen: latest at top) */}
                   <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12, backgroundColor: '#f8fafc', alignItems: 'center' }}>
-                    <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 2.5, fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Closing Balance</Text>
-                    <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1.2, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }}>
+                    <Text style={{ flex: 1.8, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 2.8, fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Closing Balance</Text>
+                    <Text style={{ flex: 2.0, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 1.4, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1.4, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1.6, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }}>
                       ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
                     </Text>
                   </View>
@@ -1067,8 +1100,8 @@ export default function EmployeeWalletScreen() {
                       const isPending = item.status !== 'Accepted';
                       return (
                         <View key={item.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#f1f5f9', padding: 12, alignItems: 'center' }}>
-                          <Text style={{ flex: 1.5, fontSize: 13, color: '#334155' }}>{formatDateDMY(item.dateStr, true)}</Text>
-                          <View style={{ flex: 2.5 }}>
+                          <Text style={{ flex: 1.8, fontSize: 13, color: '#334155' }}>{formatDateDMY(item.dateStr, true)}</Text>
+                          <View style={{ flex: 2.8 }}>
                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>{item.particulars}</Text>
                             {item.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.note}</Text> : null}
                             {item.postBalance && (
@@ -1082,10 +1115,10 @@ export default function EmployeeWalletScreen() {
                               </View>
                             )}
                           </View>
-                          <Text style={{ flex: 1.2, fontSize: 12, color: '#64748b' }}>{item.roleDept}</Text>
-                          <Text style={{ flex: 1, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>{item.debit}</Text>
-                          <Text style={{ flex: 1, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>{item.credit}</Text>
-                          <Text style={{ flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
+                          <Text style={{ flex: 2.0, fontSize: 12, color: '#64748b' }}>{item.roleDept}</Text>
+                          <Text style={{ flex: 1.4, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>{item.debit}</Text>
+                          <Text style={{ flex: 1.4, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>{item.credit}</Text>
+                          <Text style={{ flex: 1.6, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>
                             {item.runningBalance}
                           </Text>
                         </View>
@@ -1095,12 +1128,12 @@ export default function EmployeeWalletScreen() {
 
                   {/* Opening Balance Row (Shown last on screen: oldest at bottom) */}
                   <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#cbd5e1', padding: 12, backgroundColor: '#fafafa', alignItems: 'center' }}>
-                    <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 2.5, fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
-                    <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
-                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
-                    <Text style={{ flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>₹{cashOpeningBalance.toFixed(2)}</Text>
+                    <Text style={{ flex: 1.8, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 2.8, fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
+                    <Text style={{ flex: 2.0, fontSize: 13, color: '#64748b' }}>-</Text>
+                    <Text style={{ flex: 1.4, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1.4, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
+                    <Text style={{ flex: 1.6, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }}>₹{cashOpeningBalance.toFixed(2)}</Text>
                   </View>
                 </View>
               </ScrollView>

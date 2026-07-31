@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Image, TouchableOpacity, Alert } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 import { Clock, CheckCircle, AlertTriangle, Coffee, Download } from 'lucide-react-native';
 
@@ -126,7 +128,7 @@ export default function EmployeeAttendanceHistory() {
     return true;
   });
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!filteredReports || filteredReports.length === 0) return;
     
     let csvContent = "Date,Check In,Check Out,Status,Late In (mins),Early Out (mins),Breaks\n";
@@ -137,12 +139,23 @@ export default function EmployeeAttendanceHistory() {
       
       csvContent += `${formatDateToDDMMYYYY(r.date)},${checkIn},${checkOut},${r.status},${r.late_checkin_mins || 0},${r.early_checkout_mins || 0},"${breaksStr}"\n`;
     });
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `my_attendance.csv`);
-    a.click();
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `my_attendance.csv`);
+      a.click();
+    } else {
+      try {
+        const path = `${(FileSystem as any).documentDirectory}my_attendance.csv`;
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
+        await Sharing.shareAsync(path);
+      } catch (e: any) {
+        Alert.alert("Error", "Failed to export CSV: " + e.message);
+      }
+    }
   };
 
   if (loading) {

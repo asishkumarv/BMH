@@ -5,7 +5,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -157,7 +157,7 @@ export default function EmployeeWalletScreen() {
     }
   };
 
-  const exportToCSV = async (data: any[], filename: string, headers: string[], rowMapper: (item: any) => string[]) => {
+  const exportToCSV = async (data: any[], filename: string, headers: string[], rowMapper: (item: any) => string[], extraHeaderRows: string[] = []) => {
     try {
       const headerRows = [
         `"Bharat Medical Hall"`,
@@ -165,6 +165,7 @@ export default function EmployeeWalletScreen() {
         `"Department:","${user?.department || 'N/A'}"`,
         `"Role:","${user?.role || 'Delivery Boy'}"`,
         `"Date Range:","${startDate || 'All'} to ${endDate || 'All'}"`,
+        ...extraHeaderRows,
       ];
 
       let handoverCsvRows: string[] = [];
@@ -230,7 +231,7 @@ export default function EmployeeWalletScreen() {
         // @ts-ignore
         const path = `${FileSystem.documentDirectory}${filename}.csv`;
         // @ts-ignore
-        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
         await Sharing.shareAsync(path);
       }
     } catch (e: any) {
@@ -1121,14 +1122,24 @@ export default function EmployeeWalletScreen() {
                       creditAmount: 0,
                       runningBalance: `₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}`
                     });
-                    exportToCSV(printRows, 'Cash_Ledger', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Credit (Unpaid)', 'Balance'], (item) => [
-                      item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
-                      `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
-                      item.debit,
-                      item.credit,
-                      item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-',
-                      item.runningBalance
-                    ]);
+                    exportToCSV(
+                      printRows,
+                      'Cash_Ledger',
+                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Credit (Unpaid)', 'Balance'],
+                      (item) => [
+                        item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
+                        `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
+                        item.debit,
+                        item.credit,
+                        item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-',
+                        item.runningBalance
+                      ],
+                      [
+                        `"Present Cash in Hand:","₹${parseFloat(cashInHand || '0').toFixed(2)}"`,
+                        `"Filter Cash Collections:","₹${totalCashBooked.toFixed(2)}"`,
+                        `"Filter Online Collections:","₹${totalOnlineBooked.toFixed(2)}"`
+                      ]
+                    );
                   }}>
                     <Text style={styles.actionIconText}>CSV</Text>
                   </Pressable>
@@ -1153,14 +1164,22 @@ export default function EmployeeWalletScreen() {
                       creditAmount: 0,
                       runningBalance: `₹${(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}`
                     });
-                    handlePrint('Cash Ledger', ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Credit (Unpaid)', 'Balance'], printRows, (item) => [
-                      item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
-                      `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
-                      item.debit,
-                      item.credit,
-                      item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-',
-                      item.runningBalance
-                    ]);
+                    handlePrint(
+                      'Cash Ledger',
+                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Credit (Unpaid)', 'Balance'],
+                      printRows,
+                      (item) => [
+                        item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
+                        `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
+                        item.debit,
+                        item.credit,
+                        item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-',
+                        item.runningBalance
+                      ],
+                      `<div class="meta-row"><span class="meta-label">Present Cash in Hand:</span><span>₹${parseFloat(cashInHand || '0').toFixed(2)}</span></div>
+                       <div class="meta-row"><span class="meta-label">Filter Cash Collections:</span><span>₹${totalCashBooked.toFixed(2)}</span></div>
+                       <div class="meta-row"><span class="meta-label">Filter Online Collections:</span><span>₹${totalOnlineBooked.toFixed(2)}</span></div>`
+                    );
                   }}>
                     <Text style={styles.actionIconText}>Print</Text>
                   </Pressable>

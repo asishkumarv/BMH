@@ -126,7 +126,7 @@ exports.getAttendanceSummary = async (req, res) => {
 
 exports.getAdvancedReports = async (req, res) => {
   try {
-    const { department, status, startDate, endDate, employeeId, userType = 'employee', limit, offset } = req.query;
+    const { department, status, startDate, endDate, date, employeeId, userType = 'employee', limit, offset, search } = req.query;
     const parsedLimit = parseInt(limit, 10) || 50;
     const parsedOffset = parseInt(offset, 10) || 0;
 
@@ -138,8 +138,8 @@ exports.getAdvancedReports = async (req, res) => {
       SELECT 
         a.id, a.employee_id, e.full_name, ${userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = e.department_id) as department' : 'e.department'}, e.email, e.mobile, e.profile_data, a.date, 
         a.timestamp as check_in, a.checkout_timestamp as check_out, 
-        CASE WHEN a.image_url IS NOT NULL AND a.image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_in') ELSE NULL END as check_in_image,
-        CASE WHEN a.checkout_image_url IS NOT NULL AND a.checkout_image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_out') ELSE NULL END as check_out_image,
+        NULL as check_in_image,
+        NULL as check_out_image,
         a.status, a.late_duration,
         ${extraFields},
         (
@@ -154,7 +154,7 @@ exports.getAdvancedReports = async (req, res) => {
     const params = [];
     let paramIndex = 1;
 
-    if (department) {
+    if (department && department !== 'All') {
       query += ` AND e.department = $${paramIndex++}`;
       params.push(department);
     }
@@ -169,16 +169,36 @@ exports.getAdvancedReports = async (req, res) => {
     if (startDate && endDate) {
       query += ` AND a.date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
       params.push(startDate, endDate);
+    } else if (date) {
+      query += ` AND a.date = $${paramIndex++}`;
+      params.push(date);
+    }
+    if (search && search.trim() !== '') {
+      query += ` AND (e.full_name ILIKE $${paramIndex++} OR e.email ILIKE $${paramIndex++} OR e.mobile ILIKE $${paramIndex++})`;
+      params.push(`%${search.trim()}%`);
     }
 
     query += ` ORDER BY a.date DESC, a.timestamp DESC`;
 
     const result = await pool.query(query, params);
     
-    // Slice for pagination in memory, since we might need total counts or advanced mapping
-    const paginatedRows = result.rows.slice(parsedOffset, parsedOffset + parsedLimit);
-    const hasMore = parsedOffset + parsedLimit < result.rows.length;
+    // Check if any filter is applied (meaning pagination should be disabled)
+    const isFilterApplied = 
+      req.query.bypassPagination === 'true' ||
+      (department && department !== 'All' && userType !== 'sub_admin') || 
+      status || 
+      (startDate && endDate) || 
+      employeeId || 
+      (search && search.trim() !== '');
 
+    let paginatedRows = result.rows;
+    let hasMore = false;
+
+    if (!isFilterApplied) {
+      paginatedRows = result.rows.slice(parsedOffset, parsedOffset + parsedLimit);
+      hasMore = parsedOffset + parsedLimit < result.rows.length;
+    }
+    
     const processedData = paginatedRows.map(row => {
       let late_checkin_mins = 0, early_checkin_mins = 0;
       let late_checkout_mins = 0, early_checkout_mins = 0;
@@ -476,8 +496,14 @@ exports.getEmployeeAnalytics = async (req, res) => {
       ? (cmH > 0 && cmM > 0 ? `${cmH}h ${cmM}m` : (cmH > 0 ? `${cmH}h` : `${cmM}m`))
       : '0m';
 
-    const paginatedHistory = processedHistory.slice(parsedOffset, parsedOffset + parsedLimit);
-    const hasMore = parsedOffset + parsedLimit < processedHistory.length;
+    const isFilterApplied = req.query.bypassPagination === 'true' || (startDate && endDate);
+    let paginatedHistory = processedHistory;
+    let hasMore = false;
+
+    if (!isFilterApplied) {
+      paginatedHistory = processedHistory.slice(parsedOffset, parsedOffset + parsedLimit);
+      hasMore = parsedOffset + parsedLimit < processedHistory.length;
+    }
 
     res.json({
       success: true,

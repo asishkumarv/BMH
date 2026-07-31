@@ -7,6 +7,8 @@ import * as Location from 'expo-location';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const formatDateToDDMMYYYY = (dateStr: any) => {
   if (!dateStr) return '-';
@@ -178,6 +180,7 @@ export default function AdminAttendanceScreen() {
   const [selectedReportDept, setSelectedReportDept] = useState('All');
   const [selectedUserType, setSelectedUserType] = useState('employee');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [offset, setOffset] = useState(0);
@@ -288,15 +291,27 @@ export default function AdminAttendanceScreen() {
   const fetchReports = async (dept: string, userTypeStr = selectedUserType, forceClear = false, isLoadMore = false) => {
     try {
       const currentOffset = isLoadMore ? offset : 0;
+      const hasDateFilter = !forceClear && startDate && endDate;
+      const isFilterApplied = (dept && dept !== 'All') || hasDateFilter || (searchQuery.trim() !== '');
+
       let url = dept === 'All' 
         ? `https://napi.bharatmedicalhallplus.com/attendance/reports?userType=${userTypeStr}&limit=50&offset=${currentOffset}`
         : `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${dept}&userType=${userTypeStr}&limit=50&offset=${currentOffset}`;
       
-      if (!forceClear && startDate && endDate) {
+      if (isFilterApplied) {
+        url += `&bypassPagination=true`;
+      }
+
+      if (hasDateFilter) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       } else {
         url += `&date=${new Date().toISOString().split('T')[0]}`;
       }
+
+      if (searchQuery.trim() !== '') {
+        url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+      }
+
       const res = await axios.get(url);
       if (res.data.success) {
         if (isLoadMore) {
@@ -305,7 +320,12 @@ export default function AdminAttendanceScreen() {
           setReports(res.data.data);
         }
         setOffset(currentOffset + 50);
-        setHasMore(res.data.hasMore);
+
+        if (isFilterApplied) {
+          setHasMore(false);
+        } else {
+          setHasMore(res.data.hasMore);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -341,8 +361,15 @@ export default function AdminAttendanceScreen() {
   };
 
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
     fetchReports(selectedReportDept, selectedUserType);
-  }, [selectedReportDept, selectedUserType]);
+  }, [selectedReportDept, selectedUserType, debouncedSearchQuery]);
 
   const handleUpdateConfig = async () => {
     if (!deptName || !lat || !lng || !radius) {
@@ -410,7 +437,7 @@ export default function AdminAttendanceScreen() {
     setShowSummaryModal(true);
   };
 
-  const handleExportSummaryCSV = () => {
+  const handleExportSummaryCSV = async () => {
     if (!summaryModalData || summaryModalData.length === 0) return;
     
     let csvContent = `"${summaryModalType} List - ${new Date().toLocaleDateString()}"\n\n`;
@@ -446,15 +473,27 @@ export default function AdminAttendanceScreen() {
       csvContent += row + '\n';
     });
     
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `${summaryModalType.replace(/\s+/g, '_').toLowerCase()}_report_${new Date().toISOString().split('T')[0]}.csv`);
-    a.click();
+    const filename = `${summaryModalType.replace(/\s+/g, '_').toLowerCase()}_report_${new Date().toISOString().split('T')[0]}.csv`;
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', filename);
+      a.click();
+    } else {
+      try {
+        const path = `${(FileSystem as any).documentDirectory}${filename}`;
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
+        await Sharing.shareAsync(path);
+      } catch (e: any) {
+        Alert.alert("Error", "Failed to export CSV: " + e.message);
+      }
+    }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!reports || reports.length === 0) return;
     
     let csvContent = "Name,Department,Check In,Check Out,Status,Breaks\n";
@@ -466,27 +505,29 @@ export default function AdminAttendanceScreen() {
       csvContent += `${r.full_name},${r.department},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
     
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'attendance_report.csv');
-    a.click();
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'attendance_report.csv');
+      a.click();
+    } else {
+      try {
+        const path = `${(FileSystem as any).documentDirectory}attendance_report.csv`;
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
+        await Sharing.shareAsync(path);
+      } catch (e: any) {
+        Alert.alert("Error", "Failed to export CSV: " + e.message);
+      }
+    }
   };
 
   if (loading) {
     return <View style={{flex: 1, justifyContent: 'center', alignItems:'center'}}><ActivityIndicator size="large" color="#3b82f6" /></View>;
   }
 
-  const filteredReports = reports.filter(r => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (r.full_name && r.full_name.toLowerCase().includes(q)) ||
-      (r.email && r.email.toLowerCase().includes(q)) ||
-      (r.mobile && r.mobile.toLowerCase().includes(q))
-    );
-  });
+  const filteredReports = reports;
 
   const filteredUsers = allUsers.filter(u => {
     if (selectedUserType === 'employee') return u.type === 'employee';
@@ -739,9 +780,8 @@ export default function AdminAttendanceScreen() {
         </View>
 
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1450 }]}>
+          <View style={[styles.table, { minWidth: 1390 }]}>
           <View style={styles.tableRowHeader}>
-            <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
             <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
             <Text style={[styles.tableCellHeader, { width: 120 }]}>Dept</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Date</Text>
@@ -756,10 +796,6 @@ export default function AdminAttendanceScreen() {
           </View>
           {filteredReports.map((r, i) => (
             <View key={i} style={styles.tableRow}>
-              <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
-                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
-                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
-              </View>
               <View style={[styles.tableCellView, { width: 250 }]}>
                 <Text style={{fontWeight: '700', color: Colors.light.text}}>{r.full_name}</Text>
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.mobile}</Text>

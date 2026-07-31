@@ -8,7 +8,7 @@ import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import DoctorSchedulesEditor from '../../../../components/DoctorSchedulesEditor';
 import SearchableDropdown from '../../../../components/ui/SearchableDropdown';
@@ -308,7 +308,7 @@ export default function DoctorManagement() {
       // @ts-ignore
       const uri = FileSystem.documentDirectory + "bookings_export.csv";
       // @ts-ignore
-      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: 'utf8' });
       await Sharing.shareAsync(uri);
     }
   };

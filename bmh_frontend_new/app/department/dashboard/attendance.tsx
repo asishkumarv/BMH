@@ -9,6 +9,8 @@ import { Picker } from '@react-native-picker/picker';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const formatDateToDDMMYYYY = (dateStr: any) => {
   if (!dateStr) return '-';
@@ -169,8 +171,9 @@ function MyAttendanceHistory() {
 
       const currentOffset = isLoadMore ? offset : 0;
       let url = `https://napi.bharatmedicalhallplus.com/attendance/employee-analytics?employeeId=${user.id}&userType=sub_admin&limit=30&offset=${currentOffset}`;
-      if (!forceClear && startDate && endDate) {
-        url += `&startDate=${startDate}&endDate=${endDate}`;
+      const hasDateFilter = !forceClear && startDate && endDate;
+      if (hasDateFilter) {
+        url += `&startDate=${startDate}&endDate=${endDate}&bypassPagination=true`;
       }
 
       const res = await axios.get(url);
@@ -182,7 +185,12 @@ function MyAttendanceHistory() {
         }
         setAnalytics(res.data.analytics);
         setOffset(currentOffset + 30);
-        setHasMore(res.data.hasMore);
+        
+        if (hasDateFilter) {
+          setHasMore(false);
+        } else {
+          setHasMore(res.data.hasMore);
+        }
       }
     } catch (err) {
       console.log('Error fetching history', err);
@@ -198,7 +206,7 @@ function MyAttendanceHistory() {
     return true;
   });
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!filteredReports || filteredReports.length === 0) return;
     
     let csvContent = "Date,Check In,Check Out,Status,Late In (mins),Early Out (mins),Breaks\n";
@@ -209,12 +217,23 @@ function MyAttendanceHistory() {
       
       csvContent += `${formatDateToDDMMYYYY(r.date)},${checkIn},${checkOut},${r.status},${r.late_checkin_mins || 0},${r.early_checkout_mins || 0},"${breaksStr}"\n`;
     });
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `my_attendance.csv`);
-    a.click();
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `my_attendance.csv`);
+      a.click();
+    } else {
+      try {
+        const path = `${(FileSystem as any).documentDirectory}my_attendance.csv`;
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
+        await Sharing.shareAsync(path);
+      } catch (e: any) {
+        Alert.alert("Error", "Failed to export CSV: " + e.message);
+      }
+    }
   };
 
   if (loading) {
@@ -303,9 +322,8 @@ function MyAttendanceHistory() {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1100, width: '100%' }]}>
+          <View style={[styles.table, { minWidth: 1040, width: '100%' }]}>
             <View style={styles.tableRowHeader}>
-              <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Date</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check In</Text>
               <Text style={[styles.tableCellHeader, { width: 120 }]}>Check Out</Text>
@@ -320,10 +338,6 @@ function MyAttendanceHistory() {
             </View>
           ) : filteredReports.map((r, i) => (
             <View key={i} style={styles.tableRow}>
-              <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
-                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
-                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
-              </View>
               <Text style={[styles.tableCell, { width: 120 }]}>{formatDateToDDMMYYYY(r.date)}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 120 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
@@ -484,8 +498,9 @@ export default function SubAdminAttendanceDashboard() {
         
         const currentOffset = isLoadMore ? offset : 0;
         let url = `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${deptName}&limit=50&offset=${currentOffset}`;
-        if (!forceClear && startDate && endDate) {
-          url += `&startDate=${startDate}&endDate=${endDate}`;
+        const hasDateFilter = !forceClear && startDate && endDate;
+        if (hasDateFilter) {
+          url += `&startDate=${startDate}&endDate=${endDate}&bypassPagination=true`;
         } else {
           url += `&date=${new Date().toISOString().split('T')[0]}`;
         }
@@ -498,7 +513,12 @@ export default function SubAdminAttendanceDashboard() {
             setReports(repRes.data.data);
           }
           setOffset(currentOffset + 50);
-          setHasMore(repRes.data.hasMore);
+          
+          if (hasDateFilter) {
+            setHasMore(false);
+          } else {
+            setHasMore(repRes.data.hasMore);
+          }
         }
       }
     } catch (err) {
@@ -530,7 +550,7 @@ export default function SubAdminAttendanceDashboard() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!reports || reports.length === 0) return;
     
     let csvContent = "Name,Check In,Check Out,Status,Breaks\n";
@@ -541,12 +561,23 @@ export default function SubAdminAttendanceDashboard() {
       
       csvContent += `${r.full_name},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
     });
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `attendance_${userDept}.csv`);
-    a.click();
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `attendance_${userDept}.csv`);
+      a.click();
+    } else {
+      try {
+        const path = `${(FileSystem as any).documentDirectory}attendance_${userDept}.csv`;
+        await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
+        await Sharing.shareAsync(path);
+      } catch (e: any) {
+        Alert.alert("Error", "Failed to export CSV: " + e.message);
+      }
+    }
   };
 
   if (loading) {
@@ -723,9 +754,8 @@ export default function SubAdminAttendanceDashboard() {
         </View>
         
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1200 }]}>
+          <View style={[styles.table, { minWidth: 1140 }]}>
             <View style={styles.tableRowHeader}>
-            <Text style={[styles.tableCellHeader, { width: 60 }]}>In</Text>
             <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Date</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Shift</Text>
@@ -741,10 +771,6 @@ export default function SubAdminAttendanceDashboard() {
               key={i} 
               style={styles.tableRow}
             >
-              <View style={[styles.tableCellView, { width: 60, flexDirection: 'row' }]}>
-                 {r.check_in_image ? <Image source={{uri: r.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
-                 {r.check_out_image ? <Image source={{uri: r.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
-              </View>
               <View style={[styles.tableCellView, { width: 250 }]}>
                 <Text style={{fontWeight: '700', color: Colors.light.text}}>{r.full_name}</Text>
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>

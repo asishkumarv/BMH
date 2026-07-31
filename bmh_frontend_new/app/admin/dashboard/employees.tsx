@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platfor
 import { Plus, Search, MoreVertical, Shield, Building, User } from 'lucide-react-native';
 import axios from 'axios';
 import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -344,7 +344,7 @@ export default function EmployeesScreen() {
     } else {
       try {
         const uri = (FileSystem as any).documentDirectory + filename;
-        await (FileSystem as any).writeAsStringAsync(uri, csvContent, { encoding: (FileSystem as any).EncodingType.UTF8 });
+        await (FileSystem as any).writeAsStringAsync(uri, csvContent, { encoding: 'utf8' });
         await Sharing.shareAsync(uri);
       } catch (err) {
         console.error('CSV Export error:', err);

@@ -29,6 +29,7 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'attendance' | 'absent' | 'breaks'>('attendance');
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
 
   const monthsList = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -340,8 +341,16 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
                         {data.history.map((row: any, idx: number) => (
                           <View key={idx} style={styles.tableRow}>
                             <View style={[styles.tableCell, {flex: 0.5, flexDirection: 'row'}]}>
-                              {row.check_in_image ? <Image source={{uri: row.check_in_image}} style={styles.thumb} /> : <View style={styles.thumbPlaceholder} />}
-                              {row.check_out_image ? <Image source={{uri: row.check_out_image}} style={[styles.thumb, {marginLeft: -10}]} /> : null}
+                              {row.check_in_image ? (
+                                <TouchableOpacity onPress={() => setViewerImage(row.check_in_image)}>
+                                  <Image source={{uri: row.check_in_image}} style={styles.thumb} />
+                                </TouchableOpacity>
+                              ) : <View style={styles.thumbPlaceholder} />}
+                              {row.check_out_image ? (
+                                <TouchableOpacity onPress={() => setViewerImage(row.check_out_image)} style={{marginLeft: -10}}>
+                                  <Image source={{uri: row.check_out_image}} style={styles.thumb} />
+                                </TouchableOpacity>
+                              ) : null}
                             </View>
                             <Text style={styles.tableCell}>{formatDateToDDMMYYYY(row.date)}</Text>
                             <Text style={styles.tableCell}>{row.check_in ? new Date(row.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</Text>
@@ -444,6 +453,22 @@ export default function EmployeeAnalyticsModal({ visible, onClose, employeeId, u
           )}
         </View>
       </View>
+
+      {/* Full Image Viewer Modal */}
+      <Modal visible={!!viewerImage} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 10 }} onPress={() => setViewerImage(null)}>
+            <X size={32} color="white" />
+          </TouchableOpacity>
+          {viewerImage && (
+            <Image 
+              source={{ uri: viewerImage }} 
+              style={{ width: Platform.OS === 'web' ? '50%' : '90%', height: '70%', borderRadius: 12 }} 
+              resizeMode="contain" 
+            />
+          )}
+        </View>
+      </Modal>
     </Modal>
   );
 }
