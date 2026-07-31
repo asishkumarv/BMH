@@ -447,12 +447,66 @@ exports.getWalletHistory = async (req, res) => {
     bookingsQueryStr += ` ORDER BY pb.created_at DESC`;
     const bookingsRes = await pool.query(bookingsQueryStr, bookingsParams);
 
-    // 3. Orders
+    // 3. Orders — includes manual_orders, online_orders, ecogreensales_orders
+    //    Match by delivery_boy_id (delivery boy) OR created_by_id (order creator)
     const ordersQuery = `
-      SELECT mo.id, mo.order_no, mo.invoice_no, mo.amount, mo.paid_amount, mo.payment_mode, mo.order_date, mo.status, mo.created_at, mo.customer_name
+      SELECT 
+        mo.id, mo.order_no, mo.invoice_no, 
+        mo.amount, mo.paid_amount,
+        mo.payment_mode, mo.pod_payment_mode,
+        COALESCE(mo.cash_amount, 0) as cash_amount,
+        COALESCE(mo.online_amount, 0) as online_amount,
+        COALESCE(mo.credit_amount, 0) as credit_amount,
+        mo.order_date, mo.status, mo.created_at, mo.delivered_at,
+        mo.customer_name, mo.address,
+        'manual_order' as order_source
       FROM manual_orders mo
-      WHERE (mo.created_by_id = $1 OR mo.created_by_id = $2)
-      ORDER BY mo.created_at DESC
+      WHERE mo.delivery_boy_id = $1 OR mo.delivery_boy_id = $2
+         OR mo.created_by_id = $1 OR mo.created_by_id = $2
+
+      UNION ALL
+
+      SELECT 
+        oo.id::varchar as id,
+        oo.id::varchar as order_no,
+        NULL as invoice_no,
+        oo.total_amount as amount,
+        oo.total_amount as paid_amount,
+        oo.pod_payment_mode as payment_mode,
+        oo.pod_payment_mode,
+        COALESCE(oo.cash_amount, 0) as cash_amount,
+        COALESCE(oo.online_amount, 0) as online_amount,
+        COALESCE(oo.credit_amount, 0) as credit_amount,
+        oo.created_at::date as order_date,
+        oo.status, oo.created_at, oo.delivered_at,
+        oo.patient_name as customer_name,
+        oo.manual_address as address,
+        'online_order' as order_source
+      FROM online_orders oo
+      WHERE oo.delivery_boy_id::text = $1 OR oo.delivery_boy_id::text = $2
+
+      UNION ALL
+
+      SELECT 
+        so.id::varchar as id,
+        so.id::varchar as order_no,
+        so.ip_no as invoice_no,
+        so.order_total as amount,
+        so.order_total as paid_amount,
+        so.pod_payment_mode as payment_mode,
+        so.pod_payment_mode,
+        COALESCE(so.cash_amount, 0) as cash_amount,
+        COALESCE(so.online_amount, 0) as online_amount,
+        COALESCE(so.credit_amount, 0) as credit_amount,
+        so.ord_date as order_date,
+        so.status, so.created_at, so.delivered_at,
+        so.patient_name as customer_name,
+        so.patient_address as address,
+        'sales_order' as order_source
+      FROM ecogreensales_orders so
+      WHERE so.delivery_boy_id::text = $1 OR so.delivery_boy_id::text = $2
+
+      ORDER BY created_at DESC
     `;
     const ordersRes = await pool.query(ordersQuery, [employee_id, numericId]);
 

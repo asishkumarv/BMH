@@ -308,6 +308,9 @@ exports.updateDepartmentAdminProfile = async (req, res) => {
 
 exports.getRevenueStats = async (req, res) => {
   try {
+    // Delivered status values used across all order tables
+    const DELIVERED_STATUSES = `('Delivered', 'Completed', 'DELIVERED', 'COMPLETED', 'delivered', 'completed')`;
+
     // 1. Bookings Online Revenue
     const bookingOnlineRes = await pool.query(
       "SELECT COALESCE(SUM(ds.fee), 0) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Online'"
@@ -320,19 +323,67 @@ exports.getRevenueStats = async (req, res) => {
     );
     const bookingCash = parseFloat(bookingCashRes.rows[0].total) || 0;
 
-    // 3. Order Collections — Cash (payment_mode = 'Cash' or 'cash')
-    const orderCashRes = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) as total FROM manual_orders WHERE LOWER(payment_mode) = 'cash' AND status NOT IN ('Cancelled', 'cancelled', 'CANCELLED', 'Returned', 'returned', 'RETURNED', 'Failed', 'failed', 'FAILED')"
-    );
+    // 3. Order Collections — only DELIVERED orders, delivered by our staff (delivery_boy_id NOT NULL), POD cash_amount
+    //    Covers manual_orders + online_orders + ecogreen_sales_orders
+    const orderCashRes = await pool.query(`
+      SELECT COALESCE(SUM(cash_amount), 0) as total FROM (
+        -- Manual Orders (store delivery)
+        SELECT COALESCE(cash_amount, 0) as cash_amount
+        FROM manual_orders
+        WHERE status IN ${DELIVERED_STATUSES}
+          AND delivery_boy_id IS NOT NULL
+          AND COALESCE(cash_amount, 0) > 0
+
+        UNION ALL
+
+        -- Online Orders (delivered by delivery boy)
+        SELECT COALESCE(cash_amount, 0) as cash_amount
+        FROM online_orders
+        WHERE status IN ${DELIVERED_STATUSES}
+          AND delivery_boy_id IS NOT NULL
+          AND COALESCE(cash_amount, 0) > 0
+
+        UNION ALL
+
+        -- EcoGreen Sales Orders (delivered by delivery boy)
+        SELECT COALESCE(cash_amount, 0) as cash_amount
+        FROM ecogreen_sales_orders
+        WHERE status IN ${DELIVERED_STATUSES}
+          AND delivery_boy_id IS NOT NULL
+          AND COALESCE(cash_amount, 0) > 0
+      ) pod_cash
+    `);
     const orderCash = parseFloat(orderCashRes.rows[0].total) || 0;
 
-    // 4. Order Collections — Online (payment_mode != 'Cash' and not null/empty)
-    const orderOnlineRes = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) as total FROM manual_orders WHERE payment_mode IS NOT NULL AND LOWER(payment_mode) NOT IN ('cash', 'credit', '') AND status NOT IN ('Cancelled', 'cancelled', 'CANCELLED', 'Returned', 'returned', 'RETURNED', 'Failed', 'failed', 'FAILED')"
-    );
+    // 4. Order Collections — POD online_amount (same delivery conditions)
+    const orderOnlineRes = await pool.query(`
+      SELECT COALESCE(SUM(online_amount), 0) as total FROM (
+        SELECT COALESCE(online_amount, 0) as online_amount
+        FROM manual_orders
+        WHERE status IN ${DELIVERED_STATUSES}
+          AND delivery_boy_id IS NOT NULL
+          AND COALESCE(online_amount, 0) > 0
+
+        UNION ALL
+
+        SELECT COALESCE(online_amount, 0) as online_amount
+        FROM online_orders
+        WHERE status IN ${DELIVERED_STATUSES}
+          AND delivery_boy_id IS NOT NULL
+          AND COALESCE(online_amount, 0) > 0
+
+        UNION ALL
+
+        SELECT COALESCE(online_amount, 0) as online_amount
+        FROM ecogreen_sales_orders
+        WHERE status IN ${DELIVERED_STATUSES}
+          AND delivery_boy_id IS NOT NULL
+          AND COALESCE(online_amount, 0) > 0
+      ) pod_online
+    `);
     const orderOnline = parseFloat(orderOnlineRes.rows[0].total) || 0;
 
-    // Combined totals (bookings + orders)
+    // Combined totals (bookings + delivered POD orders)
     const totalOnline = bookingOnline + orderOnline;
     const totalCash = bookingCash + orderCash;
 
@@ -368,6 +419,7 @@ exports.getRevenueStats = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error fetching revenue stats' });
   }
 };
+
 
 
 exports.getAllWalletBalances = async (req, res) => {

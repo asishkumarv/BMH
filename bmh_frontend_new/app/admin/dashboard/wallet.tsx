@@ -246,11 +246,12 @@ export default function AdminWalletScreen() {
     });
 
     // Add Handovers
+    const stripId = (id: string) => (id || '').replace(/^(EMP-|SA-|DOC-|ADMIN-)/, '');
     const handoversArr = Array.isArray(employeeHistory.handovers) ? employeeHistory.handovers : [];
     handoversArr.forEach((h: any) => {
-      const isOut = h.from_employee_id == selectedEmployee.employee_id;
+      const isOut = stripId(String(h.from_employee_id)) === stripId(String(selectedEmployee.employee_id));
       const targetName = isOut 
-        ? (h.to_employee_id ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
+        ? (h.to_name ? `${h.to_name} (${h.to_employee_id})` : h.customer_name || 'Patient') 
         : `${h.from_name} (${h.from_employee_id})`;
       const targetRoleDept = isOut 
         ? (h.to_employee_id ? `${h.to_role || ''} • ${h.to_department || ''}` : 'Patient • Clinical') 
@@ -567,10 +568,11 @@ export default function AdminWalletScreen() {
           </tr>
         </thead>
         <tbody>
-          ${filteredHandovers.map(h => {
-            const isOut = h.from_employee_id == selectedEmployee.employee_id;
+          ${filteredHandovers.map((h: any) => {
+            const _stripId = (id: string) => (id || '').replace(/^(EMP-|SA-|DOC-|ADMIN-)/, '');
+            const isOut = _stripId(String(h.from_employee_id)) === _stripId(String(selectedEmployee?.employee_id));
             const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
-            const particulars = isOut ? `Handed to ${receiver}` : `Received from ${h.from_name}`;
+            const particulars = isOut ? `Cash Handover to ${receiver}` : `Received from ${h.from_name}`;
             return `
               <tr>
                 <td>${formatDateTimeToDDMMYYYY(h.created_at)}</td>
@@ -1263,20 +1265,20 @@ export default function AdminWalletScreen() {
                   <View style={styles.table}>
                     <View style={styles.tableHeader}>
                       <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Date/Time</Text>
-                      <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]}>Particulars</Text>
+                      <Text style={[styles.tableCell, { flex: 2.5, fontWeight: '600' }]}>Particulars</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right', color: '#ef4444' }]}>Debit (-)</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right', color: '#22c55e' }]}>Credit (+)</Text>
-                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Balance</Text>
                     </View>
                     {filteredHandovers.map((h, i) => {
-                      const isOut = h.from_employee_id == selectedEmployee?.employee_id;
+                      const _sid = (id: string) => (id || '').replace(/^(EMP-|SA-|DOC-|ADMIN-)/, '');
+                      const isOut = _sid(String(h.from_employee_id)) === _sid(String(selectedEmployee?.employee_id));
                       const receiver = h.to_employee_id ? h.to_name : (h.customer_name ? `${h.customer_name} (Patient)` : 'Patient');
                       return (
                         <View key={i} style={styles.tableRow}>
                           <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{formatDateTimeToDDMMYYYY(h.created_at)}</Text>
                           <View style={{ flex: 2 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>
-                              {isOut ? `Handed to ${receiver}` : `Received from ${h.from_name}`}
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: isOut ? '#ef4444' : '#16a34a' }}>
+                              {isOut ? `Cash Handover to ${receiver}` : `Received from ${h.from_name}`}
                             </Text>
                             {h.note ? <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{h.note}</Text> : null}
                             {h.status !== 'Accepted' && (
@@ -1285,14 +1287,11 @@ export default function AdminWalletScreen() {
                               </View>
                             )}
                           </View>
-                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#ef4444' }]}>
-                            {isOut && h.status === 'Accepted' ? `₹${h.amount}` : '-'}
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#ef4444', opacity: h.status === 'Pending' ? 0.6 : 1 }]}>
+                            {isOut ? `₹${parseFloat(h.amount).toFixed(2)}` : '-'}
                           </Text>
-                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#22c55e' }]}>
-                            {!isOut && h.status === 'Accepted' ? `₹${h.amount}` : '-'}
-                          </Text>
-                          <Text style={[styles.tableCell, { flex: 1.2, textAlign: 'right', fontWeight: '700', color: Colors.light.text }]}>
-                            {h.status === 'Accepted' ? h.runningBalance : '-'}
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#22c55e', opacity: h.status === 'Pending' ? 0.6 : 1 }]}>
+                            {!isOut ? `₹${parseFloat(h.amount).toFixed(2)}` : '-'}
                           </Text>
                         </View>
                       );
@@ -1336,28 +1335,70 @@ export default function AdminWalletScreen() {
                 {modalActiveTab === 'orders' && (
                   <View style={styles.table}>
                     <View style={styles.tableHeader}>
-                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600' }]}>Order No</Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Order No</Text>
                       <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600' }]}>Date</Text>
                       <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '600' }]}>Customer</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Total</Text>
-                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Paid</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Cash / Online</Text>
+                      <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'center' }]}>Mode</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontWeight: '600', textAlign: 'right' }]}>Status</Text>
                     </View>
-                    {filteredOrders.map((o, i) => (
-                      <View key={i} style={styles.tableRow}>
-                        <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{o.order_no || 'N/A'}</Text>
-                        <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13 }]}>{formatDateOnlyToDDMMYYYY(o.order_date || o.created_at)}</Text>
-                        <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{o.customer_name || 'N/A'}</Text>
-                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700' }]}>₹{o.amount}</Text>
-                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', color: '#10b981' }]}>₹{o.paid_amount}</Text>
-                        <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontSize: 13 }]}>{o.status}</Text>
-                      </View>
-                    ))}
+                    {filteredOrders.map((o, i) => {
+                      const isDelivered = ['delivered','completed'].includes((o.status||'').toLowerCase());
+                      const sourceLabel = o.order_source === 'online_order' ? 'Online' : o.order_source === 'sales_order' ? 'Sales' : 'Manual';
+                      const sourceBg = o.order_source === 'online_order' ? '#dbeafe' : o.order_source === 'sales_order' ? '#fef9c3' : '#f0fdf4';
+                      const sourceColor = o.order_source === 'online_order' ? '#1d4ed8' : o.order_source === 'sales_order' ? '#a16207' : '#15803d';
+                      return (
+                        <View key={i} style={[styles.tableRow, { flexWrap: 'wrap' }]}>
+                          <View style={{ flex: 1.5, flexDirection: 'column', paddingRight: 4 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1e293b' }}>{o.order_no || `#${o.id}`}</Text>
+                            <View style={{ backgroundColor: sourceBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 3, alignSelf: 'flex-start' }}>
+                              <Text style={{ fontSize: 10, color: sourceColor, fontWeight: '700' }}>{sourceLabel}</Text>
+                            </View>
+                          </View>
+                          <View style={{ flex: 1.2, flexDirection: 'column' }}>
+                            <Text style={{ fontSize: 13, color: '#334155' }}>{formatDateOnlyToDDMMYYYY(o.order_date || o.created_at)}</Text>
+                            {o.delivered_at && (
+                              <Text style={{ fontSize: 10, color: '#10b981' }}>Del: {formatDateOnlyToDDMMYYYY(o.delivered_at)}</Text>
+                            )}
+                          </View>
+                          <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13 }]}>{o.customer_name || 'N/A'}</Text>
+                          <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '700', fontSize: 13 }]}>₹{parseFloat(o.amount || 0).toFixed(2)}</Text>
+                          <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                            {parseFloat(o.cash_amount || 0) > 0 && (
+                              <Text style={{ fontSize: 12, color: '#16a34a', fontWeight: '600' }}>💵 ₹{parseFloat(o.cash_amount).toFixed(2)}</Text>
+                            )}
+                            {parseFloat(o.online_amount || 0) > 0 && (
+                              <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: '600' }}>📱 ₹{parseFloat(o.online_amount).toFixed(2)}</Text>
+                            )}
+                            {parseFloat(o.credit_amount || 0) > 0 && (
+                              <Text style={{ fontSize: 12, color: '#dc2626', fontWeight: '600' }}>🔴 ₹{parseFloat(o.credit_amount).toFixed(2)}</Text>
+                            )}
+                            {!parseFloat(o.cash_amount || 0) && !parseFloat(o.online_amount || 0) && (
+                              <Text style={{ fontSize: 12, color: '#94a3b8' }}>—</Text>
+                            )}
+                          </View>
+                          <View style={{ flex: 1, alignItems: 'center' }}>
+                            {o.pod_payment_mode ? (
+                              <View style={{ backgroundColor: '#f0fdf4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text style={{ fontSize: 11, color: '#15803d', fontWeight: '600' }}>{o.pod_payment_mode}</Text>
+                              </View>
+                            ) : (
+                              <Text style={{ fontSize: 11, color: '#94a3b8' }}>—</Text>
+                            )}
+                          </View>
+                          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: isDelivered ? '#10b981' : '#f59e0b' }}>{o.status}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
                     {filteredOrders.length === 0 && (
-                      <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No orders found.</Text>
+                      <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No orders found for this employee.</Text>
                     )}
                   </View>
                 )}
+
               </ScrollView>
             )}
           </View>
