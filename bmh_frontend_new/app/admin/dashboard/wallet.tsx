@@ -184,46 +184,63 @@ export default function AdminWalletScreen() {
     if (!selectedEmployee) return { openingBalance: 0, ledger: [] };
     const entries: any[] = [];
 
-    // Add Cash Bookings
+    // Add Bookings
     const bookingsArr = Array.isArray(employeeHistory.bookings) ? employeeHistory.bookings : [];
     bookingsArr.forEach((b: any) => {
-      const isCash = b.payment_mode === 'Cash' || b.payment_method === 'Cash' || (!b.payment_mode && b.payment_method !== 'Online');
-      if (isCash) {
-        const amt = parseFloat(b.amount || b.fee || '0');
-        if (amt > 0) {
-          entries.push({
-            id: `booking-${b.id || b.booking_id}`,
-            dateStr: b.created_at || b.date,
-            particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
-            roleDept: 'Patient • Clinical',
-            debit: '-',
-            credit: `₹${amt.toFixed(2)}`,
-            amount: amt,
-            type: 'credit',
-            status: 'Accepted'
-          });
-        }
+      const amt = parseFloat(b.amount || b.fee || '0');
+      if (amt > 0) {
+        const isCash = b.payment_mode === 'Cash' || b.payment_method === 'Cash';
+        entries.push({
+          id: `booking-${b.id || b.booking_id}`,
+          dateStr: b.created_at || b.date,
+          particulars: `Booking Collection - Patient: ${b.patient_name || 'N/A'} (Doc: Dr. ${b.doctor_name || 'N/A'})`,
+          roleDept: `Patient • Clinical [${isCash ? 'Cash' : 'Online'}]`,
+          debit: '-',
+          credit: `₹${amt.toFixed(2)}`,
+          amount: amt,
+          cashAmount: isCash ? amt : 0,
+          onlineAmount: !isCash ? amt : 0,
+          type: 'credit',
+          status: 'Accepted',
+          paymentMode: isCash ? 'Cash' : 'Online'
+        });
       }
     });
 
-    // Add Cash Order Collections
+    // Add Order Collections
     const ordersArr = Array.isArray(employeeHistory.orders) ? employeeHistory.orders : [];
     ordersArr.forEach((tx: any) => {
-      const isCash = tx.payment_mode === 'Cash' || tx.payment_method === 'Cash' || tx.cash_amount !== undefined;
       const cashVal = tx.cash_amount !== undefined && tx.cash_amount !== null 
         ? parseFloat(tx.cash_amount) 
-        : (isCash ? parseFloat(tx.amount || tx.paid_amount || '0') : 0);
-      if (cashVal > 0) {
+        : (tx.payment_mode === 'Cash' || tx.payment_method === 'Cash' || tx.type === 'cash_collection' ? parseFloat(tx.amount || tx.paid_amount || '0') : 0);
+      const onlineVal = tx.online_amount !== undefined && tx.online_amount !== null 
+        ? parseFloat(tx.online_amount) 
+        : (tx.payment_mode === 'Online' || tx.payment_method === 'Online' || tx.type === 'online_collection' ? parseFloat(tx.amount || tx.paid_amount || '0') : 0);
+      
+      const totalVal = cashVal + onlineVal;
+      if (totalVal > 0) {
+        let label = '';
+        if (cashVal > 0 && onlineVal > 0) {
+          label = `Split: Cash ₹${cashVal.toFixed(2)} + Online ₹${onlineVal.toFixed(2)}`;
+        } else if (cashVal > 0) {
+          label = `Cash ₹${cashVal.toFixed(2)}`;
+        } else {
+          label = `Online ₹${onlineVal.toFixed(2)}`;
+        }
+
         entries.push({
           id: `order-${tx.id || tx.order_no}`,
           dateStr: tx.created_at || tx.order_date,
           particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
-          roleDept: tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection',
+          roleDept: `${tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection'} [${label}]`,
           debit: '-',
-          credit: `₹${cashVal.toFixed(2)}`,
-          amount: cashVal,
+          credit: `₹${totalVal.toFixed(2)}`,
+          amount: totalVal,
+          cashAmount: cashVal,
+          onlineAmount: onlineVal,
           type: 'credit',
-          status: 'Accepted'
+          status: 'Accepted',
+          paymentMode: cashVal > 0 && onlineVal > 0 ? 'Split' : (cashVal > 0 ? 'Cash' : 'Online')
         });
       }
     });
@@ -247,9 +264,10 @@ export default function AdminWalletScreen() {
           dateStr: h.created_at,
           particulars: `Handed Cash to ${targetName}`,
           roleDept: targetRoleDept,
-          debit: h.status === 'Accepted' ? `₹${amt.toFixed(2)}` : '-',
+          debit: `₹${amt.toFixed(2)}`,
           credit: '-',
           amount: amt,
+          cashAmount: amt,
           type: 'debit',
           status: h.status,
           note: h.note,
@@ -262,8 +280,9 @@ export default function AdminWalletScreen() {
           particulars: `Received Cash from ${targetName}`,
           roleDept: targetRoleDept,
           debit: '-',
-          credit: h.status === 'Accepted' ? `₹${amt.toFixed(2)}` : '-',
+          credit: `₹${amt.toFixed(2)}`,
           amount: amt,
+          cashAmount: amt,
           type: 'credit',
           status: h.status,
           note: h.note,
@@ -275,43 +294,81 @@ export default function AdminWalletScreen() {
     // Sort chronologically (oldest first)
     entries.sort((a: any, b: any) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
 
-    // Calculate running balance from the beginning of time
-    let balanceAccumulator = 0;
-    const entriesWithRunningBalance = entries.map((entry: any) => {
-      if (entry.status === 'Accepted') {
-        if (entry.type === 'credit') {
-          balanceAccumulator += entry.amount;
+    // Calculate running balance backwards starting from current actual cash_in_hand (Accepted or Pending)
+    let cashBalance = parseFloat(selectedEmployee.cash_in_hand || '0');
+    
+    // Loop backwards
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      const isAcceptedOrPending = entry.status === 'Accepted' || entry.status === 'Pending' || entry.status === 'pending';
+      if (isAcceptedOrPending) {
+        if (entry.id.startsWith('handover-')) {
+          entry.runningBalanceVal = cashBalance;
+          entry.runningBalance = `₹${cashBalance.toFixed(2)}`;
+          if (entry.type === 'debit') {
+            cashBalance += entry.amount;
+          } else {
+            cashBalance -= entry.amount;
+          }
         } else {
-          balanceAccumulator -= entry.amount;
+          entry.runningBalanceVal = cashBalance;
+          entry.runningBalance = `₹${cashBalance.toFixed(2)}`;
+          cashBalance -= (entry.cashAmount || 0);
         }
+      } else {
+        entry.runningBalanceVal = null;
+        entry.runningBalance = '-';
       }
-      return {
-        ...entry,
-        runningBalanceVal: balanceAccumulator,
-        runningBalance: `₹${balanceAccumulator.toFixed(2)}`
-      };
+    }
+
+    // Filter by date range
+    const filteredEntries = entries.filter((entry: any) => {
+      const entryDate = entry.dateStr ? entry.dateStr.split('T')[0] : '';
+      if (filterStartDate && entryDate < filterStartDate) return false;
+      if (filterEndDate && entryDate > filterEndDate) return false;
+      return true;
     });
 
-    // Apply filters and calculate opening balance
+    // Determine Opening Balance for the filtered range
     let openingBalance = 0;
-    const filteredEntries: any[] = [];
-
-    entriesWithRunningBalance.forEach((entry: any) => {
-      const entryDate = entry.dateStr ? entry.dateStr.split('T')[0] : '';
-      if (filterStartDate && entryDate < filterStartDate) {
-        if (entry.status === 'Accepted') {
-          if (entry.type === 'credit') {
-            openingBalance += entry.amount;
-          } else {
-            openingBalance -= entry.amount;
+    if (filteredEntries.length > 0) {
+      const firstEntry = filteredEntries[0];
+      const idx = entries.indexOf(firstEntry);
+      if (idx > 0) {
+        let foundPrev = false;
+        for (let j = idx - 1; j >= 0; j--) {
+          const isPrevAcceptedOrPending = entries[j].status === 'Accepted' || entries[j].status === 'Pending' || entries[j].status === 'pending';
+          if (isPrevAcceptedOrPending && entries[j].runningBalanceVal !== null) {
+            openingBalance = entries[j].runningBalanceVal;
+            foundPrev = true;
+            break;
           }
         }
-      } else if (filterEndDate && entryDate > filterEndDate) {
-        // filter out
+        if (!foundPrev) {
+          openingBalance = firstEntry.runningBalanceVal;
+          const isFirstAcceptedOrPending = firstEntry.status === 'Accepted' || firstEntry.status === 'Pending' || firstEntry.status === 'pending';
+          if (isFirstAcceptedOrPending) {
+            if (firstEntry.id.startsWith('handover-') && firstEntry.type === 'debit') {
+              openingBalance += firstEntry.amount;
+            } else {
+              openingBalance -= (firstEntry.cashAmount || 0);
+            }
+          }
+        }
       } else {
-        filteredEntries.push(entry);
+        openingBalance = firstEntry.runningBalanceVal;
+        const isFirstAcceptedOrPending = firstEntry.status === 'Accepted' || firstEntry.status === 'Pending' || firstEntry.status === 'pending';
+        if (isFirstAcceptedOrPending) {
+          if (firstEntry.id.startsWith('handover-') && firstEntry.type === 'debit') {
+            openingBalance += firstEntry.amount;
+          } else {
+            openingBalance -= (firstEntry.cashAmount || 0);
+          }
+        }
       }
-    });
+    } else {
+      openingBalance = parseFloat(selectedEmployee.cash_in_hand || '0');
+    }
 
     return {
       openingBalance,
@@ -742,6 +799,26 @@ export default function AdminWalletScreen() {
   const incomingHandovers = handovers.filter(h => h.to_employee_id === adminId && h.status === 'Pending');
   const pastHandovers = handovers.filter(h => h.to_employee_id === adminId && h.status !== 'Pending');
 
+  // System-wide cash summary — use server-side revenue-stats (same as admin dashboard) for accuracy
+  // stats.totalCashInWallets = all staff cash, stats.totalPendingHandovers = all pending system handovers
+  const totalStaffCashInHand = parseFloat(String(stats.totalCashInWallets || '0'));
+  const totalEmployeeCash = walletBalances.filter((item: any) => {
+    const roleLower = (item.role || '').toLowerCase();
+    return !roleLower.includes('sub_admin') && !roleLower.includes('sub admin');
+  }).reduce((acc: number, item: any) => acc + parseFloat(item.cash_in_hand || '0'), 0);
+  const totalSubAdminCash = walletBalances.filter((item: any) => {
+    const roleLower = (item.role || '').toLowerCase();
+    return roleLower.includes('sub_admin') || roleLower.includes('sub admin');
+  }).reduce((acc: number, item: any) => acc + parseFloat(item.cash_in_hand || '0'), 0);
+
+  // Use backend-computed pending handover total (all system pending, not just this admin's)
+  const allPendingHandoversTotal = parseFloat(String(stats.totalPendingHandovers || '0'));
+  const pendingIncoming = incomingHandovers.reduce((acc: number, h: any) => acc + parseFloat(h.amount || '0'), 0);
+
+  // Total cash across entire system (vault + all staff)
+  const vaultCash = parseFloat(cashInHand || '0');
+  const systemTotalCash = vaultCash + totalStaffCashInHand;
+
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
@@ -775,8 +852,9 @@ export default function AdminWalletScreen() {
               <View style={[styles.iconBox, { backgroundColor: '#3B82F61A' }]}>
                 <CreditCard size={24} color="#3B82F6" />
               </View>
-              <Text style={{ fontSize: 16, color: '#2563EB', fontWeight: '600', marginTop: 12 }}>Online Cash</Text>
-              <Text style={{ fontSize: 32, fontWeight: '800', color: '#1E3A8A' }}>₹{stats.totalOnline || '0.00'}</Text>
+              <Text style={{ fontSize: 16, color: '#2563EB', fontWeight: '600', marginTop: 12 }}>Online Revenue</Text>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: '#1E3A8A' }}>₹{parseFloat(String(stats.totalOnline || 0)).toFixed(2)}</Text>
+              <Text style={{ fontSize: 11, color: '#3B82F6', marginTop: 4 }}>Bookings: ₹{parseFloat(String(stats.bookingOnline || 0)).toFixed(2)} | Orders: ₹{parseFloat(String(stats.orderOnline || 0)).toFixed(2)}</Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: '#FDF4FF', borderColor: '#FAE8FF' }]}>
@@ -785,8 +863,55 @@ export default function AdminWalletScreen() {
               </View>
               <Text style={{ fontSize: 16, color: '#C026D3', fontWeight: '600', marginTop: 12 }}>Total Revenue</Text>
               <Text style={{ fontSize: 32, fontWeight: '800', color: '#701A75' }}>
-                ₹{((parseFloat(stats.totalCash || '0') + parseFloat(stats.totalOnline || '0'))).toFixed(2)}
+                ₹{(parseFloat(String(stats.totalCash || 0)) + parseFloat(String(stats.totalOnline || 0))).toFixed(2)}
               </Text>
+              <Text style={{ fontSize: 11, color: '#C026D3', marginTop: 4 }}>Cash: ₹{parseFloat(String(stats.totalCash || 0)).toFixed(2)} | Online: ₹{parseFloat(String(stats.totalOnline || 0)).toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {/* System-wide Cash Summary — sourced from backend revenue-stats API */}
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>System Cash Overview</Text>
+            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+              {/* Employee Cash in Hand */}
+              <View style={{ flex: 1, minWidth: 160, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa', borderRadius: 12, padding: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#f97316' }} />
+                  <Text style={{ fontSize: 12, color: '#c2410c', fontWeight: '600' }}>Employee Cash in Hand</Text>
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#9a3412' }}>₹{totalEmployeeCash.toFixed(2)}</Text>
+                <Text style={{ fontSize: 11, color: '#c2410c', marginTop: 4 }}>{walletBalances.filter((i: any) => !((i.role||'').toLowerCase().includes('sub_admin')||(i.role||'').toLowerCase().includes('sub admin'))).length} employees</Text>
+              </View>
+
+              {/* Sub-Admin Cash in Hand */}
+              <View style={{ flex: 1, minWidth: 160, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12, padding: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#eab308' }} />
+                  <Text style={{ fontSize: 12, color: '#92400e', fontWeight: '600' }}>Sub-Admin Cash in Hand</Text>
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#78350f' }}>₹{totalSubAdminCash.toFixed(2)}</Text>
+                <Text style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>{walletBalances.filter((i: any) => (i.role||'').toLowerCase().includes('sub_admin')||(i.role||'').toLowerCase().includes('sub admin')).length} sub-admins</Text>
+              </View>
+
+              {/* Pending Handovers — from backend (system-wide) */}
+              <View style={{ flex: 1, minWidth: 160, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fcd34d', borderRadius: 12, padding: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#d97706' }} />
+                  <Text style={{ fontSize: 12, color: '#b45309', fontWeight: '600' }}>Pending Handovers (All)</Text>
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#92400e' }}>₹{allPendingHandoversTotal.toFixed(2)}</Text>
+                <Text style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>To vault: ₹{pendingIncoming.toFixed(2)}</Text>
+              </View>
+
+              {/* Total System Cash = vault + all staff */}
+              <View style={{ flex: 1, minWidth: 160, backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 12, padding: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#16a34a' }} />
+                  <Text style={{ fontSize: 12, color: '#15803d', fontWeight: '600' }}>Total System Cash</Text>
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#14532d' }}>₹{systemTotalCash.toFixed(2)}</Text>
+                <Text style={{ fontSize: 11, color: '#15803d', marginTop: 4 }}>Vault + All Staff</Text>
+              </View>
             </View>
           </View>
 
@@ -1077,20 +1202,22 @@ export default function AdminWalletScreen() {
                       <Text style={[styles.tableCell, { flex: 1.2, fontWeight: '600', textAlign: 'right' }]}>Balance</Text>
                     </View>
 
-                    {/* Opening Balance Row */}
-                    <View style={styles.tableRow}>
+                    {/* Closing Balance Row (Shown first on screen: latest at top) */}
+                    <View style={[styles.tableRow, { backgroundColor: '#f8fafc', borderBottomWidth: 2, borderBottomColor: '#cbd5e1' }]}>
                       <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13, color: '#64748b' }]}>-</Text>
-                      <Text style={[styles.tableCell, { flex: 2.5, fontSize: 13, fontWeight: '700', color: '#475569' }]}>Opening Balance</Text>
+                      <Text style={[styles.tableCell, { flex: 2.5, fontSize: 13, fontWeight: '700', color: '#0f172a' }]}>Closing Balance</Text>
                       <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#64748b' }]}>-</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
-                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }]}>₹{cashOpeningBalance.toFixed(2)}</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }]}>
+                        ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
+                      </Text>
                     </View>
 
                     {cashLedger.length === 0 ? (
                       <Text style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>No collections or handovers in this range.</Text>
                     ) : (
-                      cashLedger.map((item: any) => {
+                      [...cashLedger].reverse().map((item: any) => {
                         const isPending = item.status !== 'Accepted';
                         return (
                           <View key={item.id} style={styles.tableRow}>
@@ -1113,23 +1240,21 @@ export default function AdminWalletScreen() {
                             <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#ef4444' }]}>{item.debit}</Text>
                             <Text style={[styles.tableCell, { flex: 1, textAlign: 'right', fontWeight: '500', color: '#22c55e' }]}>{item.credit}</Text>
                             <Text style={[styles.tableCell, { flex: 1.2, textAlign: 'right', fontWeight: '700', color: Colors.light.text }]}>
-                              {isPending ? '-' : item.runningBalance}
+                              {item.runningBalance}
                             </Text>
                           </View>
                         );
                       })
                     )}
 
-                    {/* Closing Balance Row */}
-                    <View style={[styles.tableRow, { backgroundColor: '#f8fafc', borderTopWidth: 2, borderTopColor: '#cbd5e1' }]}>
+                    {/* Opening Balance Row (Shown last on screen: oldest at bottom) */}
+                    <View style={styles.tableRow}>
                       <Text style={[styles.tableCell, { flex: 1.5, fontSize: 13, color: '#64748b' }]}>-</Text>
-                      <Text style={[styles.tableCell, { flex: 2.5, fontSize: 13, fontWeight: '700', color: '#0f172a' }]}>Closing Balance</Text>
+                      <Text style={[styles.tableCell, { flex: 2.5, fontSize: 13, fontWeight: '700', color: '#475569' }]}>Opening Balance</Text>
                       <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#64748b' }]}>-</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
                       <Text style={[styles.tableCell, { flex: 1, fontSize: 13, color: '#64748b', textAlign: 'right' }]}>-</Text>
-                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#16a34a', textAlign: 'right', fontWeight: '800' }]}>
-                        ₹{(cashLedger.length > 0 ? cashLedger[cashLedger.length - 1].runningBalanceVal : cashOpeningBalance).toFixed(2)}
-                      </Text>
+                      <Text style={[styles.tableCell, { flex: 1.2, fontSize: 13, color: '#0f172a', textAlign: 'right', fontWeight: '700' }]}>₹{cashOpeningBalance.toFixed(2)}</Text>
                     </View>
                   </View>
                 )}

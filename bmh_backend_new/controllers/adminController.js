@@ -308,31 +308,56 @@ exports.updateDepartmentAdminProfile = async (req, res) => {
 
 exports.getRevenueStats = async (req, res) => {
   try {
-    // 1. Total Online Revenue
-    const onlineRes = await pool.query("SELECT SUM(ds.fee) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Online'");
-    const totalOnline = onlineRes.rows[0].total || 0;
+    // 1. Bookings Online Revenue
+    const bookingOnlineRes = await pool.query(
+      "SELECT COALESCE(SUM(ds.fee), 0) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Online'"
+    );
+    const bookingOnline = parseFloat(bookingOnlineRes.rows[0].total) || 0;
 
-    // 2. Total Cash Revenue
-    const cashRes = await pool.query("SELECT SUM(ds.fee) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Cash'");
-    const totalCash = cashRes.rows[0].total || 0;
+    // 2. Bookings Cash Revenue
+    const bookingCashRes = await pool.query(
+      "SELECT COALESCE(SUM(ds.fee), 0) as total FROM patient_bookings pb JOIN doctor_slots ds ON pb.slot_id = ds.id WHERE pb.payment_mode = 'Cash'"
+    );
+    const bookingCash = parseFloat(bookingCashRes.rows[0].total) || 0;
 
-    // 3. Employee Wallet Cash Balances (Excluding Admins)
-    const wRes = await pool.query("SELECT SUM(cash_in_hand) as total FROM employee_wallets WHERE employee_id NOT LIKE 'ADMIN-%'");
-    const totalCashInWallets = wRes.rows[0].total || 0;
+    // 3. Order Collections — Cash (payment_mode = 'Cash' or 'cash')
+    const orderCashRes = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as total FROM manual_orders WHERE LOWER(payment_mode) = 'cash' AND status NOT IN ('Cancelled', 'cancelled', 'CANCELLED', 'Returned', 'returned', 'RETURNED', 'Failed', 'failed', 'FAILED')"
+    );
+    const orderCash = parseFloat(orderCashRes.rows[0].total) || 0;
 
-    // 4. Admin Vault Cash (Only Admins)
-    const adminVaultRes = await pool.query("SELECT SUM(cash_in_hand) as total FROM employee_wallets WHERE employee_id LIKE 'ADMIN-%'");
-    const adminVaultAmount = adminVaultRes.rows[0].total || 0;
+    // 4. Order Collections — Online (payment_mode != 'Cash' and not null/empty)
+    const orderOnlineRes = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as total FROM manual_orders WHERE payment_mode IS NOT NULL AND LOWER(payment_mode) NOT IN ('cash', 'credit', '') AND status NOT IN ('Cancelled', 'cancelled', 'CANCELLED', 'Returned', 'returned', 'RETURNED', 'Failed', 'failed', 'FAILED')"
+    );
+    const orderOnline = parseFloat(orderOnlineRes.rows[0].total) || 0;
 
-    // 5. Pending Cash Handovers
-    const pRes = await pool.query("SELECT SUM(amount) as total FROM cash_handovers WHERE status = 'Pending'");
-    const totalPendingHandovers = pRes.rows[0].total || 0;
+    // Combined totals (bookings + orders)
+    const totalOnline = bookingOnline + orderOnline;
+    const totalCash = bookingCash + orderCash;
+
+    // 5. Employee Wallet Cash Balances (Excluding Admins)
+    const wRes = await pool.query("SELECT COALESCE(SUM(cash_in_hand), 0) as total FROM employee_wallets WHERE employee_id NOT LIKE 'ADMIN-%'");
+    const totalCashInWallets = parseFloat(wRes.rows[0].total) || 0;
+
+    // 6. Admin Vault Cash (Only Admins)
+    const adminVaultRes = await pool.query("SELECT COALESCE(SUM(cash_in_hand), 0) as total FROM employee_wallets WHERE employee_id LIKE 'ADMIN-%'");
+    const adminVaultAmount = parseFloat(adminVaultRes.rows[0].total) || 0;
+
+    // 7. Pending Cash Handovers
+    const pRes = await pool.query("SELECT COALESCE(SUM(amount), 0) as total FROM cash_handovers WHERE status = 'Pending'");
+    const totalPendingHandovers = parseFloat(pRes.rows[0].total) || 0;
 
     res.json({
       success: true,
       data: {
         totalOnline,
         totalCash,
+        // Breakdown for display
+        bookingCash,
+        bookingOnline,
+        orderCash,
+        orderOnline,
         totalCashInWallets,
         adminVaultAmount,
         totalPendingHandovers
@@ -343,6 +368,7 @@ exports.getRevenueStats = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error fetching revenue stats' });
   }
 };
+
 
 exports.getAllWalletBalances = async (req, res) => {
   try {

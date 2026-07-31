@@ -75,6 +75,10 @@ export default function AdminDashboard() {
   const [revStats, setRevStats] = useState({
     totalOnline: 0,
     totalCash: 0,
+    bookingCash: 0,
+    bookingOnline: 0,
+    orderCash: 0,
+    orderOnline: 0,
     totalCashInWallets: 0,
     adminVaultAmount: 0,
     totalPendingHandovers: 0
@@ -160,6 +164,10 @@ export default function AdminDashboard() {
           setRevStats({
             totalOnline: revRes.data.data.totalOnline || 0,
             totalCash: revRes.data.data.totalCash || 0,
+            bookingCash: revRes.data.data.bookingCash || 0,
+            bookingOnline: revRes.data.data.bookingOnline || 0,
+            orderCash: revRes.data.data.orderCash || 0,
+            orderOnline: revRes.data.data.orderOnline || 0,
             totalCashInWallets: revRes.data.data.totalCashInWallets || 0,
             adminVaultAmount: revRes.data.data.adminVaultAmount || 0,
             totalPendingHandovers: revRes.data.data.totalPendingHandovers || 0
@@ -251,11 +259,11 @@ export default function AdminDashboard() {
   ];
 
   const FINANCE_STATS = [
-    { label: 'Total Online Revenue', value: `₹${revStats.totalOnline}`, icon: CreditCard, color: Colors.light.primary },
-    { label: 'Total Cash Revenue', value: `₹${revStats.totalCash}`, icon: IndianRupee, color: '#16a34a' },
-    { label: 'Admin Vault Amount', value: `₹${revStats.adminVaultAmount}`, icon: Banknote, color: '#8b5cf6' },
-    { label: 'Cash in Employee Wallets', value: `₹${revStats.totalCashInWallets}`, icon: Banknote, color: '#ca8a04' },
-    { label: 'Pending Cash Handovers', value: `₹${revStats.totalPendingHandovers}`, icon: HandCoins, color: '#ea580c' },
+    { label: 'Total Online Revenue', value: `₹${parseFloat(String(revStats.totalOnline)).toFixed(2)}`, sublabel: `Bookings: ₹${parseFloat(String(revStats.bookingOnline)).toFixed(2)} | Orders: ₹${parseFloat(String(revStats.orderOnline)).toFixed(2)}`, icon: CreditCard, color: Colors.light.primary },
+    { label: 'Total Cash Revenue', value: `₹${parseFloat(String(revStats.totalCash)).toFixed(2)}`, sublabel: `Bookings: ₹${parseFloat(String(revStats.bookingCash)).toFixed(2)} | Orders: ₹${parseFloat(String(revStats.orderCash)).toFixed(2)}`, icon: IndianRupee, color: '#16a34a' },
+    { label: 'Admin Vault Amount', value: `₹${revStats.adminVaultAmount}`, sublabel: '', icon: Banknote, color: '#8b5cf6' },
+    { label: 'Cash in Employee Wallets', value: `₹${revStats.totalCashInWallets}`, sublabel: '', icon: Banknote, color: '#ca8a04' },
+    { label: 'Pending Cash Handovers', value: `₹${revStats.totalPendingHandovers}`, sublabel: '', icon: HandCoins, color: '#ea580c' },
   ];
 
   return (
@@ -308,6 +316,9 @@ export default function AdminDashboard() {
                 </View>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
+                {stat.sublabel ? (
+                  <Text style={{ fontSize: 11, color: stat.color, marginTop: 4, opacity: 0.8 }}>{stat.sublabel}</Text>
+                ) : null}
               </View>
             ))}
           </View>
