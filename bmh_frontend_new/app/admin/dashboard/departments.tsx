@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 
-type Department = { id: string; name: string; description: string; created_at: string; type?: string };
+type Department = { id: string; name: string; description: string; created_at: string; type?: string; required_employees?: number; required_sub_admins?: number; };
 type DeptAdmin = { id: string; full_name: string; email: string; department_id: string; status: string; profile_data: string };
 type Employee = { id: string; full_name: string; email: string; department: string; role: string; status: string; profile_data: string };
 type Doctor = { id: string; full_name: string; email: string; phone_number: string; department: string; status: string; experience: string; gender: string };
@@ -26,6 +26,8 @@ export default function DepartmentsScreen() {
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptDesc, setNewDeptDesc] = useState('');
   const [newDeptType, setNewDeptType] = useState<'employee' | 'consultant'>('employee');
+  const [newDeptReqEmployees, setNewDeptReqEmployees] = useState('0');
+  const [newDeptReqSubAdmins, setNewDeptReqSubAdmins] = useState('0');
   const [adding, setAdding] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'employee' | 'consultant'>('employee');
@@ -37,6 +39,8 @@ export default function DepartmentsScreen() {
   const [editDeptName, setEditDeptName] = useState('');
   const [editDeptDesc, setEditDeptDesc] = useState('');
   const [editDeptType, setEditDeptType] = useState<'employee' | 'consultant'>('employee');
+  const [editDeptReqEmployees, setEditDeptReqEmployees] = useState('0');
+  const [editDeptReqSubAdmins, setEditDeptReqSubAdmins] = useState('0');
   const [updating, setUpdating] = useState(false);
 
   const handleOpenEdit = (dept: Department) => {
@@ -44,6 +48,8 @@ export default function DepartmentsScreen() {
     setEditDeptName(dept.name);
     setEditDeptDesc(dept.description || '');
     setEditDeptType((dept.type || 'employee') as 'employee' | 'consultant');
+    setEditDeptReqEmployees(String(dept.required_employees || 0));
+    setEditDeptReqSubAdmins(String(dept.required_sub_admins || 0));
     setEditModalVisible(true);
   };
 
@@ -58,7 +64,9 @@ export default function DepartmentsScreen() {
       const response = await axios.put(`https://napi.bharatmedicalhallplus.com/department/${editingDept.id}`, {
         name: editDeptName,
         description: editDeptDesc,
-        type: editDeptType
+        type: editDeptType,
+        required_employees: parseInt(editDeptReqEmployees) || 0,
+        required_sub_admins: parseInt(editDeptReqSubAdmins) || 0
       });
       if (response.data.success) {
         setDepartments(departments.map(d => d.id === editingDept.id ? response.data.data : d));
@@ -165,7 +173,9 @@ export default function DepartmentsScreen() {
       const response = await axios.post('https://napi.bharatmedicalhallplus.com/department', {
         name: newDeptName,
         description: newDeptDesc,
-        type: newDeptType
+        type: newDeptType,
+        required_employees: parseInt(newDeptReqEmployees) || 0,
+        required_sub_admins: parseInt(newDeptReqSubAdmins) || 0
       });
       if (response.data.success) {
         setDepartments([...departments, response.data.data]);
@@ -173,6 +183,8 @@ export default function DepartmentsScreen() {
         setNewDeptName('');
         setNewDeptDesc('');
         setNewDeptType('employee');
+        setNewDeptReqEmployees('0');
+        setNewDeptReqSubAdmins('0');
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to add department');
@@ -296,11 +308,26 @@ export default function DepartmentsScreen() {
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.cardDesc}>{item.description || 'No description provided.'}</Text>
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Admins: {deptAdmins.length}</Text>
-                <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Employees: {deptEmployees.length}</Text>
-                {item.type === 'consultant' && (
-                  <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Doctors: {deptDoctors.length}</Text>
-                )}
+                <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>
+                  Admins: {deptAdmins.length} / {item.required_sub_admins || 0}
+                </Text>
+                <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>
+                  {item.type === 'consultant' ? 'Doctors' : 'Employees'}: {item.type === 'consultant' ? deptDoctors.length : deptEmployees.length} / {item.required_employees || 0}
+                </Text>
+                <View style={{
+                  backgroundColor: (Math.max(0, (item.required_employees || 0) - (item.type === 'consultant' ? deptDoctors.length : deptEmployees.length)) + Math.max(0, (item.required_sub_admins || 0) - deptAdmins.length)) > 0 ? '#fee2e2' : '#dcfce7',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 4
+                }}>
+                  <Text style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: (Math.max(0, (item.required_employees || 0) - (item.type === 'consultant' ? deptDoctors.length : deptEmployees.length)) + Math.max(0, (item.required_sub_admins || 0) - deptAdmins.length)) > 0 ? '#dc2626' : '#15803d'
+                  }}>
+                    Vacancies: {Math.max(0, (item.required_employees || 0) - (item.type === 'consultant' ? deptDoctors.length : deptEmployees.length)) + Math.max(0, (item.required_sub_admins || 0) - deptAdmins.length)}
+                  </Text>
+                </View>
                 <View style={{
                   backgroundColor: item.type === 'consultant' ? '#f5f3ff' : '#eff6ff',
                   paddingHorizontal: 8,
@@ -537,37 +564,60 @@ export default function DepartmentsScreen() {
               onChangeText={setNewDeptDesc} 
             />
 
-            <Text style={styles.label}>Department Type</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-              <Pressable
-                style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: newDeptType === 'employee' ? Colors.light.primary : Colors.light.border,
-                  backgroundColor: newDeptType === 'employee' ? 'rgba(37, 99, 235, 0.08)' : 'white',
-                  alignItems: 'center'
-                }}
-                onPress={() => setNewDeptType('employee')}
-              >
-                <Text style={{ color: newDeptType === 'employee' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Employee</Text>
-              </Pressable>
-              <Pressable
-                style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: newDeptType === 'consultant' ? Colors.light.primary : Colors.light.border,
-                  backgroundColor: newDeptType === 'consultant' ? 'rgba(37, 99, 235, 0.08)' : 'white',
-                  alignItems: 'center'
-                }}
-                onPress={() => setNewDeptType('consultant')}
-              >
-                <Text style={{ color: newDeptType === 'consultant' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Consultant (Doctor)</Text>
-              </Pressable>
-            </View>
+             <Text style={styles.label}>Department Type</Text>
+             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+               <Pressable
+                 style={{
+                   flex: 1,
+                   paddingVertical: 12,
+                   borderRadius: 8,
+                   borderWidth: 1,
+                   borderColor: newDeptType === 'employee' ? Colors.light.primary : Colors.light.border,
+                   backgroundColor: newDeptType === 'employee' ? 'rgba(37, 99, 235, 0.08)' : 'white',
+                   alignItems: 'center'
+                 }}
+                 onPress={() => setNewDeptType('employee')}
+               >
+                 <Text style={{ color: newDeptType === 'employee' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Employee</Text>
+               </Pressable>
+               <Pressable
+                 style={{
+                   flex: 1,
+                   paddingVertical: 12,
+                   borderRadius: 8,
+                   borderWidth: 1,
+                   borderColor: newDeptType === 'consultant' ? Colors.light.primary : Colors.light.border,
+                   backgroundColor: newDeptType === 'consultant' ? 'rgba(37, 99, 235, 0.08)' : 'white',
+                   alignItems: 'center'
+                 }}
+                 onPress={() => setNewDeptType('consultant')}
+               >
+                 <Text style={{ color: newDeptType === 'consultant' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Consultant (Doctor)</Text>
+               </Pressable>
+             </View>
+
+             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.label}>{newDeptType === 'consultant' ? 'Doctors Needed' : 'Employees Needed'}</Text>
+                 <TextInput 
+                   style={[styles.input, { marginBottom: 0 }]} 
+                   keyboardType="numeric"
+                   placeholder="e.g. 5" 
+                   value={newDeptReqEmployees} 
+                   onChangeText={setNewDeptReqEmployees} 
+                 />
+               </View>
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.label}>Sub Admins Needed</Text>
+                 <TextInput 
+                   style={[styles.input, { marginBottom: 0 }]} 
+                   keyboardType="numeric"
+                   placeholder="e.g. 1" 
+                   value={newDeptReqSubAdmins} 
+                   onChangeText={setNewDeptReqSubAdmins} 
+                 />
+               </View>
+             </View>
 
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
@@ -604,37 +654,60 @@ export default function DepartmentsScreen() {
               onChangeText={setEditDeptDesc} 
             />
 
-            <Text style={styles.label}>Department Type</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-              <Pressable
-                style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: editDeptType === 'employee' ? Colors.light.primary : Colors.light.border,
-                  backgroundColor: editDeptType === 'employee' ? 'rgba(37, 99, 235, 0.08)' : 'white',
-                  alignItems: 'center'
-                }}
-                onPress={() => setEditDeptType('employee')}
-              >
-                <Text style={{ color: editDeptType === 'employee' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Employee</Text>
-              </Pressable>
-              <Pressable
-                style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: editDeptType === 'consultant' ? Colors.light.primary : Colors.light.border,
-                  backgroundColor: editDeptType === 'consultant' ? 'rgba(37, 99, 235, 0.08)' : 'white',
-                  alignItems: 'center'
-                }}
-                onPress={() => setEditDeptType('consultant')}
-              >
-                <Text style={{ color: editDeptType === 'consultant' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Consultant (Doctor)</Text>
-              </Pressable>
-            </View>
+             <Text style={styles.label}>Department Type</Text>
+             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+               <Pressable
+                 style={{
+                   flex: 1,
+                   paddingVertical: 12,
+                   borderRadius: 8,
+                   borderWidth: 1,
+                   borderColor: editDeptType === 'employee' ? Colors.light.primary : Colors.light.border,
+                   backgroundColor: editDeptType === 'employee' ? 'rgba(37, 99, 235, 0.08)' : 'white',
+                   alignItems: 'center'
+                 }}
+                 onPress={() => setEditDeptType('employee')}
+               >
+                 <Text style={{ color: editDeptType === 'employee' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Employee</Text>
+               </Pressable>
+               <Pressable
+                 style={{
+                   flex: 1,
+                   paddingVertical: 12,
+                   borderRadius: 8,
+                   borderWidth: 1,
+                   borderColor: editDeptType === 'consultant' ? Colors.light.primary : Colors.light.border,
+                   backgroundColor: editDeptType === 'consultant' ? 'rgba(37, 99, 235, 0.08)' : 'white',
+                   alignItems: 'center'
+                 }}
+                 onPress={() => setEditDeptType('consultant')}
+               >
+                 <Text style={{ color: editDeptType === 'consultant' ? Colors.light.primary : Colors.light.text, fontWeight: '700' }}>Consultant (Doctor)</Text>
+               </Pressable>
+             </View>
+
+             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.label}>{editDeptType === 'consultant' ? 'Doctors Needed' : 'Employees Needed'}</Text>
+                 <TextInput 
+                   style={[styles.input, { marginBottom: 0 }]} 
+                   keyboardType="numeric"
+                   placeholder="e.g. 5" 
+                   value={editDeptReqEmployees} 
+                   onChangeText={setEditDeptReqEmployees} 
+                 />
+               </View>
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.label}>Sub Admins Needed</Text>
+                 <TextInput 
+                   style={[styles.input, { marginBottom: 0 }]} 
+                   keyboardType="numeric"
+                   placeholder="e.g. 1" 
+                   value={editDeptReqSubAdmins} 
+                   onChangeText={setEditDeptReqSubAdmins} 
+                 />
+               </View>
+             </View>
 
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelBtn} onPress={() => { setEditModalVisible(false); setEditingDept(null); }}>

@@ -12,7 +12,7 @@ exports.getDepartments = async (req, res) => {
 
 exports.addDepartment = async (req, res) => {
   try {
-    const { name, description, type } = req.body;
+    const { name, description, type, required_employees, required_sub_admins } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, message: 'Department name is required' });
     }
@@ -23,8 +23,8 @@ exports.addDepartment = async (req, res) => {
     }
 
     const insertResult = await pool.query(
-      'INSERT INTO departments (name, description, type) VALUES ($1, $2, $3) RETURNING *',
-      [name, description || '', type || 'employee']
+      'INSERT INTO departments (name, description, type, required_employees, required_sub_admins) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, description || '', type || 'employee', parseInt(required_employees) || 0, parseInt(required_sub_admins) || 0]
     );
 
     res.status(201).json({ success: true, data: insertResult.rows[0] });
@@ -36,7 +36,7 @@ exports.addDepartment = async (req, res) => {
 
 exports.updateDepartment = async (req, res) => {
   const { id } = req.params;
-  const { name, description, type } = req.body;
+  const { name, description, type, required_employees, required_sub_admins } = req.body;
   if (!name) {
     return res.status(400).json({ success: false, message: 'Department name is required' });
   }
@@ -65,8 +65,8 @@ exports.updateDepartment = async (req, res) => {
 
     // Update the department
     const updateResult = await client.query(
-      'UPDATE departments SET name = $1, description = $2, type = $3 WHERE id = $4 RETURNING *',
-      [name, description || '', type || 'employee', id]
+      'UPDATE departments SET name = $1, description = $2, type = $3, required_employees = $4, required_sub_admins = $5 WHERE id = $6 RETURNING *',
+      [name, description || '', type || 'employee', parseInt(required_employees) || 0, parseInt(required_sub_admins) || 0, id]
     );
 
     // If name changed, cascade update to other tables

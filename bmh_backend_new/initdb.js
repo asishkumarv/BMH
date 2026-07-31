@@ -17,6 +17,8 @@ async function initDB() {
         allowed_longitude NUMERIC,
         allowed_radius NUMERIC DEFAULT 2000,
         type VARCHAR(50) DEFAULT 'employee',
+        required_employees INTEGER DEFAULT 0,
+        required_sub_admins INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
