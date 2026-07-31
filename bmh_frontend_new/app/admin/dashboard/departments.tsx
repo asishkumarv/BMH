@@ -8,6 +8,7 @@ import { useResponsive } from '../../../hooks/useResponsive';
 type Department = { id: string; name: string; description: string; created_at: string; type?: string };
 type DeptAdmin = { id: string; full_name: string; email: string; department_id: string; status: string; profile_data: string };
 type Employee = { id: string; full_name: string; email: string; department: string; role: string; status: string; profile_data: string };
+type Doctor = { id: string; full_name: string; email: string; phone_number: string; department: string; status: string; experience: string; gender: string };
 
 export default function DepartmentsScreen() {
   const { isDesktop } = useResponsive();
@@ -15,6 +16,7 @@ export default function DepartmentsScreen() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [admins, setAdmins] = useState<DeptAdmin[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [expandedDeptId, setExpandedDeptId] = useState<string | null>(null);
@@ -77,37 +79,55 @@ export default function DepartmentsScreen() {
 
     const deptAdmins = admins.filter(a => a.department_id === id);
     const deptEmployees = employees.filter(e => e.department === dept.name);
+    const deptDoctors = doctors.filter(d => d.department === dept.name);
 
-    if (deptAdmins.length > 0 || deptEmployees.length > 0) {
-      Alert.alert(
-        'Cannot Delete',
-        `Cannot delete department "${dept.name}". There are still ${deptAdmins.length} sub admins and ${deptEmployees.length} employees assigned to it.`
-      );
+    if (deptAdmins.length > 0 || deptEmployees.length > 0 || deptDoctors.length > 0) {
+      const msg = `Cannot delete department "${dept.name}". There are still ${deptAdmins.length} sub admins, ${deptEmployees.length} employees, and ${deptDoctors.length} doctors assigned to it.`;
+      if (Platform.OS === 'web') {
+        alert(msg);
+      } else {
+        Alert.alert('Cannot Delete', msg);
+      }
       return;
     }
 
-    Alert.alert(
-      'Delete Department',
-      `Are you sure you want to delete department "${dept.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await axios.delete(`https://napi.bharatmedicalhallplus.com/department/${id}`);
-              if (response.data.success) {
-                setDepartments(departments.filter(d => d.id !== id));
-                Alert.alert('Success', 'Department deleted successfully');
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm(`Are you sure you want to delete department "${dept.name}"? This action cannot be undone.`);
+      if (confirmDelete) {
+        try {
+          const response = await axios.delete(`https://napi.bharatmedicalhallplus.com/department/${id}`);
+          if (response.data.success) {
+            setDepartments(departments.filter(d => d.id !== id));
+            alert('Department deleted successfully');
+          }
+        } catch (error: any) {
+          alert(error.response?.data?.message || 'Failed to delete department');
+        }
+      }
+    } else {
+      Alert.alert(
+        'Delete Department',
+        `Are you sure you want to delete department "${dept.name}"? This action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Delete', 
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const response = await axios.delete(`https://napi.bharatmedicalhallplus.com/department/${id}`);
+                if (response.data.success) {
+                  setDepartments(departments.filter(d => d.id !== id));
+                  Alert.alert('Success', 'Department deleted successfully');
+                }
+              } catch (error: any) {
+                Alert.alert('Error', error.response?.data?.message || 'Failed to delete department');
               }
-            } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.message || 'Failed to delete department');
             }
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   useEffect(() => {
@@ -117,14 +137,16 @@ export default function DepartmentsScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [deptRes, adminRes, empRes] = await Promise.all([
+      const [deptRes, adminRes, empRes, docRes] = await Promise.all([
         axios.get('https://napi.bharatmedicalhallplus.com/department'),
         axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
-        axios.get('https://napi.bharatmedicalhallplus.com/employees')
+        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+        axios.get('https://napi.bharatmedicalhallplus.com/doctors').catch(() => null)
       ]);
       if (deptRes.data.success) setDepartments(deptRes.data.data);
       if (adminRes.data.success) setAdmins(adminRes.data.data);
       if (empRes.data.success) setEmployees(empRes.data.data);
+      if (docRes && docRes.data && docRes.data.success) setDoctors(docRes.data.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -256,6 +278,7 @@ export default function DepartmentsScreen() {
   const renderItem = ({ item }: { item: Department }) => {
     const deptAdmins = admins.filter(a => a.department_id === item.id);
     const deptEmployees = employees.filter(e => e.department === item.name);
+    const deptDoctors = doctors.filter(d => d.department === item.name);
     const isExpanded = expandedDeptId === item.id;
     
     return (
@@ -271,9 +294,12 @@ export default function DepartmentsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.cardDesc}>{item.description || 'No description provided.'}</Text>
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Admins: {deptAdmins.length}</Text>
                 <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Employees: {deptEmployees.length}</Text>
+                {item.type === 'consultant' && (
+                  <Text style={{ fontSize: 13, color: Colors.light.primary, fontWeight: '600' }}>Doctors: {deptDoctors.length}</Text>
+                )}
                 <View style={{
                   backgroundColor: item.type === 'consultant' ? '#f5f3ff' : '#eff6ff',
                   paddingHorizontal: 8,
@@ -355,6 +381,35 @@ export default function DepartmentsScreen() {
                   </View>
                 </View>
               ))
+            )}
+
+            {item.type === 'consultant' && (
+              <>
+                <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Doctors ({deptDoctors.length})</Text>
+                {deptDoctors.length === 0 ? (
+                  <Text style={styles.emptyText}>No doctors registered yet.</Text>
+                ) : (
+                  deptDoctors.map(doc => (
+                    <View key={doc.id} style={styles.adminRow}>
+                      <View style={[styles.adminAvatar, { backgroundColor: '#8B5CF6' }]}>
+                        <Text style={styles.adminInitials}>{doc.full_name.charAt(0)}</Text>
+                      </View>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={styles.adminName} numberOfLines={1}>{doc.full_name}</Text>
+                        <Text style={styles.adminEmail} numberOfLines={1}>{doc.email} • {doc.experience} Yrs Exp • {doc.gender}</Text>
+                      </View>
+                      <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                        <Pressable onPress={() => setSelectedUser({ data: { ...doc, role: 'Doctor', profile_data: JSON.stringify({ mobile: doc.phone_number, bloodGroup: '-', aadhaar: '-', pan: '-', esi: '-', manager: '-', salary: '-', empType: '-', shiftIn: '-', shiftOut: '-' }) }, type: 'employee' })}>
+                          <Text style={{ color: Colors.light.primary, fontSize: 13, fontWeight: '700' }}>Details</Text>
+                        </Pressable>
+                        <View style={[styles.statusBadge, doc.status === 'Approved' ? styles.statusApproved : {backgroundColor: '#FEF3C7'}]}>
+                          <Text style={[styles.statusText, doc.status === 'Approved' ? styles.textApproved : {color: '#D97706'}]}>{doc.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </>
             )}
 
             <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end', borderTopWidth: 1, borderTopColor: Colors.light.border, paddingTop: 16, marginTop: 16 }}>

@@ -112,14 +112,18 @@ exports.deleteDepartment = async (req, res) => {
     const employeeCheck = await pool.query('SELECT count(*) FROM employees WHERE department = $1', [deptName]);
     const employeeCount = parseInt(employeeCheck.rows[0].count, 10);
 
-    if (adminCount > 0 || employeeCount > 0) {
+    // 4. Check if doctors exist
+    const doctorCheck = await pool.query('SELECT count(*) FROM doctors WHERE department = $1', [deptName]);
+    const doctorCount = parseInt(doctorCheck.rows[0].count, 10);
+
+    if (adminCount > 0 || employeeCount > 0 || doctorCount > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete department. There are still ${adminCount} sub admins and ${employeeCount} employees assigned to it.`
+        message: `Cannot delete department. There are still ${adminCount} sub admins, ${employeeCount} employees, and ${doctorCount} doctors assigned to it.`
       });
     }
 
-    // 4. Delete the department
+    // 5. Delete the department
     await pool.query('DELETE FROM departments WHERE id = $1', [id]);
 
     res.json({ success: true, message: 'Department deleted successfully' });

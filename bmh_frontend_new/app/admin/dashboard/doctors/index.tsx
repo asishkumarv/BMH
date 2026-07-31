@@ -661,7 +661,7 @@ const fetchData = async () => {
                   style={styles.picker}
                 >
                   <Picker.Item label="Select Department" value="" />
-                  {departments.map((d, i) => (
+                  {departments.filter(d => d.type === 'consultant').map((d, i) => (
                     <Picker.Item key={i} label={d.name} value={d.name} />
                   ))}
                 </Picker>
