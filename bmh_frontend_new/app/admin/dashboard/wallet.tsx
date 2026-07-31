@@ -855,29 +855,26 @@ export default function AdminWalletScreen() {
               <View style={[styles.iconBox, { backgroundColor: '#16a34a1A' }]}>
                 <IndianRupee size={24} color="#16a34a" />
               </View>
-              <Text style={{ fontSize: 16, color: '#15803d', fontWeight: '600', marginTop: 12 }}>Cash Revenue</Text>
+              <Text style={{ fontSize: 16, color: '#15803d', fontWeight: '600', marginTop: 12 }}> Bookings Cash Revenue</Text>
               <Text style={{ fontSize: 32, fontWeight: '800', color: '#14532d' }}>₹{parseFloat(String(stats.totalCash || 0)).toFixed(2)}</Text>
-              <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 4 }}>Bookings: ₹{parseFloat(String(stats.bookingCash || 0)).toFixed(2)} | Orders: ₹{parseFloat(String(stats.orderCash || 0)).toFixed(2)}</Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
               <View style={[styles.iconBox, { backgroundColor: '#3B82F61A' }]}>
                 <CreditCard size={24} color="#3B82F6" />
               </View>
-              <Text style={{ fontSize: 16, color: '#2563EB', fontWeight: '600', marginTop: 12 }}>Online Revenue</Text>
+              <Text style={{ fontSize: 16, color: '#2563EB', fontWeight: '600', marginTop: 12 }}> Bookings Online Revenue</Text>
               <Text style={{ fontSize: 32, fontWeight: '800', color: '#1E3A8A' }}>₹{parseFloat(String(stats.totalOnline || 0)).toFixed(2)}</Text>
-              <Text style={{ fontSize: 11, color: '#3B82F6', marginTop: 4 }}>Bookings: ₹{parseFloat(String(stats.bookingOnline || 0)).toFixed(2)} | Orders: ₹{parseFloat(String(stats.orderOnline || 0)).toFixed(2)}</Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: '#FDF4FF', borderColor: '#FAE8FF' }]}>
               <View style={[styles.iconBox, { backgroundColor: '#D946EF1A' }]}>
                 <TrendingUp size={24} color="#D946EF" />
               </View>
-              <Text style={{ fontSize: 16, color: '#C026D3', fontWeight: '600', marginTop: 12 }}>Total Revenue</Text>
+              <Text style={{ fontSize: 16, color: '#C026D3', fontWeight: '600', marginTop: 12 }}>Bookings Total Revenue</Text>
               <Text style={{ fontSize: 32, fontWeight: '800', color: '#701A75' }}>
                 ₹{(parseFloat(String(stats.totalCash || 0)) + parseFloat(String(stats.totalOnline || 0))).toFixed(2)}
               </Text>
-              <Text style={{ fontSize: 11, color: '#C026D3', marginTop: 4 }}>Cash: ₹{parseFloat(String(stats.totalCash || 0)).toFixed(2)} | Online: ₹{parseFloat(String(stats.totalOnline || 0)).toFixed(2)}</Text>
             </View>
           </View>
 

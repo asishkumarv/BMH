@@ -381,11 +381,12 @@ exports.getRevenueStats = async (req, res) => {
           AND COALESCE(online_amount, 0) > 0
       ) pod_online
     `);
-    const orderOnline = parseFloat(orderOnlineRes.rows[0].total) || 0;
+    const orderOnline = 0;
+    const orderCash = 0;
 
-    // Combined totals (bookings + delivered POD orders)
-    const totalOnline = bookingOnline + orderOnline;
-    const totalCash = bookingCash + orderCash;
+    // Combined totals (bookings only)
+    const totalOnline = bookingOnline;
+    const totalCash = bookingCash;
 
     // 5. Employee Wallet Cash Balances (Excluding Admins)
     const wRes = await pool.query("SELECT COALESCE(SUM(cash_in_hand), 0) as total FROM employee_wallets WHERE employee_id NOT LIKE 'ADMIN-%'");
