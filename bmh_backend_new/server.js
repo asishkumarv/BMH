@@ -249,6 +249,7 @@ app.listen(PORT, () => {
   pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_type VARCHAR(50)').catch(e => console.error(e.message));
   pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(255)').catch(e => console.error(e.message));
   pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS approved_by_dept VARCHAR(255)').catch(e => console.error(e.message));
+  pool.query('ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS rejection_reason TEXT').catch(e => console.error(e.message));
 
   // ecogreensales_orders modifications
   pool.query('ALTER TABLE ecogreensales_orders ALTER COLUMN pharmacy TYPE TEXT').catch(e => console.error(e.message));

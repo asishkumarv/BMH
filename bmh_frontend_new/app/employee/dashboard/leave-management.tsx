@@ -866,6 +866,11 @@ export default function LeaveManagement() {
                 <Text style={styles.reqReason}>
                   {typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}
                 </Text>
+                {req.status === 'rejected' && req.rejection_reason && (
+                  <Text style={{ fontSize: 14, color: Colors.light.error, fontWeight: '600', marginTop: 8 }}>
+                    Reason for Rejection: {req.rejection_reason}
+                  </Text>
+                )}
               </View>
             ))
           )}

@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { API_URL } from '../../../config';
 import { useResponsive } from '../../../hooks/useResponsive';
+import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 
 const formatDateToDDMMYYYY = (dateStr: string) => {
   if (!dateStr) return '';
@@ -49,6 +51,38 @@ export default function LeaveManagement() {
   const [empRequests, setEmpRequests] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'apply' | 'approvals'>('apply');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Filters State
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  // Action Popup State
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const formatDateTimeToDDMMYYYY = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${day}-${month}-${year} ${hours}:${minutes}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
 
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
@@ -114,6 +148,12 @@ export default function LeaveManagement() {
         setEmpRequests(data.filter((r: any) => r.user_type === 'employee' || r.user_type === 'delivery_boy'));
       }
       
+      // Fetch dropdown users
+      fetchDropdownData(emp.department);
+      if (emp.department) {
+        setFilterDepartment(emp.department);
+      }
+
       const analyticsRes = await fetch(`${API_URL}/attendance/employee-analytics?employeeId=${emp.id}&userType=sub_admin`);
       if (analyticsRes.ok) {
         const aData = await analyticsRes.json();
@@ -123,6 +163,46 @@ export default function LeaveManagement() {
       console.error('Error fetching leave requests:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDropdownData = async (deptName: string) => {
+    try {
+      const [deptRes, empRes, adminRes] = await Promise.all([
+        axios.get(`https://napi.bharatmedicalhallplus.com/department`),
+        axios.get(`${API_URL}/employees`),
+        axios.get(`${API_URL}/admin/department-admins`).catch(() => ({ data: { data: [] } }))
+      ]);
+      
+      let allUser: any[] = [];
+      if (empRes.data && empRes.data.success) {
+        const emps = (empRes.data.data || []).map((e: any) => ({
+          ...e,
+          user_type: (e.role === 'Delivery Boy' || e.department === 'Delivery') ? 'delivery_boy' : 'employee'
+        }));
+        allUser = [...allUser, ...emps];
+      }
+      if (adminRes.data && adminRes.data.data) {
+        const admins = (adminRes.data.data || []).map((a: any) => {
+          let name = 'Dept';
+          if (deptRes.data && deptRes.data.success) {
+            const match = deptRes.data.data.find((d: any) => d.id === a.department_id);
+            if (match) name = match.name;
+          }
+          return {
+            ...a,
+            department: name,
+            role: 'Sub Admin',
+            user_type: 'sub_admin'
+          };
+        });
+        allUser = [...allUser, ...admins];
+      }
+      // Filter users to only those in this sub admin's department
+      const deptFilteredUsers = allUser.filter(u => u.department === deptName);
+      setEmployees(deptFilteredUsers);
+    } catch (error) {
+      console.error("Dropdown fetch error:", error);
     }
   };
 
@@ -347,9 +427,28 @@ export default function LeaveManagement() {
     }
   };
 
-  const updateStatus = async (id: number, status: string) => {
+  const openActionPopup = (req: any, type: 'approve' | 'reject') => {
+    setSelectedRequest(req);
+    setActionType(type);
+    setRejectionReason('');
+    setActionModalVisible(true);
+  };
+
+  const handleActionSubmit = async () => {
+    if (!selectedRequest) return;
+    
+    if (actionType === 'reject' && !rejectionReason.trim()) {
+      Alert.alert('Error', 'Please provide a reason for rejection');
+      if (Platform.OS === 'web') window.alert('Please provide a reason for rejection');
+      return;
+    }
+    
+    setLoading(true);
+    setActionModalVisible(false);
+    
     try {
-      const res = await fetch(`${API_URL}/leave/request/${id}/status`, {
+      const status = actionType === 'approve' ? 'approved' : 'rejected';
+      const res = await fetch(`${API_URL}/leave/request/${selectedRequest.id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -357,19 +456,24 @@ export default function LeaveManagement() {
           approved_by_id: employee?.id,
           approved_by_type: 'sub_admin',
           approved_by_name: employee?.full_name,
-          approved_by_dept: employee?.department || 'Management'
+          approved_by_dept: employee?.department || 'Management',
+          rejection_reason: actionType === 'reject' ? rejectionReason : null
         })
       });
       if (res.ok) {
         Alert.alert('Success', `Leave request ${status}`);
+        if (Platform.OS === 'web') window.alert(`Leave request processed successfully!`);
         fetchEmployeeAndRequests();
       } else {
         const data = await res.json();
         Alert.alert('Error', data.message || 'Failed to update status');
+        if (Platform.OS === 'web') window.alert(data.message || 'Failed to update status');
       }
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -559,7 +663,7 @@ export default function LeaveManagement() {
         </View>
       </Modal>
 
-      {summary && (
+      {summary && activeTab === 'apply' && (
         <View style={[styles.summaryRow, !isDesktop && { flexDirection: 'column' }]}>
           <Pressable style={styles.summaryCard} onPress={() => setSelectedStatsCard('leaves')}>
              <Text style={styles.summaryVal}>{summary.usage.leaves} <Text style={styles.summaryLimit}>/ {summary.limits.leaves}</Text></Text>
@@ -912,6 +1016,11 @@ export default function LeaveManagement() {
                 <Text style={styles.reqReason}>
                   {typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}
                 </Text>
+                {req.status === 'rejected' && req.rejection_reason && (
+                  <Text style={{ fontSize: 14, color: Colors.light.error, fontWeight: '600', marginTop: 8 }}>
+                    Reason for Rejection: {req.rejection_reason}
+                  </Text>
+                )}
               </View>
             ))
           )}
@@ -919,69 +1028,319 @@ export default function LeaveManagement() {
       </View>
       )}
 
-      {activeTab === 'approvals' && (
-        <View>
-          {empRequests.length === 0 ? (
-            <View style={styles.emptyState}>
-              <CalendarDays size={48} color={Colors.light.border} />
-              <Text style={styles.emptyStateText}>No pending employee leave requests.</Text>
-            </View>
-          ) : null}
-          <View style={[styles.grid, !isDesktop && { flexDirection: 'column' }]}>
-            {empRequests.map(req => (
-              <View key={req.id} style={[styles.empCard, !isDesktop ? { width: '100%' } : { width: '48%' }]}>
-                <View style={styles.reqHeader}>
-                  <View>
-                    <Text style={styles.reqName}>{req.full_name}</Text>
-                    <Text style={styles.reqRole}>{req.role}</Text>
-                  </View>
-                  <View style={[styles.statusBadge, req.status === 'approved' ? styles.statusApproved : req.status === 'rejected' ? styles.statusRejected : styles.statusPending]}>
-                    <Text style={styles.statusText}>{req.status.toUpperCase()}</Text>
-                  </View>
-                </View>
-                <View style={styles.dateRow}>
-                  <CalendarDays size={16} color={Colors.light.icon} style={{ marginRight: 8 }} />
-                  <Text style={styles.reqDates}>
-                    {formatDateToDDMMYYYY(req.start_date)} {req.is_half_day ? `(Half Day - ${req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'})` : (req.request_type && req.request_type !== 'leave' ? '' : `- ${formatDateToDDMMYYYY(req.end_date)}`)}
-                  </Text>
-                  <View style={{
-                    backgroundColor: req.request_type === 'late_checkin' ? '#e0e7ff' : req.request_type === 'early_checkout' ? '#f5f3ff' : '#f1f5f9',
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    borderRadius: 4,
-                    marginLeft: 8
-                  }}>
-                    <Text style={{
-                      fontSize: 10,
-                      fontWeight: '700',
-                      color: req.request_type === 'late_checkin' ? '#4338ca' : req.request_type === 'early_checkout' ? '#6d28d9' : '#475569',
-                      textTransform: 'uppercase'
-                    }}>
-                      {req.request_type === 'late_checkin' ? 'Late Check-in' : req.request_type === 'early_checkout' ? 'Early Checkout' : 'Leave'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.reqReason}>
-                  "{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"
+      {/* Approve / Reject Confirmation Modal */}
+      <Modal visible={actionModalVisible} transparent animationType="fade" onRequestClose={() => setActionModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Confirm Leave {actionType === 'approve' ? 'Approval' : 'Rejection'}
+            </Text>
+            
+            <View style={{ marginVertical: 16, gap: 10 }}>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Employee: <Text style={{ fontWeight: '700' }}>{selectedRequest?.full_name}</Text>
+              </Text>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Dept / Role: <Text style={{ fontWeight: '700' }}>{selectedRequest?.department} • {selectedRequest?.role}</Text>
+              </Text>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Leave Type: <Text style={{ fontWeight: '700' }}>
+                  {selectedRequest?.request_type === 'late_checkin' ? 'Late Check-in' : selectedRequest?.request_type === 'early_checkout' ? 'Early Checkout' : (selectedRequest?.is_half_day ? 'Half Day' : 'Full Day')}
                 </Text>
+              </Text>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Dates: <Text style={{ fontWeight: '700' }}>
+                  {selectedRequest && formatDateToDDMMYYYY(selectedRequest.start_date)} {selectedRequest && selectedRequest.end_date !== selectedRequest.start_date && `to ${formatDateToDDMMYYYY(selectedRequest.end_date)}`}
+                </Text>
+              </Text>
+              <Text style={{ fontSize: 15, color: '#334155', fontWeight: '500' }}>
+                Reason: <Text style={{ fontWeight: '600', fontStyle: 'italic' }}>"{typeof selectedRequest?.reason === 'object' ? (selectedRequest?.reason?.text || JSON.stringify(selectedRequest?.reason)) : selectedRequest?.reason}"</Text>
+              </Text>
+              
+              {actionType === 'reject' && (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.light.text }}>Rejection Reason (visible to employee)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Provide reason for rejection..."
+                    value={rejectionReason}
+                    onChangeText={setRejectionReason}
+                    multiline
+                  />
+                </View>
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Pressable 
+                style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#f1f5f9' }} 
+                onPress={() => setActionModalVisible(false)}
+              >
+                <Text style={{ color: '#475569', fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: actionType === 'approve' ? '#10B981' : '#EF4444' }} 
+                onPress={handleActionSubmit}
+              >
+                <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>
+                  Confirm {actionType === 'approve' ? 'Approve' : 'Reject'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {activeTab === 'approvals' && (() => {
+        const filteredRequests = empRequests.filter(req => {
+          if (selectedEmployeeId) {
+            const [uType, empIdStr] = selectedEmployeeId.split('-');
+            const empId = parseInt(empIdStr);
+            if (req.employee_id !== empId || req.user_type !== uType) {
+              return false;
+            }
+          }
+
+          if (filterDepartment && filterDepartment !== 'All') {
+            if (req.department !== filterDepartment) {
+              return false;
+            }
+          }
+
+          const reqStart = req.start_date ? req.start_date.split('T')[0] : '';
+          const reqEnd = req.end_date ? req.end_date.split('T')[0] : reqStart;
+
+          if (filterFromDate && reqEnd < filterFromDate) {
+            return false;
+          }
+          if (filterToDate && reqStart > filterToDate) {
+            return false;
+          }
+
+          return true;
+        });
+
+        const pendingCount = empRequests.filter(r => r.status === 'pending').length;
+        const filteredEmployeesForDropdown = employees.filter(emp => {
+          const term = employeeSearchQuery.toLowerCase();
+          const nameMatch = emp.full_name ? emp.full_name.toLowerCase().includes(term) : false;
+          const emailMatch = emp.email ? emp.email.toLowerCase().includes(term) : false;
+          const phoneMatch = emp.mobile ? emp.mobile.includes(term) : (emp.phone ? emp.phone.includes(term) : false);
+          return nameMatch || emailMatch || phoneMatch;
+        });
+
+        return (
+          <View>
+            {/* Filters on Top */}
+            <View style={{ backgroundColor: '#FFF', padding: 20, borderRadius: 16, borderColor: Colors.light.border, borderWidth: 1, marginBottom: 20, gap: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                 
-                {req.status === 'pending' && (
-                  <View style={styles.actionRow}>
-                    <Pressable style={[styles.actionBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => updateStatus(req.id, 'approved')}>
-                      <CheckCircle2 size={16} color="white" style={{ marginRight: 6 }} />
-                      <Text style={styles.actionBtnText}>Approve</Text>
-                    </Pressable>
-                    <Pressable style={[styles.actionBtn, { backgroundColor: '#EF4444', flex: 1 }]} onPress={() => updateStatus(req.id, 'rejected')}>
-                      <XCircle size={16} color="white" style={{ marginRight: 6 }} />
-                      <Text style={styles.actionBtnText}>Reject</Text>
-                    </Pressable>
+                {/* Searchable Dropdown */}
+                <View style={{ flex: 1.5, minWidth: 250, gap: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text }}>Filter by Employee / Sub Admin</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TextInput
+                      style={[styles.filterInput, { flex: 1 }]}
+                      placeholder="Search name, email, phone..."
+                      value={employeeSearchQuery}
+                      onChangeText={setEmployeeSearchQuery}
+                    />
+                    {Platform.OS === 'web' ? (
+                      <select
+                        value={selectedEmployeeId}
+                        onChange={(e: any) => setSelectedEmployeeId(e.target.value)}
+                        style={styles.webSelectStyle}
+                      >
+                        <option value="">All Employees / Sub Admins</option>
+                        {filteredEmployeesForDropdown.map(emp => (
+                          <option key={`${emp.user_type}-${emp.id}`} value={`${emp.user_type}-${emp.id}`}>
+                            {emp.full_name} ({emp.department} - {emp.role || 'Sub Admin'})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, flex: 1, height: 42, justifyContent: 'center' }}>
+                        <Picker
+                          selectedValue={selectedEmployeeId}
+                          onValueChange={(val: any) => setSelectedEmployeeId(val)}
+                          style={{ width: '100%', height: '100%' }}
+                        >
+                          <Picker.Item label="All" value="" />
+                          {filteredEmployeesForDropdown.map(emp => (
+                            <Picker.Item key={`${emp.user_type}-${emp.id}`} label={`${emp.full_name} (${emp.role})`} value={`${emp.user_type}-${emp.id}`} />
+                          ))}
+                        </Picker>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Department Filter (Prefilled & Readonly for Sub-admin) */}
+                <View style={{ flex: 1, minWidth: 150, gap: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text }}>Department</Text>
+                  <TextInput
+                    style={[styles.filterInput, { height: 42, backgroundColor: '#f1f5f9' }]}
+                    value={employee?.department || 'My Department'}
+                    editable={false}
+                  />
+                </View>
+
+                {/* From Date to To Date */}
+                <View style={{ flex: 1.5, minWidth: 250, gap: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text }}>Date Range</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          type="date"
+                          value={filterFromDate}
+                          onChange={(e: any) => setFilterFromDate(e.target.value)}
+                          style={{ ...styles.filterInput, height: 42, paddingHorizontal: 8, boxSizing: 'border-box', width: '100%' } as any}
+                        />
+                      ) : (
+                        <>
+                          <Pressable onPress={() => setShowFromPicker(true)}>
+                            <View pointerEvents="none">
+                              <TextInput style={[styles.filterInput, { height: 42 }]} value={filterFromDate} placeholder="From Date" editable={false} />
+                            </View>
+                          </Pressable>
+                          {showFromPicker && (
+                            <DateTimePicker
+                              value={filterFromDate ? new Date(filterFromDate) : new Date()}
+                              mode="date"
+                              display="default"
+                              onChange={(event: any, selectedDate?: Date) => {
+                                setShowFromPicker(false);
+                                if (selectedDate) setFilterFromDate(selectedDate.toISOString().split('T')[0]);
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </View>
+                    <Text style={{ color: Colors.light.icon }}>to</Text>
+                    <View style={{ flex: 1 }}>
+                      {Platform.OS === 'web' ? (
+                        <input
+                          type="date"
+                          value={filterToDate}
+                          onChange={(e: any) => setFilterToDate(e.target.value)}
+                          style={{ ...styles.filterInput, height: 42, paddingHorizontal: 8, boxSizing: 'border-box', width: '100%' } as any}
+                        />
+                      ) : (
+                        <>
+                          <Pressable onPress={() => setShowToPicker(true)}>
+                            <View pointerEvents="none">
+                              <TextInput style={[styles.filterInput, { height: 42 }]} value={filterToDate} placeholder="To Date" editable={false} />
+                            </View>
+                          </Pressable>
+                          {showToPicker && (
+                            <DateTimePicker
+                              value={filterToDate ? new Date(filterToDate) : new Date()}
+                              mode="date"
+                              display="default"
+                              onChange={(event: any, selectedDate?: Date) => {
+                                setShowToPicker(false);
+                                if (selectedDate) setFilterToDate(selectedDate.toISOString().split('T')[0]);
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+              </View>
+            </View>
+
+            {/* Total Pending Count Badge */}
+            <View style={styles.pendingBadgeContainer}>
+              <Clock size={18} color="#D97706" style={{ marginRight: 8 }} />
+              <Text style={styles.pendingBadgeText}>Total Pending Requests: {pendingCount}</Text>
+            </View>
+
+            {/* Table layout with horizontal scrolling */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <View style={[styles.table, { minWidth: 1300 }]}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>S.No.</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.0 }]}>Name</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>Applied Date & Time</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>From Date to Date</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.5, textAlign: 'center' }]}>Taken / Permitted</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Leave Type</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Overlap Applied</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Overlap Approved</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.2, textAlign: 'center' }]}>Action</Text>
+                </View>
+                {filteredRequests.map((req, idx) => (
+                  <View key={req.id} style={styles.tableRow}>
+                    <Text style={[styles.tableRowCell, { flex: 0.5 }]}>{idx + 1}</Text>
+                    <View style={{ flex: 2.0 }}>
+                      <Text style={styles.cellTextBold}>{req.full_name}</Text>
+                      <Text style={styles.cellTextSmall}>{req.role} • {req.department}</Text>
+                    </View>
+                    <Text style={[styles.tableRowCell, { flex: 1.8 }]}>{formatDateTimeToDDMMYYYY(req.created_at)}</Text>
+                    <View style={{ flex: 2.2 }}>
+                      <Text style={styles.cellTextBold}>
+                        {formatDateToDDMMYYYY(req.start_date)} {req.is_half_day ? `(Half Day)` : (req.request_type && req.request_type !== 'leave' ? '' : `to ${formatDateToDDMMYYYY(req.end_date)}`)}
+                      </Text>
+                      {req.reason ? <Text style={[styles.cellTextSmall, { fontStyle: 'italic' }]}>"{typeof req.reason === 'object' ? (req.reason?.text || JSON.stringify(req.reason)) : req.reason}"</Text> : null}
+                    </View>
+                    <Text style={[styles.tableRowCell, { flex: 1.5, textAlign: 'center', fontWeight: '600' }]}>
+                      {req.taken_leaves} / {req.permitted_leaves}
+                    </Text>
+                    <View style={{ flex: 1.5 }}>
+                      <Text style={styles.cellText}>
+                        {req.request_type === 'late_checkin' ? 'Late Check-in' : req.request_type === 'early_checkout' ? 'Early Checkout' : (req.is_half_day ? 'Half Day' : 'Full Day')}
+                      </Text>
+                      {req.is_half_day && <Text style={styles.cellTextSmall}>{req.half_day_session === 'first_half' ? 'First Half' : 'Second Half'}</Text>}
+                    </View>
+                    <Text style={[styles.tableRowCell, { flex: 1.2, textAlign: 'center' }]}>{req.applied_overlap_count ?? 0}</Text>
+                    <Text style={[styles.tableRowCell, { flex: 1.2, textAlign: 'center' }]}>{req.approved_overlap_count ?? 0}</Text>
+                    <View style={{ flex: 1.2, alignItems: 'center' }}>
+                      <View style={[styles.statusCellBadge, req.status === 'approved' ? styles.statusApproved : req.status === 'rejected' ? styles.statusRejected : styles.statusPending]}>
+                        <Text style={styles.statusCellText}>{req.status.toUpperCase()}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flex: 2.2, justifyContent: 'center' }}>
+                      {req.status === 'pending' ? (
+                        <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
+                          <Pressable style={[styles.tableActionBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => openActionPopup(req, 'approve')}>
+                            <Text style={styles.tableActionBtnText}>Approve</Text>
+                          </Pressable>
+                          <Pressable style={[styles.tableActionBtn, { backgroundColor: '#EF4444', flex: 1 }]} onPress={() => openActionPopup(req, 'reject')}>
+                            <Text style={styles.tableActionBtnText}>Reject</Text>
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 11, color: Colors.light.icon }}>
+                            {req.status === 'approved' ? 'Approved' : 'Rejected'} by {req.approved_by_name || 'Admin'}
+                          </Text>
+                          {req.status === 'rejected' && req.rejection_reason && (
+                            <Text style={{ fontSize: 11, color: '#EF4444', fontStyle: 'italic', marginTop: 2, textAlign: 'center' }} numberOfLines={1}>
+                              "{req.rejection_reason}"
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+                {filteredRequests.length === 0 && (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <CalendarDays size={48} color={Colors.light.border} />
+                    <Text style={{ color: Colors.light.icon, marginTop: 12, fontSize: 15, fontWeight: '500' }}>No leave requests match the filters.</Text>
                   </View>
                 )}
               </View>
-            ))}
+            </ScrollView>
           </View>
-        </View>
-      )}
+        );
+      })()}
     </ScrollView>
   );
 }
@@ -1041,4 +1400,21 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: 'white', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 5 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.light.text, marginBottom: 12 },
+  table: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border, overflow: 'hidden', marginTop: 16 },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tableHeaderCell: { color: Colors.light.text, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tableRow: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border, alignItems: 'center', backgroundColor: '#FFF' },
+  tableRowCell: { color: Colors.light.text, fontSize: 14 },
+  cellText: { color: Colors.light.text, fontSize: 14 },
+  cellTextBold: { color: Colors.light.text, fontSize: 14, fontWeight: '700' },
+  cellTextSmall: { color: Colors.light.icon, fontSize: 12, marginTop: 2 },
+  statusCellBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100, alignItems: 'center', justifyContent: 'center', width: 90 },
+  statusCellText: { fontSize: 11, fontWeight: '800' },
+  tableActionBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  tableActionBtnText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
+  filterInput: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, backgroundColor: '#FFF', color: Colors.light.text },
+  webSelectStyle: { padding: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.light.border, fontSize: 14, height: 42, backgroundColor: '#FFF', color: Colors.light.text, minWidth: 200 } as any,
+  pendingBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9E6', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: '#FFE499', alignSelf: 'flex-start', marginBottom: 16 },
+  pendingBadgeText: { color: '#B25E00', fontWeight: '700', fontSize: 14 },
+  modalInput: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, padding: 12, fontSize: 14, backgroundColor: '#FFF', color: Colors.light.text, height: 80, textAlignVertical: 'top', marginTop: 8 }
 });

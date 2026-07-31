@@ -239,7 +239,23 @@ exports.getRequests = async (req, res) => {
     const { employee_id, user_type, department, month } = req.query; // If employee_id is passed, get for that employee. If department, for department.
     
     let query = `
-      SELECT lr.*, u.full_name, u.department, u.role
+      SELECT lr.*, u.full_name, u.department, u.role,
+             (
+               SELECT COUNT(DISTINCT lr_inner.employee_id)
+               FROM leave_requests lr_inner
+               WHERE lr_inner.request_type = 'leave'
+                 AND lr_inner.status IN ('pending', 'approved')
+                 AND lr_inner.start_date <= lr.end_date 
+                 AND lr_inner.end_date >= lr.start_date
+             ) as applied_overlap_count,
+             (
+               SELECT COUNT(DISTINCT lr_inner.employee_id)
+               FROM leave_requests lr_inner
+               WHERE lr_inner.request_type = 'leave'
+                 AND lr_inner.status = 'approved'
+                 AND lr_inner.start_date <= lr.end_date 
+                 AND lr_inner.end_date >= lr.start_date
+             ) as approved_overlap_count
       FROM leave_requests lr
       JOIN (
         SELECT id, full_name, department, role, 
@@ -283,7 +299,45 @@ exports.getRequests = async (req, res) => {
 
     query += ' ORDER BY lr.created_at DESC';
     const result = await pool.query(query, values);
-    res.status(200).json(result.rows);
+    const requests = result.rows;
+
+    // Attach leave summaries dynamically
+    const cache = {};
+    for (let reqRow of requests) {
+      const empId = reqRow.employee_id;
+      const uType = reqRow.user_type;
+      
+      // Determine the month for the request's start_date
+      let monthStr = null;
+      if (reqRow.start_date) {
+        try {
+          const d = new Date(reqRow.start_date);
+          if (!isNaN(d.getTime())) {
+            monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          }
+        } catch (e) {}
+      }
+      
+      if (empId && uType && monthStr) {
+        const cacheKey = `${empId}-${uType}-${monthStr}`;
+        if (!cache[cacheKey]) {
+          try {
+            cache[cacheKey] = await computeEmployeeLeaveSummaryInternal(empId, uType, monthStr);
+          } catch (e) {
+            console.error(`Error computing summary for ${cacheKey}:`, e);
+            cache[cacheKey] = { limits: { leaves: 0 }, usage: { leaves: 0 } };
+          }
+        }
+        
+        reqRow.taken_leaves = cache[cacheKey].usage?.leaves ?? 0;
+        reqRow.permitted_leaves = cache[cacheKey].limits?.leaves ?? 0;
+      } else {
+        reqRow.taken_leaves = 0;
+        reqRow.permitted_leaves = 0;
+      }
+    }
+
+    res.status(200).json(requests);
   } catch (error) {
     console.error('Error fetching leave requests:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -294,7 +348,7 @@ exports.getRequests = async (req, res) => {
 exports.updateRequestStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, approved_by_id, approved_by_type, approved_by_name, approved_by_dept } = req.body;
+    const { status, approved_by_id, approved_by_type, approved_by_name, approved_by_dept, rejection_reason } = req.body;
     const query = `
       UPDATE leave_requests SET 
         status = $1, 
@@ -302,10 +356,11 @@ exports.updateRequestStatus = async (req, res) => {
         approved_by_type = $3, 
         approved_by_name = $4, 
         approved_by_dept = $5, 
+        rejection_reason = $6,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $6 RETURNING *;
+      WHERE id = $7 RETURNING *;
     `;
-    const result = await pool.query(query, [status, approved_by_id, approved_by_type, approved_by_name, approved_by_dept, id]);
+    const result = await pool.query(query, [status, approved_by_id, approved_by_type, approved_by_name, approved_by_dept, rejection_reason || null, id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Request not found' });
     res.status(200).json(result.rows[0]);
   } catch (error) {
@@ -624,210 +679,212 @@ exports.getPayslips = async (req, res) => {
   }
 };
 
+const computeEmployeeLeaveSummaryInternal = async (employee_id, user_type, month) => {
+  const [yearStr, monthStr] = month.split('-');
+  const year = parseInt(yearStr);
+  const m = parseInt(monthStr) - 1;
+  const daysInMonth = new Date(year, m + 1, 0).getDate();
+
+  // 1. Get employee data
+  let finalUserType = user_type;
+  if (user_type === 'employee') {
+    const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
+    if (roleCheck.rows.length > 0) {
+      const emp = roleCheck.rows[0];
+      if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
+        finalUserType = 'delivery_boy';
+      }
+    }
+  }
+
+  const tableName = finalUserType === 'sub_admin' ? 'department_admins' : 'employees';
+  const deptCol = finalUserType === 'sub_admin' 
+    ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
+    : 'department';
+  const empRes = await pool.query(`SELECT *, ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
+  if (empRes.rows.length === 0) return { limits: { leaves: 0 }, usage: { leaves: 0 } };
+  const emp = empRes.rows[0];
+
+  // 2. Get employee settings
+  let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1 AND user_type = $2`;
+  const empSetRes = await pool.query(empSetQuery, [employee_id, finalUserType]);
+  
+  let settings = {
+    leaves_per_month: null,
+    late_checkin_limit: 0,
+    early_checkout_limit: 0,
+    extra_leave_penalty: 0,
+    late_checkin_penalty: 0,
+    early_checkout_penalty: 0,
+  };
+  if (empSetRes.rows.length > 0) {
+    settings = {
+      ...empSetRes.rows[0],
+      leaves_per_month: empSetRes.rows[0].leaves_per_month !== null ? parseInt(empSetRes.rows[0].leaves_per_month) : null
+    };
+  } else {
+    const globalSetRes = await pool.query(`SELECT * FROM employee_leave_settings WHERE employee_id = 0 AND user_type = $1`, [finalUserType]);
+    if (globalSetRes.rows.length > 0) {
+      settings = {
+        ...globalSetRes.rows[0],
+        leaves_per_month: globalSetRes.rows[0].leaves_per_month !== null ? parseInt(globalSetRes.rows[0].leaves_per_month) : null
+      };
+    }
+  }
+
+  // 3. Fetch approved leaves for this month
+  const leavesListRes = await pool.query(`
+    SELECT start_date, end_date, is_half_day FROM leave_requests
+    WHERE employee_id = $1 AND user_type = $3 AND status = 'approved'
+    AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
+  `, [employee_id, month, finalUserType]);
+
+  const approvedLeavesMap = new Map();
+  let approved_leaves_count = 0;
+  leavesListRes.rows.forEach(lr => {
+      const start = new Date(lr.start_date);
+      const end = new Date(lr.end_date);
+      if (lr.is_half_day) {
+          if (start.getMonth() === m && start.getFullYear() === year) {
+              approvedLeavesMap.set(start.getDate(), 0.5);
+              approved_leaves_count += 0.5;
+          }
+      } else {
+          for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              if (d.getMonth() === m && d.getFullYear() === year) {
+                  approvedLeavesMap.set(d.getDate(), 1.0);
+                  approved_leaves_count += 1.0;
+              }
+          }
+      }
+  });
+
+  // 4. Calculate attendance and missing days (absents)
+  let late_count = 0;
+  let early_count = 0;
+  let missingDays = 0;
+
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const [tDay, tMonth, tYear] = todayStr.split('/').map(Number);
+  const currentMonthStr = `${tYear}-${String(tMonth).padStart(2, '0')}`;
+
+  if (month <= currentMonthStr) {
+    const holidaysRes = await pool.query(
+      `SELECT date FROM holidays WHERE (department = $1 OR department = 'All') AND TO_CHAR(date, 'YYYY-MM') = $2`,
+      [emp.department, month]
+    );
+    const holidaySet = new Set(holidaysRes.rows.map(r => new Date(r.date).getDate()));
+
+    const attendanceRes = await pool.query(`
+      SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
+      FROM attendance 
+      WHERE employee_id = $1 AND user_type = $3 AND TO_CHAR(date, 'YYYY-MM') = $2
+    `, [employee_id, month, finalUserType]);
+
+    const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
+
+    let shiftInMin = null;
+    let shiftOutMin = null;
+    try {
+      if (emp.profile_data) {
+        const pd = JSON.parse(emp.profile_data);
+        if (pd.shiftIn) {
+          const [h, m] = pd.shiftIn.split(':').map(Number);
+          shiftInMin = h * 60 + m;
+        }
+        if (pd.shiftOut) {
+          const [h, m] = pd.shiftOut.split(':').map(Number);
+          shiftOutMin = h * 60 + m;
+        }
+      }
+    } catch(e) {}
+
+    attendanceRes.rows.forEach(att => {
+      let isLate = false;
+      let isEarly = false;
+      
+      if (att.late_duration && att.late_duration !== '0h 0m' && att.late_duration !== '') {
+         isLate = true;
+      } else if (shiftInMin !== null && att.timestamp) {
+         const t = new Date(att.timestamp);
+         const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+         const [h, m] = tStr.split(':').map(Number);
+         if ((h * 60 + m) > shiftInMin) isLate = true;
+      }
+      
+      if (att.early_checkout_duration && att.early_checkout_duration !== '0h 0m' && att.early_checkout_duration !== '') {
+         isEarly = true;
+      } else if (shiftOutMin !== null && att.checkout_timestamp) {
+         const t = new Date(att.checkout_timestamp);
+         const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+         const [h, m] = tStr.split(':').map(Number);
+         if ((h * 60 + m) < shiftOutMin) isEarly = true;
+      }
+      
+      if (isLate) late_count++;
+      if (isEarly) early_count++;
+    });
+
+    const limitDay = (month === currentMonthStr) ? tDay : daysInMonth + 1;
+    for (let day = 1; day < limitDay; day++) {
+        if (!holidaySet.has(day)) {
+            const leaveFraction = approvedLeavesMap.get(day) || 0;
+            if (leaveFraction === 1.0) {
+                // Full day approved leave
+            } else if (leaveFraction === 0.5) {
+                if (!attendedDays.has(day)) {
+                    missingDays += 0.5;
+                }
+            } else {
+                if (!attendedDays.has(day)) {
+                    missingDays += 1.0;
+                }
+            }
+        }
+    }
+  }
+
+  const actual_leaves = approved_leaves_count + missingDays;
+
+  const required_working_days = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
+    ? settings.leaves_per_month 
+    : 27;
+  const leaves_limit = Math.max(0, daysInMonth - required_working_days);
+
+  return {
+    limits: {
+      leaves: leaves_limit,
+      late_checkins: settings.late_checkin_limit,
+      early_checkouts: settings.early_checkout_limit
+    },
+    penalties: {
+      extra_leave: settings.extra_leave_penalty,
+      late_checkin: settings.late_checkin_penalty,
+      early_checkout: settings.early_checkout_penalty
+    },
+    usage: {
+      leaves: actual_leaves,
+      late_checkins: late_count,
+      early_checkouts: early_count
+    }
+  };
+};
+
 exports.getEmployeeLeaveSummary = async (req, res) => {
   try {
     const { employee_id } = req.params;
     const { month: queryMonth, user_type = 'employee' } = req.query;
     const now = new Date();
     
-    let finalUserType = user_type;
-    if (user_type === 'employee') {
-      const roleCheck = await pool.query('SELECT role, department FROM employees WHERE id = $1', [employee_id]);
-      if (roleCheck.rows.length > 0) {
-        const emp = roleCheck.rows[0];
-        if (emp.role === 'Delivery Boy' || emp.department === 'Delivery') {
-          finalUserType = 'delivery_boy';
-        }
-      }
-    }
-
     // Calculate current month using Indian timezone (GMT+5:30)
     const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
     const [tDay, tMonth, tYear] = todayStr.split('/').map(Number);
     const currentMonthStr = `${tYear}-${String(tMonth).padStart(2, '0')}`;
     
     const month = queryMonth || currentMonthStr;
-    const [yearStr, monthStr] = month.split('-');
-    const year = parseInt(yearStr);
-    const m = parseInt(monthStr) - 1;
-    const daysInMonth = new Date(year, m + 1, 0).getDate();
-
-    // 1. Get employee data
-    const tableName = finalUserType === 'sub_admin' ? 'department_admins' : 'employees';
-    const deptCol = finalUserType === 'sub_admin' 
-      ? '(SELECT name FROM departments WHERE id = department_admins.department_id) as department' 
-      : 'department';
-    const empRes = await pool.query(`SELECT *, ${deptCol} FROM ${tableName} WHERE id = $1`, [employee_id]);
-    if (empRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-    const emp = empRes.rows[0];
-
-    // 2. Get employee settings
-    let empSetQuery = `SELECT * FROM employee_leave_settings WHERE employee_id = $1 AND user_type = $2`;
-    const empSetRes = await pool.query(empSetQuery, [employee_id, finalUserType]);
-    
-    let settings = {
-      leaves_per_month: null,
-      late_checkin_limit: 0,
-      early_checkout_limit: 0,
-      extra_leave_penalty: 0,
-      late_checkin_penalty: 0,
-      early_checkout_penalty: 0,
-    };
-    if (empSetRes.rows.length > 0) {
-      settings = {
-        ...empSetRes.rows[0],
-        leaves_per_month: empSetRes.rows[0].leaves_per_month !== null ? parseInt(empSetRes.rows[0].leaves_per_month) : null
-      };
-    } else {
-      // Fallback to global setting (where employee_id = 0)
-      const globalSetRes = await pool.query(`SELECT * FROM employee_leave_settings WHERE employee_id = 0 AND user_type = $1`, [finalUserType]);
-      if (globalSetRes.rows.length > 0) {
-        settings = {
-          ...globalSetRes.rows[0],
-          leaves_per_month: globalSetRes.rows[0].leaves_per_month !== null ? parseInt(globalSetRes.rows[0].leaves_per_month) : null
-        };
-      }
-    }
-
-    // 3. Fetch approved leaves for this month
-    const leavesListRes = await pool.query(`
-      SELECT start_date, end_date, is_half_day FROM leave_requests
-      WHERE employee_id = $1 AND user_type = $3 AND status = 'approved'
-      AND (TO_CHAR(start_date, 'YYYY-MM') = $2 OR TO_CHAR(end_date, 'YYYY-MM') = $2)
-    `, [employee_id, month, finalUserType]);
-
-    // Map leave fractions per day of month (including Sundays!)
-    const approvedLeavesMap = new Map();
-    let approved_leaves_count = 0;
-    leavesListRes.rows.forEach(lr => {
-        const start = new Date(lr.start_date);
-        const end = new Date(lr.end_date);
-        if (lr.is_half_day) {
-            if (start.getMonth() === m && start.getFullYear() === year) {
-                approvedLeavesMap.set(start.getDate(), 0.5);
-                approved_leaves_count += 0.5;
-            }
-        } else {
-            for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                if (d.getMonth() === m && d.getFullYear() === year) {
-                    approvedLeavesMap.set(d.getDate(), 1.0);
-                    approved_leaves_count += 1.0;
-                }
-            }
-        }
-    });
-
-    // 4. Calculate attendance and missing days (absents)
-    let late_count = 0;
-    let early_count = 0;
-    let missingDays = 0;
-
-    if (month <= currentMonthStr) {
-      // Fetch holidays for the department
-      const holidaysRes = await pool.query(
-        `SELECT date FROM holidays WHERE (department = $1 OR department = 'All') AND TO_CHAR(date, 'YYYY-MM') = $2`,
-        [emp.department, month]
-      );
-      const holidaySet = new Set(holidaysRes.rows.map(r => new Date(r.date).getDate()));
-
-      // Fetch attendance
-      const attendanceRes = await pool.query(`
-        SELECT date, timestamp, checkout_timestamp, late_duration, early_checkout_duration 
-        FROM attendance 
-        WHERE employee_id = $1 AND user_type = $3 AND TO_CHAR(date, 'YYYY-MM') = $2
-      `, [employee_id, month, finalUserType]);
-
-      const attendedDays = new Set(attendanceRes.rows.map(att => new Date(att.date).getDate()));
-
-      // Parse shift times
-      let shiftInMin = null;
-      let shiftOutMin = null;
-      try {
-        if (emp.profile_data) {
-          const pd = JSON.parse(emp.profile_data);
-          if (pd.shiftIn) {
-            const [h, m] = pd.shiftIn.split(':').map(Number);
-            shiftInMin = h * 60 + m;
-          }
-          if (pd.shiftOut) {
-            const [h, m] = pd.shiftOut.split(':').map(Number);
-            shiftOutMin = h * 60 + m;
-          }
-        }
-      } catch(e) {}
-
-      // Calculate late checkins & early checkouts
-      attendanceRes.rows.forEach(att => {
-        let isLate = false;
-        let isEarly = false;
-        
-        if (att.late_duration && att.late_duration !== '0h 0m' && att.late_duration !== '') {
-           isLate = true;
-        } else if (shiftInMin !== null && att.timestamp) {
-           const t = new Date(att.timestamp);
-           const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
-           const [h, m] = tStr.split(':').map(Number);
-           if ((h * 60 + m) > shiftInMin) isLate = true;
-        }
-        
-        if (att.early_checkout_duration && att.early_checkout_duration !== '0h 0m' && att.early_checkout_duration !== '') {
-           isEarly = true;
-        } else if (shiftOutMin !== null && att.checkout_timestamp) {
-           const t = new Date(att.checkout_timestamp);
-           const tStr = t.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
-           const [h, m] = tStr.split(':').map(Number);
-           if ((h * 60 + m) < shiftOutMin) isEarly = true;
-        }
-        
-        if (isLate) late_count++;
-        if (isEarly) early_count++;
-      });
-
-      // Calculate missing days (absents) - including Sundays!
-      const limitDay = (month === currentMonthStr) ? tDay : daysInMonth + 1;
-      for (let day = 1; day < limitDay; day++) {
-          const dateObj = new Date(year, m, day);
-          if (!holidaySet.has(day)) {
-              const leaveFraction = approvedLeavesMap.get(day) || 0;
-              if (leaveFraction === 1.0) {
-                  // Full day approved leave
-              } else if (leaveFraction === 0.5) {
-                  if (!attendedDays.has(day)) {
-                      missingDays += 0.5; // Missed the other half of the day
-                  }
-              } else {
-                  if (!attendedDays.has(day)) {
-                      missingDays += 1.0; // Missed the whole day
-                  }
-              }
-          }
-      }
-    }
-
-    const actual_leaves = approved_leaves_count + missingDays;
-
-    const required_working_days = (settings.leaves_per_month !== null && settings.leaves_per_month !== undefined)
-      ? settings.leaves_per_month 
-      : 27;
-    const leaves_limit = Math.max(0, daysInMonth - required_working_days);
-
-    res.status(200).json({
-      limits: {
-        leaves: leaves_limit,
-        late_checkins: settings.late_checkin_limit,
-        early_checkouts: settings.early_checkout_limit
-      },
-      penalties: {
-        extra_leave: settings.extra_leave_penalty,
-        late_checkin: settings.late_checkin_penalty,
-        early_checkout: settings.early_checkout_penalty
-      },
-      usage: {
-        leaves: actual_leaves,
-        late_checkins: late_count,
-        early_checkouts: early_count
-      }
-    });
+    const result = await computeEmployeeLeaveSummaryInternal(employee_id, user_type, month);
+    res.status(200).json(result);
   } catch (error) {
     console.error('Error getting leave summary:', error);
     res.status(500).json({ message: 'Internal server error' });
