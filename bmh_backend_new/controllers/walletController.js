@@ -451,15 +451,23 @@ exports.getWalletHistory = async (req, res) => {
     //    Match by delivery_boy_id (delivery boy) OR created_by_id (order creator)
     const ordersQuery = `
       SELECT 
-        mo.id, mo.order_no, mo.invoice_no, 
-        mo.amount, mo.paid_amount,
-        mo.payment_mode, mo.pod_payment_mode,
-        COALESCE(mo.cash_amount, 0) as cash_amount,
-        COALESCE(mo.online_amount, 0) as online_amount,
-        COALESCE(mo.credit_amount, 0) as credit_amount,
-        mo.order_date, mo.status, mo.created_at, mo.delivered_at,
-        mo.customer_name, mo.address,
-        'manual_order' as order_source
+        mo.id::varchar as id, 
+        mo.order_no::varchar as order_no, 
+        mo.invoice_no::varchar as invoice_no, 
+        mo.amount::numeric as amount, 
+        mo.paid_amount::numeric as paid_amount,
+        mo.payment_mode::varchar as payment_mode, 
+        mo.pod_payment_mode::varchar as pod_payment_mode,
+        COALESCE(mo.cash_amount, 0)::numeric as cash_amount,
+        COALESCE(mo.online_amount, 0)::numeric as online_amount,
+        COALESCE(mo.credit_amount, 0)::numeric as credit_amount,
+        mo.order_date::date as order_date, 
+        mo.status::varchar as status, 
+        mo.created_at::timestamp as created_at, 
+        mo.delivered_at::timestamp as delivered_at,
+        mo.customer_name::varchar as customer_name, 
+        mo.address::text as address,
+        'manual_order'::varchar as order_source
       FROM manual_orders mo
       WHERE mo.delivery_boy_id = $1 OR mo.delivery_boy_id = $2
          OR mo.created_by_id = $1 OR mo.created_by_id = $2
@@ -469,19 +477,21 @@ exports.getWalletHistory = async (req, res) => {
       SELECT 
         oo.id::varchar as id,
         oo.id::varchar as order_no,
-        NULL as invoice_no,
-        oo.total_amount as amount,
-        oo.total_amount as paid_amount,
-        oo.pod_payment_mode as payment_mode,
-        oo.pod_payment_mode,
-        COALESCE(oo.cash_amount, 0) as cash_amount,
-        COALESCE(oo.online_amount, 0) as online_amount,
-        COALESCE(oo.credit_amount, 0) as credit_amount,
+        NULL::varchar as invoice_no,
+        oo.total_amount::numeric as amount,
+        oo.total_amount::numeric as paid_amount,
+        oo.pod_payment_mode::varchar as payment_mode,
+        oo.pod_payment_mode::varchar as pod_payment_mode,
+        COALESCE(oo.cash_amount, 0)::numeric as cash_amount,
+        COALESCE(oo.online_amount, 0)::numeric as online_amount,
+        COALESCE(oo.credit_amount, 0)::numeric as credit_amount,
         oo.created_at::date as order_date,
-        oo.status, oo.created_at, oo.delivered_at,
-        oo.patient_name as customer_name,
-        oo.manual_address as address,
-        'online_order' as order_source
+        oo.status::varchar as status, 
+        oo.created_at::timestamp as created_at, 
+        oo.delivered_at::timestamp as delivered_at,
+        oo.patient_name::varchar as customer_name,
+        oo.manual_address::text as address,
+        'online_order'::varchar as order_source
       FROM online_orders oo
       WHERE oo.delivery_boy_id::text = $1 OR oo.delivery_boy_id::text = $2
 
@@ -490,19 +500,21 @@ exports.getWalletHistory = async (req, res) => {
       SELECT 
         so.id::varchar as id,
         so.id::varchar as order_no,
-        so.ip_no as invoice_no,
-        so.order_total as amount,
-        so.order_total as paid_amount,
-        so.pod_payment_mode as payment_mode,
-        so.pod_payment_mode,
-        COALESCE(so.cash_amount, 0) as cash_amount,
-        COALESCE(so.online_amount, 0) as online_amount,
-        COALESCE(so.credit_amount, 0) as credit_amount,
-        so.ord_date as order_date,
-        so.status, so.created_at, so.delivered_at,
-        so.patient_name as customer_name,
-        so.patient_address as address,
-        'sales_order' as order_source
+        so.ip_no::varchar as invoice_no,
+        so.order_total::numeric as amount,
+        so.order_total::numeric as paid_amount,
+        so.pod_payment_mode::varchar as payment_mode,
+        so.pod_payment_mode::varchar as pod_payment_mode,
+        COALESCE(so.cash_amount, 0)::numeric as cash_amount,
+        COALESCE(so.online_amount, 0)::numeric as online_amount,
+        COALESCE(so.credit_amount, 0)::numeric as credit_amount,
+        so.ord_date::date as order_date,
+        so.status::varchar as status, 
+        so.created_at::timestamp as created_at, 
+        so.delivered_at::timestamp as delivered_at,
+        so.patient_name::varchar as customer_name,
+        so.patient_address::text as address,
+        'sales_order'::varchar as order_source
       FROM ecogreensales_orders so
       WHERE so.delivery_boy_id::text = $1 OR so.delivery_boy_id::text = $2
 

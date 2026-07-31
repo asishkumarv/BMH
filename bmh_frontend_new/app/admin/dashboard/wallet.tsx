@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform, Alert, ScrollView, Modal, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users, HandCoins } from 'lucide-react-native';
+import { Banknote, CheckCircle2, TrendingUp, CreditCard, Users, HandCoins, IndianRupee } from 'lucide-react-native';
 import axios from 'axios';
 import * as Print from 'expo-print';
 import { Colors } from '../../../constants/Colors';
@@ -848,6 +848,16 @@ export default function AdminWalletScreen() {
               </View>
               <Text style={{ fontSize: 16, color: '#059669', fontWeight: '600', marginTop: 12 }}>Vault Cash Balance</Text>
               <Text style={{ fontSize: 32, fontWeight: '800', color: '#064E3B' }}>₹{cashInHand}</Text>
+            </View>
+
+            {/* Cash Revenue Card */}
+            <View style={[styles.statCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+              <View style={[styles.iconBox, { backgroundColor: '#16a34a1A' }]}>
+                <IndianRupee size={24} color="#16a34a" />
+              </View>
+              <Text style={{ fontSize: 16, color: '#15803d', fontWeight: '600', marginTop: 12 }}>Cash Revenue</Text>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: '#14532d' }}>₹{parseFloat(String(stats.totalCash || 0)).toFixed(2)}</Text>
+              <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 4 }}>Bookings: ₹{parseFloat(String(stats.bookingCash || 0)).toFixed(2)} | Orders: ₹{parseFloat(String(stats.orderCash || 0)).toFixed(2)}</Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
