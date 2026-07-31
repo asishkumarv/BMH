@@ -339,6 +339,62 @@ export default function LeaveManagement() {
     }
   };
 
+  const handleRevokeRequest = (id: number) => {
+    const revokeAction = async () => {
+      try {
+        const res = await fetch(`${API_URL}/leave/request/${id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'revoked',
+            approved_by_id: employee?.id,
+            approved_by_type: 'employee',
+            approved_by_name: employee?.full_name,
+            approved_by_dept: employee?.department,
+            rejection_reason: 'Revoked by employee'
+          })
+        });
+        if (res.ok) {
+          if (Platform.OS === 'web') {
+            alert('Leave request revoked successfully.');
+          } else {
+            Alert.alert('Success', 'Leave request revoked successfully.');
+          }
+          fetchEmployeeAndRequests();
+        } else {
+          const err = await res.json();
+          if (Platform.OS === 'web') {
+            alert(err.message || 'Failed to revoke request.');
+          } else {
+            Alert.alert('Error', err.message || 'Failed to revoke request.');
+          }
+        }
+      } catch (error) {
+        console.error('Error revoking leave request:', error);
+        if (Platform.OS === 'web') {
+          alert('Network error. Failed to revoke request.');
+        } else {
+          Alert.alert('Error', 'Network error. Failed to revoke request.');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to revoke this leave request?')) {
+        revokeAction();
+      }
+    } else {
+      Alert.alert(
+        'Confirm Revoke',
+        'Are you sure you want to revoke this leave request?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Revoke', style: 'destructive', onPress: revokeAction }
+        ]
+      );
+    }
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -850,15 +906,18 @@ export default function LeaveManagement() {
                     styles.statusBadge, 
                     req.status === 'approved' ? styles.statusApproved : 
                     req.status === 'rejected' ? styles.statusRejected : 
+                    req.status === 'revoked' ? styles.statusRevoked :
                     styles.statusPending
                   ]}>
                     {req.status === 'approved' && <CheckCircle2 size={14} color="#059669" style={{ marginRight: 4 }} />}
                     {req.status === 'rejected' && <XCircle size={14} color="#DC2626" style={{ marginRight: 4 }} />}
+                    {req.status === 'revoked' && <XCircle size={14} color="#475569" style={{ marginRight: 4 }} />}
                     {req.status === 'pending' && <Clock size={14} color="#D97706" style={{ marginRight: 4 }} />}
                     <Text style={[
                       styles.statusText,
                       req.status === 'approved' ? { color: '#059669' } : 
                       req.status === 'rejected' ? { color: '#DC2626' } : 
+                      req.status === 'revoked' ? { color: '#475569' } :
                       { color: '#D97706' }
                     ]}>{req.status.toUpperCase()}</Text>
                   </View>
@@ -871,6 +930,28 @@ export default function LeaveManagement() {
                     Reason for Rejection: {req.rejection_reason}
                   </Text>
                 )}
+                {(req.status === 'pending' || req.status === 'approved') && (() => {
+                  const d = new Date();
+                  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  const reqStart = req.start_date ? req.start_date.split('T')[0] : '';
+                  if (reqStart < todayStr) return null;
+                  
+                  return (
+                    <Pressable 
+                      style={{ 
+                        marginTop: 12, 
+                        paddingVertical: 8, 
+                        paddingHorizontal: 16, 
+                        borderRadius: 8, 
+                        backgroundColor: '#EF4444', 
+                        alignSelf: 'flex-start'
+                      }}
+                      onPress={() => handleRevokeRequest(req.id)}
+                    >
+                      <Text style={{ color: 'white', fontWeight: '700', fontSize: 13 }}>Revoke Request</Text>
+                    </Pressable>
+                  );
+                })()}
               </View>
             ))
           )}
@@ -915,6 +996,7 @@ const styles = StyleSheet.create({
   statusApproved: { backgroundColor: '#D1FAE5' },
   statusRejected: { backgroundColor: '#FEE2E2' },
   statusPending: { backgroundColor: '#FEF3C7' },
+  statusRevoked: { backgroundColor: '#E2E8F0' },
   statusText: { fontSize: 12, fontWeight: '700' },
   projectionBox: { backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' },
   projectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 },

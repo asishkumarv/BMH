@@ -12,7 +12,7 @@ exports.getDepartments = async (req, res) => {
 
 exports.addDepartment = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, type } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, message: 'Department name is required' });
     }
@@ -23,14 +23,109 @@ exports.addDepartment = async (req, res) => {
     }
 
     const insertResult = await pool.query(
-      'INSERT INTO departments (name, description) VALUES ($1, $2) RETURNING *',
-      [name, description || '']
+      'INSERT INTO departments (name, description, type) VALUES ($1, $2, $3) RETURNING *',
+      [name, description || '', type || 'employee']
     );
 
     res.status(201).json({ success: true, data: insertResult.rows[0] });
   } catch (error) {
     console.error('Error adding department:', error);
     res.status(500).json({ success: false, message: 'Server error adding department' });
+  }
+};
+
+exports.updateDepartment = async (req, res) => {
+  const { id } = req.params;
+  const { name, description, type } = req.body;
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Department name is required' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get current department details
+    const currentDeptResult = await pool.query('SELECT * FROM departments WHERE id = $1', [id]);
+    if (currentDeptResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Department not found' });
+    }
+
+    const currentDeptName = currentDeptResult.rows[0].name;
+
+    // Check if new name already exists for another department
+    if (name.toLowerCase() !== currentDeptName.toLowerCase()) {
+      const checkResult = await pool.query('SELECT * FROM departments WHERE name ILIKE $1 AND id <> $2', [name, id]);
+      if (checkResult.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'Department with this name already exists' });
+      }
+    }
+
+    // Update the department
+    const updateResult = await client.query(
+      'UPDATE departments SET name = $1, description = $2, type = $3 WHERE id = $4 RETURNING *',
+      [name, description || '', type || 'employee', id]
+    );
+
+    // If name changed, cascade update to other tables
+    if (name !== currentDeptName) {
+      await client.query('UPDATE employees SET department = $1 WHERE department = $2', [name, currentDeptName]);
+      await client.query('UPDATE attendance SET department = $1 WHERE department = $2', [name, currentDeptName]);
+      await client.query('UPDATE tasks SET department = $1 WHERE department = $2', [name, currentDeptName]);
+      
+      try {
+        await client.query('UPDATE recurring_tasks SET department = $1 WHERE department = $2', [name, currentDeptName]);
+      } catch (e) {
+        console.error('recurring_tasks table update skipped:', e.message);
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, data: updateResult.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error updating department:', error);
+    res.status(500).json({ success: false, message: 'Server error updating department' });
+  } finally {
+    client.release();
+  }
+};
+
+exports.deleteDepartment = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Get department details
+    const deptResult = await pool.query('SELECT * FROM departments WHERE id = $1', [id]);
+    if (deptResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Department not found' });
+    }
+    const deptName = deptResult.rows[0].name;
+
+    // 2. Check if sub-admins exist
+    const adminCheck = await pool.query('SELECT count(*) FROM department_admins WHERE department_id = $1', [id]);
+    const adminCount = parseInt(adminCheck.rows[0].count, 10);
+
+    // 3. Check if employees exist
+    const employeeCheck = await pool.query('SELECT count(*) FROM employees WHERE department = $1', [deptName]);
+    const employeeCount = parseInt(employeeCheck.rows[0].count, 10);
+
+    if (adminCount > 0 || employeeCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete department. There are still ${adminCount} sub admins and ${employeeCount} employees assigned to it.`
+      });
+    }
+
+    // 4. Delete the department
+    await pool.query('DELETE FROM departments WHERE id = $1', [id]);
+
+    res.json({ success: true, message: 'Department deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting department:', error);
+    res.status(500).json({ success: false, message: 'Server error deleting department' });
   }
 };
 

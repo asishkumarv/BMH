@@ -61,6 +61,11 @@ export default function LeaveManagement() {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [visibleCount, setVisibleCount] = useState(75);
+
+  useEffect(() => {
+    setVisibleCount(75);
+  }, [selectedEmployeeId, employeeSearchQuery, filterFromDate, filterToDate, filterDepartment]);
 
   // Action Popup State
   const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -76,9 +81,12 @@ export default function LeaveManagement() {
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
-      const hours = String(d.getHours()).padStart(2, '0');
+      const hours24 = d.getHours();
+      const ampm = hours24 >= 12 ? 'PM' : 'AM';
+      const hours12 = hours24 % 12 || 12;
+      const formattedHours = String(hours12).padStart(2, '0');
       const minutes = String(d.getMinutes()).padStart(2, '0');
-      return `${day}-${month}-${year} ${hours}:${minutes}`;
+      return `${day}-${month}-${year} ${formattedHours}:${minutes} ${ampm}`;
     } catch (e) {
       return dateStr;
     }
@@ -680,16 +688,25 @@ export default function LeaveManagement() {
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={{flexGrow: 1}}>
-        <Pressable style={[styles.tab, activeTab === 'apply' && styles.activeTab]} onPress={() => setActiveTab('apply')}>
-          <CalendarDays size={18} color={activeTab === 'apply' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
-          <Text style={[styles.tabText, activeTab === 'apply' && styles.activeTabText]}>My Leaves</Text>
-        </Pressable>
-        <Pressable style={[styles.tab, activeTab === 'approvals' && styles.activeTab]} onPress={() => setActiveTab('approvals')}>
-          <User size={18} color={activeTab === 'approvals' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
-          <Text style={[styles.tabText, activeTab === 'approvals' && styles.activeTabText]}>Team Requests</Text>
-        </Pressable>
-      </ScrollView>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: Colors.light.border, flexWrap: 'wrap', gap: 12 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabs, { borderBottomWidth: 0, marginBottom: 0 }]} contentContainerStyle={{ flexDirection: 'row' }}>
+          <Pressable style={[styles.tab, activeTab === 'apply' && styles.activeTab]} onPress={() => setActiveTab('apply')}>
+            <CalendarDays size={18} color={activeTab === 'apply' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+            <Text style={[styles.tabText, activeTab === 'apply' && styles.activeTabText]}>My Leaves</Text>
+          </Pressable>
+          <Pressable style={[styles.tab, activeTab === 'approvals' && styles.activeTab]} onPress={() => setActiveTab('approvals')}>
+            <User size={18} color={activeTab === 'approvals' ? Colors.light.primary : Colors.light.icon} style={{ marginRight: 8 }} />
+            <Text style={[styles.tabText, activeTab === 'approvals' && styles.activeTabText]}>Team Requests</Text>
+          </Pressable>
+        </ScrollView>
+
+        {activeTab === 'approvals' && (
+          <View style={[styles.pendingBadgeContainer, { marginBottom: 0, alignSelf: 'center' }]}>
+            <Clock size={16} color="#D97706" style={{ marginRight: 6 }} />
+            <Text style={styles.pendingBadgeText}>Total Pending Requests: {empRequests.filter((r: any) => r.status === 'pending').length}</Text>
+          </View>
+        )}
+      </View>
 
       {activeTab === 'apply' && (
       <View style={[styles.layout, isDesktop && { flexDirection: 'row', gap: 24 }]}>
@@ -1132,15 +1149,15 @@ export default function LeaveManagement() {
         return (
           <View>
             {/* Filters on Top */}
-            <View style={{ backgroundColor: '#FFF', padding: 20, borderRadius: 16, borderColor: Colors.light.border, borderWidth: 1, marginBottom: 20, gap: 16 }}>
-              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <View style={{ backgroundColor: '#FFF', padding: 12, borderRadius: 12, borderColor: Colors.light.border, borderWidth: 1, marginBottom: 12, gap: 12 }}>
+              <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap' }}>
                 
                 {/* Searchable Dropdown */}
-                <View style={{ flex: 1.5, minWidth: 250, gap: 8 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text }}>Filter by Employee / Sub Admin</Text>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <View style={{ flex: isMobile ? undefined : 1.5, width: isMobile ? '100%' : undefined, minWidth: isMobile ? undefined : 200, gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.light.text }}>Filter by Employee / Sub Admin</Text>
+                  <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 6, alignItems: isMobile ? 'stretch' : 'center' }}>
                     <TextInput
-                      style={[styles.filterInput, { flex: 1 }]}
+                      style={[styles.filterInput, { flex: isMobile ? undefined : 1, width: isMobile ? '100%' : undefined, height: 36 }]}
                       placeholder="Search name, email, phone..."
                       value={employeeSearchQuery}
                       onChangeText={setEmployeeSearchQuery}
@@ -1149,7 +1166,7 @@ export default function LeaveManagement() {
                       <select
                         value={selectedEmployeeId}
                         onChange={(e: any) => setSelectedEmployeeId(e.target.value)}
-                        style={styles.webSelectStyle}
+                        style={{ ...styles.webSelectStyle, ...(isMobile ? { minWidth: '100%', width: '100%' } : {}) } as any}
                       >
                         <option value="">All Employees / Sub Admins</option>
                         {filteredEmployeesForDropdown.map(emp => (
@@ -1159,7 +1176,7 @@ export default function LeaveManagement() {
                         ))}
                       </select>
                     ) : (
-                      <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, flex: 1, height: 42, justifyContent: 'center' }}>
+                      <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, flex: isMobile ? undefined : 1, width: isMobile ? '100%' : undefined, height: 36, justifyContent: 'center' }}>
                         <Picker
                           selectedValue={selectedEmployeeId}
                           onValueChange={(val: any) => setSelectedEmployeeId(val)}
@@ -1176,32 +1193,32 @@ export default function LeaveManagement() {
                 </View>
 
                 {/* Department Filter (Prefilled & Readonly for Sub-admin) */}
-                <View style={{ flex: 1, minWidth: 150, gap: 8 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text }}>Department</Text>
+                <View style={{ flex: isMobile ? undefined : 1, width: isMobile ? '100%' : undefined, minWidth: isMobile ? undefined : 140, gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.light.text }}>Department</Text>
                   <TextInput
-                    style={[styles.filterInput, { height: 42, backgroundColor: '#f1f5f9' }]}
+                    style={[styles.filterInput, { height: 36, backgroundColor: '#f1f5f9' }]}
                     value={employee?.department || 'My Department'}
                     editable={false}
                   />
                 </View>
 
                 {/* From Date to To Date */}
-                <View style={{ flex: 1.5, minWidth: 250, gap: 8 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text }}>Date Range</Text>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <View style={{ flex: isMobile ? undefined : 1.5, width: isMobile ? '100%' : undefined, minWidth: isMobile ? undefined : 220, gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.light.text }}>Date Range</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
                       {Platform.OS === 'web' ? (
                         <input
                           type="date"
                           value={filterFromDate}
                           onChange={(e: any) => setFilterFromDate(e.target.value)}
-                          style={{ ...styles.filterInput, height: 42, paddingHorizontal: 8, boxSizing: 'border-box', width: '100%' } as any}
+                          style={{ ...styles.filterInput, height: 36, paddingHorizontal: 8, boxSizing: 'border-box', width: '100%' } as any}
                         />
                       ) : (
                         <>
                           <Pressable onPress={() => setShowFromPicker(true)}>
                             <View pointerEvents="none">
-                              <TextInput style={[styles.filterInput, { height: 42 }]} value={filterFromDate} placeholder="From Date" editable={false} />
+                              <TextInput style={[styles.filterInput, { height: 36 }]} value={filterFromDate} placeholder="From Date" editable={false} />
                             </View>
                           </Pressable>
                           {showFromPicker && (
@@ -1225,13 +1242,13 @@ export default function LeaveManagement() {
                           type="date"
                           value={filterToDate}
                           onChange={(e: any) => setFilterToDate(e.target.value)}
-                          style={{ ...styles.filterInput, height: 42, paddingHorizontal: 8, boxSizing: 'border-box', width: '100%' } as any}
+                          style={{ ...styles.filterInput, height: 36, paddingHorizontal: 8, boxSizing: 'border-box', width: '100%' } as any}
                         />
                       ) : (
                         <>
                           <Pressable onPress={() => setShowToPicker(true)}>
                             <View pointerEvents="none">
-                              <TextInput style={[styles.filterInput, { height: 42 }]} value={filterToDate} placeholder="To Date" editable={false} />
+                              <TextInput style={[styles.filterInput, { height: 36 }]} value={filterToDate} placeholder="To Date" editable={false} />
                             </View>
                           </Pressable>
                           {showToPicker && (
@@ -1254,11 +1271,7 @@ export default function LeaveManagement() {
               </View>
             </View>
 
-            {/* Total Pending Count Badge */}
-            <View style={styles.pendingBadgeContainer}>
-              <Clock size={18} color="#D97706" style={{ marginRight: 8 }} />
-              <Text style={styles.pendingBadgeText}>Total Pending Requests: {pendingCount}</Text>
-            </View>
+
 
             {/* Table layout with horizontal scrolling */}
             <ScrollView horizontal showsHorizontalScrollIndicator={true}>
@@ -1275,7 +1288,7 @@ export default function LeaveManagement() {
                   <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Status</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 2.2, textAlign: 'center' }]}>Action</Text>
                 </View>
-                {filteredRequests.map((req, idx) => (
+                {filteredRequests.slice(0, visibleCount).map((req, idx) => (
                   <View key={req.id} style={styles.tableRow}>
                     <Text style={[styles.tableRowCell, { flex: 0.5 }]}>{idx + 1}</Text>
                     <View style={{ flex: 2.0 }}>
@@ -1301,8 +1314,22 @@ export default function LeaveManagement() {
                     <Text style={[styles.tableRowCell, { flex: 1.2, textAlign: 'center' }]}>{req.applied_overlap_count ?? 0}</Text>
                     <Text style={[styles.tableRowCell, { flex: 1.2, textAlign: 'center' }]}>{req.approved_overlap_count ?? 0}</Text>
                     <View style={{ flex: 1.2, alignItems: 'center' }}>
-                      <View style={[styles.statusCellBadge, req.status === 'approved' ? styles.statusApproved : req.status === 'rejected' ? styles.statusRejected : styles.statusPending]}>
-                        <Text style={styles.statusCellText}>{req.status.toUpperCase()}</Text>
+                      <View style={[
+                        styles.statusCellBadge, 
+                        req.status === 'approved' ? styles.statusApproved : 
+                        req.status === 'rejected' ? styles.statusRejected : 
+                        req.status === 'revoked' ? styles.statusRevoked : 
+                        styles.statusPending
+                      ]}>
+                        <Text style={[
+                          styles.statusCellText,
+                          req.status === 'approved' ? { color: '#059669' } : 
+                          req.status === 'rejected' ? { color: '#DC2626' } : 
+                          req.status === 'revoked' ? { color: '#475569' } : 
+                          { color: '#B45309' }
+                        ]}>
+                          {req.status.toUpperCase()}
+                        </Text>
                       </View>
                     </View>
                     <View style={{ flex: 2.2, justifyContent: 'center' }}>
@@ -1313,6 +1340,12 @@ export default function LeaveManagement() {
                           </Pressable>
                           <Pressable style={[styles.tableActionBtn, { backgroundColor: '#EF4444', flex: 1 }]} onPress={() => openActionPopup(req, 'reject')}>
                             <Text style={styles.tableActionBtnText}>Reject</Text>
+                          </Pressable>
+                        </View>
+                      ) : req.status === 'revoked' ? (
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 6 }}>
+                          <Pressable style={[styles.tableActionBtn, { backgroundColor: '#94A3B8', flex: 1, opacity: 0.6 }]} disabled={true}>
+                            <Text style={styles.tableActionBtnText}>Revoked</Text>
                           </Pressable>
                         </View>
                       ) : (
@@ -1338,6 +1371,32 @@ export default function LeaveManagement() {
                 )}
               </View>
             </ScrollView>
+
+            {/* Pagination / Load More Button */}
+            {filteredRequests.length > visibleCount && (
+              <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                <Pressable 
+                  style={{ 
+                    paddingVertical: 8, 
+                    paddingHorizontal: 16, 
+                    backgroundColor: Colors.light.primary, 
+                    borderRadius: 8,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 2,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => setVisibleCount(prev => prev + 75)}
+                >
+                  <Text style={{ color: 'white', fontWeight: '700', fontSize: 13 }}>
+                    Load More (Showing {visibleCount} of {filteredRequests.length})
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         );
       })()}
@@ -1346,11 +1405,11 @@ export default function LeaveManagement() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 32, backgroundColor: Colors.light.background },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
-  iconContainer: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  title: { fontSize: 28, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
-  subtitle: { fontSize: 15, color: Colors.light.icon, marginTop: 4 },
+  container: { flex: 1, padding: 20, backgroundColor: Colors.light.background },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  iconContainer: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.light.text, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: Colors.light.icon, marginTop: 2 },
   layout: { gap: 24 },
   summaryRow: { flexDirection: 'row', gap: 16, marginBottom: 24 },
   summaryCard: { flex: 1, backgroundColor: Colors.light.card, padding: 20, borderRadius: 20, borderWidth: 1, borderColor: Colors.light.border, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2, alignItems: 'center' },
@@ -1380,6 +1439,7 @@ const styles = StyleSheet.create({
   statusApproved: { backgroundColor: '#D1FAE5' },
   statusRejected: { backgroundColor: '#FEE2E2' },
   statusPending: { backgroundColor: '#FEF3C7' },
+  statusRevoked: { backgroundColor: '#E2E8F0' },
   statusText: { fontSize: 12, fontWeight: '700' },
   projectionBox: { backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BFDBFE' },
   projectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.light.primary, marginBottom: 8 },
@@ -1400,11 +1460,11 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '90%', maxWidth: 500, backgroundColor: 'white', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 5 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.light.text, marginBottom: 12 },
-  table: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border, overflow: 'hidden', marginTop: 16 },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
-  tableHeaderCell: { color: Colors.light.text, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
-  tableRow: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border, alignItems: 'center', backgroundColor: '#FFF' },
-  tableRowCell: { color: Colors.light.text, fontSize: 14 },
+  table: { backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: Colors.light.border, overflow: 'hidden', marginTop: 12 },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#F8FAFC', paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  tableHeaderCell: { color: Colors.light.text, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, paddingRight: 16 },
+  tableRow: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border, alignItems: 'center', backgroundColor: '#FFF' },
+  tableRowCell: { color: Colors.light.text, fontSize: 14, paddingRight: 16 },
   cellText: { color: Colors.light.text, fontSize: 14 },
   cellTextBold: { color: Colors.light.text, fontSize: 14, fontWeight: '700' },
   cellTextSmall: { color: Colors.light.icon, fontSize: 12, marginTop: 2 },
@@ -1412,9 +1472,9 @@ const styles = StyleSheet.create({
   statusCellText: { fontSize: 11, fontWeight: '800' },
   tableActionBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   tableActionBtnText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
-  filterInput: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, backgroundColor: '#FFF', color: Colors.light.text },
-  webSelectStyle: { padding: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.light.border, fontSize: 14, height: 42, backgroundColor: '#FFF', color: Colors.light.text, minWidth: 200 } as any,
-  pendingBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9E6', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: '#FFE499', alignSelf: 'flex-start', marginBottom: 16 },
-  pendingBadgeText: { color: '#B25E00', fontWeight: '700', fontSize: 14 },
+  filterInput: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, backgroundColor: '#FFF', color: Colors.light.text },
+  webSelectStyle: { padding: 6, borderRadius: 8, borderWidth: 1, borderColor: Colors.light.border, fontSize: 13, height: 36, backgroundColor: '#FFF', color: Colors.light.text, minWidth: 200 } as any,
+  pendingBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9E6', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FFE499', alignSelf: 'flex-start', marginBottom: 12 },
+  pendingBadgeText: { color: '#B25E00', fontWeight: '700', fontSize: 13 },
   modalInput: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, padding: 12, fontSize: 14, backgroundColor: '#FFF', color: Colors.light.text, height: 80, textAlignVertical: 'top', marginTop: 8 }
 });

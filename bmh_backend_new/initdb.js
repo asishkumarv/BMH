@@ -16,6 +16,7 @@ async function initDB() {
         allowed_latitude NUMERIC,
         allowed_longitude NUMERIC,
         allowed_radius NUMERIC DEFAULT 2000,
+        type VARCHAR(50) DEFAULT 'employee',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
