@@ -353,36 +353,8 @@ exports.getRevenueStats = async (req, res) => {
           AND COALESCE(cash_amount, 0) > 0
       ) pod_cash
     `);
-    const orderCash = parseFloat(orderCashRes.rows[0].total) || 0;
-
-    // 4. Order Collections — POD online_amount (same delivery conditions)
-    const orderOnlineRes = await pool.query(`
-      SELECT COALESCE(SUM(online_amount), 0) as total FROM (
-        SELECT COALESCE(online_amount, 0) as online_amount
-        FROM manual_orders
-        WHERE status IN ${DELIVERED_STATUSES}
-          AND delivery_boy_id IS NOT NULL
-          AND COALESCE(online_amount, 0) > 0
-
-        UNION ALL
-
-        SELECT COALESCE(online_amount, 0) as online_amount
-        FROM online_orders
-        WHERE status IN ${DELIVERED_STATUSES}
-          AND delivery_boy_id IS NOT NULL
-          AND COALESCE(online_amount, 0) > 0
-
-        UNION ALL
-
-        SELECT COALESCE(online_amount, 0) as online_amount
-        FROM ecogreen_sales_orders
-        WHERE status IN ${DELIVERED_STATUSES}
-          AND delivery_boy_id IS NOT NULL
-          AND COALESCE(online_amount, 0) > 0
-      ) pod_online
-    `);
-    const orderOnline = 0;
     const orderCash = 0;
+    const orderOnline = 0;
 
     // Combined totals (bookings only)
     const totalOnline = bookingOnline;
