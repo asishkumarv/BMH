@@ -1210,4 +1210,177 @@ router.post('/order/update-patient-gps', async (req, res) => {
   }
 });
 
+// Reschedule availability checking endpoint
+router.post('/reschedule/availability', async (req, res) => {
+  const { date, time, currentDeliveryBoyId } = req.body;
+  if (!date || !time) {
+    return res.status(400).json({ success: false, error: 'Date and time are required' });
+  }
+
+  try {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = days[new Date(date).getDay()];
+
+    // 1. Fetch all delivery boys (employees in Delivery dept or Hd delivery role)
+    const employeesRes = await pool.query(`
+      SELECT id, full_name, schedule_in, schedule_out 
+      FROM employees 
+      WHERE status = 'approved' AND (department = 'Delivery' OR role = 'Hd delivery')
+    `);
+
+    // 2. Fetch approved leaves for date
+    const leavesRes = await pool.query(`
+      SELECT employee_id FROM leave_requests 
+      WHERE user_type = 'employee' AND status = 'approved' AND $1 BETWEEN start_date AND end_date
+    `, [date]);
+    const onLeaveEmployeeIds = new Set(leavesRes.rows.map(r => r.employee_id));
+
+    const toMinutes = (t) => {
+      if (!t) return 0;
+      const parts = t.split(':');
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10);
+    };
+
+    const reqMin = toMinutes(time);
+
+    const availableRiders = [];
+    let currentRiderAvailable = false;
+
+    employeesRes.rows.forEach(emp => {
+      const isOnLeave = onLeaveEmployeeIds.has(emp.id);
+
+      // Check shift hours
+      const inMin = toMinutes(emp.schedule_in || '09:00');
+      const outMin = toMinutes(emp.schedule_out || '18:00');
+      
+      let inShift = false;
+      if (outMin < inMin) {
+        // Shift spans midnight
+        inShift = (reqMin >= inMin || reqMin <= outMin);
+      } else {
+        inShift = (reqMin >= inMin && reqMin <= outMin);
+      }
+
+      const available = !isOnLeave && inShift;
+
+      if (available) {
+        availableRiders.push({
+          id: emp.id,
+          full_name: emp.full_name
+        });
+        if (emp.id === parseInt(currentDeliveryBoyId, 10)) {
+          currentRiderAvailable = true;
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      currentRiderAvailable,
+      availableRiders
+    });
+  } catch (err) {
+    console.error('Error checking reschedule availability:', err);
+    res.status(500).json({ success: false, error: 'Failed to check availability' });
+  }
+});
+
+// Reschedule confirmation endpoint
+router.post('/reschedule/confirm', async (req, res) => {
+  const { orderId, orderType, date, time, deliveryBoyId } = req.body;
+  if (!orderId || !orderType || !date || !time || !deliveryBoyId) {
+    return res.status(400).json({ success: false, error: 'Missing parameters' });
+  }
+
+  try {
+    // 1. Update the appropriate order table
+    if (orderType === 'manual_order') {
+      await pool.query(
+        `UPDATE manual_orders 
+         SET status = 'Rescheduled', is_scheduled = true, scheduled_date = $1, scheduled_time = $2, delivery_boy_id = $3, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [date, time, deliveryBoyId, orderId]
+      );
+    } else if (orderType === 'online_order') {
+      await pool.query(
+        `UPDATE online_orders 
+         SET status = 'Rescheduled', is_scheduled = true, scheduled_date = $1, scheduled_time = $2, delivery_boy_id = $3, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [date, time, deliveryBoyId, orderId]
+      );
+    } else if (orderType === 'sales_order') {
+      await pool.query(
+        `UPDATE ecogreensales_orders 
+         SET status = 'Rescheduled', is_scheduled = true, scheduled_date = $1, scheduled_time = $2, delivery_boy_id = $3 
+         WHERE id = $4`,
+        [date, time, deliveryBoyId, orderId]
+      );
+      await pool.query(
+        `UPDATE ecogreen_sales_orders 
+         SET status = 'Rescheduled', is_scheduled = true, scheduled_date = $1, scheduled_time = $2, delivery_boy_id = $3 
+         WHERE id = $4`,
+        [date, time, deliveryBoyId, orderId]
+      );
+    } else if (orderType === 'sales_invoice') {
+      await pool.query(
+        `UPDATE ecogreensales_invoices 
+         SET status = 'Rescheduled', is_scheduled = true, scheduled_date = $1, scheduled_time = $2, delivered_by_id = $3 
+         WHERE id = $4`,
+        [date, time, deliveryBoyId, orderId]
+      );
+    } else {
+      return res.status(400).json({ success: false, error: 'Unsupported order type' });
+    }
+
+    // 2. Log note to order history
+    const empRes = await pool.query('SELECT full_name, push_token FROM employees WHERE id = $1', [deliveryBoyId]);
+    const boyName = empRes.rowCount > 0 ? empRes.rows[0].full_name : `Rider #${deliveryBoyId}`;
+    const newNote = {
+      text: `Order rescheduled to ${date} at ${time} and assigned to ${boyName}`,
+      author: 'System',
+      timestamp: new Date().toISOString()
+    };
+
+    let table = '';
+    if (orderType === 'manual_order') table = 'manual_orders';
+    else if (orderType === 'online_order') table = 'online_orders';
+    else if (orderType === 'sales_order') table = 'ecogreensales_orders';
+    else if (orderType === 'sales_invoice') table = 'ecogreensales_invoices';
+
+    if (table) {
+      const notesRes = await pool.query(`SELECT notes FROM ${table} WHERE id = $1`, [orderId]);
+      let notesArray = [];
+      const existingNotesStr = notesRes.rows[0]?.notes;
+      if (existingNotesStr) {
+        try {
+          notesArray = typeof existingNotesStr === 'string' ? JSON.parse(existingNotesStr) : existingNotesStr;
+        } catch (e) {
+          notesArray = [{ text: existingNotesStr, author: 'System', timestamp: new Date().toISOString() }];
+        }
+      }
+      notesArray.push(newNote);
+      await pool.query(`UPDATE ${table} SET notes = $1 WHERE id = $2`, [JSON.stringify(notesArray), orderId]);
+    }
+
+    // 3. Send Push Notification to assigned rider
+    if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+      try {
+        const { sendExpoPushNotification } = require('../utils/pushNotification');
+        sendExpoPushNotification(
+          empRes.rows[0].push_token,
+          'Rescheduled Order Assigned',
+          `Rescheduled Order #${orderId} has been assigned to you for ${date} at ${time}.`
+        );
+      } catch (e) {
+        console.error('Push notification failed:', e.message);
+      }
+    }
+
+    res.json({ success: true, message: 'Order successfully rescheduled' });
+  } catch (err) {
+    console.error('Error confirming reschedule:', err);
+    res.status(500).json({ success: false, error: 'Failed to reschedule order' });
+  }
+});
+
 module.exports = router;

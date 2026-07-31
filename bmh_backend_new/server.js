@@ -287,6 +287,19 @@ app.listen(PORT, () => {
   pool.query("ALTER TABLE departments ADD COLUMN IF NOT EXISTS required_employees INTEGER DEFAULT 0").catch(e => console.error(e.message));
   pool.query("ALTER TABLE departments ADD COLUMN IF NOT EXISTS required_sub_admins INTEGER DEFAULT 0").catch(e => console.error(e.message));
 
+  // Rescheduling columns for all ecogreen orders & invoices
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS scheduled_date DATE DEFAULT NULL").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS scheduled_time TIME DEFAULT NULL").catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS scheduled_date DATE DEFAULT NULL").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS scheduled_time TIME DEFAULT NULL").catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS scheduled_date DATE DEFAULT NULL").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS scheduled_time TIME DEFAULT NULL").catch(e => console.error(e.message));
+
   // paid, cash, online, credit split columns
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0").catch(e => console.error(e.message));

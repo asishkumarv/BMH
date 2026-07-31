@@ -302,7 +302,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
             invoice_no: null,
             status: o.status,
             type: 'online',
-            displayType: 'Local',
+            displayType: o.delivery_type || 'Local',
             customer_name: o.patient_name || 'Online Patient',
             customer_phone: o.patient_mobile || 'N/A',
             amount: parseFloat(o.total_amount || 0),
@@ -314,8 +314,8 @@ exports.getAdminPerformanceStats = async (req, res) => {
             picked: o.created_at,
             deliveryCharge: 0,
             address: o.delivery_address || o.address,
-            modeOfDelivery: 'Local',
-            isScheduled: false
+            modeOfDelivery: o.delivery_type || 'Local',
+            isScheduled: o.is_scheduled
           };
         }),
         ...salesRes.rows.map(o => {
@@ -327,7 +327,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
             invoice_no: null,
             status: o.status,
             type: 'sales_order',
-            displayType: 'Counter',
+            displayType: o.delivery_type || 'Counter',
             customer_name: o.customer_name || 'Counter Customer',
             customer_phone: o.mobile_no || 'N/A',
             amount: parseFloat(o.order_total || 0),
@@ -339,8 +339,8 @@ exports.getAdminPerformanceStats = async (req, res) => {
             picked: o.created_at,
             deliveryCharge: 0,
             address: o.address || o.delivery_address,
-            modeOfDelivery: 'Local',
-            isScheduled: false
+            modeOfDelivery: o.delivery_type || 'Local',
+            isScheduled: o.is_scheduled
           };
         }),
         ...invoiceRes.rows.map(o => {
@@ -352,7 +352,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
             invoice_no: o.invoice_no,
             status: o.status,
             type: 'sales_invoice',
-            displayType: 'Counter',
+            displayType: o.delivery_type || 'Counter',
             customer_name: o.customer_name || 'Counter Customer',
             customer_phone: o.mobile_no || 'N/A',
             amount: parseFloat(o.order_total || 0),
@@ -364,8 +364,8 @@ exports.getAdminPerformanceStats = async (req, res) => {
             picked: o.created_at,
             deliveryCharge: 0,
             address: o.address || o.delivery_address,
-            modeOfDelivery: 'Local',
-            isScheduled: false
+            modeOfDelivery: o.delivery_type || 'Local',
+            isScheduled: o.is_scheduled
           };
         })
       ];
@@ -381,8 +381,16 @@ exports.getAdminPerformanceStats = async (req, res) => {
 
       allFilteredOrders.push(...filteredOrders);
 
+      // Filter out scheduled, rescheduled, and bus deliveries for rider KPI metrics
+      const activeRiderOrders = filteredOrders.filter(o => {
+        const isSched = o.isScheduled === true || o.isScheduled === 'true' || o.modeOfDelivery === 'Schedule Delivery';
+        const isBus = String(o.modeOfDelivery || o.displayType || '').toLowerCase() === 'bus';
+        const isResched = String(o.status || '').toLowerCase() === 'rescheduled';
+        return !isSched && !isBus && !isResched;
+      });
+
       // Counters
-      const assigned = filteredOrders.length;
+      const assigned = activeRiderOrders.length;
       let delivered = 0;
       let failed = 0;
       let returned = 0;
@@ -402,9 +410,8 @@ exports.getAdminPerformanceStats = async (req, res) => {
       let scheduledOrdersValue = 0;
       let pendingCashCollection = 0;
 
+      // System wide / Type counters
       filteredOrders.forEach(o => {
-        const statusClean = o.status?.toLowerCase() || '';
-        
         // Sum Delivery Charges
         totalDeliveryCharges += o.deliveryCharge || 0;
 
@@ -419,10 +426,20 @@ exports.getAdminPerformanceStats = async (req, res) => {
           scheduledOrdersCount++;
           scheduledOrdersValue += o.amount;
         }
-
+        
+        const statusClean = o.status?.toLowerCase() || '';
         const pMode = o.paymentMode?.toLowerCase() || '';
         const isPending = !statusClean.includes('delivered') && !statusClean.includes('completed') && 
                           !statusClean.includes('cancel') && !statusClean.includes('return') && !statusClean.includes('fail');
+        if (isPending && !(pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card'))) {
+          pendingCashCollection += o.amount;
+        }
+      });
+
+      // Active rider KPI calculations
+      activeRiderOrders.forEach(o => {
+        const statusClean = o.status?.toLowerCase() || '';
+        const pMode = o.paymentMode?.toLowerCase() || '';
 
         if (statusClean.includes('delivered') || statusClean.includes('completed')) {
           delivered++;
@@ -461,9 +478,6 @@ exports.getAdminPerformanceStats = async (req, res) => {
           failed++;
         } else {
           pending++;
-          if (!(pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card'))) {
-            pendingCashCollection += o.amount;
-          }
         }
       });
 
@@ -793,7 +807,7 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
           lat = parseFloat(o.addr_lat);
           lng = parseFloat(o.addr_lng);
         }
-        return { status: o.status, amount: parseFloat(o.amount || 0), created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at, lat, lng };
+        return { status: o.status, amount: parseFloat(o.amount || 0), created: o.created_at, delivered: o.delivered_at, picked: o.picked_up_at, lat, lng, is_scheduled: o.is_scheduled, delivery_type: o.mode_of_delivery || o.delivery_type };
       }),
       ...onlineRes.rows.map(o => {
         let lat = o.map_lat ? parseFloat(o.map_lat) : null;
@@ -802,21 +816,29 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
           lat = parseFloat(o.addr_lat);
           lng = parseFloat(o.addr_lng);
         }
-        return { status: o.status, amount: parseFloat(o.total_amount || 0), created: o.created_at, delivered: o.updated_at, picked: o.created_at, lat, lng };
+        return { status: o.status, amount: parseFloat(o.total_amount || 0), created: o.created_at, delivered: o.updated_at, picked: o.created_at, lat, lng, is_scheduled: o.is_scheduled, delivery_type: o.delivery_type };
       }),
       ...salesRes.rows.map(o => {
         let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
         let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
-        return { status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at, lat, lng };
+        return { status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at, lat, lng, is_scheduled: o.is_scheduled, delivery_type: o.delivery_type };
       }),
       ...invoiceRes.rows.map(o => {
         let lat = o.addr_lat ? parseFloat(o.addr_lat) : null;
         let lng = o.addr_lng ? parseFloat(o.addr_lng) : null;
-        return { status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at, lat, lng };
+        return { status: o.status, amount: parseFloat(o.order_total || 0), created: o.created_at, delivered: o.created_at, picked: o.created_at, lat, lng, is_scheduled: o.is_scheduled, delivery_type: o.delivery_type };
       })
     ];
 
-    const assigned = allOrders.length;
+    // Filter out scheduled, rescheduled, and bus deliveries so they do not affect KPI/KRI
+    const activeOrders = allOrders.filter(o => {
+      const isScheduled = !!o.is_scheduled;
+      const isBus = String(o.delivery_type || '').toLowerCase() === 'bus';
+      const isRescheduled = String(o.status || '').toLowerCase() === 'rescheduled';
+      return !isScheduled && !isBus && !isRescheduled;
+    });
+
+    const assigned = activeOrders.length;
     let delivered = 0;
     let cancelled = 0;
     let returned = 0;
@@ -827,7 +849,7 @@ exports.getDeliveryBoyPerformanceStats = async (req, res) => {
     let durationCount = 0;
     let totalDistance = 0;
 
-    allOrders.forEach(o => {
+    activeOrders.forEach(o => {
       const statusClean = o.status?.toLowerCase() || '';
       if (statusClean.includes('delivered') || statusClean.includes('completed')) {
         delivered++;

@@ -170,19 +170,19 @@ exports.getAssignedOrders = async (req, res) => {
     
     // Fetch from online_orders
     const onlineOrdersRes = await pool.query(
-      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, 'Local' as delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode 
+      `SELECT id, 'online_order' as type, status, total_amount, patient_name, patient_mobile as mobile_no, manual_address as address, map_lat, map_lng, created_at, 'Local' as delivery_type, NULL as bus_details, NULL::varchar as order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode, is_scheduled, scheduled_date, scheduled_time 
        FROM online_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 
     // Fetch from ecogreensales_orders
     const ecogreenSalesOrdersRes = await pool.query(
-      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode
+      `SELECT id, 'sales_order' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, order_no, NULL::varchar as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode, is_scheduled, scheduled_date, scheduled_time
        FROM ecogreensales_orders WHERE delivery_boy_id = $1 ORDER BY created_at DESC`, [id]
     );
 
     // Fetch from ecogreensales_invoices
     const ecogreenSalesInvoicesRes = await pool.query(
-      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode
+      `SELECT id, 'sales_invoice' as type, status, total_price as total_amount, patient_name, patient_contact_no as mobile_no, patient_address as address, NULL::numeric as map_lat, NULL::numeric as map_lng, created_at, delivery_type, bus_details, NULL::varchar as order_no, invoice_id as invoice_no, NULL::varchar as location_link, payment_mode, pod_payment_mode, is_scheduled, scheduled_date, scheduled_time
        FROM ecogreensales_invoices WHERE delivered_by_id = $1 ORDER BY created_at DESC`, [id]
     );
 

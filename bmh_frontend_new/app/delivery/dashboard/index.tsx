@@ -102,10 +102,20 @@ export default function DeliveryDashboard() {
 
   // Update Modal State
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
-  const [updateActionType, setUpdateActionType] = useState('menu'); // 'menu' | 'note' | 'cancel'
+  const [updateActionType, setUpdateActionType] = useState('menu'); // 'menu' | 'note' | 'cancel' | 'reschedule'
   const [updateNote, setUpdateNote] = useState('');
   const [cancelOtp, setCancelOtp] = useState('');
   const [updateOrder, setUpdateOrder] = useState<any>(null);
+
+  // Reschedule State hooks
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
+  const [currentRiderAvailable, setCurrentRiderAvailable] = useState(false);
+  const [availableRiders, setAvailableRiders] = useState<any[]>([]);
+  const [selectedNewRiderId, setSelectedNewRiderId] = useState<string | number>('');
+  const [submittingReschedule, setSubmittingReschedule] = useState(false);
 
   // GPS Location Update Modal State
   const [gpsModalVisible, setGpsModalVisible] = useState(false);
@@ -586,6 +596,21 @@ export default function DeliveryDashboard() {
     setUpdateActionType('menu');
     setUpdateNote('');
     setCancelOtp('');
+    
+    // Initialize reschedule date/time to local current time
+    const now = new Date();
+    const YYYY = now.getFullYear();
+    const MM = String(now.getMonth() + 1).padStart(2, '0');
+    const DD = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    setRescheduleDate(`${YYYY}-${MM}-${DD}`);
+    setRescheduleTime(`${hh}:${mm}`);
+    setAvailabilityChecked(false);
+    setAvailabilityLoading(false);
+    setAvailableRiders([]);
+    setSelectedNewRiderId('');
+
     setUpdateModalVisible(true);
   };
 
@@ -629,6 +654,71 @@ export default function DeliveryDashboard() {
       if (user) fetchOrders(user.id);
     } catch (err: any) {
       alert("Error: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const checkRescheduleAvailability = async () => {
+    if (!rescheduleDate || !rescheduleTime) {
+      alert('Please enter both date (YYYY-MM-DD) and time (HH:MM)');
+      return;
+    }
+    setAvailabilityLoading(true);
+    setAvailabilityChecked(false);
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/delivery-boy/reschedule/availability', {
+        date: rescheduleDate,
+        time: rescheduleTime,
+        currentDeliveryBoyId: user.id
+      });
+      if (res.data && res.data.success) {
+        setCurrentRiderAvailable(res.data.currentRiderAvailable);
+        setAvailableRiders(res.data.availableRiders);
+        setAvailabilityChecked(true);
+        if (res.data.currentRiderAvailable) {
+          setSelectedNewRiderId(String(user.id));
+        } else if (res.data.availableRiders.length > 0) {
+          setSelectedNewRiderId(String(res.data.availableRiders[0].id));
+        } else {
+          setSelectedNewRiderId('');
+        }
+      } else {
+        alert('Failed to check rider availability');
+      }
+    } catch (err: any) {
+      alert('Error checking availability: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
+  const submitRescheduleOrder = async () => {
+    if (!selectedNewRiderId) {
+      alert('Please select an available delivery boy to reschedule/reassign the order.');
+      return;
+    }
+    setSubmittingReschedule(true);
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/delivery-boy/reschedule/confirm', {
+        orderId: updateOrder.id,
+        orderType: updateOrder.type,
+        date: rescheduleDate,
+        time: rescheduleTime,
+        deliveryBoyId: parseInt(String(selectedNewRiderId), 10)
+      });
+      if (res.data && res.data.success) {
+        alert('Order rescheduled successfully!');
+        setUpdateModalVisible(false);
+        if (user) {
+          fetchOrders(user.id);
+          fetchSummary(user.id);
+        }
+      } else {
+        alert('Failed to reschedule order');
+      }
+    } catch (err: any) {
+      alert('Error rescheduling order: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setSubmittingReschedule(false);
     }
   };
 
@@ -1549,6 +1639,10 @@ export default function DeliveryDashboard() {
                     <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#EF4444' }]} onPress={() => setUpdateActionType('cancel')}>
                       <Text style={styles.saveBtnText}>Cancel Delivery</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: '#10B981' }]} onPress={() => setUpdateActionType('reschedule')}>
+                      <Clock color="#fff" size={16} style={{ marginRight: 8 }} />
+                      <Text style={styles.saveBtnText}>Reschedule Delivery</Text>
+                    </TouchableOpacity>
                   </>
                 )}
               </View>
@@ -1581,6 +1675,125 @@ export default function DeliveryDashboard() {
               </View>
             )}
 
+            {updateActionType === 'reschedule' && (
+              <View style={{ gap: 12 }}>
+                <Text style={styles.label}>Reschedule Date (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={rescheduleDate}
+                  onChangeText={(val) => {
+                    setRescheduleDate(val);
+                    setAvailabilityChecked(false);
+                  }}
+                  placeholder="e.g. 2026-07-31"
+                />
+
+                <Text style={styles.label}>Reschedule Time (HH:MM - 24hr format)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={rescheduleTime}
+                  onChangeText={(val) => {
+                    setRescheduleTime(val);
+                    setAvailabilityChecked(false);
+                  }}
+                  placeholder="e.g. 14:30"
+                />
+
+                {!availabilityChecked ? (
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { backgroundColor: Colors.light.primary, marginTop: 8 }]}
+                    onPress={checkRescheduleAvailability}
+                    disabled={availabilityLoading}
+                  >
+                    {availabilityLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.saveBtnText}>Check Availability</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <View style={{ marginTop: 8, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                    <Text style={{ fontWeight: '700', color: '#1e293b', marginBottom: 8 }}>Availability Results:</Text>
+                    
+                    {currentRiderAvailable ? (
+                      <Text style={{ color: '#16a34a', fontWeight: '600', marginBottom: 8 }}>
+                        ✓ You are available during this slot!
+                      </Text>
+                    ) : (
+                      <Text style={{ color: '#dc2626', fontWeight: '600', marginBottom: 8 }}>
+                        ✗ You are not available (shift complete / off / on leave).
+                      </Text>
+                    )}
+
+                    {availableRiders.length === 0 ? (
+                      <Text style={{ color: '#e11d48', fontStyle: 'italic' }}>
+                        No other delivery boys are available at this time.
+                      </Text>
+                    ) : (
+                      <View>
+                        <Text style={{ fontSize: 13, color: '#475569', marginBottom: 6 }}>
+                          Select a rider to reassign to:
+                        </Text>
+                        <ScrollView style={{ maxHeight: 120 }}>
+                          {currentRiderAvailable && (
+                            <TouchableOpacity
+                              style={{
+                                padding: 8,
+                                borderBottomWidth: 1,
+                                borderBottomColor: '#f1f5f9',
+                                backgroundColor: selectedNewRiderId === String(user.id) ? '#eff6ff' : 'transparent',
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                              onPress={() => setSelectedNewRiderId(String(user.id))}
+                            >
+                              <Text style={{ fontWeight: selectedNewRiderId === String(user.id) ? '700' : '400' }}>
+                                Yourself ({user.full_name})
+                              </Text>
+                              {selectedNewRiderId === String(user.id) && <CheckCircle size={16} color={Colors.light.primary} />}
+                            </TouchableOpacity>
+                          )}
+                          {availableRiders
+                            .filter(r => r.id !== user.id)
+                            .map(rider => (
+                              <TouchableOpacity
+                                key={rider.id}
+                                style={{
+                                  padding: 8,
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: '#f1f5f9',
+                                  backgroundColor: selectedNewRiderId === String(rider.id) ? '#eff6ff' : 'transparent',
+                                  flexDirection: 'row',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                                onPress={() => setSelectedNewRiderId(String(rider.id))}
+                              >
+                                <Text style={{ fontWeight: selectedNewRiderId === String(rider.id) ? '700' : '400' }}>
+                                  {rider.full_name}
+                                </Text>
+                                {selectedNewRiderId === String(rider.id) && <CheckCircle size={16} color={Colors.light.primary} />}
+                              </TouchableOpacity>
+                            ))
+                          }
+                        </ScrollView>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={{ marginTop: 8 }}
+                      onPress={() => setAvailabilityChecked(false)}
+                    >
+                      <Text style={{ color: Colors.light.primary, textDecorationLine: 'underline', fontSize: 13 }}>
+                        Change Date/Time
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
             <View style={styles.modalActions}>
               {updateActionType !== 'menu' && (
                 <TouchableOpacity style={[styles.cancelBtn, { marginRight: 'auto' }]} onPress={() => setUpdateActionType('menu')}>
@@ -1599,6 +1812,17 @@ export default function DeliveryDashboard() {
               {updateActionType === 'cancel' && (
                 <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#EF4444' }, cancelOtp.length !== 4 && { opacity: 0.5 }]} onPress={submitCancel} disabled={cancelOtp.length !== 4}>
                   <Text style={styles.saveBtnText}>Confirm Cancel</Text>
+                </TouchableOpacity>
+              )}
+              {updateActionType === 'reschedule' && availabilityChecked && (
+                <TouchableOpacity 
+                  style={[styles.saveBtn, !selectedNewRiderId && { opacity: 0.5 }]} 
+                  onPress={submitRescheduleOrder} 
+                  disabled={!selectedNewRiderId || submittingReschedule}
+                >
+                  <Text style={styles.saveBtnText}>
+                    {submittingReschedule ? 'Rescheduling...' : 'Confirm Reschedule'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
