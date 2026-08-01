@@ -1045,23 +1045,6 @@ export default function AdminAttendanceScreen() {
                 <TextInput style={[styles.input, {minWidth: 100, margin: 0, padding: 8, height: 38}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
               </>
             )}
-            <View style={{flexDirection: 'row', gap: 4, marginLeft: 4}}>
-              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} onPress={() => fetchReports(selectedReportDept)}>
-                <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Apply</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} 
-                onPress={() => { 
-                  setStartDate(''); 
-                  setEndDate(''); 
-                  setSelectedReportDept('All'); 
-                  setSearchQuery(''); 
-                  fetchReports('All', selectedUserType, true); 
-                }}
-              >
-                <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Clear</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Department Search Dropdown */}
@@ -1095,6 +1078,26 @@ export default function AdminAttendanceScreen() {
             placeholder={`Search ${selectedUserType === 'employee' ? 'Employee' : 'Sub Admin'}`}
             searchPlaceholder="Search name, email, phone..."
           />
+
+          {/* Apply and Clear buttons */}
+          <View style={{flexDirection: 'row', gap: 4, alignItems: 'center'}}>
+            <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center', minHeight: 40}} onPress={() => fetchReports(selectedReportDept)}>
+              <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Apply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center', minHeight: 40}} 
+              onPress={() => { 
+                setStartDate(''); 
+                setEndDate(''); 
+                setSelectedReportDept('All'); 
+                setSearchQuery(''); 
+                fetchReports('All', selectedUserType, true); 
+              }}
+            >
+              <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         </View>
 
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>

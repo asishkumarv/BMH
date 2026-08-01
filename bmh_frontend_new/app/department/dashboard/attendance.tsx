@@ -1189,7 +1189,7 @@ export default function SubAdminAttendanceDashboard() {
           flexWrap: 'wrap',
           zIndex: 1000
         }}>
-          {/* Date Picker block */}
+          {/* Date Range Picker block */}
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -1222,22 +1222,6 @@ export default function SubAdminAttendanceDashboard() {
                 <TextInput style={[styles.input, {minWidth: 100, margin: 0, padding: 8, height: 38}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
               </>
             )}
-            <View style={{flexDirection: 'row', gap: 4, marginLeft: 4}}>
-              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} onPress={() => fetchData(false)}>
-                <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Apply</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} 
-                onPress={() => { 
-                  setStartDate(''); 
-                  setEndDate(''); 
-                  setSearchQuery(''); 
-                  fetchData(true); 
-                }}
-              >
-                <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Clear</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Employee Search Dropdown */}
@@ -1259,6 +1243,24 @@ export default function SubAdminAttendanceDashboard() {
             placeholder="Search Employee"
             searchPlaceholder="Search name, email, phone..."
           />
+
+          {/* Apply and Clear buttons */}
+          <View style={{flexDirection: 'row', gap: 4, alignItems: 'center'}}>
+            <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center', minHeight: 40}} onPress={() => fetchData(false)}>
+              <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Apply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center', minHeight: 40}} 
+              onPress={() => { 
+                setStartDate(''); 
+                setEndDate(''); 
+                setSearchQuery(''); 
+                fetchData(true); 
+              }}
+            >
+              <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Clear</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
