@@ -90,12 +90,12 @@ exports.updateAssignmentStatus = async (req, res) => {
 
 exports.submitDiscrepancy = async (req, res) => {
   try {
-    const { assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description } = req.body;
+    const { assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp } = req.body;
     await pool.query(
       `INSERT INTO rack_discrepancies 
-       (assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description]
+       (assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp]
     );
     res.json({ success: true, message: 'Discrepancy reported successfully' });
   } catch (error) {
@@ -146,11 +146,17 @@ exports.reviewDiscrepancy = async (req, res) => {
     );
     
     if (status === 'approved') {
-      const { medicine_id, reported_qty, discrepancy_type } = discrepancy;
+      const { medicine_id, reported_qty, discrepancy_type, reported_mrp } = discrepancy;
       if (reported_qty !== null && (discrepancy_type === 'missing stock' || discrepancy_type === 'excess stock' || discrepancy_type === 'damaged item')) {
         await pool.query(
           'UPDATE ecogreen_medicines SET stockbalqty = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
           [reported_qty, medicine_id]
+        );
+      }
+      if (reported_mrp !== null) {
+        await pool.query(
+          'UPDATE ecogreen_medicines SET mrp = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [reported_mrp, medicine_id]
         );
       }
     }

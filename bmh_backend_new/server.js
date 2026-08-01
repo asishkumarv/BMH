@@ -620,6 +620,11 @@ app.listen(PORT, () => {
   }).then(() => {
     console.log('✅ rack_discrepancies table verified.');
     return pool.query(`
+      ALTER TABLE rack_discrepancies ADD COLUMN IF NOT EXISTS reported_mrp DECIMAL(10,2);
+    `);
+  }).then(() => {
+    console.log('✅ rack_discrepancies reported_mrp column ensured.');
+    return pool.query(`
       CREATE TABLE IF NOT EXISTS inventory_tasks (
         id SERIAL PRIMARY KEY,
         assigned_by VARCHAR(50),
