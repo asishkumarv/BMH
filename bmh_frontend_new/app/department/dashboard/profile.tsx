@@ -448,8 +448,25 @@ export default function SubAdminProfileScreen() {
               if (typeof reqData === 'string') {
                 try { reqData = JSON.parse(reqData); } catch (e) {}
               }
-              const keys = Object.keys(reqData).filter(k => reqData[k] !== undefined && reqData[k] !== '');
               
+              const cleanString = (val: any) => {
+                if (val === null || val === undefined) return '';
+                return String(val).trim();
+              };
+
+              const getDepartmentName = (id: any) => {
+                if (!id) return 'N/A';
+                const dept = departments.find((d: any) => String(d.id) === String(id));
+                return dept ? dept.name : `ID: ${id}`;
+              };
+
+              // Filter keys to only show those that changed compared to req.current_data
+              const keys = Object.keys(reqData).filter(k => {
+                if (reqData[k] === undefined || reqData[k] === '') return false;
+                const prevValue = req.current_data ? req.current_data[k] : '';
+                return cleanString(prevValue) !== cleanString(reqData[k]);
+              });
+
               let statusColor = '#94A3B8';
               let statusBg = '#F1F5F9';
               if (req.status === 'Approved') { statusColor = '#059669'; statusBg = '#D1FAE5'; }
@@ -465,12 +482,21 @@ export default function SubAdminProfileScreen() {
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                    {keys.map(k => (
-                      <View key={k} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, minWidth: 120, flex: 1, borderWidth: 1, borderColor: Colors.light.border }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.light.primary, marginBottom: 4, textTransform: 'uppercase' }}>{k.replace(/_/g, ' ')}</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>{reqData[k]}</Text>
-                      </View>
-                    ))}
+                    {keys.map(k => {
+                      let displayReq = reqData[k];
+                      if (k === 'department_id' || k === 'department') {
+                        displayReq = getDepartmentName(reqData[k]);
+                      }
+                      return (
+                        <View key={k} style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, minWidth: 120, flex: 1, borderWidth: 1, borderColor: Colors.light.border }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.light.primary, marginBottom: 4, textTransform: 'uppercase' }}>{k.replace(/_/g, ' ')}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.light.text }}>{displayReq}</Text>
+                        </View>
+                      );
+                    })}
+                    {keys.length === 0 && (
+                      <Text style={{ fontSize: 13, color: Colors.light.icon, fontStyle: 'italic' }}>No actual changes requested.</Text>
+                    )}
                   </View>
                   {req.rejection_reason ? (
                     <Text style={{ marginTop: 12, fontSize: 13, color: '#DC2626', backgroundColor: '#FEE2E2', padding: 8, borderRadius: 8 }}>
