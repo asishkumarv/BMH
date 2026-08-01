@@ -186,7 +186,7 @@ export default function ItemsScreen() {
       </View>
 
       {/* Filters Card */}
-      <View style={styles.card}>
+      <View style={[styles.card, { zIndex: 100, elevation: 5 }]}>
         <View style={styles.filterGrid}>
           <View style={styles.filterField}>
             <Text style={styles.filterLabel}>Search Medicine Name / Code</Text>
