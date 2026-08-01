@@ -87,12 +87,12 @@ export default function SubAdminInventoryChecker() {
       }));
 
       // Filter to only users with inventory checker access enabled
-      const allowedStaff = combinedUsers.filter(u => invAccess[u.uniqueId] === true);
+      const allowedStaff = combinedUsers.filter((u: any) => invAccess[u.uniqueId] === true);
       setStaffList(allowedStaff);
       
       setRacks(rackRes.data.racks || []);
 
-      const allowedStaffIds = new Set(allowedStaff.map(s => s.uniqueId));
+      const allowedStaffIds = new Set(allowedStaff.map((s: any) => s.uniqueId));
 
       const allTasks = taskRes.data.data || [];
       const deptTasks = allTasks.filter((t: any) => allowedStaffIds.has(String(t.assigned_to)));
@@ -443,7 +443,8 @@ const styles = StyleSheet.create({
   
   label: { fontSize: 13, fontWeight: '700', color: '#475569', marginTop: 12, marginBottom: 6 },
   selectContainer: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f8fafc', marginBottom: 16 },
-  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', border: 'none', background: 'transparent', outline: 'none' as any },
+  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent' } as any,
+  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', outlineStyle: 'none' as any, marginBottom: 16 },
   
   rackGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   rackPill: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' },
