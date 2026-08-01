@@ -181,13 +181,10 @@ exports.getAdvancedReports = async (req, res) => {
     if (startDate && endDate) {
       query += ` AND a.date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
       params.push(startDate, endDate);
-    } else if (date) {
-      query += ` AND a.date = $${paramIndex++}`;
-      params.push(date);
     }
     if (search && search.trim() !== '') {
       query += ` AND (e.full_name ILIKE $${paramIndex++} OR e.email ILIKE $${paramIndex++} OR e.mobile ILIKE $${paramIndex++})`;
-      params.push(`%${search.trim()}%`);
+      params.push(`%${search.trim()}%`, `%${search.trim()}%`, `%${search.trim()}%`);
     }
 
     query += ` ORDER BY a.date DESC, a.timestamp DESC`;
