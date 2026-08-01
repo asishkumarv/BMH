@@ -190,6 +190,7 @@ export default function SalesInvoiceList() {
         <Text style={[styles.headerText, { flex: 1.5 }]}>Invoice ID</Text>
         <Text style={[styles.headerText, { flex: 1.5 }]}>Order No</Text>
         <Text style={[styles.headerText, { flex: 2 }]}>Customer</Text>
+        <Text style={[styles.headerText, { flex: 1.3 }]}>Mobile</Text>
         <Text style={[styles.headerText, { flex: 1.2 }]}>Total Amount</Text>
         <Text style={[styles.headerText, { flex: 1.8 }]}>Date / Time</Text>
         <Text style={[styles.headerText, { flex: 1.2 }]}>Created By</Text>
@@ -214,6 +215,7 @@ export default function SalesInvoiceList() {
           </View>
 
           <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 2 }}>{item.patientName || 'Walk-in'}</Text>
+          {item.mobileNo ? <Text style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>Mob: {item.mobileNo}</Text> : null}
           {item.actCode ? <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Order No: {item.actCode}</Text> : null}
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }}>
@@ -239,6 +241,9 @@ export default function SalesInvoiceList() {
         </View>
         <View style={[styles.cell, { flex: 2 }]}>
           <Text style={styles.cellTextBold} numberOfLines={1}>{item.patientName || 'Walk-in'}</Text>
+        </View>
+        <View style={[styles.cell, { flex: 1.3 }]}>
+          <Text style={styles.cellText} numberOfLines={1}>{item.mobileNo || 'N/A'}</Text>
         </View>
         <View style={[styles.cell, { flex: 1.2 }]}>
           <Text style={[styles.cellTextBold, { color: '#10b981' }]}>₹{parseFloat(item.orderTotal || 0).toFixed(2)}</Text>

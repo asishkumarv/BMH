@@ -145,8 +145,9 @@ async function syncSalesInvoices() {
                                 shipping_charge = $15,
                                 patient_address_details = $16,
                                 pharmacy_details = $17,
-                                order_no = $18
-                            WHERE id = $19
+                                order_no = $18,
+                                mobile_no = $19
+                            WHERE id = $20
                         `, [
                             invoice.patient_address?.deliver_name || 'Walk-in',
                             addrStr || null,
@@ -166,6 +167,7 @@ async function syncSalesInvoices() {
                             invoice.patient_address ? JSON.stringify(invoice.patient_address) : null,
                             invoice.pharmacy ? JSON.stringify(invoice.pharmacy) : null,
                             invoice.order_no || null,
+                            invoice.patient_address?.mobile || null,
                             salesInvoiceId
                         ]);
 
@@ -181,10 +183,10 @@ async function syncSalesInvoices() {
                                 order_total, order_disc_per, ref_no, created_at,
                                 reminder_date, order_type, invoice_id, payment_status,
                                 order_for, delivered_by, shipping_charge, patient_address_details,
-                                pharmacy_details, order_no
+                                pharmacy_details, order_no, mobile_no
                             ) VALUES (
                                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP,
-                                $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+                                $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
                             )
                             RETURNING id
                         `;
@@ -211,7 +213,8 @@ async function syncSalesInvoices() {
                             invoice.shipping_charge || null,
                             invoice.patient_address ? JSON.stringify(invoice.patient_address) : null,
                             invoice.pharmacy ? JSON.stringify(invoice.pharmacy) : null,
-                            invoice.order_no || null
+                            invoice.order_no || null,
+                            invoice.patient_address?.mobile || null
                         ];
 
                         const headerRes = await client.query(insertHeaderQuery, headerValues);
@@ -274,8 +277,55 @@ async function syncSalesInvoices() {
     }
 }
 
-function startSalesInvoiceCron() {
+async function startSalesInvoiceCron() {
     console.log(`⏰ Starting Sales Invoice sync interval (runs every 5 seconds)...`);
+    
+    // Ensure mobile_no column exists in DB and migrate old records
+    try {
+        await pool.query(`
+            ALTER TABLE ecogreen_sales_invoices ADD COLUMN IF NOT EXISTS mobile_no VARCHAR(255);
+        `);
+        console.log("✅ ecogreen_sales_invoices 'mobile_no' column ensured.");
+
+        const oldRecordsRes = await pool.query(`
+            SELECT id, patient_address_details 
+            FROM ecogreen_sales_invoices 
+            WHERE mobile_no IS NULL AND patient_address_details IS NOT NULL
+        `);
+
+        if (oldRecordsRes.rowCount > 0) {
+            console.log(`📦 Found ${oldRecordsRes.rowCount} historical sales invoices without mobile_no. Updating them...`);
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                for (const row of oldRecordsRes.rows) {
+                    try {
+                        const addrObj = typeof row.patient_address_details === 'string'
+                            ? JSON.parse(row.patient_address_details)
+                            : row.patient_address_details;
+                        if (addrObj && addrObj.mobile) {
+                            await client.query(
+                                'UPDATE ecogreen_sales_invoices SET mobile_no = $1 WHERE id = $2',
+                                [addrObj.mobile, row.id]
+                            );
+                        }
+                    } catch (jsonErr) {
+                        // ignore malformed JSON
+                    }
+                }
+                await client.query('COMMIT');
+                console.log("✅ Successfully updated old sales invoices with mobile_no.");
+            } catch (txErr) {
+                await client.query('ROLLBACK');
+                console.error("❌ Failed to update old sales invoices mobile_no:", txErr.message);
+            } finally {
+                client.release();
+            }
+        }
+    } catch (err) {
+        console.error("⚠️ Failed to ensure column/migrate old sales invoices mobile_no:", err.message);
+    }
+
     // Run immediately on start
     syncSalesInvoices();
     // Start interval
