@@ -67,6 +67,8 @@ app.use('/delivery-boy', deliveryBoyRoutes);
 app.use('/delivery-address', deliveryAddressRoutes);
 app.use('/profile', profileRoutes);
 app.use('/performance', require('./routes/performanceRoutes'));
+app.use('/rack-checker', require('./routes/rackCheckerRoutes'));
+app.use('/inventory-checker', require('./routes/inventoryCheckerRoutes'));
 
 // Custom routes for EcoGreen-style sales orders
 app.use('/sales-order', ecogreenSalesOrderRoutes);
@@ -584,4 +586,73 @@ app.listen(PORT, () => {
       console.log('Doctor Schedules seeding completed.');
     }
   }).catch(err => console.error('Error creating doctor_schedules table:', err.message));
+
+  // Rack Checker & Inventory Checker DB Tables Initialization
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS rack_assignments (
+      id SERIAL PRIMARY KEY,
+      assigned_by VARCHAR(50),
+      assigned_to VARCHAR(50),
+      assigned_to_name VARCHAR(100),
+      assigned_to_role VARCHAR(100),
+      rack_number VARCHAR(100),
+      status VARCHAR(20) DEFAULT 'Not Checked',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).then(() => {
+    console.log('✅ rack_assignments table verified.');
+    return pool.query(`
+      CREATE TABLE IF NOT EXISTS rack_discrepancies (
+        id SERIAL PRIMARY KEY,
+        assignment_id INTEGER REFERENCES rack_assignments(id) ON DELETE CASCADE,
+        reported_by VARCHAR(50),
+        reported_by_name VARCHAR(100),
+        medicine_id INTEGER,
+        product_name VARCHAR(255),
+        discrepancy_type VARCHAR(50),
+        reported_qty INTEGER,
+        description TEXT,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }).then(() => {
+    console.log('✅ rack_discrepancies table verified.');
+    return pool.query(`
+      CREATE TABLE IF NOT EXISTS inventory_tasks (
+        id SERIAL PRIMARY KEY,
+        assigned_by VARCHAR(50),
+        assigned_to VARCHAR(50),
+        assigned_to_name VARCHAR(100),
+        assigned_to_role VARCHAR(100),
+        rack_number VARCHAR(100),
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }).then(() => {
+    console.log('✅ inventory_tasks table verified.');
+    return pool.query(`
+      CREATE TABLE IF NOT EXISTS inventory_verifications (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER REFERENCES inventory_tasks(id) ON DELETE CASCADE,
+        medicine_id INTEGER,
+        product_name VARCHAR(255),
+        batch_number VARCHAR(100),
+        expiry_date DATE,
+        quantity INTEGER,
+        selling_price DECIMAL(10,2),
+        purchase_price DECIMAL(10,2),
+        mrp DECIMAL(10,2),
+        stock_availability VARCHAR(50),
+        is_mismatch BOOLEAN DEFAULT FALSE,
+        mismatch_details JSONB,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }).then(() => console.log('✅ inventory_verifications table verified.'))
+    .catch(e => console.error('Error creating Checker tables:', e.message));
 });
