@@ -82,8 +82,18 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, searchPlace
   const [search, setSearch] = useState('');
 
   const filteredOptions = options.filter((o: any) => {
-    const label = typeof o === 'string' ? o : (o.name || o.full_name || '');
-    return label.toLowerCase().includes(search.toLowerCase());
+    if (typeof o === 'string') {
+      return o.toLowerCase().includes(search.toLowerCase());
+    }
+    const label = o.label || o.name || o.full_name || '';
+    const email = o.email || '';
+    const mobile = o.mobile || '';
+    const searchLower = search.toLowerCase();
+    return (
+      label.toLowerCase().includes(searchLower) ||
+      email.toLowerCase().includes(searchLower) ||
+      mobile.toLowerCase().includes(searchLower)
+    );
   });
 
   if (Platform.OS === 'web') {
@@ -94,7 +104,11 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, searchPlace
           style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', minHeight: 40 }]}
         >
           <Text style={{ color: value ? '#111827' : '#9ca3af', fontSize: 14 }}>
-            {value || placeholder}
+            {(() => {
+              if (!value) return placeholder;
+              const matched = options.find((o: any) => typeof o === 'string' ? o === value : o.value === value);
+              return matched ? (typeof matched === 'string' ? matched : matched.label) : value;
+            })()}
           </Text>
           <ChevronDown size={16} color="#9ca3af" />
         </TouchableOpacity>
@@ -137,7 +151,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, searchPlace
                 <Text style={{ padding: 12, color: '#9ca3af', textAlign: 'center', fontSize: 14 }}>No matches found</Text>
               ) : (
                 filteredOptions.map((o: any) => {
-                  const label = typeof o === 'string' ? o : (o.name || o.full_name || '');
+                  const label = typeof o === 'string' ? o : (o.label || o.name || o.full_name || '');
                   const val = typeof o === 'string' ? o : (o.value !== undefined ? o.value : o.name || o.full_name || '');
                   return (
                     <TouchableOpacity 
@@ -171,7 +185,13 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, searchPlace
   return (
     <View style={{ flex: 2, minWidth: 200 }}>
       <TouchableOpacity onPress={() => setOpen(true)} style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', minHeight: 40 }]}>
-        <Text style={{ color: value ? '#111827' : '#9ca3af', fontSize: 14 }}>{value || placeholder}</Text>
+        <Text style={{ color: value ? '#111827' : '#9ca3af', fontSize: 14 }}>
+          {(() => {
+            if (!value) return placeholder;
+            const matched = options.find((o: any) => typeof o === 'string' ? o === value : o.value === value);
+            return matched ? (typeof matched === 'string' ? matched : matched.label) : value;
+          })()}
+        </Text>
         <ChevronDown size={16} color="#9ca3af" />
       </TouchableOpacity>
       
@@ -209,7 +229,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, searchPlace
                 <Text style={{ padding: 20, color: '#9ca3af', textAlign: 'center' }}>No matches found</Text>
               ) : (
                 filteredOptions.map((o: any) => {
-                  const label = typeof o === 'string' ? o : (o.name || o.full_name || '');
+                  const label = typeof o === 'string' ? o : (o.label || o.name || o.full_name || '');
                   const val = typeof o === 'string' ? o : (o.value !== undefined ? o.value : o.name || o.full_name || '');
                   return (
                     <TouchableOpacity 
@@ -451,12 +471,14 @@ export default function AdminAttendanceScreen() {
   const fetchReports = async (dept: string, userTypeStr = selectedUserType, forceClear = false, isLoadMore = false) => {
     try {
       const currentOffset = isLoadMore ? offset : 0;
+      const currentDept = forceClear ? 'All' : dept;
       const hasDateFilter = !forceClear && startDate && endDate;
-      const isFilterApplied = (dept && dept !== 'All') || hasDateFilter || (searchQuery.trim() !== '');
+      const currentSearch = forceClear ? '' : searchQuery;
+      const isFilterApplied = (currentDept && currentDept !== 'All') || hasDateFilter || (currentSearch.trim() !== '');
 
-      let url = dept === 'All' 
+      let url = currentDept === 'All' 
         ? `https://napi.bharatmedicalhallplus.com/attendance/reports?userType=${userTypeStr}&limit=50&offset=${currentOffset}`
-        : `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${dept}&userType=${userTypeStr}&limit=50&offset=${currentOffset}`;
+        : `https://napi.bharatmedicalhallplus.com/attendance/reports?department=${currentDept}&userType=${userTypeStr}&limit=50&offset=${currentOffset}`;
       
       if (isFilterApplied) {
         url += `&bypassPagination=true`;
@@ -468,8 +490,8 @@ export default function AdminAttendanceScreen() {
         url += `&date=${new Date().toISOString().split('T')[0]}`;
       }
 
-      if (searchQuery.trim() !== '') {
-        url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+      if (currentSearch.trim() !== '') {
+        url += `&search=${encodeURIComponent(currentSearch.trim())}`;
       }
 
       const res = await axios.get(url);
@@ -1027,7 +1049,16 @@ export default function AdminAttendanceScreen() {
               <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} onPress={() => fetchReports(selectedReportDept)}>
                 <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Apply</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchReports(selectedReportDept, selectedUserType, true); }}>
+              <TouchableOpacity 
+                style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} 
+                onPress={() => { 
+                  setStartDate(''); 
+                  setEndDate(''); 
+                  setSelectedReportDept('All'); 
+                  setSearchQuery(''); 
+                  fetchReports('All', selectedUserType, true); 
+                }}
+              >
                 <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Clear</Text>
               </TouchableOpacity>
             </View>
@@ -1044,11 +1075,25 @@ export default function AdminAttendanceScreen() {
 
           {/* Employee/Sub-Admin Search Dropdown */}
           <SearchableDropdown
-            options={['All', ...filteredUsers.map(u => u.full_name)]}
+            options={[
+              { label: 'All', value: 'All', full_name: 'All', email: '', mobile: '' },
+              ...filteredUsers
+                .filter(u => {
+                  if (selectedReportDept === 'All') return true;
+                  return u.department === selectedReportDept;
+                })
+                .map(u => ({
+                  label: `${u.full_name} (${u.role || ''} - ${u.department || ''})`,
+                  value: u.full_name,
+                  full_name: u.full_name,
+                  email: u.email || '',
+                  mobile: u.mobile || ''
+                }))
+            ]}
             value={searchQuery || 'All'}
             onChange={(val: string) => setSearchQuery(val === 'All' ? '' : val)}
             placeholder={`Search ${selectedUserType === 'employee' ? 'Employee' : 'Sub Admin'}`}
-            searchPlaceholder="Search name..."
+            searchPlaceholder="Search name, email, phone..."
           />
         </View>
 
