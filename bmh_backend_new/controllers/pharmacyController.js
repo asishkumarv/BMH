@@ -804,6 +804,7 @@ exports.getMedicines = async (req, res) => {
         const itemCode = req.body.item_code || '';
         const expiryDate = req.body.expiry_date || '';
         const batchNo = req.body.batch_no || '';
+        const rack = req.body.rack || '';
 
         let dataQueryArgs = [limit, offset];
         let countQueryArgs = [];
@@ -811,6 +812,16 @@ exports.getMedicines = async (req, res) => {
         let countConditions = [];
         let paramIndex = 3;
         let countParamIndex = 1;
+
+        if (rack) {
+            conditions.push(`m.rack = $${paramIndex}`);
+            dataQueryArgs.push(rack);
+            paramIndex++;
+
+            countConditions.push(`m.rack = $${countParamIndex}`);
+            countQueryArgs.push(rack);
+            countParamIndex++;
+        }
 
         if (search) {
             conditions.push(`(m.itemname ILIKE $${paramIndex} OR m.c_item_code ILIKE $${paramIndex})`);

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { ShieldCheck, CheckSquare, RefreshCw, Plus, Check, X, AlertTriangle } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminRackChecker() {
   const { isDesktop } = useResponsive();
@@ -24,6 +25,7 @@ export default function AdminRackChecker() {
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -32,6 +34,15 @@ export default function AdminRackChecker() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('superAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('superAdminUser');
+      }
+      if (userStr) {
+        setCurrentUser(JSON.parse(userStr));
+      }
       // 1. Fetch settings to find who has rack_checker_access
       const settingsRes = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
       let rackAccess = settingsRes.data?.settings?.rack_checker_access || {};
@@ -107,7 +118,13 @@ export default function AdminRackChecker() {
   const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected') => {
     setReviewing(id);
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy/${id}/review`, { status });
+      const reviewed_by = currentUser ? `ADMIN-${currentUser.id}` : 'Admin';
+      const reviewed_by_name = currentUser ? currentUser.username || currentUser.full_name || 'Super Admin' : 'Super Admin';
+      await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy/${id}/review`, { 
+        status,
+        reviewed_by,
+        reviewed_by_name
+      });
       Alert.alert('Success', `Discrepancy correction request ${status}`);
       // Refresh discrepancies
       const discRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies');

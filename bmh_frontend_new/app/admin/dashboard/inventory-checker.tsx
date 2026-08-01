@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { ShieldCheck, Plus, Check, X, AlertTriangle } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminInventoryChecker() {
   const { isDesktop } = useResponsive();
@@ -24,6 +25,7 @@ export default function AdminInventoryChecker() {
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -32,6 +34,15 @@ export default function AdminInventoryChecker() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
+      let userStr = null;
+      if (Platform.OS === 'web') {
+        userStr = localStorage.getItem('superAdminUser');
+      } else {
+        userStr = await AsyncStorage.getItem('superAdminUser');
+      }
+      if (userStr) {
+        setCurrentUser(JSON.parse(userStr));
+      }
       // 1. Fetch settings to find who has inventory_checker_access
       const settingsRes = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
       let invAccess = settingsRes.data?.settings?.inventory_checker_access || {};
@@ -107,7 +118,13 @@ export default function AdminInventoryChecker() {
   const handleReviewMismatch = async (id: number, status: 'approved' | 'rejected') => {
     setReviewing(id);
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/verification/${id}/review`, { status });
+      const reviewed_by = currentUser ? `ADMIN-${currentUser.id}` : 'Admin';
+      const reviewed_by_name = currentUser ? currentUser.username || currentUser.full_name || 'Super Admin' : 'Super Admin';
+      await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/verification/${id}/review`, { 
+        status,
+        reviewed_by,
+        reviewed_by_name
+      });
       Alert.alert('Success', `Inventory mismatch verification ${status}`);
       // Refresh mismatches
       const verRes = await axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true');

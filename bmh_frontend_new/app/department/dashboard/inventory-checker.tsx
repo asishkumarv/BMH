@@ -152,7 +152,13 @@ export default function SubAdminInventoryChecker() {
   const handleReviewMismatch = async (id: number, status: 'approved' | 'rejected') => {
     setReviewing(id);
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/verification/${id}/review`, { status });
+      const reviewed_by = subAdmin ? `SA-${subAdmin.id}` : 'Sub Admin';
+      const reviewed_by_name = subAdmin ? subAdmin.full_name : 'Sub Admin';
+      await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/verification/${id}/review`, { 
+        status,
+        reviewed_by,
+        reviewed_by_name
+      });
       Alert.alert('Success', `Inventory mismatch verification ${status}`);
       // Refresh mismatches
       const verRes = await axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true');

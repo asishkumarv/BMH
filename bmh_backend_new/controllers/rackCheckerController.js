@@ -130,7 +130,7 @@ exports.getDiscrepancies = async (req, res) => {
 exports.reviewDiscrepancy = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reviewed_by, reviewed_by_name } = req.body;
     
     const discRes = await pool.query('SELECT * FROM rack_discrepancies WHERE id = $1', [id]);
     if (discRes.rows.length === 0) {
@@ -142,8 +142,8 @@ exports.reviewDiscrepancy = async (req, res) => {
     await pool.query('BEGIN');
     
     await pool.query(
-      'UPDATE rack_discrepancies SET status = $1 WHERE id = $2',
-      [status, id]
+      'UPDATE rack_discrepancies SET status = $1, reviewed_by = $2, reviewed_by_name = $3 WHERE id = $4',
+      [status, reviewed_by || null, reviewed_by_name || null, id]
     );
     
     if (status === 'approved') {

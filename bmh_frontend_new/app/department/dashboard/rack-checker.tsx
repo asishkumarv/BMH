@@ -152,7 +152,13 @@ export default function SubAdminRackChecker() {
   const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected') => {
     setReviewing(id);
     try {
-      await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy/${id}/review`, { status });
+      const reviewed_by = subAdmin ? `SA-${subAdmin.id}` : 'Sub Admin';
+      const reviewed_by_name = subAdmin ? subAdmin.full_name : 'Sub Admin';
+      await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy/${id}/review`, { 
+        status,
+        reviewed_by,
+        reviewed_by_name
+      });
       Alert.alert('Success', `Discrepancy correction request ${status}`);
       // Refresh discrepancies
       const discRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies');

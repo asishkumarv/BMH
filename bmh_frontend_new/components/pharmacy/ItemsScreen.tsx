@@ -4,6 +4,7 @@ import { Search, Calendar, ChevronLeft, ChevronRight, Edit2, X, Film, AlertCircl
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../constants/Colors';
 import { API_URL } from '../../config';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function ItemsScreen() {
   const [data, setData] = useState<any[]>([]);
@@ -18,6 +19,16 @@ export default function ItemsScreen() {
   const [itemCode, setItemCode] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [batchNoFilter, setBatchNoFilter] = useState('');
+
+  // Rack States
+  const [racks, setRacks] = useState<string[]>([]);
+  const [selectedRack, setSelectedRack] = useState('');
+  const [rackFilterSearch, setRackFilterSearch] = useState('');
+  const [rackDropdownVisible, setRackDropdownVisible] = useState(false);
+  const [rackIsFocused, setRackIsFocused] = useState(false);
+
+  // Date Picker State
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Editing State
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -36,6 +47,21 @@ export default function ItemsScreen() {
   const [formUsageDesc, setFormUsageDesc] = useState('');
   const [formImageUrl, setFormImageUrl] = useState('');
 
+  useEffect(() => {
+    const fetchRacksList = async () => {
+      try {
+        const res = await fetch(`https://napi.bharatmedicalhallplus.com/rack-checker/racks`);
+        const json = await res.json();
+        if (json.success) {
+          setRacks(json.racks || []);
+        }
+      } catch (err) {
+        console.error('Fetch racks list error:', err);
+      }
+    };
+    fetchRacksList();
+  }, []);
+
   const fetchMedicines = async (pageNum = 1) => {
     setLoading(true);
     try {
@@ -48,7 +74,8 @@ export default function ItemsScreen() {
           search,
           item_code: itemCode,
           expiry_date: expiryDate,
-          batch_no: batchNoFilter
+          batch_no: batchNoFilter,
+          rack: selectedRack
         }),
       });
       if (!res.ok) throw new Error('Failed to fetch medicines');
@@ -68,7 +95,7 @@ export default function ItemsScreen() {
 
   useEffect(() => {
     fetchMedicines(1);
-  }, [search, itemCode, expiryDate, batchNoFilter]);
+  }, [search, itemCode, expiryDate, batchNoFilter, selectedRack]);
 
   const handleEditPress = (item: any) => {
     setSelectedItem(item);
@@ -191,13 +218,58 @@ export default function ItemsScreen() {
             <Text style={styles.filterLabel}>Filter by Expiry Date</Text>
             <View style={styles.inputIconWrapper}>
               <Calendar size={16} color="#94A3B8" style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="YYYY-MM-DD"
-                value={expiryDate}
-                onChangeText={setExpiryDate}
-              />
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  style={{
+                    flex: 1,
+                    fontSize: 14,
+                    color: '#1E293B',
+                    border: 'none',
+                    outline: 'none',
+                    backgroundColor: 'transparent',
+                    height: '100%',
+                    width: '100%',
+                  }}
+                />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(true)}
+                  style={{ flex: 1, height: '100%', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: expiryDate ? '#1E293B' : '#94A3B8', fontSize: 14 }}>
+                    {expiryDate || 'Select Date'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {expiryDate ? (
+                <TouchableOpacity 
+                  style={{ marginLeft: 6 }} 
+                  onPress={() => setExpiryDate('')}
+                >
+                  <X size={16} color="#64748B" />
+                </TouchableOpacity>
+              ) : null}
             </View>
+            {Platform.OS !== 'web' && showDatePicker && (
+              <DateTimePicker
+                value={(() => {
+                  const d = new Date(expiryDate);
+                  return isNaN(d.getTime()) ? new Date() : d;
+                })()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    const formatted = selectedDate.toISOString().split('T')[0];
+                    setExpiryDate(formatted);
+                  }
+                }}
+              />
+            )}
           </View>
 
           <View style={styles.filterField}>
@@ -210,6 +282,91 @@ export default function ItemsScreen() {
                 value={batchNoFilter}
                 onChangeText={setBatchNoFilter}
               />
+            </View>
+          </View>
+
+          <View style={[styles.filterField, { zIndex: 50 }]}>
+            <Text style={styles.filterLabel}>Filter by Rack</Text>
+            <View style={{ position: 'relative' }}>
+              <View style={styles.inputIconWrapper}>
+                <Search size={16} color="#94A3B8" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Search/Select Rack..."
+                  value={selectedRack || rackFilterSearch}
+                  onChangeText={(text) => {
+                    setRackFilterSearch(text);
+                    if (selectedRack) setSelectedRack('');
+                    setRackDropdownVisible(true);
+                  }}
+                  onFocus={() => {
+                    setRackIsFocused(true);
+                    setRackDropdownVisible(true);
+                  }}
+                  onBlur={() => {
+                    setRackIsFocused(false);
+                  }}
+                />
+                {selectedRack ? (
+                  <TouchableOpacity 
+                    style={{ position: 'absolute', right: 12, top: 14 }} 
+                    onPress={() => {
+                      setSelectedRack('');
+                      setRackFilterSearch('');
+                    }}
+                  >
+                    <X size={16} color="#64748B" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {rackDropdownVisible && (
+                <>
+                  <TouchableOpacity 
+                    style={{
+                      position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+                      top: Platform.OS === 'web' ? 0 : -1000,
+                      bottom: Platform.OS === 'web' ? 0 : -1000,
+                      left: Platform.OS === 'web' ? 0 : -1000,
+                      right: Platform.OS === 'web' ? 0 : -1000,
+                      zIndex: 9999,
+                      backgroundColor: 'transparent'
+                    }}
+                    activeOpacity={1}
+                    onPress={() => setRackDropdownVisible(false)}
+                  />
+                  <View style={{ position: 'absolute', top: 46, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 180, overflowY: 'auto' as any, zIndex: 10000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
+                    <TouchableOpacity 
+                      style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
+                      onPress={() => {
+                        setSelectedRack('');
+                        setRackFilterSearch('');
+                        setRackDropdownVisible(false);
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: '#64748B', fontWeight: 'bold' }}>-- Clear Selection --</Text>
+                    </TouchableOpacity>
+                    {racks
+                      .filter(r => r.toLowerCase().includes(rackFilterSearch.toLowerCase()))
+                      .map(r => (
+                        <TouchableOpacity 
+                          key={r} 
+                          style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                          onPress={() => {
+                            setSelectedRack(r);
+                            setRackFilterSearch('');
+                            setRackDropdownVisible(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 14, color: '#334155' }}>Rack {r}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    {racks.filter(r => r.toLowerCase().includes(rackFilterSearch.toLowerCase())).length === 0 && (
+                      <Text style={{ padding: 10, color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>No matching racks</Text>
+                    )}
+                  </View>
+                </>
+              )}
             </View>
           </View>
         </View>

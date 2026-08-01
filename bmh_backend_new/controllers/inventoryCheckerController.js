@@ -116,7 +116,7 @@ exports.getVerifications = async (req, res) => {
 exports.reviewVerification = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reviewed_by, reviewed_by_name } = req.body;
     
     const verRes = await pool.query('SELECT * FROM inventory_verifications WHERE id = $1', [id]);
     if (verRes.rows.length === 0) {
@@ -127,8 +127,8 @@ exports.reviewVerification = async (req, res) => {
     await pool.query('BEGIN');
     
     await pool.query(
-      'UPDATE inventory_verifications SET status = $1 WHERE id = $2',
-      [status, id]
+      'UPDATE inventory_verifications SET status = $1, reviewed_by = $2, reviewed_by_name = $3 WHERE id = $4',
+      [status, reviewed_by || null, reviewed_by_name || null, id]
     );
     
     if (status === 'approved' && verification.is_mismatch) {
