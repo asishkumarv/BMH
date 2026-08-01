@@ -20,12 +20,11 @@ export default function SubAdminInventoryChecker() {
   const [racks, setRacks] = useState<string[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [mismatches, setMismatches] = useState<any[]>([]);
-  const [mismatchSubTab, setMismatchSubTab] = useState<'pending' | 'history'>('pending');
 
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedRacks, setSelectedRacks] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'mismatches'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'pending' | 'history'>('tasks');
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -305,11 +304,19 @@ export default function SubAdminInventoryChecker() {
           <Text style={[styles.tabText, activeTab === 'tasks' && styles.tabTextActive]}>Active Tasks</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'mismatches' && styles.tabActive]}
-          onPress={() => setActiveTab('mismatches')}
+          style={[styles.tab, activeTab === 'pending' && styles.tabActive]}
+          onPress={() => setActiveTab('pending')}
         >
-          <Text style={[styles.tabText, activeTab === 'mismatches' && styles.tabTextActive]}>
-            Pending Mismatch Reports ({mismatches.length})
+          <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>
+            Pending Mismatch Reports ({mismatches.filter((m: any) => m.status === 'pending').length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+            Mismatch History ({mismatches.filter((m: any) => m.status !== 'pending').length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -343,26 +350,12 @@ export default function SubAdminInventoryChecker() {
         </View>
       ) : (
         <View style={styles.card}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={styles.cardTitle}>Mismatch Submissions</Text>
-            <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 4, borderRadius: 8 }}>
-              <TouchableOpacity 
-                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, mismatchSubTab === 'pending' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
-                onPress={() => setMismatchSubTab('pending')}
-              >
-                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>Pending</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, mismatchSubTab === 'history' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
-                onPress={() => setMismatchSubTab('history')}
-              >
-                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>History</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <Text style={styles.cardTitle}>
+            {activeTab === 'pending' ? 'Pending Mismatch Submissions' : 'Mismatch History'}
+          </Text>
 
           {(() => {
-            const list = mismatches.filter(m => mismatchSubTab === 'pending' ? m.status === 'pending' : m.status !== 'pending');
+            const list = mismatches.filter(m => activeTab === 'pending' ? m.status === 'pending' : m.status !== 'pending');
             return (
               <>
                 {list.map((item) => {
@@ -373,8 +366,10 @@ export default function SubAdminInventoryChecker() {
                   return (
                     <View key={item.id} style={styles.discCard}>
                       <View style={styles.discCardHeader}>
-                        <View>
-                          <Text style={styles.discItemName}>{item.product_name}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.discItemName}>
+                            {item.item_code ? `[Code: ${item.item_code}] ` : ''}{item.product_name}
+                          </Text>
                           <Text style={styles.discSub}>
                             Rack {item.rack_number} • Verified by {item.assigned_to_name}
                           </Text>
@@ -396,7 +391,7 @@ export default function SubAdminInventoryChecker() {
                         ))}
                       </View>
 
-                      {mismatchSubTab === 'pending' ? (
+                      {activeTab === 'pending' ? (
                         <View style={styles.discFooter}>
                           <TouchableOpacity 
                             style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
@@ -426,7 +421,7 @@ export default function SubAdminInventoryChecker() {
                   );
                 })}
                 {list.length === 0 && (
-                  <Text style={styles.emptyText}>No {mismatchSubTab} mismatch submissions found.</Text>
+                  <Text style={styles.emptyText}>No {activeTab === 'pending' ? 'pending' : 'historical'} mismatch submissions found.</Text>
                 )}
               </>
             );

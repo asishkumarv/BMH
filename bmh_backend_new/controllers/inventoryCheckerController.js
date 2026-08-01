@@ -82,9 +82,10 @@ exports.getVerifications = async (req, res) => {
   try {
     const { status, is_mismatch } = req.query;
     let query = `
-      SELECT iv.*, it.rack_number, it.assigned_to_name, it.assigned_to
+      SELECT iv.*, it.rack_number, it.assigned_to_name, it.assigned_to, em.c_item_code as item_code
       FROM inventory_verifications iv
       JOIN inventory_tasks it ON iv.task_id = it.id
+      LEFT JOIN ecogreen_medicines em ON iv.medicine_id = em.id
     `;
     let conditions = [];
     let params = [];

@@ -108,7 +108,7 @@ exports.getDiscrepancies = async (req, res) => {
   try {
     const { status } = req.query;
     let query = `
-      SELECT rd.*, ra.rack_number, em.batchno as batch_no
+      SELECT rd.*, ra.rack_number, em.batchno as batch_no, em.c_item_code as item_code
       FROM rack_discrepancies rd 
       JOIN rack_assignments ra ON rd.assignment_id = ra.id
       LEFT JOIN ecogreen_medicines em ON rd.medicine_id = em.id

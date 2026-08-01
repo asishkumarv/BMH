@@ -20,12 +20,10 @@ export default function SubAdminRackChecker() {
   const [racks, setRacks] = useState<string[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
-  const [discSubTab, setDiscSubTab] = useState<'pending' | 'history'>('pending');
-
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedRacks, setSelectedRacks] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'assignments' | 'discrepancies'>('assignments');
+  const [activeTab, setActiveTab] = useState<'assignments' | 'pending' | 'history'>('assignments');
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -306,11 +304,19 @@ export default function SubAdminRackChecker() {
           <Text style={[styles.tabText, activeTab === 'assignments' && styles.tabTextActive]}>Active Assignments</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'discrepancies' && styles.tabActive]}
-          onPress={() => setActiveTab('discrepancies')}
+          style={[styles.tab, activeTab === 'pending' && styles.tabActive]}
+          onPress={() => setActiveTab('pending')}
         >
-          <Text style={[styles.tabText, activeTab === 'discrepancies' && styles.tabTextActive]}>
-            Pending Discrepancies ({discrepancies.length})
+          <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>
+            Pending Discrepancies ({discrepancies.filter((d: any) => d.status === 'pending').length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+            Discrepancy History ({discrepancies.filter((d: any) => d.status !== 'pending').length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -344,33 +350,21 @@ export default function SubAdminRackChecker() {
         </View>
       ) : (
         <View style={styles.card}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={styles.cardTitle}>Correction Requests</Text>
-            <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 4, borderRadius: 8 }}>
-              <TouchableOpacity 
-                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, discSubTab === 'pending' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
-                onPress={() => setDiscSubTab('pending')}
-              >
-                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>Pending</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, discSubTab === 'history' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
-                onPress={() => setDiscSubTab('history')}
-              >
-                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>History</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <Text style={styles.cardTitle}>
+            {activeTab === 'pending' ? 'Pending Correction Requests' : 'Discrepancy History'}
+          </Text>
 
           {(() => {
-            const list = discrepancies.filter(d => discSubTab === 'pending' ? d.status === 'pending' : d.status !== 'pending');
+            const list = discrepancies.filter(d => activeTab === 'pending' ? d.status === 'pending' : d.status !== 'pending');
             return (
               <>
                 {list.map((item) => (
                   <View key={item.id} style={styles.discCard}>
                     <View style={styles.discCardHeader}>
-                      <View>
-                        <Text style={styles.discItemName}>{item.product_name}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.discItemName}>
+                          {item.item_code ? `[Code: ${item.item_code}] ` : ''}{item.product_name}
+                        </Text>
                         <Text style={styles.discSub}>
                           Rack {item.rack_number} • Batch: {item.batch_no || 'N/A'} • Reported by {item.reported_by_name}
                         </Text>
@@ -410,7 +404,7 @@ export default function SubAdminRackChecker() {
                       </View>
                     </View>
 
-                    {discSubTab === 'pending' ? (
+                    {activeTab === 'pending' ? (
                       <View style={styles.discFooter}>
                         <TouchableOpacity 
                           style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
@@ -439,7 +433,7 @@ export default function SubAdminRackChecker() {
                   </View>
                 ))}
                 {list.length === 0 && (
-                  <Text style={styles.emptyText}>No {discSubTab} requests found.</Text>
+                  <Text style={styles.emptyText}>No {activeTab === 'pending' ? 'pending' : 'historical'} requests found.</Text>
                 )}
               </>
             );
