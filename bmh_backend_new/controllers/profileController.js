@@ -177,7 +177,39 @@ exports.getMyRequests = async (req, res) => {
       'SELECT * FROM profile_update_requests WHERE user_type = $1 AND user_id = $2 ORDER BY created_at DESC',
       [user_type, user_id]
     );
-    res.json({ success: true, data: result.rows });
+
+    const enrichedData = await Promise.all(result.rows.map(async (request) => {
+      let tableName = request.user_type === 'sub_admin' ? 'department_admins' : 'employees';
+      let userQuery = `SELECT * FROM ${tableName} WHERE id = $1`;
+      
+      try {
+        const userResult = await pool.query(userQuery, [request.user_id]);
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          let currentProfileData = {};
+          if (user.profile_data) {
+             currentProfileData = typeof user.profile_data === 'string' ? JSON.parse(user.profile_data) : user.profile_data;
+          }
+          const basicColumns = ['mobile', 'image', 'schedule_in', 'schedule_out', 'break_in', 'break_out', 'weekly_off_days', 'full_name', 'email', 'department', 'department_id', 'role', 'dob'];
+          for (const col of basicColumns) {
+            if (user[col] !== undefined) {
+              currentProfileData[col] = user[col];
+            }
+          }
+          return {
+            ...request,
+            user_name: user.full_name,
+            user_email: user.email,
+            current_data: currentProfileData
+          };
+        }
+      } catch(e) {
+        console.error("Error fetching user data for personal request", request.id);
+      }
+      return request;
+    }));
+
+    res.json({ success: true, data: enrichedData });
   } catch (error) {
     console.error('Error fetching personal profile requests:', error);
     res.status(500).json({ success: false, message: 'Server error fetching personal requests' });
