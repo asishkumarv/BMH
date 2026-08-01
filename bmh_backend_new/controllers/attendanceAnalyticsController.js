@@ -130,6 +130,14 @@ exports.getAdvancedReports = async (req, res) => {
     const parsedLimit = parseInt(limit, 10) || 50;
     const parsedOffset = parseInt(offset, 10) || 0;
 
+    const isFilterApplied = 
+      req.query.bypassPagination === 'true' ||
+      (department && department !== 'All' && department !== 'All Departments') || 
+      status || 
+      (startDate && endDate) || 
+      employeeId || 
+      (search && search.trim() !== '');
+
     const extraFields = userType === 'sub_admin' 
       ? 'e.schedule_in, e.schedule_out, e.break_in, e.break_out'
       : 'NULL as schedule_in, NULL as schedule_out, NULL as break_in, NULL as break_out';
@@ -154,8 +162,12 @@ exports.getAdvancedReports = async (req, res) => {
     const params = [];
     let paramIndex = 1;
 
-    if (department && department !== 'All') {
-      query += ` AND e.department = $${paramIndex++}`;
+    if (department && department !== 'All' && department !== 'All Departments') {
+      if (userType === 'sub_admin') {
+        query += ` AND e.department_id = (SELECT id FROM departments WHERE name = $${paramIndex++})`;
+      } else {
+        query += ` AND e.department = $${paramIndex++}`;
+      }
       params.push(department);
     }
     if (status) {
@@ -180,23 +192,74 @@ exports.getAdvancedReports = async (req, res) => {
 
     query += ` ORDER BY a.date DESC, a.timestamp DESC`;
 
-    const result = await pool.query(query, params);
-    
-    // Check if any filter is applied (meaning pagination should be disabled)
-    const isFilterApplied = 
-      req.query.bypassPagination === 'true' ||
-      (department && department !== 'All' && userType !== 'sub_admin') || 
-      status || 
-      (startDate && endDate) || 
-      employeeId || 
-      (search && search.trim() !== '');
-
-    let paginatedRows = result.rows;
+    let paginatedRows = [];
     let hasMore = false;
 
-    if (!isFilterApplied) {
-      paginatedRows = result.rows.slice(parsedOffset, parsedOffset + parsedLimit);
-      hasMore = parsedOffset + parsedLimit < result.rows.length;
+    if (isFilterApplied) {
+      const result = await pool.query(query, params);
+      paginatedRows = result.rows;
+      hasMore = false;
+    } else {
+      const referenceDate = date || new Date().toISOString().split('T')[0];
+      if (parsedOffset === 0) {
+        const todayQuery = `
+          SELECT 
+            a.id, a.employee_id, e.full_name, ${userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = e.department_id) as department' : 'e.department'}, e.email, e.mobile, e.profile_data, a.date, 
+            a.timestamp as check_in, a.checkout_timestamp as check_out, 
+            NULL as check_in_image,
+            NULL as check_out_image,
+            a.status, a.late_duration,
+            ${extraFields},
+            (
+              SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
+              FROM break_logs bl
+              WHERE bl.employee_id = a.employee_id AND bl.user_type = a.user_type AND DATE(bl.timestamp) = a.date
+            ) as breaks
+          FROM attendance a
+          JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
+          WHERE a.date = $1
+          ORDER BY a.timestamp DESC
+        `;
+        const result = await pool.query(todayQuery, [referenceDate]);
+        paginatedRows = result.rows;
+
+        const countRes = await pool.query(
+          `SELECT COUNT(*) FROM attendance WHERE user_type = $1 AND date < $2`,
+          [userType, referenceDate]
+        );
+        const olderCount = parseInt(countRes.rows[0].count, 10);
+        hasMore = olderCount > 0;
+      } else {
+        const olderQuery = `
+          SELECT 
+            a.id, a.employee_id, e.full_name, ${userType === 'sub_admin' ? '(SELECT name FROM departments WHERE id = e.department_id) as department' : 'e.department'}, e.email, e.mobile, e.profile_data, a.date, 
+            a.timestamp as check_in, a.checkout_timestamp as check_out, 
+            NULL as check_in_image,
+            NULL as check_out_image,
+            a.status, a.late_duration,
+            ${extraFields},
+            (
+              SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
+              FROM break_logs bl
+              WHERE bl.employee_id = a.employee_id AND bl.user_type = a.user_type AND DATE(bl.timestamp) = a.date
+            ) as breaks
+          FROM attendance a
+          JOIN ${userType === 'sub_admin' ? 'department_admins' : 'employees'} e ON a.employee_id = e.id AND a.user_type = '${userType}'
+          WHERE a.date < $1
+          ORDER BY a.date DESC, a.timestamp DESC
+          LIMIT $2 OFFSET $3
+        `;
+        const oldOffset = Math.max(0, parsedOffset - 50);
+        const result = await pool.query(olderQuery, [referenceDate, parsedLimit, oldOffset]);
+        paginatedRows = result.rows;
+
+        const countRes = await pool.query(
+          `SELECT COUNT(*) FROM attendance WHERE user_type = $1 AND date < $2`,
+          [userType, referenceDate]
+        );
+        const olderCount = parseInt(countRes.rows[0].count, 10);
+        hasMore = oldOffset + parsedLimit < olderCount;
+      }
     }
     
     const processedData = paginatedRows.map(row => {

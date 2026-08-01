@@ -143,6 +143,192 @@ const Dropdown = ({ options, value, onChange }: any) => {
   );
 };
 
+const SearchableDropdown = ({ options, value, onChange, placeholder, searchPlaceholder }: any) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredOptions = options.filter((o: any) => {
+    const label = typeof o === 'string' ? o : (o.name || o.full_name || '');
+    return label.toLowerCase().includes(search.toLowerCase());
+  });
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={{ position: 'relative', zIndex: 9999, minWidth: 200, flex: 2 }}>
+        <TouchableOpacity 
+          onPress={() => setOpen(!open)} 
+          style={[
+            {
+              borderWidth: 1,
+              borderColor: '#cbd5e1',
+              borderRadius: 8,
+              padding: 12,
+              backgroundColor: 'white',
+              justifyContent: 'space-between',
+              flexDirection: 'row',
+              alignItems: 'center',
+              minHeight: 40
+            }
+          ]}
+        >
+          <Text style={{ color: value ? '#111827' : '#9ca3af', fontSize: 14 }}>
+            {value || placeholder}
+          </Text>
+          <ChevronDown size={16} color="#9ca3af" />
+        </TouchableOpacity>
+
+        {open && (
+          <View style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: 'white',
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+            borderRadius: 8,
+            marginTop: 4,
+            maxHeight: 250,
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 5,
+            zIndex: 99999
+          }}>
+            <TextInput
+              style={{
+                padding: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f1f5f9',
+                backgroundColor: '#f8fafc',
+                fontSize: 14,
+              }}
+              placeholder={searchPlaceholder || "Search..."}
+              value={search}
+              onChangeText={setSearch}
+              autoFocus
+            />
+            <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+              {filteredOptions.length === 0 ? (
+                <Text style={{ padding: 12, color: '#9ca3af', textAlign: 'center', fontSize: 14 }}>No matches found</Text>
+              ) : (
+                filteredOptions.map((o: any) => {
+                  const label = typeof o === 'string' ? o : (o.name || o.full_name || '');
+                  const val = typeof o === 'string' ? o : (o.value !== undefined ? o.value : o.name || o.full_name || '');
+                  return (
+                    <TouchableOpacity 
+                      key={val} 
+                      style={{ 
+                        padding: 12, 
+                        borderBottomWidth: 1, 
+                        borderBottomColor: '#f1f5f9', 
+                        backgroundColor: value === val ? '#eff6ff' : 'white' 
+                      }} 
+                      onPress={() => { 
+                        onChange(val); 
+                        setOpen(false); 
+                        setSearch(''); 
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: value === val ? '#0284c7' : '#334155', fontWeight: value === val ? '600' : '400' }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 2, minWidth: 200 }}>
+      <TouchableOpacity 
+        onPress={() => setOpen(true)} 
+        style={[
+          {
+            borderWidth: 1,
+            borderColor: '#cbd5e1',
+            borderRadius: 8,
+            padding: 12,
+            backgroundColor: 'white',
+            justifyContent: 'space-between',
+            flexDirection: 'row',
+            alignItems: 'center',
+            minHeight: 40
+          }
+        ]}
+      >
+        <Text style={{ color: value ? '#111827' : '#9ca3af', fontSize: 14 }}>{value || placeholder}</Text>
+        <ChevronDown size={16} color="#9ca3af" />
+      </TouchableOpacity>
+      
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity 
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }} 
+          onPress={() => { setOpen(false); setSearch(''); }}
+          activeOpacity={1}
+        >
+          <View style={{ backgroundColor: 'white', width: '100%', maxWidth: 400, maxHeight: '60%', borderRadius: 12, overflow: 'hidden' }}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: '#f8fafc', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b' }}>{placeholder}</Text>
+              <TouchableOpacity onPress={() => { setOpen(false); setSearch(''); }}>
+                <X size={20} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={{
+                padding: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f1f5f9',
+                backgroundColor: '#fff',
+                fontSize: 15,
+                margin: 10,
+                borderWidth: 1,
+                borderColor: '#cbd5e1',
+                borderRadius: 8
+              }}
+              placeholder={searchPlaceholder || "Search..."}
+              value={search}
+              onChangeText={setSearch}
+            />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {filteredOptions.length === 0 ? (
+                <Text style={{ padding: 20, color: '#9ca3af', textAlign: 'center' }}>No matches found</Text>
+              ) : (
+                filteredOptions.map((o: any) => {
+                  const label = typeof o === 'string' ? o : (o.name || o.full_name || '');
+                  const val = typeof o === 'string' ? o : (o.value !== undefined ? o.value : o.name || o.full_name || '');
+                  return (
+                    <TouchableOpacity 
+                      key={val} 
+                      style={{ padding: 16, borderBottomWidth: 1, borderColor: '#f1f5f9', backgroundColor: value === val ? '#eff6ff' : 'white' }} 
+                      onPress={() => { 
+                        onChange(val); 
+                        setOpen(false); 
+                        setSearch(''); 
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, color: value === val ? '#0284c7' : '#334155', fontWeight: value === val ? '600' : '400' }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+};
+
 function MyAttendanceHistory() {
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<any[]>([]);
@@ -533,6 +719,11 @@ export default function SubAdminAttendanceDashboard() {
 
   const [activeTab, setActiveTab] = useState<'department' | 'personal'>('department');
 
+  // Search States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+
   // Edit State
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editRecord, setEditRecord] = useState<any>(null);
@@ -540,6 +731,19 @@ export default function SubAdminAttendanceDashboard() {
   const [editCheckOut, setEditCheckOut] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (activeTab === 'department') {
+      fetchData();
+    }
+  }, [debouncedSearchQuery]);
 
   const openEditModal = (r: any) => {
     setEditRecord(r);
@@ -601,7 +805,15 @@ export default function SubAdminAttendanceDashboard() {
       
       let deptName = user.department;
       
-      const deptRes = await axios.get('https://napi.bharatmedicalhallplus.com/department');
+      const [deptRes, usersRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/department'),
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users').catch(() => null)
+      ]);
+
+      if (usersRes && usersRes.data && usersRes.data.success) {
+        setAllUsers(usersRes.data.data);
+      }
+
       if (deptRes.data.success) {
         const dept = deptRes.data.data.find((d: any) => d.id === user.department_id || d.name === user.department);
         if (dept) {
@@ -626,6 +838,10 @@ export default function SubAdminAttendanceDashboard() {
           url += `&startDate=${startDate}&endDate=${endDate}&bypassPagination=true`;
         } else {
           url += `&date=${new Date().toISOString().split('T')[0]}`;
+        }
+
+        if (searchQuery.trim() !== '') {
+          url += `&search=${encodeURIComponent(searchQuery.trim())}`;
         }
         
         const repRes = await axios.get(url);
@@ -944,51 +1160,71 @@ export default function SubAdminAttendanceDashboard() {
           </TouchableOpacity>
         </View>
 
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
-          {Platform.OS === 'web' ? (
-            <View style={{flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, backgroundColor: '#f3f4f6', padding: 8, borderRadius: 8, width: isDesktop ? 'auto' : '100%'}}>
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)} 
-                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
-              />
-              <Text style={{color: '#6b7280', fontWeight: '500', textAlign: 'center'}}>to</Text>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
-                style={{padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', width: '100%', minHeight: '40px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
-              />
-              <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
-                <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchData(false)}>
-                  <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchData(true); }}>
-                  <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={{
+          flexDirection: isDesktop ? 'row' : 'column',
+          alignItems: isDesktop ? 'center' : 'stretch',
+          marginBottom: 15,
+          gap: 10,
+          flexWrap: 'wrap',
+          zIndex: 1000
+        }}>
+          {/* Date Picker block */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: '#f3f4f6',
+            padding: 6,
+            borderRadius: 8,
+            alignSelf: 'flex-start'
+          }}>
+            {Platform.OS === 'web' ? (
+              <>
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={(e) => setStartDate(e.target.value)} 
+                  style={{padding: '8px 10px', borderRadius: 6, border: '1px solid #d1d5db', width: '130px', minHeight: '38px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
+                />
+                <Text style={{color: '#6b7280', fontWeight: '500', marginHorizontal: 2}}>to</Text>
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={(e) => setEndDate(e.target.value)} 
+                  style={{padding: '8px 10px', borderRadius: 6, border: '1px solid #d1d5db', width: '130px', minHeight: '38px', boxSizing: 'border-box', backgroundColor: '#fff', color: '#000'}}
+                />
+              </>
+            ) : (
+              <>
+                <TextInput style={[styles.input, {minWidth: 100, margin: 0, padding: 8, height: 38}]} placeholder="YYYY-MM-DD" value={startDate} onChangeText={setStartDate} />
+                <Text style={{color: '#6b7280', marginHorizontal: 2}}>to</Text>
+                <TextInput style={[styles.input, {minWidth: 100, margin: 0, padding: 8, height: 38}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
+              </>
+            )}
+            <View style={{flexDirection: 'row', gap: 4, marginLeft: 4}}>
+              <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} onPress={() => fetchData(false)}>
+                <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Apply</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchData(true); }}>
+                <Text style={{color: 'white', fontWeight: 'bold', fontSize: 13}}>Clear</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            <View style={{flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'stretch', gap: 8, width: isDesktop ? 'auto' : '100%'}}>
-              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8, width: '100%'}]} placeholder="YYYY-MM-DD" value={startDate} onChangeText={setStartDate} />
-              <Text style={{color: '#6b7280', textAlign: 'center'}}>to</Text>
-              <TextInput style={[styles.input, {minWidth: 110, margin: 0, padding: 8, width: '100%'}]} placeholder="YYYY-MM-DD" value={endDate} onChangeText={setEndDate} />
-              <View style={{flexDirection: 'row', gap: 8, marginTop: isDesktop ? 0 : 8, width: '100%'}}>
-                <TouchableOpacity style={{backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => fetchData(false)}>
-                  <Text style={{color: 'white', fontWeight: 'bold'}}>Apply</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={{backgroundColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, flex: 1, alignItems: 'center'}} onPress={() => { setStartDate(''); setEndDate(''); fetchData(true); }}>
-                  <Text style={{color: 'white', fontWeight: 'bold'}}>Clear</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+          </View>
+
+          {/* Employee Search Dropdown */}
+          <SearchableDropdown
+            options={['All', ...allUsers.filter(u => u.type === 'employee' && (u.department === userDept || !userDept)).map(u => u.full_name)]}
+            value={searchQuery || 'All'}
+            onChange={(val: string) => setSearchQuery(val === 'All' ? '' : val)}
+            placeholder="Search Employee"
+            searchPlaceholder="Search name..."
+          />
         </View>
         
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-          <View style={[styles.table, { minWidth: 1140 }]}>
+          <View style={[styles.table, { minWidth: 1200 }]}>
             <View style={styles.tableRowHeader}>
+            <Text style={[styles.tableCellHeader, { width: 60 }]}>S.No</Text>
             <Text style={[styles.tableCellHeader, { width: 250 }]}>Name</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Date</Text>
             <Text style={[styles.tableCellHeader, { width: 100 }]}>Shift</Text>
@@ -1004,6 +1240,7 @@ export default function SubAdminAttendanceDashboard() {
               key={i} 
               style={styles.tableRow}
             >
+              <Text style={[styles.tableCell, { width: 60, fontWeight: 'bold' }]}>{i + 1}</Text>
               <View style={[styles.tableCellView, { width: 250 }]}>
                 <Text style={{fontWeight: '700', color: Colors.light.text}}>{r.full_name}</Text>
                 <Text style={{fontSize: 12, color: Colors.light.icon}}>{r.email}</Text>
