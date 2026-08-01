@@ -21,6 +21,25 @@ const formatDateToDDMMYYYY = (dateStr: any) => {
   return `${day}-${month}-${year}`;
 };
 
+const formatTimeTo12Hr = (timeStr: string | null | undefined) => {
+  if (!timeStr || timeStr === 'N/A' || timeStr === '-') return '-';
+  const trimmed = timeStr.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) {
+    if (trimmed.toLowerCase().includes('am') || trimmed.toLowerCase().includes('pm')) {
+      return trimmed;
+    }
+    return trimmed;
+  }
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${strHours}:${minutes} ${ampm}`;
+};
+
 const Dropdown = ({ options, value, onChange }: any) => {
   const [open, setOpen] = useState(false);
   
@@ -1125,7 +1144,7 @@ export default function AdminAttendanceScreen() {
               <Text style={[styles.tableCell, { width: 120 }]}>{r.department}</Text>
               <Text style={[styles.tableCell, { width: 100 }]}>{formatDateToDDMMYYYY(r.date)}</Text>
               <View style={[styles.tableCellView, { width: 100 }]}>
-                {r.shiftIn && r.shiftOut ? <Text style={{fontSize: 12, color: Colors.light.text}}>{r.shiftIn} - {r.shiftOut}</Text> : <Text style={{fontSize: 12, color: Colors.light.icon}}>-</Text>}
+                {r.shiftIn && r.shiftOut ? <Text style={{fontSize: 12, color: Colors.light.text}}>{formatTimeTo12Hr(r.shiftIn)} - {formatTimeTo12Hr(r.shiftOut)}</Text> : <Text style={{fontSize: 12, color: Colors.light.icon}}>-</Text>}
               </View>
               <Text style={[styles.tableCell, { width: 100 }]}>{r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
               <Text style={[styles.tableCell, { width: 100 }]}>{r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</Text>
@@ -1134,9 +1153,10 @@ export default function AdminAttendanceScreen() {
               </View>
               <View style={[styles.tableCellView, { width: 120 }]}>
                 {r.late_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Late In: {formatMins(r.late_checkin_mins)}</Text> : null}
+                {r.early_checkin_mins > 0 ? <Text style={{fontSize: 12, color: '#10b981'}}>Early In: {formatMins(r.early_checkin_mins)}</Text> : null}
                 {r.early_checkout_mins > 0 ? <Text style={{fontSize: 12, color: '#f59e0b'}}>Early Out: {formatMins(r.early_checkout_mins)}</Text> : null}
                 {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
-                {(!r.late_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
+                {(!r.late_checkin_mins && !r.early_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
               <View style={[styles.tableCellView, { width: 200 }]}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 4 }}>Total: {getBreakDuration(r)}</Text>
