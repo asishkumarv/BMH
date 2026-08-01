@@ -152,9 +152,9 @@ async function startMedicineCron() {
         await syncMedicines(formatDateTime(d));
     });
 
-    // Schedule daily full sync at 2 AM to correct any drift/missed updates
-    cron.schedule('0 2 * * *', async () => {
-        console.log("⏰ Running scheduled daily full medicine sync (2 AM)...");
+    // Schedule daily full sync at 8 AM to correct any drift/missed updates
+    cron.schedule('0 8 * * *', async () => {
+        console.log("⏰ Running scheduled daily full medicine sync (8 AM)...");
         await syncMedicines("2023-01-01 10:10:00");
     });
 }
