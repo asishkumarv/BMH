@@ -295,17 +295,25 @@ export default function EmployeeRackChecker() {
         </View>
 
         {/* Action Panel */}
-        <View style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-          <View>
+        <View style={[
+          styles.card, 
+          { 
+            flexDirection: isDesktop ? 'row' : 'column', 
+            justifyContent: 'space-between', 
+            alignItems: isDesktop ? 'center' : 'stretch',
+            gap: 12
+          }
+        ]}>
+          <View style={!isDesktop && { marginBottom: 4 }}>
             <Text style={{ fontSize: 13, color: '#64748b', fontWeight: 'bold' }}>CURRENT STATUS</Text>
             <Text style={{ fontSize: 18, color: selectedAssignment.status === 'Checked' ? '#10b981' : '#f59e0b', fontWeight: 'bold', marginTop: 4 }}>
               {selectedAssignment.status}
             </Text>
           </View>
           
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 10, width: isDesktop ? 'auto' : '100%' }}>
             <TouchableOpacity 
-              style={[styles.reportBtn, { backgroundColor: '#fef3c7', borderColor: '#b45309' }]}
+              style={[styles.reportBtn, { backgroundColor: '#fef3c7', borderColor: '#b45309', width: isDesktop ? 'auto' : '100%', height: 45 }]}
               onPress={() => setDiscModalVisible(true)}
             >
               <AlertTriangle size={16} color="#b45309" style={{ marginRight: 6 }} />
@@ -314,7 +322,7 @@ export default function EmployeeRackChecker() {
 
             {selectedAssignment.status !== 'Checked' ? (
               <TouchableOpacity 
-                style={[styles.statusBtn, { backgroundColor: '#10b981' }]} 
+                style={[styles.statusBtn, { backgroundColor: '#10b981', width: isDesktop ? 'auto' : '100%', height: 45 }]} 
                 onPress={() => handleStatusChange('Checked')}
                 disabled={updatingStatus}
               >
@@ -322,7 +330,7 @@ export default function EmployeeRackChecker() {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity 
-                style={[styles.statusBtn, { backgroundColor: '#ef4444' }]} 
+                style={[styles.statusBtn, { backgroundColor: '#ef4444', width: isDesktop ? 'auto' : '100%', height: 45 }]} 
                 onPress={() => handleStatusChange('Not Checked')}
                 disabled={updatingStatus}
               >
@@ -339,23 +347,29 @@ export default function EmployeeRackChecker() {
             <ActivityIndicator size="small" color={Colors.light.primary} />
           ) : (
             <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-              <View style={{ minWidth: isDesktop ? '100%' : 750 }}>
+              <View style={{ minWidth: isDesktop ? '100%' : 610 }}>
                 <View style={styles.tableHeader}>
-                  <Text style={[styles.th, { flex: 1.5 }]}>Item Code</Text>
-                  <Text style={[styles.th, { flex: 3.5 }]}>Medicine Name</Text>
-                  <Text style={[styles.th, { flex: 2 }]}>Batch No</Text>
-                  <Text style={[styles.th, { flex: 2, textAlign: 'right' }]}>Stock Bal Qty</Text>
-                  <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>MRP</Text>
+                  <Text style={[styles.th, { width: 90 }]}>Item Code</Text>
+                  <Text style={[styles.th, { width: 220 }]}>Medicine Name</Text>
+                  <Text style={[styles.th, { width: 110 }]}>Batch No</Text>
+                  <Text style={[styles.th, { width: 110, textAlign: 'right' }]}>Stock Bal Qty</Text>
+                  <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>MRP</Text>
                 </View>
                 {medicines.map((med) => (
                   <View key={med.id} style={styles.tableRow}>
-                    <Text style={[styles.td, { flex: 1.5, color: '#64748b' }]}>{med.c_item_code || '-'}</Text>
-                    <Text style={[styles.td, { flex: 3.5, fontWeight: '700' }]}>{med.itemname}</Text>
-                    <Text style={[styles.td, { flex: 2, color: '#64748b' }]}>{med.batchno || '-'}</Text>
-                    <Text style={[styles.td, { flex: 2, textAlign: 'right', fontWeight: 'bold' }]}>
+                    <Text style={[styles.td, { width: 90, color: '#64748b' }]} numberOfLines={1} ellipsizeMode="tail">
+                      {med.c_item_code || '-'}
+                    </Text>
+                    <Text style={[styles.td, { width: 220, fontWeight: '700' }]} numberOfLines={2} ellipsizeMode="tail">
+                      {med.itemname}
+                    </Text>
+                    <Text style={[styles.td, { width: 110, color: '#64748b' }]} numberOfLines={1} ellipsizeMode="tail">
+                      {med.batchno || '-'}
+                    </Text>
+                    <Text style={[styles.td, { width: 110, textAlign: 'right', fontWeight: 'bold' }]}>
                       {med.stockbalqty}
                     </Text>
-                    <Text style={[styles.td, { flex: 1.5, textAlign: 'right', fontWeight: 'bold' }]}>
+                    <Text style={[styles.td, { width: 80, textAlign: 'right', fontWeight: 'bold' }]}>
                       {med.mrp || '-'}
                     </Text>
                   </View>
