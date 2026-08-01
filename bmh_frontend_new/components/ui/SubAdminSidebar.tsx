@@ -128,6 +128,24 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Item Master', icon: Package, route: '/department/dashboard/pharmacy/items' });
             }
           }
+
+          if (res.data.success && res.data.settings.rack_checker_access) {
+            let value = res.data.settings.rack_checker_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const saId = `SA-${userId}`;
+            if (userId && value[saId] === true) {
+              dynamicNavItems.push({ name: 'Rack Checker', icon: Activity, route: '/department/dashboard/rack-checker' });
+            }
+          }
+
+          if (res.data.success && res.data.settings.inventory_checker_access) {
+            let value = res.data.settings.inventory_checker_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const saId = `SA-${userId}`;
+            if (userId && value[saId] === true) {
+              dynamicNavItems.push({ name: 'Inventory Checker', icon: Activity, route: '/department/dashboard/inventory-checker' });
+            }
+          }
         }
         
         // Build dynamic pharmacy items

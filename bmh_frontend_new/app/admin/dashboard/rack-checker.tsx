@@ -1,0 +1,336 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
+import axios from 'axios';
+import { Colors } from '../../../constants/Colors';
+import { useResponsive } from '../../../hooks/useResponsive';
+import { ShieldCheck, CheckSquare, RefreshCw, Plus, Check, X, AlertTriangle } from 'lucide-react-native';
+
+export default function AdminRackChecker() {
+  const { isDesktop } = useResponsive();
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+  const [reviewing, setReviewing] = useState<number | null>(null);
+
+  // Data states
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [racks, setRacks] = useState<string[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [discrepancies, setDiscrepancies] = useState<any[]>([]);
+
+  // Selection states
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [selectedRacks, setSelectedRacks] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'assignments' | 'discrepancies'>('assignments');
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch settings to find who has rack_checker_access
+      const settingsRes = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
+      let rackAccess = settingsRes.data?.settings?.rack_checker_access || {};
+      if (typeof rackAccess === 'string') rackAccess = JSON.parse(rackAccess);
+
+      // 2. Fetch all staff (employees and sub-admins)
+      const [empRes, subAdminRes, rackRes, assignRes, discRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+        axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
+        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/racks'),
+        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/assignments'),
+        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies?status=pending')
+      ]);
+
+      const emps = empRes.data.data || [];
+      const subAdmins = subAdminRes.data.data || [];
+      
+      const combinedUsers = [
+        ...emps.map((e: any) => ({ ...e, uniqueId: e.id.toString(), displayName: `${e.full_name} (Employee - ${e.department || 'N/A'})` })),
+        ...subAdmins.map((sa: any) => ({ ...sa, uniqueId: `SA-${sa.id}`, displayName: `${sa.full_name} (Sub Admin - ${sa.department_name || 'N/A'})` }))
+      ];
+
+      // Filter to only users with rack checker access enabled
+      const allowedStaff = combinedUsers.filter(u => rackAccess[u.uniqueId] === true);
+      setStaffList(allowedStaff);
+      setRacks(rackRes.data.racks || []);
+      setAssignments(assignRes.data.data || []);
+      setDiscrepancies(discRes.data.data || []);
+    } catch (error) {
+      console.error('Failed to load rack checker data:', error);
+      Alert.alert('Error', 'Failed to load initial data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!selectedStaffId) {
+      Alert.alert('Validation Error', 'Please select a staff member.');
+      return;
+    }
+    if (selectedRacks.length === 0) {
+      Alert.alert('Validation Error', 'Please select at least one rack.');
+      return;
+    }
+
+    const targetStaff = staffList.find(s => s.uniqueId === selectedStaffId);
+    if (!targetStaff) return;
+
+    setAssigning(true);
+    try {
+      await axios.post('https://napi.bharatmedicalhallplus.com/rack-checker/assign', {
+        assigned_by: 'Super Admin',
+        assigned_to: selectedStaffId,
+        assigned_to_name: targetStaff.full_name,
+        assigned_to_role: selectedStaffId.startsWith('SA-') ? 'Sub Admin' : 'Employee',
+        rack_number: selectedRacks
+      });
+
+      Alert.alert('Success', 'Rack(s) assigned successfully!');
+      setSelectedRacks([]);
+      // Refresh assignments
+      const assignRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/assignments');
+      setAssignments(assignRes.data.data || []);
+    } catch (error) {
+      console.error('Failed to assign rack:', error);
+      Alert.alert('Error', 'Failed to complete rack assignment');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected') => {
+    setReviewing(id);
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy/${id}/review`, { status });
+      Alert.alert('Success', `Discrepancy correction request ${status}`);
+      // Refresh discrepancies
+      const discRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies?status=pending');
+      setDiscrepancies(discRes.data.data || []);
+    } catch (error) {
+      console.error('Failed to review discrepancy:', error);
+      Alert.alert('Error', 'Failed to submit review');
+    } finally {
+      setReviewing(null);
+    }
+  };
+
+  const toggleRackSelection = (rack: string) => {
+    if (selectedRacks.includes(rack)) {
+      setSelectedRacks(selectedRacks.filter(r => r !== rack));
+    } else {
+      setSelectedRacks([...selectedRacks, rack]);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Rack Checker Management</Text>
+        <Text style={styles.subtitle}>Assign racks to staff and review submitted stock discrepancies.</Text>
+      </View>
+
+      {/* Assignment Section */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Assign New Racks</Text>
+        
+        <Text style={styles.label}>Select Staff Member (with Access)</Text>
+        <View style={styles.selectContainer}>
+          <select 
+            value={selectedStaffId} 
+            onChange={(e) => setSelectedStaffId(e.target.value)}
+            style={styles.selectInput}
+          >
+            <option value="">-- Choose Checker --</option>
+            {staffList.map(s => (
+              <option key={s.uniqueId} value={s.uniqueId}>{s.displayName}</option>
+            ))}
+          </select>
+        </View>
+
+        <Text style={styles.label}>Select Racks (Multiple allowed)</Text>
+        <View style={styles.rackGrid}>
+          {racks.map(r => {
+            const isSel = selectedRacks.includes(r);
+            return (
+              <TouchableOpacity 
+                key={r} 
+                style={[styles.rackPill, isSel && styles.rackPillActive]} 
+                onPress={() => toggleRackSelection(r)}
+              >
+                <Text style={[styles.rackText, isSel && styles.rackTextActive]}>{r}</Text>
+              </TouchableOpacity>
+            );
+          })}
+          {racks.length === 0 && <Text style={{ color: '#94a3b8' }}>No racks found in Item Master database.</Text>}
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.assignBtn, assigning && { opacity: 0.7 }]} 
+          onPress={handleAssign}
+          disabled={assigning}
+        >
+          {assigning ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Plus size={18} color="white" style={{ marginRight: 6 }} />
+              <Text style={styles.assignBtnText}>Create Assignment</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Navigation tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'assignments' && styles.tabActive]}
+          onPress={() => setActiveTab('assignments')}
+        >
+          <Text style={[styles.tabText, activeTab === 'assignments' && styles.tabTextActive]}>Active Assignments</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'discrepancies' && styles.tabActive]}
+          onPress={() => setActiveTab('discrepancies')}
+        >
+          <Text style={[styles.tabText, activeTab === 'discrepancies' && styles.tabTextActive]}>
+            Pending Discrepancies ({discrepancies.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'assignments' ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Assignments List</Text>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.th, { width: 180 }]}>Staff Checker</Text>
+            <Text style={[styles.th, { width: 100 }]}>Rack No</Text>
+            <Text style={[styles.th, { width: 120 }]}>Status</Text>
+            <Text style={[styles.th, { width: 150 }]}>Assigned On</Text>
+          </View>
+          {assignments.map((item, idx) => (
+            <View key={item.id || idx} style={styles.tableRow}>
+              <Text style={[styles.td, { width: 180, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
+              <Text style={[styles.td, { width: 100 }]}>{item.rack_number}</Text>
+              <Text style={[styles.td, { width: 120, color: item.status === 'Checked' ? '#10b981' : '#f59e0b', fontWeight: 'bold' }]}>
+                {item.status}
+              </Text>
+              <Text style={[styles.td, { width: 150 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+            </View>
+          ))}
+          {assignments.length === 0 && (
+            <Text style={styles.emptyText}>No assignments found.</Text>
+          )}
+        </View>
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Pending Correction Requests</Text>
+          {discrepancies.map((item) => (
+            <View key={item.id} style={styles.discCard}>
+              <View style={styles.discCardHeader}>
+                <View>
+                  <Text style={styles.discItemName}>{item.product_name}</Text>
+                  <Text style={styles.discSub}>
+                    Rack {item.rack_number} • Reported by {item.reported_by_name}
+                  </Text>
+                </View>
+                <View style={styles.badgeWarning}>
+                  <AlertTriangle size={12} color="#b45309" style={{ marginRight: 4 }} />
+                  <Text style={styles.badgeTextWarning}>{item.discrepancy_type}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.discBody}>
+                <Text style={styles.discDesc}><Text style={{ fontWeight: '700' }}>Note:</Text> {item.description || 'No comments'}</Text>
+                <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Quantity:</Text> {item.reported_qty}</Text>
+              </View>
+
+              <View style={styles.discFooter}>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
+                  disabled={reviewing === item.id}
+                  onPress={() => handleReviewDiscrepancy(item.id, 'rejected')}
+                >
+                  <X size={16} color="#ef4444" style={{ marginRight: 4 }} />
+                  <Text style={styles.rejectText}>Reject Changes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
+                  disabled={reviewing === item.id}
+                  onPress={() => handleReviewDiscrepancy(item.id, 'approved')}
+                >
+                  <Check size={16} color="white" style={{ marginRight: 4 }} />
+                  <Text style={styles.approveText}>Approve & Update Stock</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+          {discrepancies.length === 0 && (
+            <Text style={styles.emptyText}>No pending discrepancy requests.</Text>
+          )}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8fafc', padding: 24 },
+  header: { marginBottom: 24 },
+  title: { fontSize: 26, fontWeight: 'bold', color: '#0f172a' },
+  subtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
+  
+  card: { backgroundColor: 'white', padding: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, marginBottom: 24 },
+  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 },
+  
+  label: { fontSize: 13, fontWeight: '700', color: '#475569', marginTop: 12, marginBottom: 6 },
+  selectContainer: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f8fafc', marginBottom: 16 },
+  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', border: 'none', background: 'transparent', outline: 'none' as any },
+  
+  rackGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  rackPill: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' },
+  rackPillActive: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
+  rackText: { fontSize: 13, color: '#475569', fontWeight: '500' },
+  rackTextActive: { color: 'white', fontWeight: 'bold' },
+  
+  assignBtn: { backgroundColor: Colors.light.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8, marginTop: 12 },
+  assignBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  
+  tabContainer: { flexDirection: 'row', gap: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', marginBottom: 20 },
+  tab: { paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabActive: { borderBottomColor: Colors.light.primary },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  tabTextActive: { color: Colors.light.primary },
+  
+  tableHeader: { flexDirection: 'row', backgroundColor: '#f8fafc', paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  th: { fontSize: 12, fontWeight: '700', color: '#64748b', textTransform: 'uppercase' },
+  tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },
+  td: { fontSize: 14, color: '#334155' },
+  emptyText: { textAlign: 'center', color: '#94a3b8', padding: 20, fontStyle: 'italic' },
+
+  discCard: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
+  discCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  discItemName: { fontSize: 15, fontWeight: 'bold', color: '#0f172a' },
+  discSub: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  badgeWarning: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
+  badgeTextWarning: { fontSize: 11, color: '#b45309', fontWeight: 'bold', textTransform: 'uppercase' },
+  discBody: { backgroundColor: 'white', padding: 12, borderRadius: 8, marginBottom: 12 },
+  discDesc: { fontSize: 13, color: '#475569' },
+  discQty: { fontSize: 13, color: '#475569', marginTop: 4 },
+  discFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6, borderWidth: 1 },
+  rejectBtn: { borderColor: '#ef4444', backgroundColor: 'white' },
+  rejectText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
+  approveBtn: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  approveText: { color: 'white', fontSize: 13, fontWeight: '600' }
+});

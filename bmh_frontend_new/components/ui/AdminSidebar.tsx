@@ -22,6 +22,8 @@ const NAV_ITEMS = [
   { name: 'Notifications', icon: Bell, route: '/admin/dashboard/notifications' },
   { name: 'CRM', icon: MessageSquare, route: '/admin/dashboard/crm' },
   { name: 'Settings', icon: Settings, route: '/admin/dashboard/settings' },
+  { name: 'Rack Checker', icon: Activity, route: '/admin/dashboard/rack-checker' },
+  { name: 'Inventory Checker', icon: Activity, route: '/admin/dashboard/inventory-checker' },
   { name: 'Profile Requests', icon: Users, route: '/admin/dashboard/profile-requests' },
   { name: 'Profile', icon: Users, route: '/admin/dashboard/profile' },
 ];

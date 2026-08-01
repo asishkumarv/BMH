@@ -137,6 +137,24 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
               dynamicNavItems.push({ name: 'Item Master', icon: Package, route: '/employee/dashboard/pharmacy/items' });
             }
           }
+
+          if (res.data.success && res.data.settings.rack_checker_access) {
+            let value = res.data.settings.rack_checker_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const empId = u.id?.toString();
+            if (empId && value[empId] === true) {
+              dynamicNavItems.push({ name: 'Rack Checker', icon: CheckSquare, route: '/employee/dashboard/rack-checker' });
+            }
+          }
+
+          if (res.data.success && res.data.settings.inventory_checker_access) {
+            let value = res.data.settings.inventory_checker_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const empId = u.id?.toString();
+            if (empId && value[empId] === true) {
+              dynamicNavItems.push({ name: 'Inventory Checker', icon: CheckSquare, route: '/employee/dashboard/inventory-checker' });
+            }
+          }
           
           let dynamicPharmacyItems = [...BASE_PHARMACY_ITEMS];
           setPharmacyItems(dynamicPharmacyItems);
