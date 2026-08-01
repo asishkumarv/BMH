@@ -1098,7 +1098,6 @@ export default function AdminAttendanceScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        </View>
 
         <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
           <View style={[styles.table, { minWidth: 1450 }]}>
