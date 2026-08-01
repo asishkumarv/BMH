@@ -23,6 +23,7 @@ export default function EmployeeRackChecker() {
   const [selectedMedicineId, setSelectedMedicineId] = useState('');
   const [discrepancyType, setDiscrepancyType] = useState('missing stock');
   const [reportedQty, setReportedQty] = useState('');
+  const [reportedMrp, setReportedMrp] = useState('');
   const [description, setDescription] = useState('');
   const [submittingDisc, setSubmittingDisc] = useState(false);
 
@@ -116,6 +117,7 @@ export default function EmployeeRackChecker() {
         product_name: selectedMed.itemname,
         discrepancy_type: discrepancyType,
         reported_qty: parseInt(reportedQty),
+        reported_mrp: reportedMrp ? parseFloat(reportedMrp) : null,
         description: description
       });
 
@@ -123,6 +125,7 @@ export default function EmployeeRackChecker() {
       setDiscModalVisible(false);
       setSelectedMedicineId('');
       setReportedQty('');
+      setReportedMrp('');
       setDescription('');
     } catch (error) {
       console.error('Error reporting discrepancy:', error);
@@ -199,25 +202,33 @@ export default function EmployeeRackChecker() {
           {loadingMeds ? (
             <ActivityIndicator size="small" color={Colors.light.primary} />
           ) : (
-            <View>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.th, { flex: 2 }]}>Medicine Name</Text>
-                <Text style={[styles.th, { flex: 1 }]}>Batch No</Text>
-                <Text style={[styles.th, { flex: 1, textAlign: 'right' }]}>Stock Bal Qty</Text>
-              </View>
-              {medicines.map((med) => (
-                <View key={med.id} style={styles.tableRow}>
-                  <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{med.itemname}</Text>
-                  <Text style={[styles.td, { flex: 1, color: '#64748b' }]}>{med.batchno || '-'}</Text>
-                  <Text style={[styles.td, { flex: 1, textAlign: 'right', fontWeight: 'bold' }]}>
-                    {med.stockbalqty}
-                  </Text>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+              <View style={{ minWidth: isDesktop ? '100%' : 750 }}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { flex: 1.5 }]}>Item Code</Text>
+                  <Text style={[styles.th, { flex: 3.5 }]}>Medicine Name</Text>
+                  <Text style={[styles.th, { flex: 2 }]}>Batch No</Text>
+                  <Text style={[styles.th, { flex: 2, textAlign: 'right' }]}>Stock Bal Qty</Text>
+                  <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>MRP</Text>
                 </View>
-              ))}
-              {medicines.length === 0 && (
-                <Text style={styles.emptyText}>No medicines assigned to this rack in system database.</Text>
-              )}
-            </View>
+                {medicines.map((med) => (
+                  <View key={med.id} style={styles.tableRow}>
+                    <Text style={[styles.td, { flex: 1.5, color: '#64748b' }]}>{med.c_item_code || '-'}</Text>
+                    <Text style={[styles.td, { flex: 3.5, fontWeight: '700' }]}>{med.itemname}</Text>
+                    <Text style={[styles.td, { flex: 2, color: '#64748b' }]}>{med.batchno || '-'}</Text>
+                    <Text style={[styles.td, { flex: 2, textAlign: 'right', fontWeight: 'bold' }]}>
+                      {med.stockbalqty}
+                    </Text>
+                    <Text style={[styles.td, { flex: 1.5, textAlign: 'right', fontWeight: 'bold' }]}>
+                      {med.mrp || '-'}
+                    </Text>
+                  </View>
+                ))}
+                {medicines.length === 0 && (
+                  <Text style={styles.emptyText}>No medicines assigned to this rack in system database.</Text>
+                )}
+              </View>
+            </ScrollView>
           )}
         </View>
 
@@ -262,14 +273,28 @@ export default function EmployeeRackChecker() {
                   </select>
                 </View>
 
-                <Text style={styles.modalLabel}>Actual Verified Quantity</Text>
-                <TextInput 
-                  style={styles.textInput}
-                  placeholder="Enter observed quantity"
-                  keyboardType="numeric"
-                  value={reportedQty}
-                  onChangeText={setReportedQty}
-                />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalLabel}>Verified Stock Bal</Text>
+                    <TextInput 
+                      style={styles.textInput}
+                      placeholder="Enter actual qty"
+                      keyboardType="numeric"
+                      value={reportedQty}
+                      onChangeText={setReportedQty}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalLabel}>Verified MRP</Text>
+                    <TextInput 
+                      style={styles.textInput}
+                      placeholder="Enter actual mrp"
+                      keyboardType="numeric"
+                      value={reportedMrp}
+                      onChangeText={setReportedMrp}
+                    />
+                  </View>
+                </View>
 
                 <Text style={styles.modalLabel}>Describe Discrepancy / Comments</Text>
                 <TextInput 

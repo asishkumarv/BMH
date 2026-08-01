@@ -21,6 +21,8 @@ export default function AdminRackChecker() {
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedRacks, setSelectedRacks] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'assignments' | 'discrepancies'>('assignments');
+  const [rackSearch, setRackSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -158,21 +160,55 @@ export default function AdminRackChecker() {
           </select>
         </View>
 
-        <Text style={styles.label}>Select Racks (Multiple allowed)</Text>
-        <View style={styles.rackGrid}>
-          {racks.map(r => {
-            const isSel = selectedRacks.includes(r);
-            return (
-              <TouchableOpacity 
-                key={r} 
-                style={[styles.rackPill, isSel && styles.rackPillActive]} 
-                onPress={() => toggleRackSelection(r)}
-              >
-                <Text style={[styles.rackText, isSel && styles.rackTextActive]}>{r}</Text>
-              </TouchableOpacity>
-            );
-          })}
-          {racks.length === 0 && <Text style={{ color: '#94a3b8' }}>No racks found in Item Master database.</Text>}
+        <Text style={styles.label}>Search & Select Racks</Text>
+        <View style={{ position: 'relative', zIndex: 10, marginBottom: 16 }}>
+          {selectedRacks.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {selectedRacks.map(r => (
+                <View key={r} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2e8f0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 13, color: '#334155', fontWeight: '600' }}>{r}</Text>
+                  <TouchableOpacity style={{ marginLeft: 6 }} onPress={() => setSelectedRacks(selectedRacks.filter(item => item !== r))}>
+                    <X size={14} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <TextInput 
+            style={styles.textInput}
+            placeholder="Type to search and select racks..."
+            value={rackSearch}
+            onChangeText={(text) => {
+              setRackSearch(text);
+              setDropdownOpen(text.length > 0 || true);
+            }}
+            onFocus={() => setDropdownOpen(true)}
+          />
+
+          {dropdownOpen && (
+            <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
+              {racks
+                .filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r))
+                .slice(0, 50)
+                .map(r => (
+                  <TouchableOpacity 
+                    key={r}
+                    style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                    onPress={() => {
+                      setSelectedRacks([...selectedRacks, r]);
+                      setRackSearch('');
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: '#334155' }}>{r}</Text>
+                  </TouchableOpacity>
+                ))}
+              {racks.filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r)).length === 0 && (
+                <Text style={{ padding: 12, color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>No matching racks found</Text>
+              )}
+            </View>
+          )}
         </View>
 
         <TouchableOpacity 
@@ -212,25 +248,29 @@ export default function AdminRackChecker() {
       {activeTab === 'assignments' ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Assignments List</Text>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.th, { width: 180 }]}>Staff Checker</Text>
-            <Text style={[styles.th, { width: 100 }]}>Rack No</Text>
-            <Text style={[styles.th, { width: 120 }]}>Status</Text>
-            <Text style={[styles.th, { width: 150 }]}>Assigned On</Text>
-          </View>
-          {assignments.map((item, idx) => (
-            <View key={item.id || idx} style={styles.tableRow}>
-              <Text style={[styles.td, { width: 180, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
-              <Text style={[styles.td, { width: 100 }]}>{item.rack_number}</Text>
-              <Text style={[styles.td, { width: 120, color: item.status === 'Checked' ? '#10b981' : '#f59e0b', fontWeight: 'bold' }]}>
-                {item.status}
-              </Text>
-              <Text style={[styles.td, { width: 150 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+            <View style={{ minWidth: isDesktop ? '100%' : 600 }}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.th, { flex: 2 }]}>Staff Checker</Text>
+                <Text style={[styles.th, { flex: 1.5 }]}>Rack No</Text>
+                <Text style={[styles.th, { flex: 1.5 }]}>Status</Text>
+                <Text style={[styles.th, { flex: 2 }]}>Assigned On</Text>
+              </View>
+              {assignments.map((item, idx) => (
+                <View key={item.id || idx} style={styles.tableRow}>
+                  <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
+                  <Text style={[styles.td, { flex: 1.5 }]}>{item.rack_number}</Text>
+                  <Text style={[styles.td, { flex: 1.5, color: item.status === 'Checked' ? '#10b981' : '#f59e0b', fontWeight: 'bold' }]}>
+                    {item.status}
+                  </Text>
+                  <Text style={[styles.td, { flex: 2 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                </View>
+              ))}
+              {assignments.length === 0 && (
+                <Text style={styles.emptyText}>No assignments found.</Text>
+              )}
             </View>
-          ))}
-          {assignments.length === 0 && (
-            <Text style={styles.emptyText}>No assignments found.</Text>
-          )}
+          </ScrollView>
         </View>
       ) : (
         <View style={styles.card}>
@@ -252,7 +292,12 @@ export default function AdminRackChecker() {
               
               <View style={styles.discBody}>
                 <Text style={styles.discDesc}><Text style={{ fontWeight: '700' }}>Note:</Text> {item.description || 'No comments'}</Text>
-                <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Quantity:</Text> {item.reported_qty}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 }}>
+                  <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Qty:</Text> {item.reported_qty}</Text>
+                  {item.reported_mrp !== undefined && item.reported_mrp !== null && (
+                    <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported MRP:</Text> {item.reported_mrp}</Text>
+                  )}
+                </View>
               </View>
 
               <View style={styles.discFooter}>
@@ -270,7 +315,7 @@ export default function AdminRackChecker() {
                   onPress={() => handleReviewDiscrepancy(item.id, 'approved')}
                 >
                   <Check size={16} color="white" style={{ marginRight: 4 }} />
-                  <Text style={styles.approveText}>Approve & Update Stock</Text>
+                  <Text style={styles.approveText}>Approve & Update DB</Text>
                 </TouchableOpacity>
               </View>
             </View>
