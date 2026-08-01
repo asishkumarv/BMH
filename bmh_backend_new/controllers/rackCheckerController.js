@@ -147,7 +147,7 @@ exports.reviewDiscrepancy = async (req, res) => {
     
     if (status === 'approved') {
       const { medicine_id, reported_qty, discrepancy_type, reported_mrp } = discrepancy;
-      if (reported_qty !== null && (discrepancy_type === 'missing stock' || discrepancy_type === 'excess stock' || discrepancy_type === 'damaged item')) {
+      if (reported_qty !== null && (discrepancy_type === 'missing stock' || discrepancy_type === 'excess stock' || discrepancy_type === 'damaged item' || discrepancy_type === 'expired')) {
         await pool.query(
           'UPDATE ecogreen_medicines SET stockbalqty = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
           [reported_qty, medicine_id]
@@ -159,6 +159,27 @@ exports.reviewDiscrepancy = async (req, res) => {
           [reported_mrp, medicine_id]
         );
       }
+      if (discrepancy_type === 'wrong item') {
+        try {
+          const wrongDetails = JSON.parse(description);
+          if (wrongDetails.actual_item_id) {
+            // Update actual item's stock and rack number
+            await pool.query(
+              `UPDATE ecogreen_medicines 
+               SET stockbalqty = $1, rack = (SELECT rack_number FROM rack_assignments WHERE id = $2), updated_at = CURRENT_TIMESTAMP 
+               WHERE id = $3`,
+              [wrongDetails.actual_item_stock, assignment_id, wrongDetails.actual_item_id]
+            );
+            // Clear rack of the wrong medicine assigned
+            await pool.query(
+              "UPDATE ecogreen_medicines SET rack = '', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+              [medicine_id]
+            );
+          }
+        } catch (e) {
+          console.error('Error parsing wrong item details:', e);
+        }
+      }
     }
     
     await pool.query('COMMIT');
@@ -166,6 +187,26 @@ exports.reviewDiscrepancy = async (req, res) => {
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('reviewDiscrepancy error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.searchMedicines = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.json({ success: true, medicines: [] });
+    }
+    const result = await pool.query(`
+      SELECT id, c_item_code, itemname, rack, batchno, stockbalqty, expirydate, mrp 
+      FROM ecogreen_medicines 
+      WHERE itemname ILIKE $1 OR c_item_code ILIKE $1 
+      ORDER BY itemname ASC 
+      LIMIT 20
+    `, [`%${q}%`]);
+    res.json({ success: true, medicines: result.rows });
+  } catch (error) {
+    console.error('searchMedicines error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

@@ -18,13 +18,28 @@ export default function EmployeeRackChecker() {
   const [loadingMeds, setLoadingMeds] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // Discrepancy Modal States
+  // Discrepancy Modal & List States
   const [discModalVisible, setDiscModalVisible] = useState(false);
   const [selectedMedicineId, setSelectedMedicineId] = useState('');
   const [discrepancyType, setDiscrepancyType] = useState('missing stock');
-  const [reportedQty, setReportedQty] = useState('');
+  const [discrepancyList, setDiscrepancyList] = useState<any[]>([]);
+
+  // Individual Form Fields based on Type
+  const [missingQty, setMissingQty] = useState('');
+  const [excessQty, setExcessQty] = useState('');
+  const [damagedQty, setDamagedQty] = useState('');
+  const [expiredQty, setExpiredQty] = useState('');
+  const [totalStock, setTotalStock] = useState('');
   const [reportedMrp, setReportedMrp] = useState('');
   const [description, setDescription] = useState('');
+
+  // Wrong Item search states
+  const [wrongItemSearch, setWrongItemSearch] = useState('');
+  const [wrongItemStock, setWrongItemStock] = useState('');
+  const [selectedWrongMed, setSelectedWrongMed] = useState<any>(null);
+  const [wrongMedResults, setWrongMedResults] = useState<any[]>([]);
+  const [wrongDropdownOpen, setWrongDropdownOpen] = useState(false);
+
   const [submittingDisc, setSubmittingDisc] = useState(false);
 
   useEffect(() => {
@@ -94,42 +109,163 @@ export default function EmployeeRackChecker() {
     }
   };
 
-  const handleSubmitDiscrepancy = async () => {
+  const handleSearchWrongMed = async (query: string) => {
+    setWrongItemSearch(query);
+    if (query.trim().length > 1) {
+      try {
+        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/rack-checker/search-medicines?q=${query}`);
+        if (res.data.success) {
+          setWrongMedResults(res.data.medicines || []);
+          setWrongDropdownOpen(true);
+        }
+      } catch (error) {
+        console.error('Error searching wrong medicine:', error);
+      }
+    } else {
+      setWrongMedResults([]);
+      setWrongDropdownOpen(false);
+    }
+  };
+
+  const handleAddDiscrepancy = () => {
     if (!selectedMedicineId) {
       Alert.alert('Validation Error', 'Please select a medicine.');
-      return;
-    }
-    if (!reportedQty) {
-      Alert.alert('Validation Error', 'Please specify the actual stock quantity.');
       return;
     }
 
     const selectedMed = medicines.find(m => m.id.toString() === selectedMedicineId);
     if (!selectedMed) return;
 
+    let reported_qty: number | null = null;
+    let reported_mrp_val: number | null = null;
+    let finalDescription = '';
+
+    // Validate inputs based on discrepancy type
+    if (discrepancyType === 'missing stock') {
+      if (!missingQty || !totalStock) {
+        Alert.alert('Validation Error', 'Please specify missing quantity and total stock of batch.');
+        return;
+      }
+      reported_qty = parseInt(totalStock) - parseInt(missingQty);
+      finalDescription = `${description} (Missing: ${missingQty}, Total: ${totalStock})`;
+    } else if (discrepancyType === 'excess stock') {
+      if (!excessQty || !totalStock) {
+        Alert.alert('Validation Error', 'Please specify excess quantity and total stock of batch.');
+        return;
+      }
+      reported_qty = parseInt(totalStock) + parseInt(excessQty);
+      finalDescription = `${description} (Excess: ${excessQty}, Total: ${totalStock})`;
+    } else if (discrepancyType === 'wrong item') {
+      if (!selectedWrongMed || !wrongItemStock) {
+        Alert.alert('Validation Error', 'Please search/select actual medicine and observed stock.');
+        return;
+      }
+      reported_qty = null;
+      finalDescription = JSON.stringify({
+        actual_item_id: selectedWrongMed.id,
+        actual_item_name: selectedWrongMed.itemname,
+        actual_item_stock: parseInt(wrongItemStock)
+      });
+    } else if (discrepancyType === 'damaged item') {
+      if (!damagedQty || !totalStock) {
+        Alert.alert('Validation Error', 'Please specify damaged quantity and total stock.');
+        return;
+      }
+      reported_qty = parseInt(totalStock) - parseInt(damagedQty);
+      finalDescription = `${description} (Damaged: ${damagedQty}, Total: ${totalStock})`;
+    } else if (discrepancyType === 'expired') {
+      if (!expiredQty || !totalStock) {
+        Alert.alert('Validation Error', 'Please specify expired quantity and total stock.');
+        return;
+      }
+      reported_qty = parseInt(totalStock) - parseInt(expiredQty);
+      finalDescription = `${description} (Expired: ${expiredQty}, Total: ${totalStock})`;
+    } else if (discrepancyType === 'mrp') {
+      if (!reportedMrp) {
+        Alert.alert('Validation Error', 'Please specify verified MRP.');
+        return;
+      }
+      reported_qty = null;
+      reported_mrp_val = parseFloat(reportedMrp);
+      finalDescription = `${description} (New MRP: ${reportedMrp})`;
+    } else { // other
+      if (!description) {
+        Alert.alert('Validation Error', 'Please provide details about the mismatch.');
+        return;
+      }
+      reported_qty = null;
+      finalDescription = description;
+    }
+
+    const newDisc = {
+      id: Date.now().toString(),
+      medicine_id: selectedMed.id,
+      product_name: selectedMed.itemname,
+      discrepancy_type: discrepancyType,
+      reported_qty,
+      reported_mrp: reported_mrp_val,
+      description: finalDescription,
+      display_text: `${discrepancyType.toUpperCase()}: ${
+        discrepancyType === 'wrong item'
+          ? `Replace with "${selectedWrongMed.itemname}" (Stock: ${wrongItemStock})`
+          : discrepancyType === 'mrp'
+          ? `MRP corrected to ${reportedMrp}`
+          : `Stock adjusted (System updated to: ${reported_qty})`
+      }`
+    };
+
+    setDiscrepancyList([...discrepancyList, newDisc]);
+
+    // Clear item inputs
+    setMissingQty('');
+    setExcessQty('');
+    setDamagedQty('');
+    setExpiredQty('');
+    setTotalStock('');
+    setReportedMrp('');
+    setDescription('');
+    setWrongItemSearch('');
+    setWrongItemStock('');
+    setSelectedWrongMed(null);
+    setWrongMedResults([]);
+  };
+
+  const handleRemoveDiscrepancy = (id: string) => {
+    setDiscrepancyList(discrepancyList.filter(item => item.id !== id));
+  };
+
+  const handleSubmitDiscrepancy = async () => {
+    if (discrepancyList.length === 0) {
+      Alert.alert('Validation Error', 'Please add at least one discrepancy request.');
+      return;
+    }
+
     setSubmittingDisc(true);
     try {
-      await axios.post('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy', {
-        assignment_id: selectedAssignment.id,
-        reported_by: user.role === 'Sub Admin' ? `SA-${user.id}` : user.id.toString(),
-        reported_by_name: user.full_name,
-        medicine_id: selectedMed.id,
-        product_name: selectedMed.itemname,
-        discrepancy_type: discrepancyType,
-        reported_qty: parseInt(reportedQty),
-        reported_mrp: reportedMrp ? parseFloat(reportedMrp) : null,
-        description: description
+      // Loop through all items and post them to backend
+      const posts = discrepancyList.map(disc => {
+        return axios.post('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy', {
+          assignment_id: selectedAssignment.id,
+          reported_by: user.role === 'Sub Admin' ? `SA-${user.id}` : user.id.toString(),
+          reported_by_name: user.full_name,
+          medicine_id: disc.medicine_id,
+          product_name: disc.product_name,
+          discrepancy_type: disc.discrepancy_type,
+          reported_qty: disc.reported_qty,
+          reported_mrp: disc.reported_mrp,
+          description: disc.description
+        });
       });
 
-      Alert.alert('Success', 'Correction request submitted to Admin.');
+      await Promise.all(posts);
+
+      Alert.alert('Success', 'All correction requests submitted successfully to Admin.');
       setDiscModalVisible(false);
       setSelectedMedicineId('');
-      setReportedQty('');
-      setReportedMrp('');
-      setDescription('');
+      setDiscrepancyList([]);
     } catch (error) {
-      console.error('Error reporting discrepancy:', error);
-      Alert.alert('Error', 'Failed to submit correction request.');
+      console.error('Error reporting discrepancies:', error);
+      Alert.alert('Error', 'Failed to submit correction requests.');
     } finally {
       setSubmittingDisc(false);
     }
@@ -238,7 +374,10 @@ export default function EmployeeRackChecker() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Submit Correction Request</Text>
-                <TouchableOpacity onPress={() => setDiscModalVisible(false)}>
+                <TouchableOpacity onPress={() => {
+                  setDiscModalVisible(false);
+                  setDiscrepancyList([]);
+                }}>
                   <X size={24} color="#64748b" />
                 </TouchableOpacity>
               </View>
@@ -258,6 +397,23 @@ export default function EmployeeRackChecker() {
                   </select>
                 </View>
 
+                {/* Added Discrepancies list */}
+                {discrepancyList.length > 0 && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={[styles.modalLabel, { color: Colors.light.primary }]}>Added Corrections ({discrepancyList.length})</Text>
+                    {discrepancyList.map(item => (
+                      <View key={item.id} style={styles.discListItem}>
+                        <Text style={styles.discListText}>
+                          {item.product_name} - {item.display_text}
+                        </Text>
+                        <TouchableOpacity style={styles.removeDiscBtn} onPress={() => handleRemoveDiscrepancy(item.id)}>
+                          <X size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 <Text style={styles.modalLabel}>Discrepancy Type</Text>
                 <View style={styles.selectContainer}>
                   <select 
@@ -269,23 +425,165 @@ export default function EmployeeRackChecker() {
                     <option value="excess stock">Excess Stock</option>
                     <option value="wrong item">Wrong Item</option>
                     <option value="damaged item">Damaged Item</option>
+                    <option value="expired">Expired</option>
+                    <option value="mrp">MRP Mismatch</option>
                     <option value="other">Other</option>
                   </select>
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalLabel}>Verified Stock Bal</Text>
+                {/* Dynamic fields based on type */}
+                {discrepancyType === 'missing stock' && (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Qty Missing</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Enter missing qty"
+                        keyboardType="numeric"
+                        value={missingQty}
+                        onChangeText={setMissingQty}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Total Stock of Batch</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Expected stock"
+                        keyboardType="numeric"
+                        value={totalStock}
+                        onChangeText={setTotalStock}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {discrepancyType === 'excess stock' && (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Qty Excess</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Enter excess qty"
+                        keyboardType="numeric"
+                        value={excessQty}
+                        onChangeText={setExcessQty}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Total Stock of Batch</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Expected stock"
+                        keyboardType="numeric"
+                        value={totalStock}
+                        onChangeText={setTotalStock}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {discrepancyType === 'wrong item' && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={styles.modalLabel}>Search Wrong Medicine (Actual Item)</Text>
+                    {selectedWrongMed ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2e8f0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 12 }}>
+                        <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '700', flex: 1 }}>
+                          {selectedWrongMed.itemname} (Batch: {selectedWrongMed.batchno || 'N/A'})
+                        </Text>
+                        <TouchableOpacity onPress={() => setSelectedWrongMed(null)}>
+                          <X size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={{ position: 'relative', zIndex: 99, marginBottom: 12 }}>
+                        <TextInput 
+                          style={styles.textInput}
+                          placeholder="Type item name to search..."
+                          value={wrongItemSearch}
+                          onChangeText={handleSearchWrongMed}
+                        />
+                        {wrongDropdownOpen && wrongMedResults.length > 0 && (
+                          <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 150, overflowY: 'auto' as any, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 }}>
+                            {wrongMedResults.map(m => (
+                              <TouchableOpacity 
+                                key={m.id} 
+                                style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                                onPress={() => {
+                                  setSelectedWrongMed(m);
+                                  setWrongDropdownOpen(false);
+                                }}
+                              >
+                                <Text style={{ fontSize: 13, color: '#334155' }}>{m.itemname} (Batch: {m.batchno || 'N/A'})</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    <Text style={styles.modalLabel}>Actual observed stock of this medicine</Text>
                     <TextInput 
                       style={styles.textInput}
                       placeholder="Enter actual qty"
                       keyboardType="numeric"
-                      value={reportedQty}
-                      onChangeText={setReportedQty}
+                      value={wrongItemStock}
+                      onChangeText={setWrongItemStock}
                     />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalLabel}>Verified MRP</Text>
+                )}
+
+                {discrepancyType === 'damaged item' && (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Qty Damaged</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Enter damaged qty"
+                        keyboardType="numeric"
+                        value={damagedQty}
+                        onChangeText={setDamagedQty}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Total Stock of Batch</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Total stock"
+                        keyboardType="numeric"
+                        value={totalStock}
+                        onChangeText={setTotalStock}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {discrepancyType === 'expired' && (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Qty Expired</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Enter expired qty"
+                        keyboardType="numeric"
+                        value={expiredQty}
+                        onChangeText={setExpiredQty}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalLabel}>Total Stock of Batch</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Total stock"
+                        keyboardType="numeric"
+                        value={totalStock}
+                        onChangeText={setTotalStock}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {discrepancyType === 'mrp' && (
+                  <View>
+                    <Text style={styles.modalLabel}>Observed Actual MRP</Text>
                     <TextInput 
                       style={styles.textInput}
                       placeholder="Enter actual mrp"
@@ -294,23 +592,36 @@ export default function EmployeeRackChecker() {
                       onChangeText={setReportedMrp}
                     />
                   </View>
-                </View>
+                )}
 
-                <Text style={styles.modalLabel}>Describe Discrepancy / Comments</Text>
+                <Text style={styles.modalLabel}>Comments / Remarks</Text>
                 <TextInput 
-                  style={[styles.textInput, { height: 100, textAlignVertical: 'top' }]}
-                  placeholder="Provide details about the mismatch..."
+                  style={[styles.textInput, { height: 70, textAlignVertical: 'top' }]}
+                  placeholder="Provide any comments..."
                   multiline
                   value={description}
                   onChangeText={setDescription}
                 />
 
                 <TouchableOpacity 
+                  style={styles.addDiscBtn} 
+                  onPress={handleAddDiscrepancy}
+                >
+                  <Text style={styles.addDiscBtnText}>+ Add to Correction List</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
                   style={[styles.submitDiscBtn, submittingDisc && { opacity: 0.7 }]} 
                   onPress={handleSubmitDiscrepancy}
                   disabled={submittingDisc}
                 >
-                  {submittingDisc ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.submitDiscBtnText}>Submit to Admin</Text>}
+                  {submittingDisc ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.submitDiscBtnText}>
+                      Submit Correction Request ({discrepancyList.length})
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -392,5 +703,11 @@ const styles = StyleSheet.create({
   selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', border: 'none', background: 'transparent', outline: 'none' as any },
   textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', outlineStyle: 'none' as any, marginBottom: 16 },
   submitDiscBtn: { backgroundColor: Colors.light.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
-  submitDiscBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 }
+  submitDiscBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  
+  addDiscBtn: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12, marginBottom: 20 },
+  addDiscBtnText: { color: '#334155', fontWeight: 'bold', fontSize: 13 },
+  discListItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, marginBottom: 8 },
+  discListText: { fontSize: 13, color: '#334155', fontWeight: '600', flex: 1 },
+  removeDiscBtn: { marginLeft: 12, padding: 4 }
 });

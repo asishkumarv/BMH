@@ -313,9 +313,28 @@ export default function AdminRackChecker() {
               </View>
               
               <View style={styles.discBody}>
-                <Text style={styles.discDesc}><Text style={{ fontWeight: '700' }}>Note:</Text> {item.description || 'No comments'}</Text>
+                {(() => {
+                  let descText = item.description || 'No comments';
+                  let isWrongItem = item.discrepancy_type === 'wrong item';
+                  if (isWrongItem) {
+                    try {
+                      const parsed = JSON.parse(item.description);
+                      descText = `Actual Observed Item: ${parsed.actual_item_name} | Stock: ${parsed.actual_item_stock}`;
+                    } catch (e) {
+                      descText = item.description;
+                    }
+                  }
+                  return (
+                    <Text style={styles.discDesc}>
+                      <Text style={{ fontWeight: '700' }}>{isWrongItem ? 'Wrong Item Details:' : 'Note:'}</Text> {descText}
+                    </Text>
+                  );
+                })()}
+                
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 }}>
-                  <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Qty:</Text> {item.reported_qty}</Text>
+                  {item.reported_qty !== null && (
+                    <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Qty:</Text> {item.reported_qty}</Text>
+                  )}
                   {item.reported_mrp !== undefined && item.reported_mrp !== null && (
                     <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported MRP:</Text> {item.reported_mrp}</Text>
                   )}

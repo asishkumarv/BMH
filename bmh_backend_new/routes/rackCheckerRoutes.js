@@ -4,6 +4,7 @@ const rackCheckerController = require('../controllers/rackCheckerController');
 
 router.get('/racks', rackCheckerController.getRacksList);
 router.get('/rack-medicines/:rack', rackCheckerController.getRackMedicines);
+router.get('/search-medicines', rackCheckerController.searchMedicines);
 router.post('/assign', rackCheckerController.assignRacks);
 router.get('/assignments', rackCheckerController.getAssignments);
 router.put('/assignment/:id/status', rackCheckerController.updateAssignmentStatus);
