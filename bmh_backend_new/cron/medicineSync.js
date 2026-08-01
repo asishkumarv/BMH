@@ -9,6 +9,7 @@ async function initMedicineDB() {
             id SERIAL PRIMARY KEY,
             c_item_code VARCHAR(100),
             itemName VARCHAR(255),
+            rack VARCHAR(100),
             itemQtyPerBox INTEGER,
             batchNo VARCHAR(100),
             stockBalQty DECIMAL(10,2),
@@ -20,6 +21,17 @@ async function initMedicineDB() {
         );
     `;
     await pool.query(createTableQuery);
+
+    // Ensure rack column exists in case the table was created previously without it
+    try {
+        await pool.query(`
+            ALTER TABLE ecogreen_medicines ADD COLUMN IF NOT EXISTS rack VARCHAR(100);
+        `);
+        console.log("✅ ecogreen_medicines 'rack' column ensured.");
+    } catch (alterErr) {
+        console.error("⚠️ Failed to ensure 'rack' column in ecogreen_medicines:", alterErr.message);
+    }
+
     console.log("✅ ecogreen_medicines table ensured in DB.");
 }
 
@@ -59,11 +71,12 @@ async function syncMedicines(inputDateTime) {
                 
                 const queryText = `
                     INSERT INTO ecogreen_medicines 
-                        (c_item_code, itemName, itemQtyPerBox, batchNo, stockBalQty, expiryDate, mrp, saleRate, updated_at) 
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+                        (c_item_code, itemName, rack, itemQtyPerBox, batchNo, stockBalQty, expiryDate, mrp, saleRate, updated_at) 
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
                     ON CONFLICT (c_item_code, batchNo) 
                     DO UPDATE SET 
                         itemName = EXCLUDED.itemName,
+                        rack = EXCLUDED.rack,
                         itemQtyPerBox = EXCLUDED.itemQtyPerBox,
                         stockBalQty = EXCLUDED.stockBalQty,
                         expiryDate = EXCLUDED.expiryDate,
@@ -77,6 +90,7 @@ async function syncMedicines(inputDateTime) {
                     await client.query(queryText, [
                         item.c_item_code,
                         item.itemName,
+                        item.rack || '',
                         item.itemQtyPerBox || 1,
                         item.batchNo || 'N/A',
                         item.stockBalQty || 0,
@@ -119,6 +133,14 @@ async function startMedicineCron() {
         console.log("📦 ecogreen_medicines is empty! Running initial full sync...");
         // initial sync from long ago
         await syncMedicines("2023-01-01 10:10:00");
+    } else {
+        // If there are existing records but rack is NULL, trigger a background full sync to update old records
+        const nullRackRes = await pool.query("SELECT COUNT(*) FROM ecogreen_medicines WHERE rack IS NULL");
+        const nullRackCount = parseInt(nullRackRes.rows[0].count, 10);
+        if (nullRackCount > 0) {
+            console.log(`📦 Found ${nullRackCount} items without rack info. Running full sync to update old data...`);
+            syncMedicines("2023-01-01 10:10:00").catch(err => console.error("❌ Background full sync failed:", err));
+        }
     }
 
     // Schedule hourly sync for recent changes

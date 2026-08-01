@@ -99,6 +99,7 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allSto
             <Text style={[styles.th, { flex: 0.5 }]}>Sr.</Text>
             <Text style={[styles.th, { flex: 3 }]}>Item Name</Text>
             <Text style={[styles.th, { flex: 1.5 }]}>Code</Text>
+            <Text style={[styles.th, { flex: 1 }]}>Rack</Text>
             <Text style={[styles.th, { flex: 1 }]}>Batch No.</Text>
             <Text style={[styles.th, { flex: 1 }]}>Bal.Qty</Text>
             <Text style={[styles.th, { flex: 1.5 }]}>Exp Dt</Text>
@@ -132,6 +133,7 @@ export function ItemMasterModal({ visible, onClose, onSelectItem, apiKey, allSto
                   <Text style={[styles.td, { flex: 0.5 }]}>F{index + 1}</Text>
                   <Text style={[styles.td, { flex: 3 }]}>{item.itemName}</Text>
                   <Text style={[styles.td, { flex: 1.5 }]}>{item.c_item_code}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>{item.rack || '-'}</Text>
                   <Text style={[styles.td, { flex: 1 }]}>{item.batchNo}</Text>
                   <Text style={[styles.td, { flex: 1 }]}>{item.stockBalQty}</Text>
                   <Text style={[styles.td, { flex: 1.5 }]}>{item.expiryDate}</Text>

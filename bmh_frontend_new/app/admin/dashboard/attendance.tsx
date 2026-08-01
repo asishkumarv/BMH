@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform, Image, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
-import { Download, MapPin, ChevronDown, ChevronUp, Edit2, X, Target } from 'lucide-react-native';
+import { Download, MapPin, ChevronDown, ChevronUp, Edit2, X, Target, Printer } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import EmployeeAnalyticsModal from '../../../components/EmployeeAnalyticsModal';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { Colors } from '../../../constants/Colors';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 
 const formatDateToDDMMYYYY = (dateStr: any) => {
   if (!dateStr) return '-';
@@ -496,17 +497,32 @@ export default function AdminAttendanceScreen() {
   const handleExportCSV = async () => {
     if (!reports || reports.length === 0) return;
     
-    let csvContent = "Name,Department,Check In,Check Out,Status,Breaks\n";
-    reports.forEach((r) => {
-      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString() : 'N/A';
-      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString() : 'N/A';
-      const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString()}`).join('; ') : 'No breaks';
-      
-      csvContent += `${r.full_name},${r.department},${checkIn},${checkOut},${r.status},"${breaksStr}"\n`;
+    const hasDateFilter = startDate && endDate;
+    const dateStr = hasDateFilter ? `${startDate} to ${endDate}` : (reports[0]?.date ? formatDateToDDMMYYYY(reports[0].date) : new Date().toISOString().split('T')[0]);
+
+    const headerRows = [
+      `"Bharat Medical Hall"`,
+      `"Report Type:","Super Admin Attendance Report"`,
+      `"Role Filter:","${selectedUserType === 'employee' ? 'Employees' : 'Sub Admins'}"`,
+      `"Department Filter:","${selectedReportDept}"`,
+      `"Date/Range:","${dateStr}"`,
+      `"Search:","${searchQuery || 'None'}"`,
+      ``,
+      `"Name","Department","Date","Check In","Check Out","Worked Hours","Status","Breaks"`
+    ];
+    
+    const dataRows = reports.map((r) => {
+      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+      const workedHrs = r.worked_mins != null ? formatMins(r.worked_mins) : (r.check_in && r.check_out ? formatMins(Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000)) : '-');
+      const breaksStr = r.breaks ? r.breaks.map((b: any) => `${b.break_type} at ${new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`).join('; ') : 'No breaks';
+      return `"${r.full_name}","${r.department}","${formatDateToDDMMYYYY(r.date)}","${checkIn}","${checkOut}","${workedHrs}","${r.status}","${breaksStr.replace(/"/g, '""')}"`;
     });
+
+    const csvContent = [...headerRows, ...dataRows].join('\n');
     
     if (Platform.OS === 'web') {
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.setAttribute('href', url);
@@ -514,12 +530,114 @@ export default function AdminAttendanceScreen() {
       a.click();
     } else {
       try {
-        const path = `${(FileSystem as any).documentDirectory}attendance_report.csv`;
+        const path = `${FileSystem.documentDirectory}attendance_report.csv`;
         await FileSystem.writeAsStringAsync(path, csvContent, { encoding: 'utf8' });
         await Sharing.shareAsync(path);
       } catch (e: any) {
         Alert.alert("Error", "Failed to export CSV: " + e.message);
       }
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!reports || reports.length === 0) return;
+
+    const hasDateFilter = startDate && endDate;
+    const dateStr = hasDateFilter ? `${startDate} to ${endDate}` : (reports[0]?.date ? formatDateToDDMMYYYY(reports[0].date) : new Date().toISOString().split('T')[0]);
+
+    const tableHeadersHtml = `
+      <tr>
+        <th>Name</th>
+        <th>Department</th>
+        <th>Date</th>
+        <th>Check In</th>
+        <th>Check Out</th>
+        <th>Worked</th>
+        <th>Status</th>
+        <th>Breaks</th>
+      </tr>
+    `;
+
+    const tableRowsHtml = reports.map(r => {
+      const checkIn = r.check_in ? new Date(r.check_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+      const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+      const workedHrs = r.worked_mins != null ? formatMins(r.worked_mins) : (r.check_in && r.check_out ? formatMins(Math.floor((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 60000)) : '-');
+      const breaksHtml = r.breaks && r.breaks.length > 0 
+        ? r.breaks.map((b: any) => `<div>${b.break_type}: ${new Date(b.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>`).join('')
+        : '-';
+      return `
+        <tr>
+          <td><b>${r.full_name}</b><br/><small>${r.mobile || ''}</small></td>
+          <td>${r.department || '-'}</td>
+          <td>${formatDateToDDMMYYYY(r.date)}</td>
+          <td>${checkIn}</td>
+          <td>${checkOut}</td>
+          <td>${workedHrs}</td>
+          <td>${r.status}</td>
+          <td>${breaksHtml}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <html>
+        <head>
+          <style>
+            @page { size: portrait; margin: 8mm; }
+            body { font-family: sans-serif; padding: 10px; color: #334155; }
+            h1 { color: #0f172a; margin-bottom: 4px; text-align: center; font-size: 18px; }
+            .meta-section { margin-top: 10px; margin-bottom: 12px; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; }
+            .meta-row { display: flex; margin-bottom: 4px; font-size: 11px; }
+            .meta-label { font-weight: bold; width: 130px; color: #475569; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9px; }
+            th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; vertical-align: top; }
+            th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+          </style>
+        </head>
+        <body>
+          <h1>Bharat Medical Hall</h1>
+          <div class="meta-section">
+            <div class="meta-row"><span class="meta-label">Report Type:</span><span>Super Admin Attendance Report</span></div>
+            <div class="meta-row"><span class="meta-label">Role Filter:</span><span>${selectedUserType === 'employee' ? 'Employees' : 'Sub Admins'}</span></div>
+            <div class="meta-row"><span class="meta-label">Department Filter:</span><span>${selectedReportDept}</span></div>
+            <div class="meta-row"><span class="meta-label">Date/Range:</span><span>${dateStr}</span></div>
+            <div class="meta-row"><span class="meta-label">Search Query:</span><span>${searchQuery || 'None'}</span></div>
+          </div>
+          <table>
+            <thead>${tableHeadersHtml}</thead>
+            <tbody>${tableRowsHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentWindow?.document || iframe.contentDocument;
+        if (doc) {
+          doc.open();
+          doc.write(htmlContent);
+          doc.close();
+          setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            document.body.removeChild(iframe);
+          }, 500);
+        }
+      } else {
+        await Print.printAsync({ html: htmlContent });
+      }
+    } catch (e: any) {
+      Alert.alert("Error", "Failed to print: " + e.message);
     }
   };
 
@@ -693,6 +811,10 @@ export default function AdminAttendanceScreen() {
             <TouchableOpacity style={styles.exportButton} onPress={handleExportCSV}>
               <Download size={20} color="white" />
               <Text style={styles.buttonText}> Export CSV</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.exportButton, {backgroundColor: '#3b82f6'}]} onPress={handlePrint}>
+              <Printer size={20} color="white" />
+              <Text style={styles.buttonText}> Print</Text>
             </TouchableOpacity>
           </View>
         </View>

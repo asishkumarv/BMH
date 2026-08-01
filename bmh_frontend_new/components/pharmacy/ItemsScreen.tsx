@@ -225,11 +225,12 @@ export default function ItemsScreen() {
         ) : (
           <View style={styles.tableContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator>
-              <View style={{ minWidth: 1200 }}>
+              <View style={{ minWidth: 1280 }}>
                 {/* Table Header */}
                 <View style={styles.tableHeader}>
                   <Text style={[styles.headerCell, { flex: 1 }]}>Item Code</Text>
                   <Text style={[styles.headerCell, { flex: 2 }]}>Medicine Name</Text>
+                  <Text style={[styles.headerCell, { flex: 0.8 }]}>Rack</Text>
                   <Text style={[styles.headerCell, { flex: 1 }]}>Batch No</Text>
                   <Text style={[styles.headerCell, { flex: 1, textAlign: 'center' }]}>Expiry</Text>
                   <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>MRP</Text>
@@ -248,6 +249,7 @@ export default function ItemsScreen() {
                         {item.c_item_code || '-'}
                       </Text>
                       <Text style={[styles.cell, { flex: 2 }]} numberOfLines={2}>{item.itemName || '-'}</Text>
+                      <Text style={[styles.cell, { flex: 0.8 }]}>{item.rack || '-'}</Text>
                       <Text style={[styles.cell, { flex: 1 }]}>{item.batchNo || '-'}</Text>
                       <Text style={[styles.cell, { flex: 1, textAlign: 'center' }]}>{item.expiryDate || '-'}</Text>
                       <Text style={[styles.cell, { flex: 0.8, textAlign: 'right', fontWeight: '600' }]}>₹{item.mrp}</Text>
