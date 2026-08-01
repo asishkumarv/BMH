@@ -303,7 +303,7 @@ export default function AdminRackChecker() {
                 <View>
                   <Text style={styles.discItemName}>{item.product_name}</Text>
                   <Text style={styles.discSub}>
-                    Rack {item.rack_number} • Reported by {item.reported_by_name}
+                    Rack {item.rack_number} • Batch: {item.batch_no || 'N/A'} • Reported by {item.reported_by_name}
                   </Text>
                 </View>
                 <View style={styles.badgeWarning}>
