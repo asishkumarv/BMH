@@ -190,32 +190,46 @@ export default function AdminInventoryChecker() {
             }}
             onBlur={() => {
               setIsFocused(false);
-              setTimeout(() => setDropdownOpen(false), 200);
             }}
           />
 
           {dropdownOpen && (
-            <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 10000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
-              {racks
-                .filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r))
-                .slice(0, 50)
-                .map(r => (
-                  <TouchableOpacity 
-                    key={r}
-                    style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
-                    onPress={() => {
-                      setSelectedRacks([...selectedRacks, r]);
-                      setRackSearch('');
-                      setDropdownOpen(false);
-                    }}
-                  >
-                    <Text style={{ fontSize: 14, color: '#334155' }}>{r}</Text>
-                  </TouchableOpacity>
-                ))}
-              {racks.filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r)).length === 0 && (
-                <Text style={{ padding: 12, color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>No matching racks found</Text>
-              )}
-            </View>
+            <>
+              <TouchableOpacity 
+                style={{
+                  position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+                  top: Platform.OS === 'web' ? 0 : -1000,
+                  bottom: Platform.OS === 'web' ? 0 : -1000,
+                  left: Platform.OS === 'web' ? 0 : -1000,
+                  right: Platform.OS === 'web' ? 0 : -1000,
+                  zIndex: 9999,
+                  backgroundColor: 'transparent'
+                }}
+                activeOpacity={1}
+                onPress={() => setDropdownOpen(false)}
+              />
+              <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 10000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
+                {racks
+                  .filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r))
+                  .slice(0, 50)
+                  .map(r => (
+                    <TouchableOpacity 
+                      key={r}
+                      style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                      onPress={() => {
+                        setSelectedRacks([...selectedRacks, r]);
+                        setRackSearch('');
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: '#334155' }}>{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                {racks.filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r)).length === 0 && (
+                  <Text style={{ padding: 12, color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>No matching racks found</Text>
+                )}
+              </View>
+            </>
           )}
         </View>
 
