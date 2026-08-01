@@ -8,12 +8,25 @@ import { CheckCircle2, XCircle, User, Clock } from 'lucide-react-native';
 export default function AdminProfileRequestsScreen() {
   const { isDesktop } = useResponsive();
   const [requests, setRequests] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchRequests();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/department');
+      if (res.data.success) {
+        setDepartments(res.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -50,6 +63,24 @@ export default function AdminProfileRequestsScreen() {
       try { pd = JSON.parse(pd); } catch (e) {}
     }
 
+    const cleanString = (val: any) => {
+      if (val === null || val === undefined) return '';
+      return String(val).trim();
+    };
+
+    const getDepartmentName = (id: any) => {
+      if (!id) return 'N/A';
+      const dept = departments.find((d: any) => String(d.id) === String(id));
+      return dept ? dept.name : `ID: ${id}`;
+    };
+
+    // Filter updates to only show those that have changed
+    const changedKeys = Object.keys(pd).filter(key => {
+      if (pd[key] === undefined || pd[key] === '') return false;
+      const prevValue = item.current_data ? item.current_data[key] : '';
+      return cleanString(prevValue) !== cleanString(pd[key]);
+    });
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -60,7 +91,9 @@ export default function AdminProfileRequestsScreen() {
             <View>
               <Text style={styles.userName}>{item.user_name || `User ID: ${item.user_id}`}</Text>
               <Text style={styles.userEmail}>{item.user_email}</Text>
-              <Text style={styles.userType}>{item.user_type === 'sub_admin' ? 'Sub Admin' : 'Employee'} - {item.department_name}</Text>
+              <Text style={styles.userType}>
+                {item.user_type === 'sub_admin' ? 'Sub Admin' : `Employee (${item.current_data?.role || 'N/A'})`} - {item.department_name}
+              </Text>
             </View>
           </View>
           <View style={styles.statusBadge}>
@@ -72,27 +105,35 @@ export default function AdminProfileRequestsScreen() {
         <View style={styles.cardBody}>
           <Text style={styles.sectionTitle}>Requested Updates:</Text>
           <View style={styles.updatesGrid}>
-            {Object.keys(pd).map((key) => {
-              if (pd[key] !== undefined && pd[key] !== '') {
-                const prevValue = item.current_data ? item.current_data[key] : 'N/A';
-                return (
-                  <View key={key} style={styles.updateItem}>
-                    <Text style={styles.updateLabel}>{key.replace(/_/g, ' ').toUpperCase()}</Text>
-                    <View style={styles.valueRow}>
-                      <View style={styles.valueCol}>
-                        <Text style={styles.valueSub}>Current:</Text>
-                        <Text style={styles.prevValue} numberOfLines={2}>{prevValue || 'N/A'}</Text>
-                      </View>
-                      <View style={styles.valueCol}>
-                        <Text style={styles.valueSub}>Requested:</Text>
-                        <Text style={styles.updateValue} numberOfLines={2}>{pd[key]}</Text>
-                      </View>
+            {changedKeys.map((key) => {
+              const prevValue = item.current_data ? item.current_data[key] : 'N/A';
+              let displayPrev = prevValue;
+              let displayReq = pd[key];
+
+              if (key === 'department_id' || key === 'department') {
+                displayPrev = getDepartmentName(prevValue);
+                displayReq = getDepartmentName(pd[key]);
+              }
+
+              return (
+                <View key={key} style={styles.updateItem}>
+                  <Text style={styles.updateLabel}>{key.replace(/_/g, ' ').toUpperCase()}</Text>
+                  <View style={styles.valueRow}>
+                    <View style={styles.valueCol}>
+                      <Text style={styles.valueSub}>Current:</Text>
+                      <Text style={styles.prevValue} numberOfLines={2}>{displayPrev || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.valueCol}>
+                      <Text style={styles.valueSub}>Requested:</Text>
+                      <Text style={styles.updateValue} numberOfLines={2}>{displayReq}</Text>
                     </View>
                   </View>
-                );
-              }
-              return null;
+                </View>
+              );
             })}
+            {changedKeys.length === 0 && (
+              <Text style={{ fontSize: 14, color: '#94a3b8', fontStyle: 'italic' }}>No actual changes detected.</Text>
+            )}
           </View>
         </View>
 
