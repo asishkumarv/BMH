@@ -20,6 +20,7 @@ export default function SubAdminRackChecker() {
   const [racks, setRacks] = useState<string[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
+  const [discSubTab, setDiscSubTab] = useState<'pending' | 'history'>('pending');
 
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -69,7 +70,7 @@ export default function SubAdminRackChecker() {
         axios.get('https://napi.bharatmedicalhallplus.com/employees'),
         axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/racks'),
         axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/assignments'),
-        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies?status=pending')
+        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies')
       ]);
 
       const emps = empRes.data.data || [];
@@ -155,7 +156,7 @@ export default function SubAdminRackChecker() {
       await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/discrepancy/${id}/review`, { status });
       Alert.alert('Success', `Discrepancy correction request ${status}`);
       // Refresh discrepancies
-      const discRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies?status=pending');
+      const discRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies');
       const allowedStaffIds = new Set(staffList.map(s => s.uniqueId));
       const allDiscrepancies = discRes.data.data || [];
       setDiscrepancies(allDiscrepancies.filter((d: any) => allowedStaffIds.has(String(d.reported_by))));
@@ -343,74 +344,106 @@ export default function SubAdminRackChecker() {
         </View>
       ) : (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Pending Correction Requests</Text>
-          {discrepancies.map((item) => (
-            <View key={item.id} style={styles.discCard}>
-              <View style={styles.discCardHeader}>
-                <View>
-                  <Text style={styles.discItemName}>{item.product_name}</Text>
-                  <Text style={styles.discSub}>
-                    Rack {item.rack_number} • Batch: {item.batch_no || 'N/A'} • Reported by {item.reported_by_name}
-                  </Text>
-                </View>
-                <View style={styles.badgeWarning}>
-                  <AlertTriangle size={12} color="#b45309" style={{ marginRight: 4 }} />
-                  <Text style={styles.badgeTextWarning}>{item.discrepancy_type}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.discBody}>
-                {(() => {
-                  let descText = item.description || 'No comments';
-                  let isWrongItem = item.discrepancy_type === 'wrong item';
-                  if (isWrongItem) {
-                    try {
-                      const parsed = JSON.parse(item.description);
-                      descText = `Actual Observed Item: ${parsed.actual_item_name} | Stock: ${parsed.actual_item_stock}`;
-                    } catch (e) {
-                      descText = item.description;
-                    }
-                  }
-                  return (
-                    <Text style={styles.discDesc}>
-                      <Text style={{ fontWeight: '700' }}>{isWrongItem ? 'Wrong Item Details:' : 'Note:'}</Text> {descText}
-                    </Text>
-                  );
-                })()}
-                
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 }}>
-                  {item.reported_qty !== null && (
-                    <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Qty:</Text> {item.reported_qty}</Text>
-                  )}
-                  {item.reported_mrp !== undefined && item.reported_mrp !== null && (
-                    <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported MRP:</Text> {item.reported_mrp}</Text>
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.discFooter}>
-                <TouchableOpacity 
-                  style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
-                  disabled={reviewing === item.id}
-                  onPress={() => handleReviewDiscrepancy(item.id, 'rejected')}
-                >
-                  <X size={16} color="#ef4444" style={{ marginRight: 4 }} />
-                  <Text style={styles.rejectText}>Reject Changes</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
-                  disabled={reviewing === item.id}
-                  onPress={() => handleReviewDiscrepancy(item.id, 'approved')}
-                >
-                  <Check size={16} color="white" style={{ marginRight: 4 }} />
-                  <Text style={styles.approveText}>Approve & Update Stock</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={styles.cardTitle}>Correction Requests</Text>
+            <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 4, borderRadius: 8 }}>
+              <TouchableOpacity 
+                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, discSubTab === 'pending' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
+                onPress={() => setDiscSubTab('pending')}
+              >
+                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>Pending</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, discSubTab === 'history' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
+                onPress={() => setDiscSubTab('history')}
+              >
+                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>History</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-          {discrepancies.length === 0 && (
-            <Text style={styles.emptyText}>No pending discrepancy requests.</Text>
-          )}
+          </View>
+
+          {(() => {
+            const list = discrepancies.filter(d => discSubTab === 'pending' ? d.status === 'pending' : d.status !== 'pending');
+            return (
+              <>
+                {list.map((item) => (
+                  <View key={item.id} style={styles.discCard}>
+                    <View style={styles.discCardHeader}>
+                      <View>
+                        <Text style={styles.discItemName}>{item.product_name}</Text>
+                        <Text style={styles.discSub}>
+                          Rack {item.rack_number} • Batch: {item.batch_no || 'N/A'} • Reported by {item.reported_by_name}
+                        </Text>
+                      </View>
+                      <View style={styles.badgeWarning}>
+                        <AlertTriangle size={12} color="#b45309" style={{ marginRight: 4 }} />
+                        <Text style={styles.badgeTextWarning}>{item.discrepancy_type}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.discBody}>
+                      {(() => {
+                        let descText = item.description || 'No comments';
+                        let isWrongItem = item.discrepancy_type === 'wrong item';
+                        if (isWrongItem) {
+                          try {
+                            const parsed = JSON.parse(item.description);
+                            descText = `Actual Observed Item: ${parsed.actual_item_name} | Stock: ${parsed.actual_item_stock}`;
+                          } catch (e) {
+                            descText = item.description;
+                          }
+                        }
+                        return (
+                          <Text style={styles.discDesc}>
+                            <Text style={{ fontWeight: '700' }}>{isWrongItem ? 'Wrong Item Details:' : 'Note:'}</Text> {descText}
+                          </Text>
+                        );
+                      })()}
+                      
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 }}>
+                        {item.reported_qty !== null && (
+                          <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported Qty:</Text> {item.reported_qty}</Text>
+                        )}
+                        {item.reported_mrp !== undefined && item.reported_mrp !== null && (
+                          <Text style={styles.discQty}><Text style={{ fontWeight: '700' }}>Reported MRP:</Text> {item.reported_mrp}</Text>
+                        )}
+                      </View>
+                    </View>
+
+                    {discSubTab === 'pending' ? (
+                      <View style={styles.discFooter}>
+                        <TouchableOpacity 
+                          style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
+                          disabled={reviewing === item.id}
+                          onPress={() => handleReviewDiscrepancy(item.id, 'rejected')}
+                        >
+                          <X size={16} color="#ef4444" style={{ marginRight: 4 }} />
+                          <Text style={styles.rejectText}>Reject Changes</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
+                          disabled={reviewing === item.id}
+                          onPress={() => handleReviewDiscrepancy(item.id, 'approved')}
+                        >
+                          <Check size={16} color="white" style={{ marginRight: 4 }} />
+                          <Text style={styles.approveText}>Approve & Update DB</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.status === 'approved' ? '#10b981' : '#ef4444', textTransform: 'capitalize' }}>
+                          Status: {item.status}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+                {list.length === 0 && (
+                  <Text style={styles.emptyText}>No {discSubTab} requests found.</Text>
+                )}
+              </>
+            );
+          })()}
         </View>
       )}
     </ScrollView>

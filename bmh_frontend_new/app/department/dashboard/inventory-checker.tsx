@@ -20,6 +20,7 @@ export default function SubAdminInventoryChecker() {
   const [racks, setRacks] = useState<string[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [mismatches, setMismatches] = useState<any[]>([]);
+  const [mismatchSubTab, setMismatchSubTab] = useState<'pending' | 'history'>('pending');
 
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -69,7 +70,7 @@ export default function SubAdminInventoryChecker() {
         axios.get('https://napi.bharatmedicalhallplus.com/employees'),
         axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/racks'),
         axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/tasks'),
-        axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true&status=pending')
+        axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true')
       ]);
 
       const emps = empRes.data.data || [];
@@ -154,7 +155,7 @@ export default function SubAdminInventoryChecker() {
       await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/verification/${id}/review`, { status });
       Alert.alert('Success', `Inventory mismatch verification ${status}`);
       // Refresh mismatches
-      const verRes = await axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true&status=pending');
+      const verRes = await axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true');
       const allowedStaffIds = new Set(staffList.map(s => s.uniqueId));
       const allVerifications = verRes.data.data || [];
       setMismatches(allVerifications.filter((v: any) => allowedStaffIds.has(String(v.assigned_to))));
@@ -342,62 +343,94 @@ export default function SubAdminInventoryChecker() {
         </View>
       ) : (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Pending Mismatch Submissions</Text>
-          {mismatches.map((item) => {
-            let details = item.mismatch_details;
-            if (typeof details === 'string') {
-              try { details = JSON.parse(details); } catch(e) {}
-            }
-            return (
-              <View key={item.id} style={styles.discCard}>
-                <View style={styles.discCardHeader}>
-                  <View>
-                    <Text style={styles.discItemName}>{item.product_name}</Text>
-                    <Text style={styles.discSub}>
-                      Rack {item.rack_number} • Verified by {item.assigned_to_name}
-                    </Text>
-                  </View>
-                  <View style={styles.badgeWarning}>
-                    <AlertTriangle size={12} color="#b45309" style={{ marginRight: 4 }} />
-                    <Text style={styles.badgeTextWarning}>Mismatch</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.mismatchGrid}>
-                  {details && Object.keys(details).map((key) => (
-                    <View key={key} style={styles.mismatchRow}>
-                      <Text style={styles.mismatchKey}>{key.replace(/_/g, ' ').toUpperCase()}:</Text>
-                      <Text style={styles.mismatchValOld}>{details[key].current || '-'}</Text>
-                      <Text style={{ color: '#94a3b8' }}>→</Text>
-                      <Text style={styles.mismatchValNew}>{details[key].verified || '-'}</Text>
-                    </View>
-                  ))}
-                </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={styles.cardTitle}>Mismatch Submissions</Text>
+            <View style={{ flexDirection: 'row', backgroundColor: '#f1f5f9', padding: 4, borderRadius: 8 }}>
+              <TouchableOpacity 
+                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, mismatchSubTab === 'pending' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
+                onPress={() => setMismatchSubTab('pending')}
+              >
+                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>Pending</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }, mismatchSubTab === 'history' && { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }]}
+                onPress={() => setMismatchSubTab('history')}
+              >
+                <Text style={{ fontSize: 13, color: '#334155', fontWeight: 'bold' }}>History</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-                <View style={styles.discFooter}>
-                  <TouchableOpacity 
-                    style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
-                    disabled={reviewing === item.id}
-                    onPress={() => handleReviewMismatch(item.id, 'rejected')}
-                  >
-                    <X size={16} color="#ef4444" style={{ marginRight: 4 }} />
-                    <Text style={styles.rejectText}>Reject Mismatch</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
-                    disabled={reviewing === item.id}
-                    onPress={() => handleReviewMismatch(item.id, 'approved')}
-                  >
-                    <Check size={16} color="white" style={{ marginRight: 4 }} />
-                    <Text style={styles.approveText}>Approve & Update DB</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+          {(() => {
+            const list = mismatches.filter(m => mismatchSubTab === 'pending' ? m.status === 'pending' : m.status !== 'pending');
+            return (
+              <>
+                {list.map((item) => {
+                  let details = item.mismatch_details;
+                  if (typeof details === 'string') {
+                    try { details = JSON.parse(details); } catch(e) {}
+                  }
+                  return (
+                    <View key={item.id} style={styles.discCard}>
+                      <View style={styles.discCardHeader}>
+                        <View>
+                          <Text style={styles.discItemName}>{item.product_name}</Text>
+                          <Text style={styles.discSub}>
+                            Rack {item.rack_number} • Verified by {item.assigned_to_name}
+                          </Text>
+                        </View>
+                        <View style={styles.badgeWarning}>
+                          <AlertTriangle size={12} color="#b45309" style={{ marginRight: 4 }} />
+                          <Text style={styles.badgeTextWarning}>Mismatch</Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.mismatchGrid}>
+                        {details && Object.keys(details).map((key) => (
+                          <View key={key} style={styles.mismatchRow}>
+                            <Text style={styles.mismatchKey}>{key.replace(/_/g, ' ').toUpperCase()}:</Text>
+                            <Text style={styles.mismatchValOld}>{details[key].current || '-'}</Text>
+                            <Text style={{ color: '#94a3b8' }}>→</Text>
+                            <Text style={styles.mismatchValNew}>{details[key].verified || '-'}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {mismatchSubTab === 'pending' ? (
+                        <View style={styles.discFooter}>
+                          <TouchableOpacity 
+                            style={[styles.actionBtn, styles.rejectBtn, reviewing === item.id && { opacity: 0.5 }]}
+                            disabled={reviewing === item.id}
+                            onPress={() => handleReviewMismatch(item.id, 'rejected')}
+                          >
+                            <X size={16} color="#ef4444" style={{ marginRight: 4 }} />
+                            <Text style={styles.rejectText}>Reject Mismatch</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
+                            disabled={reviewing === item.id}
+                            onPress={() => handleReviewMismatch(item.id, 'approved')}
+                          >
+                            <Check size={16} color="white" style={{ marginRight: 4 }} />
+                            <Text style={styles.approveText}>Approve & Update Stock</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.status === 'approved' ? '#10b981' : '#ef4444', textTransform: 'capitalize' }}>
+                            Status: {item.status}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+                {list.length === 0 && (
+                  <Text style={styles.emptyText}>No {mismatchSubTab} mismatch submissions found.</Text>
+                )}
+              </>
             );
-          })}
-          {mismatches.length === 0 && (
-            <Text style={styles.emptyText}>No pending mismatch reports found.</Text>
-          )}
+          })()}
         </View>
       )}
     </ScrollView>
