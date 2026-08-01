@@ -82,7 +82,7 @@ exports.getVerifications = async (req, res) => {
   try {
     const { status, is_mismatch } = req.query;
     let query = `
-      SELECT iv.*, it.rack_number, it.assigned_to_name
+      SELECT iv.*, it.rack_number, it.assigned_to_name, it.assigned_to
       FROM inventory_verifications iv
       JOIN inventory_tasks it ON iv.task_id = it.id
     `;
