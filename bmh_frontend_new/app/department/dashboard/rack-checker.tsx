@@ -27,6 +27,7 @@ export default function SubAdminRackChecker() {
   const [activeTab, setActiveTab] = useState<'assignments' | 'discrepancies'>('assignments');
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -190,7 +191,7 @@ export default function SubAdminRackChecker() {
       </View>
 
       {/* Assignment Section */}
-      <View style={styles.card}>
+      <View style={[styles.card, { zIndex: 50 }]}>
         <Text style={styles.cardTitle}>Assign Department Racks</Text>
         
         <Text style={styles.label}>Select Department Employee</Text>
@@ -223,18 +224,25 @@ export default function SubAdminRackChecker() {
           )}
 
           <TextInput 
-            style={styles.textInput}
+            style={[styles.textInput, isFocused && { borderColor: Colors.light.primary, borderWidth: 1.5 }]}
             placeholder="Type to search and select racks..."
             value={rackSearch}
             onChangeText={(text) => {
               setRackSearch(text);
               setDropdownOpen(text.length > 0 || true);
             }}
-            onFocus={() => setDropdownOpen(true)}
+            onFocus={() => {
+              setIsFocused(true);
+              setDropdownOpen(true);
+            }}
+            onBlur={() => {
+              setIsFocused(false);
+              setTimeout(() => setDropdownOpen(false), 200);
+            }}
           />
 
           {dropdownOpen && (
-            <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
+            <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 10000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
               {racks
                 .filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r))
                 .slice(0, 50)
