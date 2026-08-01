@@ -11,12 +11,16 @@ async function syncPurchaseOrders() {
         const pad = (n) => n.toString().padStart(2, '0');
         const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const fromDateStr = `${threeDaysAgo.getFullYear()}-${pad(threeDaysAgo.getMonth() + 1)}-${pad(threeDaysAgo.getDate())}`;
+
         const payload = {
             "c2Code": "P00000",
             "storeId": "001",
             "prodCode": "02",
             "apiKey": token,
-            "fromDate": todayStr,
+            "fromDate": fromDateStr,
             "toDate": todayStr
         };
 

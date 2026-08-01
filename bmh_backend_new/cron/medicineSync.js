@@ -143,13 +143,19 @@ async function startMedicineCron() {
         }
     }
 
-    // Schedule hourly sync for recent changes
-    // Get changes from past 1 hour and 5 minutes (small overlap)
-    cron.schedule('0 * * * *', async () => {
-        console.log("⏰ Running scheduled medicine background sync...");
+    // Schedule sync every 10 minutes for recent changes
+    // Get changes from past 20 minutes (overlap to prevent missed records)
+    cron.schedule('*/10 * * * *', async () => {
+        console.log("⏰ Running scheduled medicine background sync (every 10 mins)...");
         const d = new Date();
-        d.setMinutes(d.getMinutes() - 65);
+        d.setMinutes(d.getMinutes() - 20);
         await syncMedicines(formatDateTime(d));
+    });
+
+    // Schedule daily full sync at 2 AM to correct any drift/missed updates
+    cron.schedule('0 2 * * *', async () => {
+        console.log("⏰ Running scheduled daily full medicine sync (2 AM)...");
+        await syncMedicines("2023-01-01 10:10:00");
     });
 }
 
