@@ -16,6 +16,7 @@ export default function SubAdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [hasAppointmentsAccess, setHasAppointmentsAccess] = useState(false);
   const [hasBillingAccess, setHasBillingAccess] = useState(false);
+  const [hasClinicOverviewAccess, setHasClinicOverviewAccess] = useState(false);
   
   const [metrics, setMetrics] = useState({
     totalEmployees: 0,
@@ -80,6 +81,12 @@ export default function SubAdminDashboard() {
                   if (typeof billAccess === 'string') billAccess = JSON.parse(billAccess);
                   if (billAccess[`SA-${parsedUser.id}`] === true) {
                     setHasBillingAccess(true);
+                  }
+
+                  let viewAccess = res.data.settings.clinic_overview_access || {};
+                  if (typeof viewAccess === 'string') viewAccess = JSON.parse(viewAccess);
+                  if (viewAccess[`SA-${parsedUser.id}`] === true) {
+                    setHasClinicOverviewAccess(true);
                   }
                 }
               } catch (err) {
@@ -354,7 +361,7 @@ export default function SubAdminDashboard() {
           </View>
         </View>
 
-        {(hasAppointmentsAccess || hasBillingAccess) && (
+        {(hasAppointmentsAccess || hasBillingAccess || hasClinicOverviewAccess) && (
           <View style={[styles.chartCard, { marginBottom: 24 }]}>
             <Text style={{ fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 16 }}>Queue & Financial Dashboard</Text>
             
@@ -368,6 +375,22 @@ export default function SubAdminDashboard() {
                   <View>
                     <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Appointments Dashboard</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Manage walk-ins, track queues, and view status.</Text>
+                  </View>
+                </View>
+                <ChevronRight color="white" size={20} />
+              </TouchableOpacity>
+            )}
+
+            {hasClinicOverviewAccess && (
+              <TouchableOpacity 
+                style={{ backgroundColor: '#3b82f6', padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}
+                onPress={() => router.push('/department/dashboard/clinic-overview' as any)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <CalendarRange color="white" size={24} />
+                  <View>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Clinic Operations Overview</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Monitor clinical command center KPIs and live doctor delay alerts.</Text>
                   </View>
                 </View>
                 <ChevronRight color="white" size={20} />

@@ -343,6 +343,21 @@ export default function AdminDashboard() {
 
             <TouchableOpacity 
               style={[styles.statCard, !isDesktop && styles.statCardMobile, { flex: 1 }]} 
+              onPress={() => router.push('/admin/dashboard/clinic-overview' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: '#3b82f61A' }]}>
+                <Building color="#3b82f6" size={24} />
+              </View>
+              <Text style={styles.statValue}>Live</Text>
+              <Text style={styles.statLabel}>Today's Clinic Operations Overview</Text>
+              <Text style={{ fontSize: 12, color: '#3b82f6', fontWeight: 'bold', marginTop: 10 }}>
+                View Command Center & Performance →
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.statCard, !isDesktop && styles.statCardMobile, { flex: 1 }]} 
               onPress={() => router.push('/admin/dashboard/billing' as any)}
               activeOpacity={0.7}
             >
