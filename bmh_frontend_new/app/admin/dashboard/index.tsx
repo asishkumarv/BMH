@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, TouchableOpacity, Modal, Image } from 'react-native';
-import { Users, UserPlus, FileText, CheckCircle, Building, Clock, IndianRupee, CreditCard, Banknote, HandCoins, UserX, AlertCircle, X, Download, Gift } from 'lucide-react-native';
+import { Users, UserPlus, FileText, CheckCircle, Building, Clock, IndianRupee, CreditCard, Banknote, HandCoins, UserX, AlertCircle, X, Download, Gift, CalendarDays } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
+import { useRouter } from 'expo-router';
 
 const isBirthdayToday = (dobStr: string | null) => {
   if (!dobStr) return false;
@@ -63,8 +64,10 @@ const formatDateToDDMMYYYY = (dateStr: string | null) => {
 };
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const { isDesktop } = useResponsive();
   const [loading, setLoading] = useState(true);
+  const [todayAppointments, setTodayAppointments] = useState(0);
   const [stats, setStats] = useState({
     employees: 0,
     subAdmins: 0,
@@ -99,14 +102,22 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [empRes, adminRes, deptRes, revRes, balRes, attStatsRes] = await Promise.all([
+        const todayStr = new Date().toISOString().split('T')[0];
+        const [empRes, adminRes, deptRes, revRes, balRes, attStatsRes, bookingsRes] = await Promise.all([
           axios.get('https://napi.bharatmedicalhallplus.com/employees'),
           axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
           axios.get('https://napi.bharatmedicalhallplus.com/department'),
           axios.get('https://napi.bharatmedicalhallplus.com/admin/revenue-stats'),
           axios.get('https://napi.bharatmedicalhallplus.com/admin/wallet-balances'),
-          axios.get('https://napi.bharatmedicalhallplus.com/attendance/dashboard-stats')
+          axios.get('https://napi.bharatmedicalhallplus.com/attendance/dashboard-stats'),
+          axios.get(`https://napi.bharatmedicalhallplus.com/bookings?date=${todayStr}`)
         ]);
+        
+        if (bookingsRes.data.success) {
+          const list = bookingsRes.data.data || [];
+          const activeBookingsCount = list.filter((b: any) => b.status !== 'Cancelled').length;
+          setTodayAppointments(activeBookingsCount);
+        }
         
         const emps = empRes.data.success ? empRes.data.data : [];
         const admins = adminRes.data.success ? adminRes.data.data : [];
@@ -305,6 +316,24 @@ export default function AdminDashboard() {
                 )}
               </TouchableOpacity>
             ))}
+          </View>
+
+          <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginBottom: 16, marginTop: 16 }}>Clinic & Appointments Queue</Text>
+          <View style={[styles.statsGrid, !isDesktop && styles.statsGridMobile, { marginBottom: 24 }]}>
+            <TouchableOpacity 
+              style={[styles.statCard, !isDesktop && styles.statCardMobile, { flex: 1 }]} 
+              onPress={() => router.push('/admin/dashboard/appointments' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: Colors.light.primary + '1A' }]}>
+                <CalendarDays color={Colors.light.primary} size={24} />
+              </View>
+              <Text style={styles.statValue}>{todayAppointments}</Text>
+              <Text style={styles.statLabel}>Today's Scheduled Appointments</Text>
+              <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: 'bold', marginTop: 10 }}>
+                Manage Live Queue & Patient Admissions →
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={{ fontSize: 20, fontWeight: '700', color: Colors.light.text, marginBottom: 16 }}>Financial Overview</Text>

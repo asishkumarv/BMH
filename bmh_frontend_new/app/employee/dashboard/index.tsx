@@ -6,13 +6,16 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks, AlertTriangle, CalendarRange } from 'lucide-react-native';
+import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks, AlertTriangle, CalendarRange, ChevronRight } from 'lucide-react-native';
 import LeaveManagement from './leave-management';
+import { useRouter } from 'expo-router';
 
 export default function EmployeeDashboardScreen() {
+  const router = useRouter();
   const { isDesktop } = useResponsive();
   const [user, setUser] = useState<any>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const [hasAppointmentsAccess, setHasAppointmentsAccess] = useState(false);
   const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
   
   const [cameraVisible, setCameraVisible] = useState(false);
@@ -52,6 +55,19 @@ export default function EmployeeDashboardScreen() {
         setUser(parsedUser);
         fetchSummary(parsedUser.id);
         fetchAbsentLeaveStats();
+        
+        try {
+          const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
+          if (res.data.success) {
+            let access = res.data.settings.todays_appointments_access || {};
+            if (typeof access === 'string') access = JSON.parse(access);
+            if (access[parsedUser.id.toString()] === true) {
+              setHasAppointmentsAccess(true);
+            }
+          }
+        } catch (err) {
+          console.log("Failed to load appointments access", err);
+        }
       }
     };
     loadUser();
@@ -356,6 +372,25 @@ export default function EmployeeDashboardScreen() {
             ) : null}
           </View>
         </View>
+
+        {hasAppointmentsAccess && (
+          <View style={[styles.actionSection, { marginTop: 24 }]}>
+            <Text style={styles.sectionTitle}>Queue & Appointments</Text>
+            <TouchableOpacity 
+              style={{ backgroundColor: Colors.light.primary, padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              onPress={() => router.push('/admin/dashboard/appointments' as any)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <CalendarRange color="white" size={24} />
+                <View>
+                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Appointments Dashboard</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Manage walk-ins, track queues, and view status.</Text>
+                </View>
+              </View>
+              <ChevronRight color="white" size={20} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Leaves & Absences Widget */}
         <View style={styles.statsListSection}>

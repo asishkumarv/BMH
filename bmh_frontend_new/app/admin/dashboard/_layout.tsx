@@ -20,19 +20,43 @@ export default function AdminLayout() {
 
     const checkAuth = async () => {
       try {
-        let userStr = null;
+        let superAdminStr = null;
+        let subAdminStr = null;
+        let employeeStr = null;
+
         if (Platform.OS === 'web') {
-          userStr = localStorage.getItem('superAdminUser');
+          superAdminStr = localStorage.getItem('superAdminUser');
+          subAdminStr = localStorage.getItem('subAdminUser');
+          employeeStr = localStorage.getItem('employeeUser');
         } else {
-          userStr = await AsyncStorage.getItem('superAdminUser');
+          superAdminStr = await AsyncStorage.getItem('superAdminUser');
+          subAdminStr = await AsyncStorage.getItem('subAdminUser');
+          employeeStr = await AsyncStorage.getItem('employeeUser');
         }
-        if (!userStr) {
-          router.replace('/admin/login');
-        } else {
+
+        if (superAdminStr) {
           setLoading(false);
+          return;
         }
+
+        const anyUser = subAdminStr ? JSON.parse(subAdminStr) : employeeStr ? JSON.parse(employeeStr) : null;
+        if (anyUser) {
+          const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
+          if (res.data.success) {
+            let access = res.data.settings.todays_appointments_access || {};
+            if (typeof access === 'string') access = JSON.parse(access);
+            
+            const empId = anyUser.role === 'Sub Admin' ? `SA-${anyUser.id}` : anyUser.id.toString();
+            if (access[empId] === true) {
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        router.replace('/roles');
       } catch (e) {
-        router.replace('/admin/login');
+        router.replace('/roles');
       }
     };
     checkAuth();

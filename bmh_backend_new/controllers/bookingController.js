@@ -157,21 +157,23 @@ exports.getBookings = async (req, res) => {
                p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name, p.age, p.gender, pb.print_count,
                ds.date, ds.start_time, ds.end_time, ds.fee,
                d.id as doctor_id, d.full_name as doctor_name, d.department,
-               e.full_name as booked_by_name, pb.booked_by::varchar as booked_by_id
+               e.full_name as booked_by_name, pb.booked_by::varchar as booked_by_id,
+               (SELECT COUNT(*) FROM patient_bookings WHERE patient_id = pb.patient_id)::integer as patient_total_bookings
         FROM patient_bookings pb
         LEFT JOIN patients p ON pb.patient_id = p.id
         JOIN doctor_slots ds ON pb.slot_id = ds.id
         JOIN doctors d ON ds.doctor_id = d.id
         LEFT JOIN employees e ON pb.booked_by::varchar = e.id::varchar
-
+ 
         UNION ALL
-
+ 
         SELECT cpb.original_booking_id as booking_id, cpb.token_number, 'Cancelled'::varchar as status, cpb.payment_mode, cpb.reason_for_visit, cpb.pr, cpb.reference,
                NULL::timestamp as modified_date, NULL::varchar as modified_by_name, NULL::varchar as modified_by_role, NULL::varchar as modified_by_dept, cpb.cancelled_at as created_at, cpb.slot_id,
                p.id as patient_id, p.name as patient_name, p.mobile, p.blood_group, p.city, p.pin_code, p.guardian_name, p.age, p.gender, 0::integer as print_count,
                ds.date, ds.start_time, ds.end_time, ds.fee,
                d.id as doctor_id, d.full_name as doctor_name, d.department,
-               e.full_name as booked_by_name, cpb.booked_by::varchar as booked_by_id
+               e.full_name as booked_by_name, cpb.booked_by::varchar as booked_by_id,
+               (SELECT COUNT(*) FROM patient_bookings WHERE patient_id = cpb.patient_id)::integer as patient_total_bookings
         FROM cancelled_patient_bookings cpb
         LEFT JOIN patients p ON cpb.patient_id = p.id
         JOIN doctor_slots ds ON cpb.slot_id = ds.id
@@ -179,7 +181,7 @@ exports.getBookings = async (req, res) => {
         LEFT JOIN employees e ON cpb.booked_by::varchar = e.id::varchar
       ) as combined_bookings
       WHERE 1=1
-    `;
+`;
     let params = [];
 
     if (exclude_blocked === 'true') {
