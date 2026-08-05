@@ -743,7 +743,7 @@ exports.getBillingStats = async (req, res) => {
     const manualOrders = await pool.query(manualOrdersDeliveredQuery, [date]);
 
     const salesInvoicesQuery = `
-      SELECT id, invoice_no, customer_name, customer_phone as mobile,
+      SELECT id, invoice_id as invoice_no, patient_name as customer_name, patient_contact_no as mobile,
              cash_amount, online_amount, credit_amount, (cash_amount + online_amount) as amount,
              status, payment_mode, created_at
       FROM ecogreensales_invoices
