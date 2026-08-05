@@ -417,7 +417,7 @@ export default function EmployeeRackChecker() {
                 <TouchableOpacity 
                   style={[styles.statusBtn, { backgroundColor: '#3b82f6', width: isDesktop ? 'auto' : '100%', height: 45 }]} 
                   onPress={() => {
-                    const totalQty = medicines.reduce((sum, m) => sum + (m.stockbalqty || 0), 0);
+                    const totalQty = Math.round(medicines.reduce((sum, m) => sum + parseFloat(m.stockbalqty || 0), 0));
                     const skuCount = new Set(medicines.map(m => m.c_item_code)).size;
                     const batchCount = new Set(medicines.map(m => m.batchno)).size;
                     handleStatusChange('Completed', { sku_count: skuCount, batch_count: batchCount, total_qty: totalQty });

@@ -87,9 +87,9 @@ exports.updateAssignmentStatus = async (req, res) => {
     } else if (status === 'Completed') {
       query += `, end_time = CURRENT_TIMESTAMP, duration = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))::INTEGER`;
       
-      let computedSkus = sku_count;
-      let computedBatches = batch_count;
-      let computedQty = total_qty;
+      let computedSkus = sku_count !== undefined ? parseInt(sku_count) : undefined;
+      let computedBatches = batch_count !== undefined ? parseInt(batch_count) : undefined;
+      let computedQty = total_qty !== undefined ? parseInt(total_qty) : undefined;
       
       if (sku_count === undefined || batch_count === undefined || total_qty === undefined) {
         const assignRes = await pool.query('SELECT rack_number FROM rack_assignments WHERE id = $1', [id]);
