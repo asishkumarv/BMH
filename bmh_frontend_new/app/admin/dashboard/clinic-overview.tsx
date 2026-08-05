@@ -249,6 +249,18 @@ export default function ClinicOverviewDashboard() {
 
   const totalFootfall = (stats.appointmentsBookedCount || 0) + (stats.salesInvoicesCount || 0);
 
+  // Helper to safely format labels
+  const formatDateLabel = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}`;
+    }
+    return dateStr;
+  };
+
+  const chartWidth = isDesktop ? 500 : Dimensions.get('window').width - 32;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       
