@@ -527,8 +527,8 @@ const fetchData = async () => {
   };
 
   const handleToggleStatus = async (doc: any) => {
-    const newStatus = doc.status === 'Inactive' ? 'Approved' : 'Inactive';
-    Alert.alert('Confirm', `Are you sure you want to ${newStatus === 'Inactive' ? 'deactivate' : 'activate'} Dr. ${doc.full_name}?`, [
+    const newStatus = doc.status === 'Pending' ? 'Approved' : 'Pending';
+    Alert.alert('Confirm', `Are you sure you want to ${newStatus === 'Pending' ? 'deactivate' : 'activate'} Dr. ${doc.full_name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Yes', onPress: async () => {
           try {
@@ -1094,8 +1094,8 @@ const fetchData = async () => {
                       <TouchableOpacity style={{backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4}} onPress={() => setEditDoctor(d)}>
                         <Text style={{fontSize: 12, color: '#334155'}}>Edit</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={{backgroundColor: d.status === 'Inactive' ? '#dcfce7' : '#fee2e2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4}} onPress={() => handleToggleStatus(d)}>
-                        <Text style={{fontSize: 12, color: d.status === 'Inactive' ? '#166534' : '#991b1b'}}>{d.status === 'Inactive' ? 'Activate' : 'Deactivate'}</Text>
+                      <TouchableOpacity style={{backgroundColor: d.status === 'Pending' ? '#dcfce7' : '#fee2e2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4}} onPress={() => handleToggleStatus(d)}>
+                        <Text style={{fontSize: 12, color: d.status === 'Pending' ? '#166534' : '#991b1b'}}>{d.status === 'Pending' ? 'Activate' : 'Deactivate'}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
