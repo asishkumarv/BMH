@@ -719,42 +719,16 @@ const fetchData = async () => {
           <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#1e293b'}}>Configure Doctor Slot</Text>
           
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
-              <Text style={styles.label}>Department</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={slotDept}
-                  onValueChange={(val) => {
-                    setSlotDept(val);
-                    setNewSlot({...newSlot, doctor_id: ''});
-                  }}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Department" value="" />
-                  {departments.map((d, i) => (
-                    <Picker.Item key={i} label={d.name} value={d.name} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-            <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
+            <View style={[styles.formCol, { flex: 1, width: '100%' }]}>
               <Text style={styles.label}>Select Doctor *</Text>
               <SearchableDropdown
                 options={doctors
-                  .filter(d => d.status === 'Approved' && (!slotDept || d.department === slotDept))
+                  .filter(d => d.status === 'Approved')
                   .map(d => ({ label: `${d.full_name} (${d.department})`, value: d.id }))
                 }
                 value={newSlot.doctor_id}
-                onChange={(val) => {
-                  const selectedDoc = doctors.find(d => d.id === val);
-                  if (selectedDoc) {
-                    setSlotDept(selectedDoc.department);
-                    setNewSlot({...newSlot, doctor_id: val});
-                  } else {
-                    setNewSlot({...newSlot, doctor_id: val});
-                  }
-                }}
-                placeholder={slotDept ? "Select Doctor" : "Select Doctor"}
+                onChange={(val) => setNewSlot({...newSlot, doctor_id: val})}
+                placeholder="Select Doctor"
                 searchPlaceholder="Search doctor..."
               />
             </View>
