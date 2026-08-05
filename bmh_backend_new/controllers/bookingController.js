@@ -740,7 +740,16 @@ exports.getBillingStats = async (req, res) => {
       FROM manual_orders
       WHERE status IN ('Delivered', 'Completed') AND (delivered_at::date = $1 OR updated_at::date = $1)
     `;
-    const manualOrders = await pool.query(manualOrdersDeliveredQuery, [date]);
+    const manualOrdersDelivered = await pool.query(manualOrdersDeliveredQuery, [date]);
+
+    const manualOrdersGeneratedQuery = `
+      SELECT id, order_no, customer_name, customer_phone as mobile,
+             cash_amount, online_amount, credit_amount, amount,
+             status, payment_mode, delivery_boy_id, created_at, updated_at
+      FROM manual_orders
+      WHERE created_at::date = $1
+    `;
+    const manualOrdersGenerated = await pool.query(manualOrdersGeneratedQuery, [date]);
 
     const salesInvoicesQuery = `
       SELECT id, ip_no as invoice_no, patient_name as customer_name, mobile_no as mobile,
@@ -754,7 +763,7 @@ exports.getBillingStats = async (req, res) => {
     `;
     const salesInvoices = await pool.query(salesInvoicesQuery, [date]);
 
-    const appointmentsQuery = `
+    const appointmentsScheduledQuery = `
       SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode,
              p.name as patient_name, p.mobile, p.age, p.gender,
              ds.date, ds.start_time, ds.end_time, ds.fee as amount,
@@ -766,7 +775,21 @@ exports.getBillingStats = async (req, res) => {
       JOIN doctors d ON ds.doctor_id = d.id
       WHERE ds.date = $1 AND pb.status != 'Cancelled'
     `;
-    const appointmentsRes = await pool.query(appointmentsQuery, [date]);
+    const appointmentsScheduledRes = await pool.query(appointmentsScheduledQuery, [date]);
+
+    const appointmentsBookedQuery = `
+      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode,
+             p.name as patient_name, p.mobile, p.age, p.gender,
+             ds.date, ds.start_time, ds.end_time, ds.fee as amount,
+             d.full_name as doctor_name, d.department,
+             (SELECT COUNT(*) FROM patient_bookings WHERE patient_id = pb.patient_id)::integer as patient_total_bookings
+      FROM patient_bookings pb
+      LEFT JOIN patients p ON pb.patient_id = p.id
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
+      WHERE pb.created_at::date = $1 AND pb.status != 'Cancelled'
+    `;
+    const appointmentsBookedRes = await pool.query(appointmentsBookedQuery, [date]);
 
     const refundQuery = `
       SELECT cpb.original_booking_id as booking_id, cpb.token_number, 'Cancelled'::varchar as status, cpb.payment_mode,
@@ -783,36 +806,50 @@ exports.getBillingStats = async (req, res) => {
     const refundRes = await pool.query(refundQuery, [date]);
 
     const bookingsSum = bookingColls.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
-    const manualSum = manualOrders.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+    const manualDeliveredSum = manualOrdersDelivered.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+    const manualGeneratedSum = manualOrdersGenerated.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
     const salesInvoicesSum = salesInvoices.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
-    const todayCollectionsSum = bookingsSum + manualSum + salesInvoicesSum; 
+    const todayCollectionsSum = bookingsSum + manualDeliveredSum + salesInvoicesSum; 
     const refundSum = refundRes.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
-    const pendingCreditSum = manualOrders.rows.reduce((sum, r) => sum + parseFloat(r.credit_amount || 0), 0);
+    const pendingCreditSum = manualOrdersDelivered.rows.reduce((sum, r) => sum + parseFloat(r.credit_amount || 0), 0);
 
     res.json({
       success: true,
       stats: {
         todayCollections: todayCollectionsSum,
-        appointmentsCount: appointmentsRes.rows.length,
-        manualOrdersCollection: manualSum,
+        
+        appointmentsScheduledCount: appointmentsScheduledRes.rows.length,
+        appointmentsScheduledAmount: appointmentsScheduledRes.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0),
+        
+        appointmentsBookedCount: appointmentsBookedRes.rows.length,
+        appointmentsBookedAmount: appointmentsBookedRes.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0),
+        
+        manualOrdersGeneratedCount: manualOrdersGenerated.rows.length,
+        manualOrdersGeneratedAmount: manualGeneratedSum,
+        
+        manualOrdersDeliveredCount: manualOrdersDelivered.rows.length,
+        manualOrdersDeliveredAmount: manualDeliveredSum,
+        
         salesInvoicesCount: salesInvoices.rows.length,
-        totalBookedAppointments: appointmentsRes.rows.length,
+        salesInvoicesAmount: salesInvoicesSum,
+        
         refundAmount: refundSum,
         pendingCredit: pendingCreditSum
       },
       lists: {
         todayCollectionsList: [
           ...bookingColls.rows.map(r => ({ ...r, type: 'Booking Consultation' })),
-          ...manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Manual Order' })),
+          ...manualOrdersDelivered.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Manual Order' })),
           ...salesInvoices.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Sales Invoice' }))
         ],
-        appointmentsList: appointmentsRes.rows,
-        manualOrdersList: manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name })),
+        appointmentsList: appointmentsScheduledRes.rows,
+        appointmentsBookedList: appointmentsBookedRes.rows,
+        manualOrdersGeneratedList: manualOrdersGenerated.rows.map(r => ({ ...r, patient_name: r.customer_name })),
+        manualOrdersDeliveredList: manualOrdersDelivered.rows.map(r => ({ ...r, patient_name: r.customer_name })),
         salesInvoicesList: salesInvoices.rows.map(r => ({ ...r, patient_name: r.customer_name })),
-        totalBookedList: appointmentsRes.rows,
         refundList: refundRes.rows,
-        pendingCreditList: manualOrders.rows.filter(r => parseFloat(r.credit_amount) > 0).map(r => ({ ...r, patient_name: r.customer_name }))
+        pendingCreditList: manualOrdersDelivered.rows.filter(r => parseFloat(r.credit_amount) > 0).map(r => ({ ...r, patient_name: r.customer_name }))
       }
     });
   } catch (error) {
