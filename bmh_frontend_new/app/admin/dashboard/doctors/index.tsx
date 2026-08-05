@@ -739,19 +739,24 @@ const fetchData = async () => {
             </View>
             <View style={[styles.formCol, isMobile ? { flex: 0, marginBottom: 16, width: '100%' } : { flex: 1 }]}>
               <Text style={styles.label}>Select Doctor *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={newSlot.doctor_id}
-                  onValueChange={(val) => setNewSlot({...newSlot, doctor_id: val})}
-                  style={styles.picker}
-                  enabled={!!slotDept}
-                >
-                  <Picker.Item label="Select Doctor" value="" />
-                  {doctors.filter(d => d.status === 'Approved' && d.department === slotDept).map((d: any) => (
-                    <Picker.Item key={d.id} label={`${d.full_name} (${d.department})`} value={d.id} />
-                  ))}
-                </Picker>
-              </View>
+              <SearchableDropdown
+                options={doctors
+                  .filter(d => d.status === 'Approved' && (!slotDept || d.department === slotDept))
+                  .map(d => ({ label: `${d.full_name} (${d.department})`, value: d.id }))
+                }
+                value={newSlot.doctor_id}
+                onChange={(val) => {
+                  const selectedDoc = doctors.find(d => d.id === val);
+                  if (selectedDoc) {
+                    setSlotDept(selectedDoc.department);
+                    setNewSlot({...newSlot, doctor_id: val});
+                  } else {
+                    setNewSlot({...newSlot, doctor_id: val});
+                  }
+                }}
+                placeholder={slotDept ? "Select Doctor" : "Select Doctor"}
+                searchPlaceholder="Search doctor..."
+              />
             </View>
           </View>
 

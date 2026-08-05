@@ -747,18 +747,13 @@ const fetchData = async () => {
           <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
             <View style={[styles.formCol, isMobile && { width: '100%', marginBottom: 16 }]}>
               <Text style={styles.label}>Select Doctor *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={newSlot.doctor_id}
-                  onValueChange={(val) => setNewSlot({...newSlot, doctor_id: val})}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Doctor" value="" />
-                  {doctors.filter(d => d.status === 'Approved').map((d: any) => (
-                    <Picker.Item key={d.id} label={`${d.full_name} (${d.department})`} value={d.id} />
-                  ))}
-                </Picker>
-              </View>
+              <SearchableDropdown
+                options={doctors.filter(d => d.status === 'Approved').map(d => ({ label: `${d.full_name} (${d.department})`, value: d.id }))}
+                value={newSlot.doctor_id}
+                onChange={(val) => setNewSlot({...newSlot, doctor_id: val})}
+                placeholder="Select Doctor"
+                searchPlaceholder="Search doctor..."
+              />
             </View>
           </View>
 
