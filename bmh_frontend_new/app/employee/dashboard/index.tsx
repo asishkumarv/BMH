@@ -6,7 +6,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
-import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks, AlertTriangle, CalendarRange, ChevronRight } from 'lucide-react-native';
+import { Users, Clock, PlayCircle, StopCircle, Coffee, Sun, Moon, Utensils, CheckCircle2, ListTodo, ListChecks, AlertTriangle, CalendarRange, ChevronRight, IndianRupee } from 'lucide-react-native';
 import LeaveManagement from './leave-management';
 import { useRouter } from 'expo-router';
 
@@ -16,6 +16,7 @@ export default function EmployeeDashboardScreen() {
   const [user, setUser] = useState<any>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [hasAppointmentsAccess, setHasAppointmentsAccess] = useState(false);
+  const [hasBillingAccess, setHasBillingAccess] = useState(false);
   const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
   
   const [cameraVisible, setCameraVisible] = useState(false);
@@ -64,9 +65,15 @@ export default function EmployeeDashboardScreen() {
             if (access[parsedUser.id.toString()] === true) {
               setHasAppointmentsAccess(true);
             }
+
+            let billAccess = res.data.settings.todays_billing_access || {};
+            if (typeof billAccess === 'string') billAccess = JSON.parse(billAccess);
+            if (billAccess[parsedUser.id.toString()] === true) {
+              setHasBillingAccess(true);
+            }
           }
         } catch (err) {
-          console.log("Failed to load appointments access", err);
+          console.log("Failed to load appointments/billing access", err);
         }
       }
     };
@@ -373,22 +380,41 @@ export default function EmployeeDashboardScreen() {
           </View>
         </View>
 
-        {hasAppointmentsAccess && (
+        {(hasAppointmentsAccess || hasBillingAccess) && (
           <View style={[styles.actionSection, { marginTop: 24 }]}>
-            <Text style={styles.sectionTitle}>Queue & Appointments</Text>
-            <TouchableOpacity 
-              style={{ backgroundColor: Colors.light.primary, padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-              onPress={() => router.push('/admin/dashboard/appointments' as any)}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <CalendarRange color="white" size={24} />
-                <View>
-                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Appointments Dashboard</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Manage walk-ins, track queues, and view status.</Text>
+            <Text style={styles.sectionTitle}>Queue & Financial Dashboard</Text>
+            
+            {hasAppointmentsAccess && (
+              <TouchableOpacity 
+                style={{ backgroundColor: Colors.light.primary, padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}
+                onPress={() => router.push('/employee/dashboard/appointments' as any)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <CalendarRange color="white" size={24} />
+                  <View>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Appointments Dashboard</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Manage walk-ins, track queues, and view status.</Text>
+                  </View>
                 </View>
-              </View>
-              <ChevronRight color="white" size={20} />
-            </TouchableOpacity>
+                <ChevronRight color="white" size={20} />
+              </TouchableOpacity>
+            )}
+
+            {hasBillingAccess && (
+              <TouchableOpacity 
+                style={{ backgroundColor: '#10b981', padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                onPress={() => router.push('/employee/dashboard/billing' as any)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <IndianRupee color="white" size={24} />
+                  <View>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Financial Collections</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Monitor collections, manual order billing, sales invoices & refunds.</Text>
+                  </View>
+                </View>
+                <ChevronRight color="white" size={20} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 

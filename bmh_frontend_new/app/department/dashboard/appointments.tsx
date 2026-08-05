@@ -289,7 +289,7 @@ export default function AppointmentsDashboard() {
       {/* Title Header */}
       <View style={[styles.header, isDesktop && { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity style={styles.backButtonRound} onPress={() => router.replace('/admin/dashboard')}>
+          <TouchableOpacity style={styles.backButtonRound} onPress={() => router.replace('/department/dashboard')}>
             <ArrowLeft size={18} color={Colors.light.primary} />
           </TouchableOpacity>
           <View>
@@ -444,11 +444,11 @@ export default function AppointmentsDashboard() {
               <Text style={styles.actionBtnText}>Book Appointment</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => router.push('/admin/dashboard/doctors' as any)}>
+            <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => router.push('/department/dashboard/doctors' as any)}>
               <Text style={styles.actionBtnSecondaryText}>Doctor Availability</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => router.push('/admin/dashboard/patient-history' as any)}>
+            <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => router.push('/department/dashboard/patient-history' as any)}>
               <Text style={styles.actionBtnSecondaryText}>Patient History Directory</Text>
             </TouchableOpacity>
             

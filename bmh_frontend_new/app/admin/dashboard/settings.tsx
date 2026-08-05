@@ -16,6 +16,7 @@ export default function AdminSettings() {
   const [rackCheckerAccess, setRackCheckerAccess] = useState<Record<string, boolean>>({});
   const [inventoryCheckerAccess, setInventoryCheckerAccess] = useState<Record<string, boolean>>({});
   const [todaysAppointmentsAccess, setTodaysAppointmentsAccess] = useState<Record<string, boolean>>({});
+  const [todaysBillingAccess, setTodaysBillingAccess] = useState<Record<string, boolean>>({});
   
   const [doubleTickApiKey, setDoubleTickApiKey] = useState('');
   const [doubleTickWaba, setDoubleTickWaba] = useState('');
@@ -71,6 +72,7 @@ export default function AdminSettings() {
       setRackCheckerAccess(parseSetting('rack_checker_access'));
       setInventoryCheckerAccess(parseSetting('inventory_checker_access'));
       setTodaysAppointmentsAccess(parseSetting('todays_appointments_access'));
+      setTodaysBillingAccess(parseSetting('todays_billing_access'));
       
       const configVal = parseSetting('doubletick_config');
       setDoubleTickApiKey(configVal.apiKey || '');
@@ -217,6 +219,7 @@ export default function AdminSettings() {
         {renderCard('Rack Checker Access', 'Control which Employees and Sub-Admins can verify racks, check stock, and report discrepancies.', 'Rack Checker Access')}
         {renderCard('Inventory Checker Access', 'Control which Employees and Sub-Admins can verify detailed product inventory records.', 'Inventory Checker Access')}
         {renderCard('Today\'s Appointments Access', 'Control which Employees and Sub-Admins can view and manage Today\'s Appointments & Patient Queue.', 'Today\'s Appointments Access')}
+        {renderCard('Granular Collections & Billing Access', 'Control which Employees and Sub-Admins can view and manage Today\'s Collections, Manual Orders billing, and Sales Invoices.', 'Today\'s Billing Access')}
 
         {/* DoubleTick Configuration Section */}
         <View style={styles.card}>
@@ -275,6 +278,7 @@ export default function AdminSettings() {
       {renderAccessList('Rack Checker Access', 'rack_checker_access', rackCheckerAccess, setRackCheckerAccess)}
       {renderAccessList('Inventory Checker Access', 'inventory_checker_access', inventoryCheckerAccess, setInventoryCheckerAccess)}
       {renderAccessList('Today\'s Appointments Access', 'todays_appointments_access', todaysAppointmentsAccess, setTodaysAppointmentsAccess)}
+      {renderAccessList('Today\'s Billing Access', 'todays_billing_access', todaysBillingAccess, setTodaysBillingAccess)}
     </View>
   );
 }

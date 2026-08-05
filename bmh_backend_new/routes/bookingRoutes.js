@@ -15,6 +15,7 @@ router.put('/:id/reschedule', bookingController.rescheduleBooking);
 
 router.put('/:id', bookingController.editBooking);
 router.post('/:id/cancel', bookingController.cancelBooking);
+router.get('/billing-stats', bookingController.getBillingStats);
 router.put('/cancelled/:id/refund', bookingController.processRefund);
 
 module.exports = router;

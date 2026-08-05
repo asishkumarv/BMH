@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, TouchableOpacity, Alert, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
-import { Users, FileText, CheckCircle, Clock, Sun, Moon, Utensils, CheckCircle2, AlertTriangle, CalendarRange, ChevronRight } from 'lucide-react-native';
+import { Users, FileText, CheckCircle, Clock, Sun, Moon, Utensils, CheckCircle2, AlertTriangle, CalendarRange, ChevronRight, IndianRupee } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -15,6 +15,7 @@ export default function SubAdminDashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [hasAppointmentsAccess, setHasAppointmentsAccess] = useState(false);
+  const [hasBillingAccess, setHasBillingAccess] = useState(false);
   
   const [metrics, setMetrics] = useState({
     totalEmployees: 0,
@@ -69,16 +70,22 @@ export default function SubAdminDashboard() {
              try {
                const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
                if (res.data.success) {
-                 let access = res.data.settings.todays_appointments_access || {};
-                 if (typeof access === 'string') access = JSON.parse(access);
-                 if (access[`SA-${parsedUser.id}`] === true) {
-                   setHasAppointmentsAccess(true);
-                 }
-               }
-             } catch (err) {
-               console.log("Failed to load appointments access", err);
-             }
-           }
+                  let access = res.data.settings.todays_appointments_access || {};
+                  if (typeof access === 'string') access = JSON.parse(access);
+                  if (access[`SA-${parsedUser.id}`] === true) {
+                    setHasAppointmentsAccess(true);
+                  }
+
+                  let billAccess = res.data.settings.todays_billing_access || {};
+                  if (typeof billAccess === 'string') billAccess = JSON.parse(billAccess);
+                  if (billAccess[`SA-${parsedUser.id}`] === true) {
+                    setHasBillingAccess(true);
+                  }
+                }
+              } catch (err) {
+                console.log("Failed to load appointments/billing access", err);
+              }
+            }
        } catch (error) {
         console.error('Initialization error', error);
       } finally {
@@ -347,22 +354,41 @@ export default function SubAdminDashboard() {
           </View>
         </View>
 
-        {hasAppointmentsAccess && (
+        {(hasAppointmentsAccess || hasBillingAccess) && (
           <View style={[styles.chartCard, { marginBottom: 24 }]}>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 16 }}>Queue & Appointments</Text>
-            <TouchableOpacity 
-              style={{ backgroundColor: Colors.light.primary, padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-              onPress={() => router.push('/admin/dashboard/appointments' as any)}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <CalendarRange color="white" size={24} />
-                <View>
-                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Appointments Dashboard</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Manage walk-ins, track queues, and view status.</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 16 }}>Queue & Financial Dashboard</Text>
+            
+            {hasAppointmentsAccess && (
+              <TouchableOpacity 
+                style={{ backgroundColor: Colors.light.primary, padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}
+                onPress={() => router.push('/department/dashboard/appointments' as any)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <CalendarRange color="white" size={24} />
+                  <View>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Appointments Dashboard</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Manage walk-ins, track queues, and view status.</Text>
+                  </View>
                 </View>
-              </View>
-              <ChevronRight color="white" size={20} />
-            </TouchableOpacity>
+                <ChevronRight color="white" size={20} />
+              </TouchableOpacity>
+            )}
+
+            {hasBillingAccess && (
+              <TouchableOpacity 
+                style={{ backgroundColor: '#10b981', padding: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                onPress={() => router.push('/department/dashboard/billing' as any)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <IndianRupee color="white" size={24} />
+                  <View>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Today's Financial Collections</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Monitor collections, manual order billing, sales invoices & refunds.</Text>
+                  </View>
+                </View>
+                <ChevronRight color="white" size={20} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 

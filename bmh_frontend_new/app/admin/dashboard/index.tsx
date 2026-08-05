@@ -68,6 +68,7 @@ export default function AdminDashboard() {
   const { isDesktop } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [todayAppointments, setTodayAppointments] = useState(0);
+  const [todayCollections, setTodayCollections] = useState(0);
   const [stats, setStats] = useState({
     employees: 0,
     subAdmins: 0,
@@ -103,15 +104,20 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         const todayStr = new Date().toISOString().split('T')[0];
-        const [empRes, adminRes, deptRes, revRes, balRes, attStatsRes, bookingsRes] = await Promise.all([
+        const [empRes, adminRes, deptRes, revRes, balRes, attStatsRes, bookingsRes, billingRes] = await Promise.all([
           axios.get('https://napi.bharatmedicalhallplus.com/employees'),
           axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins'),
           axios.get('https://napi.bharatmedicalhallplus.com/department'),
           axios.get('https://napi.bharatmedicalhallplus.com/admin/revenue-stats'),
           axios.get('https://napi.bharatmedicalhallplus.com/admin/wallet-balances'),
           axios.get('https://napi.bharatmedicalhallplus.com/attendance/dashboard-stats'),
-          axios.get(`https://napi.bharatmedicalhallplus.com/bookings?date=${todayStr}`)
+          axios.get(`https://napi.bharatmedicalhallplus.com/bookings?date=${todayStr}`),
+          axios.get(`https://napi.bharatmedicalhallplus.com/bookings/billing-stats?date=${todayStr}`)
         ]);
+        
+        if (billingRes.data.success) {
+          setTodayCollections(billingRes.data.stats.todayCollections || 0);
+        }
         
         if (bookingsRes.data.success) {
           const list = bookingsRes.data.data || [];
@@ -332,6 +338,21 @@ export default function AdminDashboard() {
               <Text style={styles.statLabel}>Today's Scheduled Appointments</Text>
               <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: 'bold', marginTop: 10 }}>
                 Manage Live Queue & Patient Admissions →
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.statCard, !isDesktop && styles.statCardMobile, { flex: 1 }]} 
+              onPress={() => router.push('/admin/dashboard/billing' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: '#10b9811A' }]}>
+                <IndianRupee color="#10b981" size={24} />
+              </View>
+              <Text style={styles.statValue}>₹{todayCollections.toLocaleString('en-IN')}</Text>
+              <Text style={styles.statLabel}>Today's Financial Collections</Text>
+              <Text style={{ fontSize: 12, color: '#10b981', fontWeight: 'bold', marginTop: 10 }}>
+                Manage Billing, Invoices & Refunds →
               </Text>
             </TouchableOpacity>
           </View>

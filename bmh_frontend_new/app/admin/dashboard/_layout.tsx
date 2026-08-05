@@ -46,8 +46,11 @@ export default function AdminLayout() {
             let access = res.data.settings.todays_appointments_access || {};
             if (typeof access === 'string') access = JSON.parse(access);
             
+            let billAccess = res.data.settings.todays_billing_access || {};
+            if (typeof billAccess === 'string') billAccess = JSON.parse(billAccess);
+            
             const empId = anyUser.role === 'Sub Admin' ? `SA-${anyUser.id}` : anyUser.id.toString();
-            if (access[empId] === true) {
+            if (access[empId] === true || billAccess[empId] === true) {
               setLoading(false);
               return;
             }

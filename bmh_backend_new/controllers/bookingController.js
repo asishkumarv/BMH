@@ -711,3 +711,108 @@ exports.getCancelledBookings = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
+
+exports.getBillingStats = async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) {
+      return res.status(400).json({ success: false, message: 'Date query param is required' });
+    }
+
+    const bookingCollectionsQuery = `
+      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode,
+             p.name as patient_name, p.mobile, p.age, p.gender,
+             ds.date, ds.start_time, ds.end_time, ds.fee as amount,
+             d.full_name as doctor_name, d.department,
+             (SELECT COUNT(*) FROM patient_bookings WHERE patient_id = pb.patient_id)::integer as patient_total_bookings
+      FROM patient_bookings pb
+      LEFT JOIN patients p ON pb.patient_id = p.id
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
+      WHERE ds.date = $1 AND pb.status IN ('Completed', 'Current', 'Waiting')
+    `;
+    const bookingColls = await pool.query(bookingCollectionsQuery, [date]);
+
+    const manualOrdersDeliveredQuery = `
+      SELECT id, order_no, customer_name, customer_phone as mobile,
+             cash_amount, online_amount, credit_amount, (cash_amount + online_amount) as amount,
+             status, payment_mode, delivery_boy_id, created_at, updated_at
+      FROM manual_orders
+      WHERE status IN ('Delivered', 'Completed') AND (delivered_at::date = $1 OR updated_at::date = $1)
+    `;
+    const manualOrders = await pool.query(manualOrdersDeliveredQuery, [date]);
+
+    const salesInvoicesQuery = `
+      SELECT id, invoice_no, customer_name, customer_phone as mobile,
+             cash_amount, online_amount, credit_amount, (cash_amount + online_amount) as amount,
+             status, payment_mode, created_at
+      FROM ecogreensales_invoices
+      WHERE created_at::date = $1
+    `;
+    const salesInvoices = await pool.query(salesInvoicesQuery, [date]);
+
+    const appointmentsQuery = `
+      SELECT pb.id as booking_id, pb.token_number, pb.status, pb.payment_mode,
+             p.name as patient_name, p.mobile, p.age, p.gender,
+             ds.date, ds.start_time, ds.end_time, ds.fee as amount,
+             d.full_name as doctor_name, d.department,
+             (SELECT COUNT(*) FROM patient_bookings WHERE patient_id = pb.patient_id)::integer as patient_total_bookings
+      FROM patient_bookings pb
+      LEFT JOIN patients p ON pb.patient_id = p.id
+      JOIN doctor_slots ds ON pb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
+      WHERE ds.date = $1 AND pb.status != 'Cancelled'
+    `;
+    const appointmentsRes = await pool.query(appointmentsQuery, [date]);
+
+    const refundQuery = `
+      SELECT cpb.original_booking_id as booking_id, cpb.token_number, 'Cancelled'::varchar as status, cpb.payment_mode,
+             p.name as patient_name, p.mobile, p.age, p.gender,
+             ds.date, ds.start_time, ds.end_time, ds.fee as amount,
+             d.full_name as doctor_name, d.department,
+             (SELECT COUNT(*) FROM patient_bookings WHERE patient_id = cpb.patient_id)::integer as patient_total_bookings
+      FROM cancelled_patient_bookings cpb
+      LEFT JOIN patients p ON cpb.patient_id = p.id
+      JOIN doctor_slots ds ON cpb.slot_id = ds.id
+      JOIN doctors d ON ds.doctor_id = d.id
+      WHERE ds.date = $1
+    `;
+    const refundRes = await pool.query(refundQuery, [date]);
+
+    const bookingsSum = bookingColls.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+    const manualSum = manualOrders.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+    const salesInvoicesSum = salesInvoices.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+
+    const todayCollectionsSum = bookingsSum + manualSum; 
+    const refundSum = refundRes.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+    const pendingCreditSum = manualOrders.rows.reduce((sum, r) => sum + parseFloat(r.credit_amount || 0), 0);
+
+    res.json({
+      success: true,
+      stats: {
+        todayCollections: todayCollectionsSum,
+        appointmentsCount: appointmentsRes.rows.length,
+        manualOrdersCollection: manualSum,
+        salesInvoicesCount: salesInvoices.rows.length,
+        totalBookedAppointments: appointmentsRes.rows.length,
+        refundAmount: refundSum,
+        pendingCredit: pendingCreditSum
+      },
+      lists: {
+        todayCollectionsList: [
+          ...bookingColls.rows.map(r => ({ ...r, type: 'Booking Consultation' })),
+          ...manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Manual Order' }))
+        ],
+        appointmentsList: appointmentsRes.rows,
+        manualOrdersList: manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name })),
+        salesInvoicesList: salesInvoices.rows.map(r => ({ ...r, patient_name: r.customer_name })),
+        totalBookedList: appointmentsRes.rows,
+        refundList: refundRes.rows,
+        pendingCreditList: manualOrders.rows.filter(r => parseFloat(r.credit_amount) > 0).map(r => ({ ...r, patient_name: r.customer_name }))
+      }
+    });
+  } catch (error) {
+    console.error('Get Billing Stats Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
