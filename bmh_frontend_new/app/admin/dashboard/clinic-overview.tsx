@@ -5,7 +5,99 @@ import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { CalendarDays, Clock, UserCheck, Play, CheckCircle2, UserX, Plus, RefreshCw, X, ArrowLeft, Phone, ShieldAlert, Award, UserPlus, HeartHandshake, ShieldCheck, Flame, ShoppingBag, DollarSign, Receipt, BadgeDollarSign, FileSpreadsheet, RotateCcw, ShieldCheck as VerifiedIcon } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { LineChart, PieChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
+import Svg, { Circle, G } from 'react-native-svg';
+
+const RingChart = ({ data, size = 180, strokeWidth = 20, isCurrency = false }: { data: { name: string, value: number, color: string }[], size?: number, strokeWidth?: number, isCurrency?: boolean }) => {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  
+  let currentOffset = 0;
+  
+  const formatVal = (v: number) => {
+    if (isCurrency) {
+      return `₹${v.toLocaleString('en-IN')}`;
+    }
+    return v.toLocaleString('en-IN');
+  };
+
+  const formatCenter = (v: number) => {
+    if (isCurrency) {
+      if (v >= 100000) return `₹${(v/100000).toFixed(1)}L`;
+      if (v >= 1000) return `₹${(v/1000).toFixed(1)}k`;
+      return `₹${v}`;
+    }
+    if (v >= 1000) return `${(v/1000).toFixed(1)}k`;
+    return `${v}`;
+  };
+  
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+      <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <G rotation="-90" origin={`${size/2}, ${size/2}`}>
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="#f1f5f9"
+              strokeWidth={strokeWidth}
+              fill="transparent"
+            />
+            {total > 0 && data.map((item, idx) => {
+              const percentage = item.value / total;
+              const strokeLength = percentage * circumference;
+              const strokeOffset = circumference - strokeLength + currentOffset;
+              currentOffset -= strokeLength;
+              
+              return (
+                <Circle
+                  key={idx}
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  stroke={item.color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${strokeLength} ${circumference}`}
+                  strokeDashoffset={strokeOffset}
+                  fill="transparent"
+                />
+              );
+            })}
+          </G>
+        </Svg>
+        <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}>
+            {formatCenter(total)}
+          </Text>
+          <Text style={{ fontSize: 8, color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold', marginTop: 2 }}>
+            Total
+          </Text>
+        </View>
+      </View>
+      
+      <View style={{ gap: 8, minWidth: 150 }}>
+        {data.map((item, idx) => {
+          const percentText = total > 0 ? `${Math.round((item.value / total) * 100)}%` : '0%';
+          return (
+            <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#334155' }}>
+                  {item.name}
+                </Text>
+                <Text style={{ fontSize: 10, color: '#64748b' }}>
+                  {formatVal(item.value)} ({percentText})
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
 
 export default function ClinicOverviewDashboard() {
   const router = useRouter();
@@ -415,46 +507,27 @@ export default function ClinicOverviewDashboard() {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Today's Revenue Split (Ring View)</Text>
                 {parseFloat(stats.manualOrdersDeliveredAmount || 0) + parseFloat(stats.salesInvoicesAmount || 0) + parseFloat(stats.appointmentsBookedAmount || 0) > 0 ? (
-                  <PieChart
+                  <RingChart
                     data={[
                       {
                         name: "Manual Orders",
-                        population: parseFloat(stats.manualOrdersDeliveredAmount || 0),
-                        color: "#a855f7",
-                        legendFontColor: "#475569",
-                        legendFontSize: 11
+                        value: parseFloat(stats.manualOrdersDeliveredAmount || 0),
+                        color: "#ef4444" // Red
                       },
                       {
                         name: "Sales Invoices",
-                        population: parseFloat(stats.salesInvoicesAmount || 0),
-                        color: "#10b981",
-                        legendFontColor: "#475569",
-                        legendFontSize: 11
+                        value: parseFloat(stats.salesInvoicesAmount || 0),
+                        color: "#10b981" // Green
                       },
                       {
                         name: "Bookings",
-                        population: parseFloat(stats.appointmentsBookedAmount || 0),
-                        color: "#3b82f6",
-                        legendFontColor: "#475569",
-                        legendFontSize: 11
+                        value: parseFloat(stats.appointmentsBookedAmount || 0),
+                        color: "#eab308" // Yellow
                       }
                     ]}
-                    width={chartWidth}
-                    height={200}
-                    chartConfig={{
-                      backgroundGradientFrom: "#ffffff",
-                      backgroundGradientTo: "#ffffff",
-                      decimalPlaces: 0,
-                      color: (opacity = 1) => `rgba(71, 85, 105, ${opacity})`,
-                      labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-                      style: { borderRadius: 16 }
-                    }}
-                    accessor={"population"}
-                    backgroundColor={"transparent"}
-                    paddingLeft={"15"}
-                    center={[10, 0]}
-                    absolute
-                    donut={true}
+                    isCurrency={true}
+                    size={160}
+                    strokeWidth={16}
                   />
                 ) : (
                   <Text style={styles.emptyText}>No revenue logged today to display chart.</Text>
@@ -464,39 +537,22 @@ export default function ClinicOverviewDashboard() {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Today's Footfalls Split (Ring View)</Text>
                 {(stats.appointmentsBookedCount || 0) + (stats.salesInvoicesCount || 0) > 0 ? (
-                  <PieChart
+                  <RingChart
                     data={[
                       {
                         name: "Bookings",
-                        population: stats.appointmentsBookedCount || 0,
-                        color: "#3b82f6",
-                        legendFontColor: "#475569",
-                        legendFontSize: 11
+                        value: stats.appointmentsBookedCount || 0,
+                        color: "#eab308" // Yellow
                       },
                       {
                         name: "Sales Invoices",
-                        population: stats.salesInvoicesCount || 0,
-                        color: "#10b981",
-                        legendFontColor: "#475569",
-                        legendFontSize: 11
+                        value: stats.salesInvoicesCount || 0,
+                        color: "#10b981" // Green
                       }
                     ]}
-                    width={chartWidth}
-                    height={200}
-                    chartConfig={{
-                      backgroundGradientFrom: "#ffffff",
-                      backgroundGradientTo: "#ffffff",
-                      decimalPlaces: 0,
-                      color: (opacity = 1) => `rgba(71, 85, 105, ${opacity})`,
-                      labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-                      style: { borderRadius: 16 }
-                    }}
-                    accessor={"population"}
-                    backgroundColor={"transparent"}
-                    paddingLeft={"15"}
-                    center={[10, 0]}
-                    absolute
-                    donut={true}
+                    isCurrency={false}
+                    size={160}
+                    strokeWidth={16}
                   />
                 ) : (
                   <Text style={styles.emptyText}>No footfalls logged today to display chart.</Text>
@@ -524,8 +580,8 @@ export default function ClinicOverviewDashboard() {
                               parseFloat(historicalStats[1]?.salesInvoicesAmount || 0),
                               parseFloat(historicalStats[0]?.salesInvoicesAmount || 0)
                             ],
-                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                            strokeWidth: 2
+                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Green
+                            strokeWidth: 3
                           },
                           {
                             data: [
@@ -533,8 +589,8 @@ export default function ClinicOverviewDashboard() {
                               parseFloat(historicalStats[1]?.manualOrdersDeliveredAmount || 0),
                               parseFloat(historicalStats[0]?.manualOrdersDeliveredAmount || 0)
                             ],
-                            color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
-                            strokeWidth: 2
+                            color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`, // Red
+                            strokeWidth: 3
                           }
                         ],
                         legend: ["Sales Invoices Amount", "Manual Orders Amount"]
@@ -573,8 +629,8 @@ export default function ClinicOverviewDashboard() {
                               historicalStats[1]?.salesInvoicesCount || 0,
                               historicalStats[0]?.salesInvoicesCount || 0
                             ],
-                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                            strokeWidth: 2
+                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Green
+                            strokeWidth: 3
                           },
                           {
                             data: [
@@ -582,8 +638,8 @@ export default function ClinicOverviewDashboard() {
                               historicalStats[1]?.manualOrdersDeliveredCount || 0,
                               historicalStats[0]?.manualOrdersDeliveredCount || 0
                             ],
-                            color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
-                            strokeWidth: 2
+                            color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`, // Red
+                            strokeWidth: 3
                           }
                         ],
                         legend: ["Sales Invoices Count", "Manual Orders Count"]
