@@ -744,10 +744,10 @@ exports.getBillingStats = async (req, res) => {
 
     const salesInvoicesQuery = `
       SELECT id, invoice_id as invoice_no, patient_name as customer_name, patient_contact_no as mobile,
-             cash_amount, online_amount, credit_amount, (cash_amount + online_amount) as amount,
-             status, payment_mode, created_at
-      FROM ecogreensales_invoices
-      WHERE created_at::date = $1
+             cash_amount, online_amount, credit_amount, order_total as amount,
+             'Delivered'::varchar as status, COALESCE(payment_mode, 'Online') as payment_mode, created_at, ord_date
+      FROM ecogreen_sales_invoices
+      WHERE created_at::date = $1 OR ord_date::date = $1
     `;
     const salesInvoices = await pool.query(salesInvoicesQuery, [date]);
 
@@ -783,7 +783,7 @@ exports.getBillingStats = async (req, res) => {
     const manualSum = manualOrders.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
     const salesInvoicesSum = salesInvoices.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
-    const todayCollectionsSum = bookingsSum + manualSum; 
+    const todayCollectionsSum = bookingsSum + manualSum + salesInvoicesSum; 
     const refundSum = refundRes.rows.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
     const pendingCreditSum = manualOrders.rows.reduce((sum, r) => sum + parseFloat(r.credit_amount || 0), 0);
 
@@ -801,7 +801,8 @@ exports.getBillingStats = async (req, res) => {
       lists: {
         todayCollectionsList: [
           ...bookingColls.rows.map(r => ({ ...r, type: 'Booking Consultation' })),
-          ...manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Manual Order' }))
+          ...manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Manual Order' })),
+          ...salesInvoices.rows.map(r => ({ ...r, patient_name: r.customer_name, type: 'Sales Invoice' }))
         ],
         appointmentsList: appointmentsRes.rows,
         manualOrdersList: manualOrders.rows.map(r => ({ ...r, patient_name: r.customer_name })),
