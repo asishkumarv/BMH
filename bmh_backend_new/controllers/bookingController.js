@@ -744,7 +744,10 @@ exports.getBillingStats = async (req, res) => {
 
     const salesInvoicesQuery = `
       SELECT id, ip_no as invoice_no, patient_name as customer_name, mobile_no as mobile,
-             cash_amount, online_amount, credit_amount, order_total as amount,
+             (CASE WHEN COALESCE(payment_mode, 'Online') = 'Cash' THEN order_total ELSE 0 END) as cash_amount,
+             (CASE WHEN COALESCE(payment_mode, 'Online') != 'Cash' AND COALESCE(payment_mode, 'Online') != 'Credit' THEN order_total ELSE 0 END) as online_amount,
+             (CASE WHEN COALESCE(payment_mode, 'Online') = 'Credit' THEN order_total ELSE 0 END) as credit_amount,
+             order_total as amount,
              'Delivered'::varchar as status, COALESCE(payment_mode, 'Online') as payment_mode, created_at, ord_date
       FROM ecogreen_sales_invoices
       WHERE created_at::date = $1 OR ord_date::date = $1
