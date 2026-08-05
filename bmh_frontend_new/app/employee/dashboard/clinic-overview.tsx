@@ -48,8 +48,8 @@ const RingChart = ({ data, size = 180, strokeWidth = 20, isCurrency = false }: {
             {total > 0 && data.map((item, idx) => {
               const percentage = item.value / total;
               const strokeLength = percentage * circumference;
-              const strokeOffset = circumference - strokeLength + currentOffset;
-              currentOffset -= strokeLength;
+              const strokeOffset = circumference - strokeLength - currentOffset;
+              currentOffset += strokeLength;
               
               return (
                 <Circle
@@ -59,7 +59,7 @@ const RingChart = ({ data, size = 180, strokeWidth = 20, isCurrency = false }: {
                   r={radius}
                   stroke={item.color}
                   strokeWidth={strokeWidth}
-                  strokeDasharray={`${strokeLength} ${circumference}`}
+                  strokeDasharray={[strokeLength, circumference]}
                   strokeDashoffset={strokeOffset}
                   fill="transparent"
                 />
