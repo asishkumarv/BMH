@@ -283,7 +283,6 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>{totalFootfall}</Text>
                 <Text style={styles.kpiLabel}>Total Footfall (Today)</Text>
-                <Text style={styles.kpiTrend}>↑ 12.4% vs Yesterday</Text>
               </View>
             </View>
 
@@ -295,7 +294,6 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>{(stats.appointmentsScheduledCount || 0)}</Text>
                 <Text style={styles.kpiLabel}>OPD Appointments</Text>
-                <Text style={styles.kpiTrend}>↑ 14.5% vs Yesterday</Text>
               </View>
             </View>
 
@@ -307,7 +305,6 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>{queueStats.completed + queueStats.current}</Text>
                 <Text style={styles.kpiLabel}>Consultations Done</Text>
-                <Text style={styles.kpiTrend}>↑ 10.3% vs Yesterday</Text>
               </View>
             </View>
 
@@ -319,7 +316,6 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>₹{parseFloat(stats.todayCollections).toLocaleString('en-IN')}</Text>
                 <Text style={styles.kpiLabel}>Total Collection (Today)</Text>
-                <Text style={styles.kpiTrend}>↑ 18.5% vs Yesterday</Text>
               </View>
             </View>
 
@@ -331,7 +327,6 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>₹{parseFloat(stats.manualOrdersDeliveredAmount || 0).toLocaleString('en-IN')}</Text>
                 <Text style={styles.kpiLabel}>Lab Revenue (Today)</Text>
-                <Text style={styles.kpiTrend}>↑ 16.2% vs Yesterday</Text>
               </View>
             </View>
 
@@ -343,7 +338,6 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>₹{parseFloat(stats.salesInvoicesAmount || 0).toLocaleString('en-IN')}</Text>
                 <Text style={styles.kpiLabel}>Pharmacy Sales (Today)</Text>
-                <Text style={styles.kpiTrend}>↑ 13.1% vs Yesterday</Text>
               </View>
             </View>
 
@@ -355,115 +349,27 @@ export default function ClinicOverviewDashboard() {
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.kpiValue}>₹{parseFloat(stats.pendingCredit).toLocaleString('en-IN')}</Text>
                 <Text style={styles.kpiLabel}>Outstanding Dues</Text>
-                <Text style={{ color: '#ef4444', fontSize: 10, marginTop: 4 }}>↓ 6.3% vs Yesterday</Text>
               </View>
             </View>
           </View>
 
-          {/* Core Operations Dashboard row */}
-          <View style={[styles.portalLayout, !isDesktop && styles.portalLayoutMobile]}>
-            
-            {/* COLUMN 1: Operations Overview & Live Snapshot */}
-            <View style={[styles.portalColumn, { flex: 1.2 }]}>
-              {/* Operations Overview grid */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Operations Overview (Live)</Text>
-                <View style={styles.overviewGrid}>
-                  {[
-                    { title: 'Reception', status: '6 / 6 Online', statusColor: '#10b981' },
-                    { title: 'Doctors', status: `${doctors.length} Online`, statusColor: '#10b981' },
-                    { title: 'Lab', status: 'Busy', statusColor: '#f59e0b' },
-                    { title: 'Pharmacy', status: 'Online', statusColor: '#10b981' },
-                    { title: 'Cashier', status: 'Online', statusColor: '#10b981' },
-                    { title: 'Radiology', status: 'Busy', statusColor: '#f59e0b' },
-                    { title: 'Home Delivery', status: 'Online', statusColor: '#10b981' },
-                    { title: 'Accounts', status: 'Online', statusColor: '#10b981' }
-                  ].map((op, idx) => (
-                    <View key={idx} style={styles.overviewMiniCard}>
-                      <Text style={styles.overviewMiniTitle}>{op.title}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                        <View style={[styles.statusDot, { backgroundColor: op.statusColor }]} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>{op.status}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* Live Queue Snapshot */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Live Queue Snapshot</Text>
-                <View style={styles.snapshotRow}>
-                  {[
-                    { label: 'Total Queue', val: queueStats.total, color: '#475569' },
-                    { label: 'Waiting', val: queueStats.waiting, color: '#f59e0b' },
-                    { label: 'Consulting', val: queueStats.current, color: '#3b82f6' },
-                    { label: 'Completed', val: queueStats.completed, color: '#10b981' },
-                    { label: 'No Show', val: queueStats.noShow, color: '#ef4444' }
-                  ].map((s, idx) => (
-                    <View key={idx} style={{ flex: 1, alignItems: 'center' }}>
-                      <Text style={[styles.snapshotVal, { color: s.color }]}>{s.val}</Text>
-                      <Text style={styles.snapshotLabel}>{s.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            {/* COLUMN 2: Critical Alerts & Target Tracking */}
-            <View style={[styles.portalColumn, { flex: 1.8 }]}>
-              {/* Critical Alerts panel */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Critical Alerts Today</Text>
-                
-                <View style={styles.alertItem}>
-                  <ShieldAlert size={18} color="#ef4444" />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={styles.alertText}>Dr. Lipi Mohanty is running 15 mins delay</Text>
-                    <Text style={styles.alertTime}>10:20 AM</Text>
+          {/* Live Queue Snapshot */}
+          <View style={{ marginTop: 20 }}>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Live Queue Snapshot</Text>
+              <View style={styles.snapshotRow}>
+                {[
+                  { label: 'Total Queue', val: queueStats.total, color: '#475569' },
+                  { label: 'Waiting', val: queueStats.waiting, color: '#f59e0b' },
+                  { label: 'Consulting', val: queueStats.current, color: '#3b82f6' },
+                  { label: 'Completed', val: queueStats.completed, color: '#10b981' },
+                  { label: 'No Show', val: queueStats.noShow, color: '#ef4444' }
+                ].map((s, idx) => (
+                  <View key={idx} style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={[styles.snapshotVal, { color: s.color }]}>{s.val}</Text>
+                    <Text style={styles.snapshotLabel}>{s.label}</Text>
                   </View>
-                </View>
-
-                <View style={styles.alertItem}>
-                  <ShieldAlert size={18} color="#f59e0b" />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={styles.alertText}>Lab - 4 diagnostic reports pending verification &gt; 24 hrs</Text>
-                    <Text style={styles.alertTime}>09:45 AM</Text>
-                  </View>
-                </View>
-
-                <View style={styles.alertItem}>
-                  <ShieldAlert size={18} color="#ef4444" />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={styles.alertText}>Pharmacy stock out reported: Telma 40mg</Text>
-                    <Text style={styles.alertTime}>09:15 AM</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Target tracking */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Today's Targets vs Achievement</Text>
-                <View style={{ gap: 12 }}>
-                  {[
-                    { label: 'OPD Consultations', current: queueStats.completed, target: 20, color: '#3b82f6' },
-                    { label: 'Lab Reports Generated', current: stats.manualOrdersDeliveredCount || 0, target: 15, color: '#06b6d4' },
-                    { label: 'Pharmacy Bills Issued', current: stats.salesInvoicesCount || 0, target: 50, color: '#8b5cf6' }
-                  ].map((t, idx) => {
-                    const percent = Math.min(Math.round((t.current / t.target) * 100), 100);
-                    return (
-                      <View key={idx}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>{t.label}</Text>
-                          <Text style={{ fontSize: 12, color: '#64748b' }}>{t.current} / {t.target} ({percent}%)</Text>
-                        </View>
-                        <View style={styles.progressBarBg}>
-                          <View style={[styles.progressBarFill, { width: `${percent}%`, backgroundColor: t.color }]} />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
+                ))}
               </View>
             </View>
           </View>
@@ -522,7 +428,6 @@ export default function ClinicOverviewDashboard() {
               </View>
             </View>
           </View>
-
         </>
       )}
 
