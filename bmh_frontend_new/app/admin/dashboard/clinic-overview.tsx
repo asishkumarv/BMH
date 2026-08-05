@@ -13,7 +13,7 @@ const RingChart = ({ data, size = 180, strokeWidth = 20, isCurrency = false }: {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   
-  let currentOffset = 0;
+  let currentAngle = -90; // Start at 12 o'clock
   
   const formatVal = (v: number) => {
     if (isCurrency) {
@@ -36,36 +36,38 @@ const RingChart = ({ data, size = 180, strokeWidth = 20, isCurrency = false }: {
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
       <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          <G rotation="-90" origin={`${size/2}, ${size/2}`}>
-            <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              stroke="#f1f5f9"
-              strokeWidth={strokeWidth}
-              fill="transparent"
-            />
-            {total > 0 && data.map((item, idx) => {
-              const percentage = item.value / total;
-              const strokeLength = percentage * circumference;
-              const strokeOffset = circumference - strokeLength - currentOffset;
-              currentOffset += strokeLength;
-              
-              return (
-                <Circle
-                  key={idx}
-                  cx={size / 2}
-                  cy={size / 2}
-                  r={radius}
-                  stroke={item.color}
-                  strokeWidth={strokeWidth}
-                  strokeDasharray={[strokeLength, circumference]}
-                  strokeDashoffset={strokeOffset}
-                  fill="transparent"
-                />
-              );
-            })}
-          </G>
+          {/* Background ring */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#f1f5f9"
+            strokeWidth={strokeWidth}
+            fill="transparent"
+          />
+          {total > 0 && data.map((item, idx) => {
+            const percentage = item.value / total;
+            const strokeLength = percentage * circumference;
+            const rotationAngle = currentAngle;
+            
+            // Increment the angle for the next segment
+            currentAngle += percentage * 360;
+            
+            return (
+              <Circle
+                key={idx}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                stroke={item.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={[strokeLength, circumference]}
+                strokeDashoffset={0}
+                transform={`rotate(${rotationAngle}, ${size / 2}, ${size / 2})`}
+                fill="transparent"
+              />
+            );
+          })}
         </Svg>
         <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1e293b' }}>
