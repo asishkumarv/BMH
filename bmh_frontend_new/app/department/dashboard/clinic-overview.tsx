@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Dimensions } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { CalendarDays, Receipt, UserCheck, DollarSign, HeartHandshake, ShoppingBag, RotateCcw, ArrowLeft, RefreshCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { LineChart, PieChart } from 'react-native-chart-kit';
 
 export default function ClinicOverviewDashboard() {
   const router = useRouter();
@@ -32,22 +33,41 @@ export default function ClinicOverviewDashboard() {
     pendingCredit: 0
   });
 
+  const [historicalStats, setHistoricalStats] = useState<any[]>([]);
+  const [dates, setDates] = useState<string[]>([]);
+
   // Load initial data
   const loadDashboardData = async (dateStr: string) => {
     setLoading(true);
     try {
-      const [bookingsRes, billingRes] = await Promise.all([
+      const d = new Date(dateStr);
+      const date1 = dateStr;
+      const date2 = new Date(d.getTime() - 86400000).toISOString().split('T')[0];
+      const date3 = new Date(d.getTime() - 2 * 86400000).toISOString().split('T')[0];
+
+      setDates([date1, date2, date3]);
+
+      const [bookingsRes, billingRes1, billingRes2, billingRes3] = await Promise.all([
         axios.get(`https://napi.bharatmedicalhallplus.com/bookings?date=${dateStr}`),
-        axios.get(`https://napi.bharatmedicalhallplus.com/bookings/billing-stats?date=${dateStr}`)
+        axios.get(`https://napi.bharatmedicalhallplus.com/bookings/billing-stats?date=${date1}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/bookings/billing-stats?date=${date2}`),
+        axios.get(`https://napi.bharatmedicalhallplus.com/bookings/billing-stats?date=${date3}`)
       ]);
 
       if (bookingsRes.data.success) {
         setBookings(bookingsRes.data.data || []);
       }
 
-      if (billingRes.data.success) {
-        setStats(billingRes.data.stats);
+      if (billingRes1.data.success) {
+        setStats(billingRes1.data.stats);
       }
+
+      const hStats = [
+        billingRes1.data.success ? billingRes1.data.stats : {},
+        billingRes2.data.success ? billingRes2.data.stats : {},
+        billingRes3.data.success ? billingRes3.data.stats : {}
+      ];
+      setHistoricalStats(hStats);
     } catch (error) {
       console.error('Error loading appointments dashboard:', error);
       Alert.alert('Error', 'Failed to fetch appointments data.');
@@ -104,6 +124,27 @@ export default function ClinicOverviewDashboard() {
   };
 
   const totalFootfall = (stats.appointmentsBookedCount || 0) + (stats.salesInvoicesCount || 0);
+
+  // Helper to safely format labels
+  const formatDateLabel = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}`;
+    }
+    return dateStr;
+  };
+
+  const chartWidth = isDesktop ? 500 : Dimensions.get('window').width - 32;
+
+  const chartConfig = {
+    backgroundGradientFrom: "#ffffff",
+    backgroundGradientTo: "#ffffff",
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(71, 85, 105, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+    style: { borderRadius: 16 }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -247,6 +288,182 @@ export default function ClinicOverviewDashboard() {
                   </View>
                 ))}
               </View>
+            </View>
+          </View>
+
+          {/* Clinic Analytics & Insights */}
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginTop: 24, marginBottom: 12 }}>Clinic Analytics & Insights</Text>
+          
+          <View style={[styles.portalLayout, !isDesktop && styles.portalLayoutMobile]}>
+            {/* Donut Ring Charts Column */}
+            <View style={[styles.portalColumn, { flex: 1.5 }]}>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Today's Revenue Split (Ring View)</Text>
+                {parseFloat(stats.manualOrdersDeliveredAmount || 0) + parseFloat(stats.salesInvoicesAmount || 0) + parseFloat(stats.appointmentsBookedAmount || 0) > 0 ? (
+                  <PieChart
+                    data={[
+                      {
+                        name: "Manual Orders",
+                        population: parseFloat(stats.manualOrdersDeliveredAmount || 0),
+                        color: "#a855f7",
+                        legendFontColor: "#475569",
+                        legendFontSize: 11
+                      },
+                      {
+                        name: "Sales Invoices",
+                        population: parseFloat(stats.salesInvoicesAmount || 0),
+                        color: "#10b981",
+                        legendFontColor: "#475569",
+                        legendFontSize: 11
+                      },
+                      {
+                        name: "Bookings",
+                        population: parseFloat(stats.appointmentsBookedAmount || 0),
+                        color: "#3b82f6",
+                        legendFontColor: "#475569",
+                        legendFontSize: 11
+                      }
+                    ]}
+                    width={chartWidth}
+                    height={200}
+                    chartConfig={chartConfig}
+                    accessor={"population"}
+                    backgroundColor={"transparent"}
+                    paddingLeft={"15"}
+                    center={[10, 0]}
+                    absolute
+                    donut={true}
+                  />
+                ) : (
+                  <Text style={styles.emptyText}>No revenue logged today to display chart.</Text>
+                )}
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Today's Footfalls Split (Ring View)</Text>
+                {(stats.appointmentsBookedCount || 0) + (stats.salesInvoicesCount || 0) > 0 ? (
+                  <PieChart
+                    data={[
+                      {
+                        name: "Bookings",
+                        population: stats.appointmentsBookedCount || 0,
+                        color: "#3b82f6",
+                        legendFontColor: "#475569",
+                        legendFontSize: 11
+                      },
+                      {
+                        name: "Sales Invoices",
+                        population: stats.salesInvoicesCount || 0,
+                        color: "#10b981",
+                        legendFontColor: "#475569",
+                        legendFontSize: 11
+                      }
+                    ]}
+                    width={chartWidth}
+                    height={200}
+                    chartConfig={chartConfig}
+                    accessor={"population"}
+                    backgroundColor={"transparent"}
+                    paddingLeft={"15"}
+                    center={[10, 0]}
+                    absolute
+                    donut={true}
+                  />
+                ) : (
+                  <Text style={styles.emptyText}>No footfalls logged today to display chart.</Text>
+                )}
+              </View>
+            </View>
+
+            {/* Historical Trends Column */}
+            <View style={[styles.portalColumn, { flex: 1.5 }]}>
+              {historicalStats.length === 3 && (
+                <>
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>3-Day Revenue Trend (Sales vs Manual)</Text>
+                    <LineChart
+                      data={{
+                        labels: [
+                          formatDateLabel(dates[2]),
+                          formatDateLabel(dates[1]),
+                          formatDateLabel(dates[0])
+                        ],
+                        datasets: [
+                          {
+                            data: [
+                              parseFloat(historicalStats[2]?.salesInvoicesAmount || 0),
+                              parseFloat(historicalStats[1]?.salesInvoicesAmount || 0),
+                              parseFloat(historicalStats[0]?.salesInvoicesAmount || 0)
+                            ],
+                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                            strokeWidth: 2
+                          },
+                          {
+                            data: [
+                              parseFloat(historicalStats[2]?.manualOrdersDeliveredAmount || 0),
+                              parseFloat(historicalStats[1]?.manualOrdersDeliveredAmount || 0),
+                              parseFloat(historicalStats[0]?.manualOrdersDeliveredAmount || 0)
+                            ],
+                            color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
+                            strokeWidth: 2
+                          }
+                        ],
+                        legend: ["Sales Invoices Amount", "Manual Orders Amount"]
+                      }}
+                      width={chartWidth}
+                      height={200}
+                      chartConfig={chartConfig}
+                      bezier
+                      style={{
+                        marginVertical: 8,
+                        borderRadius: 16
+                      }}
+                    />
+                  </View>
+
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>3-Day Volumetric Trend (Sales vs Manual)</Text>
+                    <LineChart
+                      data={{
+                        labels: [
+                          formatDateLabel(dates[2]),
+                          formatDateLabel(dates[1]),
+                          formatDateLabel(dates[0])
+                        ],
+                        datasets: [
+                          {
+                            data: [
+                              historicalStats[2]?.salesInvoicesCount || 0,
+                              historicalStats[1]?.salesInvoicesCount || 0,
+                              historicalStats[0]?.salesInvoicesCount || 0
+                            ],
+                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                            strokeWidth: 2
+                          },
+                          {
+                            data: [
+                              historicalStats[2]?.manualOrdersDeliveredCount || 0,
+                              historicalStats[1]?.manualOrdersDeliveredCount || 0,
+                              historicalStats[0]?.manualOrdersDeliveredCount || 0
+                            ],
+                            color: (opacity = 1) => `rgba(168, 85, 247, ${opacity})`,
+                            strokeWidth: 2
+                          }
+                        ],
+                        legend: ["Sales Invoices Count", "Manual Orders Count"]
+                      }}
+                      width={chartWidth}
+                      height={200}
+                      chartConfig={chartConfig}
+                      bezier
+                      style={{
+                        marginVertical: 8,
+                        borderRadius: 16
+                      }}
+                    />
+                  </View>
+                </>
+              )}
             </View>
           </View>
 
