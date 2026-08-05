@@ -550,17 +550,31 @@ const fetchData = async () => {
 
   const handleToggleStatus = async (doc: any) => {
     const newStatus = doc.status === 'Pending' ? 'Approved' : 'Pending';
-    Alert.alert('Confirm', `Are you sure you want to ${newStatus === 'Pending' ? 'deactivate' : 'activate'} Dr. ${doc.full_name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Yes', onPress: async () => {
-          try {
-            await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${doc.id}/status`, { status: newStatus });
-            fetchData();
-          } catch(e) {
-            Alert.alert('Error', 'Failed to update status');
-          }
-      }}
-    ]);
+    const message = `Are you sure you want to ${newStatus === 'Pending' ? 'deactivate' : 'activate'} Dr. ${doc.full_name}?`;
+    
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(message);
+      if (confirmed) {
+        try {
+          await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${doc.id}/status`, { status: newStatus });
+          fetchData();
+        } catch(e) {
+          alert('Failed to update status');
+        }
+      }
+    } else {
+      Alert.alert('Confirm', message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Yes', onPress: async () => {
+            try {
+              await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/${doc.id}/status`, { status: newStatus });
+              fetchData();
+            } catch(e) {
+              Alert.alert('Error', 'Failed to update status');
+            }
+        }}
+      ]);
+    }
   };
 
   const handleAddDoctor = async () => {
