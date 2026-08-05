@@ -17,6 +17,28 @@ export default function EmployeeRackChecker() {
   const [medicines, setMedicines] = useState<any[]>([]);
   const [loadingMeds, setLoadingMeds] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval: any;
+    if (selectedAssignment && selectedAssignment.status === 'In Progress' && selectedAssignment.start_time) {
+      const startMs = new Date(selectedAssignment.start_time).getTime();
+      interval = setInterval(() => {
+        const diffSecs = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+        setElapsedSeconds(diffSecs);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [selectedAssignment]);
+
+  const formatElapsed = (sec: number) => {
+    const hrs = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    const secs = sec % 60;
+    return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s`;
+  };
 
   // Discrepancy Modal & List States
   const [discModalVisible, setDiscModalVisible] = useState(false);
@@ -39,8 +61,9 @@ export default function EmployeeRackChecker() {
   const [selectedWrongMed, setSelectedWrongMed] = useState<any>(null);
   const [wrongMedResults, setWrongMedResults] = useState<any[]>([]);
   const [wrongDropdownOpen, setWrongDropdownOpen] = useState(false);
-
   const [submittingDisc, setSubmittingDisc] = useState(false);
+  const [medicineDropdownOpen, setMedicineDropdownOpen] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
 
   useEffect(() => {
     loadUserAndAssignments();
@@ -90,17 +113,27 @@ export default function EmployeeRackChecker() {
     }
   };
 
-  const handleStatusChange = async (newStatus: 'Checked' | 'Not Checked') => {
+  const handleStatusChange = async (
+    newStatus: string, 
+    extra: { sku_count?: number; batch_count?: number; total_qty?: number; remarks?: string } = {}
+  ) => {
     if (!selectedAssignment) return;
     setUpdatingStatus(true);
     try {
       await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/assignment/${selectedAssignment.id}/status`, {
-        status: newStatus
+        status: newStatus,
+        ...extra
       });
-      Alert.alert('Success', `Rack marked as ${newStatus}`);
-      setSelectedAssignment({ ...selectedAssignment, status: newStatus });
-      // Refresh list
-      loadUserAndAssignments();
+      Alert.alert('Success', `Rack organization marked as ${newStatus}`);
+      
+      // Fetch updated assignments
+      const uniqueId = user.role === 'Sub Admin' ? `SA-${user.id}` : user.id.toString();
+      const listRes = await axios.get(`https://napi.bharatmedicalhallplus.com/rack-checker/assignments?assigned_to=${uniqueId}`);
+      if (listRes.data.success) {
+        setAssignments(listRes.data.data || []);
+        const updated = listRes.data.data.find((a: any) => String(a.id) === String(selectedAssignment.id));
+        if (updated) setSelectedAssignment(updated);
+      }
     } catch (error) {
       console.error('Failed to update status:', error);
       Alert.alert('Error', 'Failed to update status.');
@@ -288,11 +321,40 @@ export default function EmployeeRackChecker() {
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Verify Rack: {selectedAssignment.rack_number}</Text>
+          <Text style={styles.title}>
+            {selectedAssignment.assignment_type === 'reorganization' ? 'Re-organize Rack: ' : 'Verify Rack: '}
+            {selectedAssignment.rack_number}
+          </Text>
           <Text style={styles.subtitle}>
-            Review the list of medicines below, verify their count, and submit discrepancies.
+            {selectedAssignment.assignment_type === 'reorganization' 
+              ? 'Alphabetically organize stock and follow FEFO based on corrected parameters.'
+              : 'Review the list of medicines below, verify their count, and submit discrepancies.'}
           </Text>
         </View>
+
+        {selectedAssignment.assignment_type === 'reorganization' && (
+          <View style={{ backgroundColor: '#fffbeb', borderLeftWidth: 4, borderColor: '#f59e0b', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#b45309' }}>⚠️ Re-organization Task</Text>
+            <Text style={{ fontSize: 13, color: '#b45309', marginTop: 4 }}>
+              Supervisor has requested reorganizing this rack. Please align shelf layout, sort alphabetically, follow FEFO guidelines, and verify labeling.
+            </Text>
+            {selectedAssignment.corrected_items && (
+              <View style={{ marginTop: 8, backgroundColor: 'white', padding: 10, borderRadius: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569' }}>Corrected Item Details:</Text>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  {typeof selectedAssignment.corrected_items === 'string' ? selectedAssignment.corrected_items : JSON.stringify(selectedAssignment.corrected_items)}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {selectedAssignment.status === 'Rejected' && selectedAssignment.remarks && (
+          <View style={{ backgroundColor: '#fef2f2', borderLeftWidth: 4, borderColor: '#ef4444', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#991b1b' }}>❌ Reopened with Supervisor Remarks:</Text>
+            <Text style={{ fontSize: 13, color: '#b91c1c', marginTop: 4 }}>{selectedAssignment.remarks}</Text>
+          </View>
+        )}
 
         {/* Action Panel */}
         <View style={[
@@ -306,36 +368,65 @@ export default function EmployeeRackChecker() {
         ]}>
           <View style={!isDesktop && { marginBottom: 4 }}>
             <Text style={{ fontSize: 13, color: '#64748b', fontWeight: 'bold' }}>CURRENT STATUS</Text>
-            <Text style={{ fontSize: 18, color: selectedAssignment.status === 'Checked' ? '#10b981' : '#f59e0b', fontWeight: 'bold', marginTop: 4 }}>
+            <Text style={{ fontSize: 18, color: selectedAssignment.status === 'Verified' ? '#10b981' : selectedAssignment.status === 'Completed' ? '#0284c7' : selectedAssignment.status === 'In Progress' ? '#3b82f6' : '#f59e0b', fontWeight: 'bold', marginTop: 4 }}>
               {selectedAssignment.status}
             </Text>
+            
+            {selectedAssignment.status === 'Completed' && (
+              <View style={{ marginTop: 6, gap: 2 }}>
+                <Text style={{ fontSize: 12, color: '#64748b' }}>Duration: {formatElapsed(selectedAssignment.duration || 0)}</Text>
+                <Text style={{ fontSize: 12, color: '#64748b' }}>SKUs: {selectedAssignment.sku_count || 0} | Batches: {selectedAssignment.batch_count || 0} | Qty: {selectedAssignment.total_qty || 0}</Text>
+              </View>
+            )}
+            {selectedAssignment.status === 'Verified' && (
+              <View style={{ marginTop: 6, gap: 2 }}>
+                <Text style={{ fontSize: 12, color: '#10b981', fontWeight: '600' }}>Approved & Stored in System</Text>
+                {selectedAssignment.remarks && <Text style={{ fontSize: 12, color: '#64748b' }}>Remarks: {selectedAssignment.remarks}</Text>}
+              </View>
+            )}
           </View>
           
           <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 10, width: isDesktop ? 'auto' : '100%' }}>
-            <TouchableOpacity 
-              style={[styles.reportBtn, { backgroundColor: '#fef3c7', borderColor: '#b45309', width: isDesktop ? 'auto' : '100%', height: 45 }]}
-              onPress={() => setDiscModalVisible(true)}
-            >
-              <AlertTriangle size={16} color="#b45309" style={{ marginRight: 6 }} />
-              <Text style={{ color: '#b45309', fontWeight: 'bold', fontSize: 13 }}>Report Discrepancy</Text>
-            </TouchableOpacity>
+            {selectedAssignment.status === 'In Progress' && (
+              <View style={{ marginRight: 12, justifyContent: 'center' }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#4b5563' }}>⏱️ Active Time: {formatElapsed(elapsedSeconds)}</Text>
+              </View>
+            )}
 
-            {selectedAssignment.status !== 'Checked' ? (
+            {/* Render buttons conditionally based on status */}
+            {(selectedAssignment.status === 'Not Checked' || selectedAssignment.status === 'Rejected') && (
               <TouchableOpacity 
                 style={[styles.statusBtn, { backgroundColor: '#10b981', width: isDesktop ? 'auto' : '100%', height: 45 }]} 
-                onPress={() => handleStatusChange('Checked')}
+                onPress={() => handleStatusChange('In Progress')}
                 disabled={updatingStatus}
               >
-                <Text style={styles.statusBtnText}>Mark Checked</Text>
+                <Text style={styles.statusBtnText}>Start Organization</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={[styles.statusBtn, { backgroundColor: '#ef4444', width: isDesktop ? 'auto' : '100%', height: 45 }]} 
-                onPress={() => handleStatusChange('Not Checked')}
-                disabled={updatingStatus}
-              >
-                <Text style={styles.statusBtnText}>Mark Unchecked</Text>
-              </TouchableOpacity>
+            )}
+
+            {selectedAssignment.status === 'In Progress' && (
+              <>
+                <TouchableOpacity 
+                  style={[styles.reportBtn, { backgroundColor: '#fef3c7', borderColor: '#b45309', width: isDesktop ? 'auto' : '100%', height: 45 }]}
+                  onPress={() => setDiscModalVisible(true)}
+                >
+                  <AlertTriangle size={16} color="#b45309" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#b45309', fontWeight: 'bold', fontSize: 13 }}>Report Discrepancy</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.statusBtn, { backgroundColor: '#3b82f6', width: isDesktop ? 'auto' : '100%', height: 45 }]} 
+                  onPress={() => {
+                    const totalQty = medicines.reduce((sum, m) => sum + (m.stockbalqty || 0), 0);
+                    const skuCount = new Set(medicines.map(m => m.c_item_code)).size;
+                    const batchCount = new Set(medicines.map(m => m.batchno)).size;
+                    handleStatusChange('Completed', { sku_count: skuCount, batch_count: batchCount, total_qty: totalQty });
+                  }}
+                  disabled={updatingStatus}
+                >
+                  <Text style={styles.statusBtnText}>Complete Rack & Submit</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
@@ -398,18 +489,46 @@ export default function EmployeeRackChecker() {
               
               <ScrollView style={styles.modalBody}>
                 <Text style={styles.modalLabel}>Select Medicine</Text>
-                <View style={styles.selectContainer}>
-                  <select 
-                    value={selectedMedicineId} 
-                    onChange={(e) => setSelectedMedicineId(e.target.value)}
-                    style={styles.selectInput}
-                  >
-                    <option value="">-- Choose Medicine --</option>
-                    {medicines.map(m => (
-                      <option key={m.id} value={m.id}>{m.itemname} (Batch: {m.batchno || 'N/A'})</option>
-                    ))}
-                  </select>
-                </View>
+                <TouchableOpacity 
+                  style={styles.selectContainer}
+                  onPress={() => setMedicineDropdownOpen(true)}
+                >
+                  <Text style={styles.selectInput}>
+                    {selectedMedicineId 
+                      ? (medicines.find(m => m.id.toString() === selectedMedicineId)?.itemname + ` (Batch: ${medicines.find(m => m.id.toString() === selectedMedicineId)?.batchno || 'N/A'})`) 
+                      : 'Choose medicine...'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Medicine Selector Modal */}
+                <Modal visible={medicineDropdownOpen} transparent animationType="fade">
+                  <TouchableOpacity style={styles.modalOverlay} onPress={() => setMedicineDropdownOpen(false)}>
+                    <View style={styles.modalContent}>
+                      <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Medicine</Text>
+                        <TouchableOpacity onPress={() => setMedicineDropdownOpen(false)}>
+                          <X size={18} color="#64748b" />
+                        </TouchableOpacity>
+                      </View>
+                      <ScrollView style={{ maxHeight: 300, padding: 12 }}>
+                        {medicines.map((m: any) => (
+                          <TouchableOpacity 
+                            key={m.id}
+                            style={{ paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                            onPress={() => {
+                              setSelectedMedicineId(m.id.toString());
+                              setMedicineDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, color: '#334155', fontWeight: selectedMedicineId === m.id.toString() ? '700' : '400' }}>
+                              {m.itemname} (Batch: {m.batchno || 'N/A'})
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
 
                 {/* Added Discrepancies list */}
                 {discrepancyList.length > 0 && (
@@ -429,21 +548,52 @@ export default function EmployeeRackChecker() {
                 )}
 
                 <Text style={styles.modalLabel}>Discrepancy Type</Text>
-                <View style={styles.selectContainer}>
-                  <select 
-                    value={discrepancyType} 
-                    onChange={(e) => setDiscrepancyType(e.target.value)}
-                    style={styles.selectInput}
-                  >
-                    <option value="missing stock">Missing Stock</option>
-                    <option value="excess stock">Excess Stock</option>
-                    <option value="wrong item">Wrong Item</option>
-                    <option value="damaged item">Damaged Item</option>
-                    <option value="expired">Expired</option>
-                    <option value="mrp">MRP Mismatch</option>
-                    <option value="other">Other</option>
-                  </select>
-                </View>
+                <TouchableOpacity 
+                  style={styles.selectContainer}
+                  onPress={() => setTypeDropdownOpen(true)}
+                >
+                  <Text style={styles.selectInput}>
+                    {discrepancyType ? discrepancyType.replace(/_/g, ' ').toUpperCase() : 'Select Type...'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Type Selector Modal */}
+                <Modal visible={typeDropdownOpen} transparent animationType="fade">
+                  <TouchableOpacity style={styles.modalOverlay} onPress={() => setTypeDropdownOpen(false)}>
+                    <View style={styles.modalContent}>
+                      <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Discrepancy Type</Text>
+                        <TouchableOpacity onPress={() => setTypeDropdownOpen(false)}>
+                          <X size={18} color="#64748b" />
+                        </TouchableOpacity>
+                      </View>
+                      <ScrollView style={{ maxHeight: 300, padding: 12 }}>
+                        {[
+                          { label: 'Missing Stock', value: 'missing stock' },
+                          { label: 'Excess Stock', value: 'excess stock' },
+                          { label: 'Wrong Item', value: 'wrong item' },
+                          { label: 'Damaged Item', value: 'damaged item' },
+                          { label: 'Expired', value: 'expired' },
+                          { label: 'MRP Mismatch', value: 'mrp' },
+                          { label: 'Other', value: 'other' }
+                        ].map((opt) => (
+                          <TouchableOpacity 
+                            key={opt.value}
+                            style={{ paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                            onPress={() => {
+                              setDiscrepancyType(opt.value);
+                              setTypeDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, color: '#334155', fontWeight: discrepancyType === opt.value ? '700' : '400' }}>
+                              {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
 
                 {/* Dynamic fields based on type */}
                 {discrepancyType === 'missing stock' && (
@@ -714,8 +864,8 @@ const styles = StyleSheet.create({
   modalBody: { padding: 20 },
   modalLabel: { fontSize: 13, fontWeight: '700', color: '#475569', marginTop: 12, marginBottom: 6 },
   selectContainer: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f8fafc', marginBottom: 16 },
-  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', border: 'none', background: 'transparent', outline: 'none' as any },
-  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', outlineStyle: 'none' as any, marginBottom: 16 },
+  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent' } as any,
+  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', marginBottom: 16 },
   submitDiscBtn: { backgroundColor: Colors.light.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   submitDiscBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
   

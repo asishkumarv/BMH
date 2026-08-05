@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform, Modal } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -11,6 +11,55 @@ export default function AdminRackChecker() {
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
   const [reviewing, setReviewing] = useState<number | null>(null);
+  
+  const [activeTab, setActiveTab] = useState<'assignments' | 'pending' | 'history' | 'reports'>('assignments');
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectRemarks, setRejectRemarks] = useState('');
+  const [performanceStats, setPerformanceStats] = useState<any>(null);
+  const [loadingPerformance, setLoadingPerformance] = useState(false);
+  const [staffDropdownOpen, setStaffDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchPerformanceStats();
+    }
+  }, [activeTab]);
+
+  const fetchPerformanceStats = async () => {
+    setLoadingPerformance(true);
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/performance-stats');
+      if (res.data.success) {
+        setPerformanceStats(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to load performance stats.');
+    } finally {
+      setLoadingPerformance(false);
+    }
+  };
+
+  const handleReviewAssignment = async (id: number, status: 'Verified' | 'Rejected', remarks?: string) => {
+    setReviewing(id);
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/rack-checker/assignment/${id}/status`, { 
+        status,
+        remarks: remarks || null
+      });
+      Alert.alert('Success', `Rack assignment marked as ${status}`);
+      setRejectingId(null);
+      setRejectRemarks('');
+      // Refresh assignments
+      const assignRes = await axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/assignments');
+      setAssignments(assignRes.data.data || []);
+    } catch (error) {
+      console.error('Failed to review assignment:', error);
+      Alert.alert('Error', 'Failed to submit review');
+    } finally {
+      setReviewing(null);
+    }
+  };
 
   // Data states
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -21,7 +70,6 @@ export default function AdminRackChecker() {
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedRacks, setSelectedRacks] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'assignments' | 'pending' | 'history'>('assignments');
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -166,17 +214,47 @@ export default function AdminRackChecker() {
         
         <Text style={styles.label}>Select Staff Member (with Access)</Text>
         <View style={styles.selectContainer}>
-          <select 
-            value={selectedStaffId} 
-            onChange={(e) => setSelectedStaffId(e.target.value)}
-            style={styles.selectInput}
+          <TouchableOpacity 
+            style={{ width: '100%', height: 42, paddingHorizontal: 12, justifyContent: 'center' }}
+            onPress={() => setStaffDropdownOpen(true)}
           >
-            <option value="">-- Choose Checker --</option>
-            {staffList.map(s => (
-              <option key={s.uniqueId} value={s.uniqueId}>{s.displayName}</option>
-            ))}
-          </select>
+            <Text style={{ fontSize: 14, color: selectedStaffId ? '#334155' : '#94a3b8' }}>
+              {selectedStaffId 
+                ? (staffList.find(s => s.uniqueId === selectedStaffId)?.displayName || 'Select Checker') 
+                : '-- Choose Checker --'}
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Staff Selector Modal */}
+        <Modal visible={staffDropdownOpen} transparent animationType="fade">
+          <TouchableOpacity style={styles.modalOverlay} onPress={() => setStaffDropdownOpen(false)}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Checker</Text>
+                <TouchableOpacity onPress={() => setStaffDropdownOpen(false)}>
+                  <X size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 300, padding: 12 }}>
+                {staffList.map((s: any) => (
+                  <TouchableOpacity 
+                    key={s.uniqueId}
+                    style={{ paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                    onPress={() => {
+                      setSelectedStaffId(s.uniqueId);
+                      setStaffDropdownOpen(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: '#334155', fontWeight: selectedStaffId === s.uniqueId ? '700' : '400' }}>
+                      {s.displayName}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         <Text style={styles.label}>Search & Select Racks</Text>
         <View style={{ position: 'relative', zIndex: 10, marginBottom: 16 }}>
@@ -290,6 +368,14 @@ export default function AdminRackChecker() {
             Discrepancy History ({discrepancies.filter((d: any) => d.status !== 'pending').length})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'reports' && styles.tabActive]}
+          onPress={() => setActiveTab('reports')}
+        >
+          <Text style={[styles.tabText, activeTab === 'reports' && styles.tabTextActive]}>
+            Productivity & KPIs
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'assignments' ? (
@@ -304,13 +390,74 @@ export default function AdminRackChecker() {
                 <Text style={[styles.th, { flex: 2 }]}>Assigned On</Text>
               </View>
               {assignments.map((item, idx) => (
-                <View key={item.id || idx} style={styles.tableRow}>
-                  <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
-                  <Text style={[styles.td, { flex: 1.5 }]}>{item.rack_number}</Text>
-                  <Text style={[styles.td, { flex: 1.5, color: item.status === 'Checked' ? '#10b981' : '#f59e0b', fontWeight: 'bold' }]}>
-                    {item.status}
-                  </Text>
-                  <Text style={[styles.td, { flex: 2 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                <View key={item.id || idx} style={{ borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingVertical: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
+                    <Text style={[styles.td, { flex: 1.5 }]}>{item.rack_number} {item.assignment_type === 'reorganization' && <Text style={{ fontSize: 10, color: '#f59e0b', fontWeight: 'bold' }}>(Reorg)</Text>}</Text>
+                    <Text style={[styles.td, { flex: 1.5, color: item.status === 'Verified' ? '#10b981' : item.status === 'Completed' ? '#3b82f6' : item.status === 'Rejected' ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }]}>
+                      {item.status}
+                    </Text>
+                    <Text style={[styles.td, { flex: 2 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                  </View>
+                  
+                  {/* Detailed metrics for completed/verified/rejected rack organization */}
+                  {(item.status === 'Completed' || item.status === 'Verified' || item.status === 'Rejected') && (
+                    <View style={{ marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, gap: 4 }}>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>
+                        Duration: {item.duration ? Math.round(item.duration / 60) + 'm ' + (item.duration % 60) + 's' : 'N/A'} | 
+                        SKUs: {item.sku_count || 0} | Batches: {item.batch_count || 0} | Total Qty: {item.total_qty || 0}
+                      </Text>
+                      {item.remarks && (
+                        <Text style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
+                          Remarks: {item.remarks}
+                        </Text>
+                      )}
+                      
+                      {item.status === 'Completed' && (
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+                          {rejectingId === item.id ? (
+                            <View style={{ flex: 1, gap: 6 }}>
+                              <TextInput 
+                                style={[styles.textInput, { marginBottom: 0, height: 35, fontSize: 12 }]} 
+                                placeholder="Enter rejection reason..."
+                                value={rejectRemarks}
+                                onChangeText={setRejectRemarks}
+                              />
+                              <View style={{ flexDirection: 'row', gap: 6 }}>
+                                <TouchableOpacity 
+                                  style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#ef4444', borderRadius: 4 }}
+                                  onPress={() => handleReviewAssignment(item.id, 'Rejected', rejectRemarks)}
+                                >
+                                  <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Confirm Reject</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                  style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#64748b', borderRadius: 4 }}
+                                  onPress={() => setRejectingId(null)}
+                                >
+                                  <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Cancel</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ) : (
+                            <>
+                              <TouchableOpacity 
+                                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#10b981', borderRadius: 6 }}
+                                onPress={() => handleReviewAssignment(item.id, 'Verified')}
+                              >
+                                <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Approve & Store</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'white', borderWidth: 1, borderColor: '#ef4444', borderRadius: 6 }}
+                                onPress={() => setRejectingId(item.id)}
+                              >
+                                <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Reject / Reopen</Text>
+                              </TouchableOpacity>
+                            </>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))}
               {assignments.length === 0 && (
@@ -318,6 +465,48 @@ export default function AdminRackChecker() {
               )}
             </View>
           </ScrollView>
+        </View>
+      ) : activeTab === 'reports' ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Productivity & KPI Analytics</Text>
+          {loadingPerformance ? (
+            <ActivityIndicator size="small" color={Colors.light.primary} />
+          ) : performanceStats ? (
+            <View style={{ gap: 20 }}>
+              {/* Rack Checker Summary Row */}
+              <View>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1e293b', marginBottom: 10 }}>Rack Checker Productivity (RMPS)</Text>
+                {performanceStats.rack_checker?.map((rc: any, idx: number) => (
+                  <View key={idx} style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0f172a' }}>{rc.assigned_to_name}</Text>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>Role: {rc.assigned_to_role}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#4F46E5' }}>{rc.total_completed} / {rc.total_assigned} Completed</Text>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>Avg Duration: {rc.avg_duration_seconds ? `${Math.round(rc.avg_duration_seconds / 60)}m ${Math.round(rc.avg_duration_seconds % 60)}s` : 'N/A'}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Purchase Entry Auditing Summary */}
+              <View style={{ borderTopWidth: 1, borderColor: '#e2e8f0', paddingTop: 16 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1e293b', marginBottom: 10 }}>Purchase Entry Auditing (Error Tracker)</Text>
+                {performanceStats.purchase_entry_errors?.map((pe: any, idx: number) => (
+                  <View key={idx} style={{ backgroundColor: '#fff5f5', padding: 12, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#991b1b' }}>{pe.purchase_entry_employee}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#ef4444' }}>{pe.error_count} Entry Errors Logged</Text>
+                  </View>
+                ))}
+                {performanceStats.purchase_entry_errors?.length === 0 && (
+                  <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>No purchase entry errors logged by checkers.</Text>
+                )}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>No statistics found.</Text>
+          )}
         </View>
       ) : (
         <View style={styles.card}>
@@ -426,7 +615,8 @@ const styles = StyleSheet.create({
   
   label: { fontSize: 13, fontWeight: '700', color: '#475569', marginTop: 12, marginBottom: 6 },
   selectContainer: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f8fafc', marginBottom: 16 },
-  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', border: 'none', background: 'transparent', outline: 'none' as any },
+  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent' } as any,
+  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', marginBottom: 16 },
   
   rackGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   rackPill: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' },
@@ -463,5 +653,9 @@ const styles = StyleSheet.create({
   rejectBtn: { borderColor: '#ef4444', backgroundColor: 'white' },
   rejectText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
   approveBtn: { backgroundColor: '#10b981', borderColor: '#10b981' },
-  approveText: { color: 'white', fontSize: 13, fontWeight: '600' }
+  approveText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', maxWidth: 450, backgroundColor: 'white', borderRadius: 12, overflow: 'hidden' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' }
 });

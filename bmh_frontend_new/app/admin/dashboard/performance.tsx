@@ -1558,6 +1558,40 @@ export default function AdminPerformance() {
                   </View>
                 </View>
 
+                {/* Checker Productivity & RMPS Audit KPIs */}
+                <View style={{ borderTopWidth: 1, borderTopColor: '#e2e8f0', marginTop: 16, paddingTop: 16, marginBottom: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b', marginBottom: 12 }}>RMPS Checker Productivity & Audits</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                    <View style={{ flex: 1, minWidth: 200, backgroundColor: '#EFF6FF', padding: 12, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: '#1e3a8a', fontWeight: 'bold' }}>RACK CHECKER (ORGANIZATION)</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e40af', marginTop: 4 }}>
+                        {selectedEmp?.performance?.rackAssignmentsCompleted || 0} / {selectedEmp?.performance?.rackAssignmentsTotal || 0}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#60a5fa', marginTop: 2 }}>
+                        Avg Time: {selectedEmp?.performance?.rackAvgDurationSec ? `${Math.round(selectedEmp?.performance?.rackAvgDurationSec / 60)}m ${selectedEmp?.performance?.rackAvgDurationSec % 60}s` : 'N/A'}
+                      </Text>
+                    </View>
+
+                    <View style={{ flex: 1, minWidth: 200, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: '#065f46', fontWeight: 'bold' }}>INVENTORY CHECKER (AUDITING)</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: '#047857', marginTop: 4 }}>
+                        {selectedEmp?.performance?.inventoryTasksCompleted || 0} / {selectedEmp?.performance?.inventoryTasksTotal || 0}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#059669', marginTop: 2 }}>
+                        Accuracy Rate: {selectedEmp?.performance?.inventoryAccuracyRate || 0}% | Avg Time: {selectedEmp?.performance?.inventoryAvgDurationSec ? `${Math.round(selectedEmp?.performance?.inventoryAvgDurationSec / 60)}m ${selectedEmp?.performance?.inventoryAvgDurationSec % 60}s` : 'N/A'}
+                      </Text>
+                    </View>
+
+                    <View style={{ flex: 1, minWidth: 200, backgroundColor: '#FEF2F2', padding: 12, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: '#991b1b', fontWeight: 'bold' }}>PURCHASE ENTRY ERRORS</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: '#ef4444', marginTop: 4 }}>
+                        {selectedEmp?.performance?.purchaseEntryErrors || 0} errors
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#f87171', marginTop: 2 }}>Logged by Inventory Audits</Text>
+                    </View>
+                  </View>
+                </View>
+
                 {/* Edit Form */}
                 <View style={{ gap: 16 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569' }}>Reporting Manager Appraisal Inputs</Text>
@@ -2079,7 +2113,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
     marginBottom: 20,
   },
   sectionTitle: {
@@ -2153,7 +2191,11 @@ const styles = StyleSheet.create({
   },
   periodTabActive: {
     backgroundColor: '#fff',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   periodTabText: {
     fontSize: 11,
@@ -2189,7 +2231,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   iconContainer: {
     width: 48,

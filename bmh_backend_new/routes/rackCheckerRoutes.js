@@ -11,5 +11,6 @@ router.put('/assignment/:id/status', rackCheckerController.updateAssignmentStatu
 router.post('/discrepancy', rackCheckerController.submitDiscrepancy);
 router.get('/discrepancies', rackCheckerController.getDiscrepancies);
 router.put('/discrepancy/:id/review', rackCheckerController.reviewDiscrepancy);
+router.get('/performance-stats', rackCheckerController.getPerformanceStats);
 
 module.exports = router;

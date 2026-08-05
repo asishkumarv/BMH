@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform, Modal } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -11,6 +11,49 @@ export default function AdminInventoryChecker() {
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
   const [reviewing, setReviewing] = useState<number | null>(null);
+  
+  const [assigningReorgId, setAssigningReorgId] = useState<number | null>(null);
+  const [selectedReorgStaffId, setSelectedReorgStaffId] = useState('');
+  const [sendingReorg, setSendingReorg] = useState(false);
+
+  const handleDispatchReorg = async (item: any) => {
+    if (!selectedReorgStaffId) {
+      Alert.alert('Warning', 'Please select a staff member to assign the task.');
+      return;
+    }
+    const staff = staffList.find(s => s.id.toString() === selectedReorgStaffId);
+    if (!staff) return;
+
+    setSendingReorg(true);
+    try {
+      let details = item.mismatch_details;
+      if (typeof details === 'string') {
+        try { details = JSON.parse(details); } catch(e) {}
+      }
+      
+      await axios.post('https://napi.bharatmedicalhallplus.com/inventory-checker/send-reorganization', {
+        verification_id: item.id,
+        assigned_by: 'Super Admin',
+        assigned_to: staff.id.toString(),
+        assigned_to_name: staff.full_name,
+        assigned_to_role: 'Employee',
+        rack_number: item.rack_number,
+        corrected_items: details
+      });
+      
+      Alert.alert('Success', 'Re-organization task dispatched successfully!');
+      setAssigningReorgId(null);
+      setSelectedReorgStaffId('');
+      // Refresh verifications
+      const verRes = await axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications');
+      setMismatches(verRes.data.data || []);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to dispatch re-organization task.');
+    } finally {
+      setSendingReorg(false);
+    }
+  };
 
   // Data states
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -26,6 +69,7 @@ export default function AdminInventoryChecker() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [staffDropdownOpen, setStaffDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -166,17 +210,47 @@ export default function AdminInventoryChecker() {
         
         <Text style={styles.label}>Select Staff Member (with Access)</Text>
         <View style={styles.selectContainer}>
-          <select 
-            value={selectedStaffId} 
-            onChange={(e) => setSelectedStaffId(e.target.value)}
-            style={styles.selectInput}
+          <TouchableOpacity 
+            style={{ width: '100%', height: 42, paddingHorizontal: 12, justifyContent: 'center' }}
+            onPress={() => setStaffDropdownOpen(true)}
           >
-            <option value="">-- Choose Checker --</option>
-            {staffList.map(s => (
-              <option key={s.uniqueId} value={s.uniqueId}>{s.displayName}</option>
-            ))}
-          </select>
+            <Text style={{ fontSize: 14, color: selectedStaffId ? '#334155' : '#94a3b8' }}>
+              {selectedStaffId 
+                ? (staffList.find(s => s.uniqueId === selectedStaffId)?.displayName || 'Select Checker') 
+                : '-- Choose Checker --'}
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Staff Selector Modal */}
+        <Modal visible={staffDropdownOpen} transparent animationType="fade">
+          <TouchableOpacity style={styles.modalOverlay} onPress={() => setStaffDropdownOpen(false)}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Checker</Text>
+                <TouchableOpacity onPress={() => setStaffDropdownOpen(false)}>
+                  <X size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 300, padding: 12 }}>
+                {staffList.map((s: any) => (
+                  <TouchableOpacity 
+                    key={s.uniqueId}
+                    style={{ paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                    onPress={() => {
+                      setSelectedStaffId(s.uniqueId);
+                      setStaffDropdownOpen(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: '#334155', fontWeight: selectedStaffId === s.uniqueId ? '700' : '400' }}>
+                      {s.displayName}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         <Text style={styles.label}>Search & Select Racks</Text>
         <View style={{ position: 'relative', zIndex: 10, marginBottom: 16 }}>
@@ -382,10 +456,51 @@ export default function AdminInventoryChecker() {
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, flexDirection: 'row', justifyContent: 'flex-end' }}>
-                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.status === 'approved' ? '#10b981' : '#ef4444', textTransform: 'capitalize' }}>
-                            Status: {item.status}
+                        <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.status === 'approved' ? '#10b981' : item.status === 'sent_to_reorg' ? '#6366f1' : '#ef4444', textTransform: 'capitalize' }}>
+                            Status: {item.status === 'sent_to_reorg' ? 'Sent to Re-organization' : item.status}
                           </Text>
+                          
+                          {item.status === 'approved' && (
+                            <View style={{ gap: 6 }}>
+                              {assigningReorgId === item.id ? (
+                                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                  <View style={[styles.selectContainer, { marginBottom: 0, width: 150, height: 35 }]}>
+                                    <select 
+                                      value={selectedReorgStaffId} 
+                                      onChange={(e) => setSelectedReorgStaffId(e.target.value)}
+                                      style={styles.selectInput}
+                                    >
+                                      <option value="">Select Staff...</option>
+                                      {staffList.map((s: any) => (
+                                        <option key={s.id} value={s.id}>{s.full_name}</option>
+                                      ))}
+                                    </select>
+                                  </View>
+                                  <TouchableOpacity 
+                                    style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#6366f1', borderRadius: 6 }}
+                                    onPress={() => handleDispatchReorg(item)}
+                                    disabled={sendingReorg}
+                                  >
+                                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Dispatch</Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity 
+                                    style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#64748b', borderRadius: 6 }}
+                                    onPress={() => setAssigningReorgId(null)}
+                                  >
+                                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Cancel</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              ) : (
+                                <TouchableOpacity 
+                                  style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#6366f1', borderRadius: 6 }}
+                                  onPress={() => setAssigningReorgId(item.id)}
+                                >
+                                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Dispatch Re-org</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          )}
                         </View>
                       )}
                     </View>
@@ -414,7 +529,7 @@ const styles = StyleSheet.create({
   
   label: { fontSize: 13, fontWeight: '700', color: '#475569', marginTop: 12, marginBottom: 6 },
   selectContainer: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f8fafc', marginBottom: 16 },
-  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent' } as any,
+  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent', outlineStyle: 'none' } as any,
   textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', outlineStyle: 'none' as any, marginBottom: 16 },
   
   rackGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
@@ -456,5 +571,9 @@ const styles = StyleSheet.create({
   rejectBtn: { borderColor: '#ef4444', backgroundColor: 'white' },
   rejectText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
   approveBtn: { backgroundColor: '#10b981', borderColor: '#10b981' },
-  approveText: { color: 'white', fontSize: 13, fontWeight: '600' }
+  approveText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', maxWidth: 450, backgroundColor: 'white', borderRadius: 12, overflow: 'hidden' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' }
 });

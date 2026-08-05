@@ -76,11 +76,64 @@ exports.getAssignments = async (req, res) => {
 exports.updateAssignmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    await pool.query(
-      'UPDATE rack_assignments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [status, id]
-    );
+    const { status, remarks, sku_count, batch_count, total_qty } = req.body;
+    
+    let query = 'UPDATE rack_assignments SET status = $1, updated_at = CURRENT_TIMESTAMP';
+    let params = [status];
+    let paramIdx = 2;
+    
+    if (status === 'In Progress') {
+      query += `, start_time = CURRENT_TIMESTAMP`;
+    } else if (status === 'Completed') {
+      query += `, end_time = CURRENT_TIMESTAMP, duration = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))::INTEGER`;
+      
+      let computedSkus = sku_count;
+      let computedBatches = batch_count;
+      let computedQty = total_qty;
+      
+      if (sku_count === undefined || batch_count === undefined || total_qty === undefined) {
+        const assignRes = await pool.query('SELECT rack_number FROM rack_assignments WHERE id = $1', [id]);
+        if (assignRes.rows.length > 0) {
+          const rackNum = assignRes.rows[0].rack_number;
+          const medsRes = await pool.query(
+            `SELECT COUNT(DISTINCT c_item_code) as sku_count, 
+                    COUNT(DISTINCT batchno) as batch_count, 
+                    SUM(stockbalqty) as total_qty 
+             FROM ecogreen_medicines 
+             WHERE rack = $1`, 
+            [rackNum]
+          );
+          if (medsRes.rows.length > 0) {
+            computedSkus = computedSkus !== undefined ? computedSkus : parseInt(medsRes.rows[0].sku_count || 0);
+            computedBatches = computedBatches !== undefined ? computedBatches : parseInt(medsRes.rows[0].batch_count || 0);
+            computedQty = computedQty !== undefined ? computedQty : parseInt(medsRes.rows[0].total_qty || 0);
+          }
+        }
+      }
+      
+      if (computedSkus !== undefined) {
+        query += `, sku_count = $${paramIdx++}`;
+        params.push(computedSkus);
+      }
+      if (computedBatches !== undefined) {
+        query += `, batch_count = $${paramIdx++}`;
+        params.push(computedBatches);
+      }
+      if (computedQty !== undefined) {
+        query += `, total_qty = $${paramIdx++}`;
+        params.push(computedQty);
+      }
+    }
+    
+    if (remarks !== undefined) {
+      query += `, remarks = $${paramIdx++}`;
+      params.push(remarks);
+    }
+    
+    query += ` WHERE id = $${paramIdx}`;
+    params.push(id);
+    
+    await pool.query(query, params);
     res.json({ success: true, message: 'Assignment status updated successfully' });
   } catch (error) {
     console.error('updateAssignmentStatus error:', error);
@@ -208,6 +261,74 @@ exports.searchMedicines = async (req, res) => {
     res.json({ success: true, medicines: result.rows });
   } catch (error) {
     console.error('searchMedicines error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.getPerformanceStats = async (req, res) => {
+  try {
+    // Get rack checker assignments summary grouped by employee
+    const rackStats = await pool.query(`
+      SELECT 
+        assigned_to_name,
+        assigned_to_role,
+        COUNT(*) as total_assigned,
+        COUNT(CASE WHEN status = 'Verified' THEN 1 END) as total_completed,
+        AVG(CASE WHEN status = 'Verified' AND duration IS NOT NULL THEN duration END) as avg_duration_seconds
+      FROM rack_assignments
+      GROUP BY assigned_to_name, assigned_to_role
+    `);
+    
+    // Get discrepancy summary grouped by type
+    const discrepancyStats = await pool.query(`
+      SELECT discrepancy_type, COUNT(*) as count
+      FROM rack_discrepancies
+      GROUP BY discrepancy_type
+    `);
+    
+    // Get inventory checker task stats
+    const inventoryStats = await pool.query(`
+      SELECT 
+        assigned_to_name,
+        assigned_to_role,
+        COUNT(*) as total_assigned,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as total_completed,
+        AVG(CASE WHEN status = 'completed' AND duration IS NOT NULL THEN duration END) as avg_duration_seconds
+      FROM inventory_tasks
+      GROUP BY assigned_to_name, assigned_to_role
+    `);
+    
+    // Get mismatch verification breakdown including purchase entry errors
+    const verificationStats = await pool.query(`
+      SELECT 
+        is_mismatch,
+        purchase_entry_error,
+        COUNT(*) as count
+      FROM inventory_verifications
+      GROUP BY is_mismatch, purchase_entry_error
+    `);
+    
+    // Get purchase entry errors by employee
+    const purchaseEntryErrorStats = await pool.query(`
+      SELECT 
+        purchase_entry_employee,
+        COUNT(*) as error_count
+      FROM inventory_verifications
+      WHERE purchase_entry_error = true AND purchase_entry_employee IS NOT NULL AND purchase_entry_employee != ''
+      GROUP BY purchase_entry_employee
+      ORDER BY error_count DESC
+    `);
+
+    res.json({
+      success: true,
+      rack_checker: rackStats.rows,
+      discrepancies: discrepancyStats.rows,
+      inventory_checker: inventoryStats.rows,
+      verifications: verificationStats.rows,
+      purchase_entry_errors: purchaseEntryErrorStats.rows
+    });
+  } catch (error) {
+    console.error('getPerformanceStats error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

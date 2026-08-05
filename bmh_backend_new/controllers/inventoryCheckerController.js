@@ -44,16 +44,23 @@ exports.getTasks = async (req, res) => {
 
 exports.submitVerification = async (req, res) => {
   try {
-    const { task_id, medicine_id, product_name, batch_number, expiry_date, quantity, selling_price, purchase_price, mrp, stock_availability, is_mismatch, mismatch_details } = req.body;
+    const { 
+      task_id, medicine_id, product_name, batch_number, expiry_date, quantity, 
+      selling_price, purchase_price, mrp, stock_availability, is_mismatch, 
+      mismatch_details, purchase_entry_employee, pack_size, purchase_entry_error 
+    } = req.body;
     
     await pool.query(
       `INSERT INTO inventory_verifications 
-       (task_id, medicine_id, product_name, batch_number, expiry_date, quantity, selling_price, purchase_price, mrp, stock_availability, is_mismatch, mismatch_details, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+       (task_id, medicine_id, product_name, batch_number, expiry_date, quantity, selling_price, purchase_price, mrp, stock_availability, is_mismatch, mismatch_details, status, purchase_entry_employee, pack_size, purchase_entry_error)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         task_id, medicine_id, product_name, batch_number, expiry_date, quantity, selling_price, purchase_price, mrp, stock_availability, is_mismatch, 
         typeof mismatch_details === 'object' ? JSON.stringify(mismatch_details) : mismatch_details,
-        is_mismatch ? 'pending' : 'approved'
+        is_mismatch ? 'pending' : 'approved',
+        purchase_entry_employee || null,
+        pack_size || null,
+        purchase_entry_error || false
       ]
     );
 
@@ -67,7 +74,10 @@ exports.submitVerification = async (req, res) => {
       const verifiedMeds = verRes.rows.length;
       
       if (verifiedMeds >= totalMeds) {
-        await pool.query('UPDATE inventory_tasks SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['completed', task_id]);
+        await pool.query(
+          "UPDATE inventory_tasks SET status = $1, end_time = CURRENT_TIMESTAMP, duration = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))::INTEGER, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+          ['completed', task_id]
+        );
       }
     }
 
@@ -152,6 +162,65 @@ exports.reviewVerification = async (req, res) => {
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('reviewVerification error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.updateTaskStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, remarks } = req.body;
+    let query = 'UPDATE inventory_tasks SET status = $1, updated_at = CURRENT_TIMESTAMP';
+    let params = [status];
+    let paramIdx = 2;
+    
+    if (status === 'In Progress') {
+      query += ', start_time = CURRENT_TIMESTAMP';
+    } else if (status === 'completed') {
+      query += ', end_time = CURRENT_TIMESTAMP, duration = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))::INTEGER';
+    }
+    
+    if (remarks !== undefined) {
+      query += `, remarks = $${paramIdx++}`;
+      params.push(remarks);
+    }
+    
+    query += ` WHERE id = $${paramIdx}`;
+    params.push(id);
+    
+    await pool.query(query, params);
+    res.json({ success: true, message: 'Task status updated successfully' });
+  } catch (error) {
+    console.error('updateTaskStatus error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.sendReorganization = async (req, res) => {
+  try {
+    const { verification_id, assigned_by, assigned_to, assigned_to_name, assigned_to_role, rack_number, corrected_items } = req.body;
+    
+    await pool.query('BEGIN');
+    
+    // Create a rack organization assignment of type 'reorganization'
+    const result = await pool.query(
+      `INSERT INTO rack_assignments 
+       (assigned_by, assigned_to, assigned_to_name, assigned_to_role, rack_number, status, assignment_type, verification_id, corrected_items)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [assigned_by, assigned_to, assigned_to_name, assigned_to_role, rack_number, 'Not Checked', 'reorganization', verification_id, JSON.stringify(corrected_items)]
+    );
+    
+    // Update verification status
+    await pool.query(
+      `UPDATE inventory_verifications SET status = 'sent_to_reorg' WHERE id = $1`,
+      [verification_id]
+    );
+    
+    await pool.query('COMMIT');
+    res.json({ success: true, message: 'Re-organization task assigned successfully', assignment_id: result.rows[0].id });
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('sendReorganization error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

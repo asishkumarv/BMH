@@ -30,8 +30,51 @@ export default function EmployeeInventoryChecker() {
   const [verifiedSellingPrice, setVerifiedSellingPrice] = useState('');
   const [verifiedPurchasePrice, setVerifiedPurchasePrice] = useState('');
   const [verifiedMrp, setVerifiedMrp] = useState('');
+  const [verifiedPackSize, setVerifiedPackSize] = useState('');
+  const [purchaseEntryEmployee, setPurchaseEntryEmployee] = useState('');
   const [stockAvailability, setStockAvailability] = useState('Available');
   const [submittingVer, setSubmittingVer] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval: any;
+    if (selectedTask && selectedTask.status === 'In Progress' && selectedTask.start_time) {
+      const startMs = new Date(selectedTask.start_time).getTime();
+      interval = setInterval(() => {
+        const diffSecs = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+        setElapsedSeconds(diffSecs);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [selectedTask]);
+
+  const formatElapsed = (sec: number) => {
+    const hrs = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    const secs = sec % 60;
+    return `${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s`;
+  };
+
+  const handleStartTask = async () => {
+    if (!selectedTask) return;
+    setUpdatingStatus(true);
+    try {
+      await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/task/${selectedTask.id}/status`, {
+        status: 'In Progress'
+      });
+      Alert.alert('Success', 'Task started!');
+      setSelectedTask({ ...selectedTask, status: 'In Progress', start_time: new Date().toISOString() });
+      loadUserAndTasks();
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to start task.');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   useEffect(() => {
     loadUserAndTasks();
@@ -104,6 +147,8 @@ export default function EmployeeInventoryChecker() {
     setVerifiedSellingPrice(med.salerate?.toString() || '0');
     setVerifiedPurchasePrice(med.purchaserate?.toString() || '0');
     setVerifiedMrp(med.mrp?.toString() || '0');
+    setVerifiedPackSize(med.packsize || med.pack_size || '');
+    setPurchaseEntryEmployee('');
     setStockAvailability(med.stockbalqty > 0 ? 'Available' : 'Out of Stock');
     
     setVerModalVisible(true);
@@ -140,6 +185,11 @@ export default function EmployeeInventoryChecker() {
       mismatchDetails['mrp'] = { current: selectedMed.mrp, verified: parseFloat(verifiedMrp) };
       isMismatch = true;
     }
+    const currentPack = selectedMed.packsize || selectedMed.pack_size || '';
+    if (verifiedPackSize !== currentPack) {
+      mismatchDetails['pack_size'] = { current: currentPack, verified: verifiedPackSize };
+      isMismatch = true;
+    }
 
     setSubmittingVer(true);
     try {
@@ -155,7 +205,10 @@ export default function EmployeeInventoryChecker() {
         mrp: parseFloat(verifiedMrp),
         stock_availability: stockAvailability,
         is_mismatch: isMismatch,
-        mismatch_details: mismatchDetails
+        mismatch_details: mismatchDetails,
+        purchase_entry_employee: purchaseEntryEmployee,
+        purchase_entry_error: purchaseEntryEmployee.trim().length > 0,
+        pack_size: verifiedPackSize
       });
 
       Alert.alert('Success', 'Verification details submitted successfully!');
@@ -190,8 +243,36 @@ export default function EmployeeInventoryChecker() {
         <View style={styles.header}>
           <Text style={styles.title}>Inventory Rack Task: {selectedTask.rack_number}</Text>
           <Text style={styles.subtitle}>
-            Inspect all attributes for medicines listed below. Tap to verify.
+            Inspect all attributes for medicines listed. Capture mismatches and track correctness.
           </Text>
+        </View>
+
+        {/* Task Start / Timed Flow Panel */}
+        <View style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View>
+            <Text style={{ fontSize: 13, color: '#64748b', fontWeight: 'bold' }}>TASK STATUS</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: selectedTask.status === 'completed' ? '#10b981' : selectedTask.status === 'In Progress' ? '#3b82f6' : '#f59e0b', marginTop: 4 }}>
+              {selectedTask.status.toUpperCase()}
+            </Text>
+            {selectedTask.status === 'completed' && selectedTask.duration && (
+              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Duration: {formatElapsed(selectedTask.duration)}</Text>
+            )}
+          </View>
+          
+          <View>
+            {selectedTask.status === 'pending' && (
+              <TouchableOpacity 
+                style={[styles.submitVerBtn, { marginTop: 0, paddingHorizontal: 20 }]} 
+                onPress={handleStartTask}
+                disabled={updatingStatus}
+              >
+                <Text style={styles.submitVerBtnText}>Start Task</Text>
+              </TouchableOpacity>
+            )}
+            {selectedTask.status === 'In Progress' && (
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#4b5563' }}>⏱️ Active Time: {formatElapsed(elapsedSeconds)}</Text>
+            )}
+          </View>
         </View>
 
         {/* Medicines list */}
@@ -210,7 +291,13 @@ export default function EmployeeInventoryChecker() {
                   <TouchableOpacity 
                     key={med.id} 
                     style={styles.verificationRow}
-                    onPress={() => openVerificationModal(med)}
+                    onPress={() => {
+                      if (selectedTask.status === 'pending') {
+                        Alert.alert('Warning', 'Please click "Start Task" before verifying items.');
+                        return;
+                      }
+                      openVerificationModal(med);
+                    }}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.medName}>{med.itemname}</Text>
@@ -274,8 +361,16 @@ export default function EmployeeInventoryChecker() {
                 <Text style={styles.modalLabel}>Product Name</Text>
                 <TextInput style={styles.textInput} value={verifiedName} onChangeText={setVerifiedName} />
 
-                <Text style={styles.modalLabel}>Batch Number</Text>
-                <TextInput style={styles.textInput} value={verifiedBatch} onChangeText={setVerifiedBatch} />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalLabel}>Batch Number</Text>
+                    <TextInput style={styles.textInput} value={verifiedBatch} onChangeText={setVerifiedBatch} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalLabel}>Pack Size</Text>
+                    <TextInput style={styles.textInput} value={verifiedPackSize} onChangeText={setVerifiedPackSize} />
+                  </View>
+                </View>
 
                 <Text style={styles.modalLabel}>Expiry Date</Text>
                 <TextInput style={styles.textInput} placeholder="YYYY-MM-DD" value={verifiedExpiry} onChangeText={setVerifiedExpiry} />
@@ -302,17 +397,34 @@ export default function EmployeeInventoryChecker() {
                   </View>
                 </View>
 
+                <Text style={styles.modalLabel}>Purchase Entry Employee Name (if mismatch is due to entry error)</Text>
+                <TextInput style={styles.textInput} placeholder="e.g. Amit Kumar" value={purchaseEntryEmployee} onChangeText={setPurchaseEntryEmployee} />
+
                 <Text style={styles.modalLabel}>Stock Availability</Text>
-                <View style={styles.selectContainer}>
-                  <select 
-                    value={stockAvailability} 
-                    onChange={(e) => setStockAvailability(e.target.value)}
-                    style={styles.selectInput}
-                  >
-                    <option value="Available">Available</option>
-                    <option value="Out of Stock">Out of Stock</option>
-                    <option value="Damaged">Damaged</option>
-                  </select>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                  {['Available', 'Out of Stock', 'Damaged'].map((status) => (
+                    <TouchableOpacity
+                      key={status}
+                      onPress={() => setStockAvailability(status)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        alignItems: 'center',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: stockAvailability === status ? Colors.light.primary : '#cbd5e1',
+                        backgroundColor: stockAvailability === status ? `${Colors.light.primary}10` : '#f8fafc',
+                      }}
+                    >
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: stockAvailability === status ? Colors.light.primary : '#475569',
+                      }}>
+                        {status}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
                 <TouchableOpacity 
@@ -402,10 +514,10 @@ const styles = StyleSheet.create({
   
   infoBox: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8, marginBottom: 12 },
   infoText: { fontSize: 12, color: '#475569', marginTop: 2 },
-
+ 
   selectContainer: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#f8fafc', marginBottom: 16 },
-  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', border: 'none', background: 'transparent', outline: 'none' as any },
-  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', outlineStyle: 'none' as any, marginBottom: 16 },
+  selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent' } as any,
+  textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', marginBottom: 16 },
   submitVerBtn: { backgroundColor: Colors.light.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   submitVerBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 }
 });

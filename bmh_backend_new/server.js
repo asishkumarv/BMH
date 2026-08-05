@@ -4,6 +4,7 @@ const cors = require('cors');
 const pool = require('./db');
 require('./cron/taskScheduler');
 require('./cron/attendanceScheduler');
+require('./cron/checkerAutoAssignment');
 
 const app = express();
 app.use(cors());
@@ -658,6 +659,39 @@ app.listen(PORT, () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-  }).then(() => console.log('✅ inventory_verifications table verified.'))
+  }).then(() => {
+    console.log('✅ inventory_verifications table verified.');
+    return pool.query(`
+      ALTER TABLE rack_assignments 
+      ADD COLUMN IF NOT EXISTS start_time TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS end_time TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS duration INTEGER,
+      ADD COLUMN IF NOT EXISTS remarks TEXT,
+      ADD COLUMN IF NOT EXISTS sku_count INTEGER,
+      ADD COLUMN IF NOT EXISTS batch_count INTEGER,
+      ADD COLUMN IF NOT EXISTS total_qty INTEGER,
+      ADD COLUMN IF NOT EXISTS assignment_type VARCHAR(50) DEFAULT 'regular',
+      ADD COLUMN IF NOT EXISTS verification_id INTEGER,
+      ADD COLUMN IF NOT EXISTS discrepancy_id INTEGER,
+      ADD COLUMN IF NOT EXISTS corrected_items JSONB;
+    `);
+  }).then(() => {
+    console.log('✅ rack_assignments layout columns ensured.');
+    return pool.query(`
+      ALTER TABLE inventory_tasks
+      ADD COLUMN IF NOT EXISTS start_time TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS end_time TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS duration INTEGER,
+      ADD COLUMN IF NOT EXISTS remarks TEXT;
+    `);
+  }).then(() => {
+    console.log('✅ inventory_tasks layout columns ensured.');
+    return pool.query(`
+      ALTER TABLE inventory_verifications
+      ADD COLUMN IF NOT EXISTS purchase_entry_employee VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS pack_size VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS purchase_entry_error BOOLEAN DEFAULT FALSE;
+    `);
+  }).then(() => console.log('✅ Checker tables layout columns ensured.'))
     .catch(e => console.error('Error creating Checker tables:', e.message));
 });

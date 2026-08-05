@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform, Modal } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -12,6 +12,7 @@ export default function SubAdminInventoryChecker() {
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
   const [reviewing, setReviewing] = useState<number | null>(null);
+  const [staffDropdownOpen, setStaffDropdownOpen] = useState(false);
 
   // User details
   const [subAdmin, setSubAdmin] = useState<any>(null);
@@ -245,17 +246,47 @@ export default function SubAdminInventoryChecker() {
               
               <Text style={styles.label}>Select Department Employee</Text>
               <View style={styles.selectContainer}>
-                <select 
-                  value={selectedStaffId} 
-                  onChange={(e) => setSelectedStaffId(e.target.value)}
-                  style={styles.selectInput}
+                <TouchableOpacity 
+                  style={{ width: '100%', height: 42, paddingHorizontal: 12, justifyContent: 'center' }}
+                  onPress={() => setStaffDropdownOpen(true)}
                 >
-                  <option value="">-- Choose Employee --</option>
-                  {staffList.map(s => (
-                    <option key={s.uniqueId} value={s.uniqueId}>{s.displayName}</option>
-                  ))}
-                </select>
+                  <Text style={{ fontSize: 14, color: selectedStaffId ? '#334155' : '#94a3b8' }}>
+                    {selectedStaffId 
+                      ? (staffList.find(s => s.uniqueId === selectedStaffId)?.displayName || 'Select Checker') 
+                      : '-- Choose Checker --'}
+                  </Text>
+                </TouchableOpacity>
               </View>
+
+              {/* Staff Selector Modal */}
+              <Modal visible={staffDropdownOpen} transparent animationType="fade">
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setStaffDropdownOpen(false)}>
+                  <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Select Employee</Text>
+                      <TouchableOpacity onPress={() => setStaffDropdownOpen(false)}>
+                        <X size={18} color="#64748b" />
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView style={{ maxHeight: 300, padding: 12 }}>
+                      {staffList.map((s: any) => (
+                        <TouchableOpacity 
+                          key={s.uniqueId}
+                          style={{ paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                          onPress={() => {
+                            setSelectedStaffId(s.uniqueId);
+                            setStaffDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={{ fontSize: 14, color: '#334155', fontWeight: selectedStaffId === s.uniqueId ? '700' : '400' }}>
+                            {s.displayName}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </TouchableOpacity>
+              </Modal>
 
               <Text style={styles.label}>Search & Select Racks</Text>
               <View style={{ position: 'relative', zIndex: 10, marginBottom: 16 }}>
@@ -511,5 +542,9 @@ const styles = StyleSheet.create({
   rejectBtn: { borderColor: '#ef4444', backgroundColor: 'white' },
   rejectText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
   approveBtn: { backgroundColor: '#10b981', borderColor: '#10b981' },
-  approveText: { color: 'white', fontSize: 13, fontWeight: '600' }
+  approveText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', maxWidth: 450, backgroundColor: 'white', borderRadius: 12, overflow: 'hidden' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' }
 });

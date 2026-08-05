@@ -1322,6 +1322,41 @@ async function getEmployeePerformanceStats(req, res) {
       `, taskFilterParams);
       const bookings = bookingsRes.rows;
 
+      // Get checker stats
+      const uniqueId = String(empId);
+      const rackStatsRes = await pool.query(`
+        SELECT 
+          COUNT(*) as total_assigned,
+          COUNT(CASE WHEN status = 'Verified' THEN 1 END) as total_completed,
+          AVG(CASE WHEN status = 'Verified' AND duration IS NOT NULL THEN duration END) as avg_duration_seconds
+        FROM rack_assignments
+        WHERE assigned_to = $1
+      `, [uniqueId]);
+      const rackStats = rackStatsRes.rows[0];
+
+      const invStatsRes = await pool.query(`
+        SELECT 
+          COUNT(*) as total_assigned,
+          COUNT(CASE WHEN status = 'completed' THEN 1 END) as total_completed,
+          AVG(CASE WHEN status = 'completed' AND duration IS NOT NULL THEN duration END) as avg_duration_seconds
+        FROM inventory_tasks
+        WHERE assigned_to = $1
+      `, [uniqueId]);
+      const invStats = invStatsRes.rows[0];
+
+      const verStatsRes = await pool.query(`
+        SELECT 
+          COUNT(*) as total_checks,
+          COUNT(CASE WHEN is_mismatch = false THEN 1 END) as correct_checks
+        FROM inventory_verifications iv
+        JOIN inventory_tasks it ON iv.task_id = it.id
+        WHERE it.assigned_to = $1
+      `, [uniqueId]);
+      const verStats = verStatsRes.rows[0];
+      const totalChecks = parseInt(verStats.total_checks || 0, 10);
+      const correctChecks = parseInt(verStats.correct_checks || 0, 10);
+      const accuracyRate = totalChecks > 0 ? Math.round((correctChecks / totalChecks) * 100) : 100;
+
       const totalTasks = tasks.length;
       const completedTasks = tasks.filter(t => t.status?.toLowerCase() === 'completed').length;
       const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -1554,6 +1589,15 @@ async function getEmployeePerformanceStats(req, res) {
           completed: consultedBookings,
           completionRate: bookingCompletionRate,
           revenue: parseFloat(bookingRevenue.toFixed(2))
+        },
+        checker: {
+          rackTotal: parseInt(rackStats.total_assigned || 0, 10),
+          rackCompleted: parseInt(rackStats.total_completed || 0, 10),
+          rackAvgDurationSec: Math.round(parseFloat(rackStats.avg_duration_seconds || 0)),
+          inventoryTotal: parseInt(invStats.total_assigned || 0, 10),
+          inventoryCompleted: parseInt(invStats.total_completed || 0, 10),
+          inventoryAvgDurationSec: Math.round(parseFloat(invStats.avg_duration_seconds || 0)),
+          accuracyRate
         }
       };
     }));
@@ -1855,6 +1899,48 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
       fee: parseFloat(b.fee)
     }));
 
+    // Get checker stats for individual employee
+    const uniqueId = String(employeeId);
+    const rackStatsRes = await pool.query(`
+      SELECT 
+        COUNT(*) as total_assigned,
+        COUNT(CASE WHEN status = 'Verified' THEN 1 END) as total_completed,
+        AVG(CASE WHEN status = 'Verified' AND duration IS NOT NULL THEN duration END) as avg_duration_seconds
+      FROM rack_assignments
+      WHERE assigned_to = $1
+    `, [uniqueId]);
+    const rackStats = rackStatsRes.rows[0];
+
+    const invStatsRes = await pool.query(`
+      SELECT 
+        COUNT(*) as total_assigned,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as total_completed,
+        AVG(CASE WHEN status = 'completed' AND duration IS NOT NULL THEN duration END) as avg_duration_seconds
+      FROM inventory_tasks
+      WHERE assigned_to = $1
+    `, [uniqueId]);
+    const invStats = invStatsRes.rows[0];
+
+    const verStatsRes = await pool.query(`
+      SELECT 
+        COUNT(*) as total_checks,
+        COUNT(CASE WHEN is_mismatch = false THEN 1 END) as correct_checks
+      FROM inventory_verifications iv
+      JOIN inventory_tasks it ON iv.task_id = it.id
+      WHERE it.assigned_to = $1
+    `, [uniqueId]);
+    const verStats = verStatsRes.rows[0];
+    const totalChecks = parseInt(verStats.total_checks || 0, 10);
+    const correctChecks = parseInt(verStats.correct_checks || 0, 10);
+    const accuracyRate = totalChecks > 0 ? Math.round((correctChecks / totalChecks) * 100) : 100;
+
+    const purchaseErrorsRes = await pool.query(`
+      SELECT COUNT(*) as error_count
+      FROM inventory_verifications
+      WHERE purchase_entry_error = true AND purchase_entry_employee = $1
+    `, [emp.full_name]);
+    const purchaseErrors = purchaseErrorsRes.rows[0].error_count || 0;
+
     res.json({
       success: true,
       data: {
@@ -1885,7 +1971,16 @@ exports.getEmployeeIndividualPerformanceStats = async (req, res) => {
           bookingsMade: totalBookings,
           bookingsCompleted: consultedBookings,
           bookingCompletionRate,
-          bookingRevenue: parseFloat(bookingRevenue.toFixed(2))
+          bookingRevenue: parseFloat(bookingRevenue.toFixed(2)),
+          // Checker layout fields
+          rackAssignmentsTotal: parseInt(rackStats.total_assigned || 0, 10),
+          rackAssignmentsCompleted: parseInt(rackStats.total_completed || 0, 10),
+          rackAvgDurationSec: Math.round(parseFloat(rackStats.avg_duration_seconds || 0)),
+          inventoryTasksTotal: parseInt(invStats.total_assigned || 0, 10),
+          inventoryTasksCompleted: parseInt(invStats.total_completed || 0, 10),
+          inventoryAvgDurationSec: Math.round(parseFloat(invStats.avg_duration_seconds || 0)),
+          inventoryAccuracyRate: accuracyRate,
+          purchaseEntryErrors: parseInt(purchaseErrors, 10)
         },
         appraisal: {
           qualityScore,
