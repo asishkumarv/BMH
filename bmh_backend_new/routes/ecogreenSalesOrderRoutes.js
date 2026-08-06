@@ -453,13 +453,13 @@ router.put('/:id/status', async (req, res) => {
     
     const result = await pool.query(
       `UPDATE ${targetTable} 
-       SET status = $1,
+       SET status = $1::varchar,
            pod_payment_mode = COALESCE($2, pod_payment_mode),
            payment_txn_id = COALESCE($3, payment_txn_id),
            cash_amount = COALESCE($5, cash_amount),
            online_amount = COALESCE($6, online_amount),
            credit_amount = COALESCE($7, credit_amount),
-           delivered_at = CASE WHEN $1::text = 'DELIVERED' OR $1::text = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
+           delivered_at = CASE WHEN $1::varchar = 'DELIVERED' OR $1::varchar = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END
        WHERE id = $4 
        RETURNING *`,
       [
