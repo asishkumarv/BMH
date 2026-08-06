@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert as AlertRN, TextInput, Platform, Modal } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { CheckSquare, AlertTriangle, ChevronRight, X, ArrowLeft, Check } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const Alert = {
+  alert: (title: string, message?: string) => {
+    if (Platform.OS === 'web') {
+      alert(message ? `${title}: ${message}` : title);
+    } else {
+      AlertRN.alert(title, message);
+    }
+  }
+};
 
 export default function EmployeeInventoryChecker() {
   const { isDesktop } = useResponsive();

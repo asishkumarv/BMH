@@ -19,6 +19,9 @@ export default function SubAdminRackChecker() {
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [pendingItemId, setPendingItemId] = useState<number | null>(null);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
+  const [allStaffList, setAllStaffList] = useState<any[]>([]);
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [selectedPriority, setSelectedPriority] = useState<'High' | 'Moderate' | 'Low'>('High');
 
   const handleReviewAssignment = async (id: number, status: 'Verified' | 'Rejected', remarks?: string) => {
     setReviewing(id);
@@ -93,31 +96,28 @@ export default function SubAdminRackChecker() {
       if (typeof rackAccess === 'string') rackAccess = JSON.parse(rackAccess);
 
       // 3. Fetch data
-      const [empRes, rackRes, assignRes, discRes] = await Promise.all([
-        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+      const [allUsersRes, rackRes, assignRes, discRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users'),
         axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/racks'),
         axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/assignments'),
         axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/discrepancies')
       ]);
 
-      const emps = empRes.data.data || [];
-      
-      // Filter employees to only those in the same department
-      const filteredEmps = emps.filter((e: any) => {
-        if (!deptName) return true;
-        return String(e.department).toLowerCase() === deptName.toLowerCase();
-      });
-
-      const combinedUsers = filteredEmps.map((e: any) => ({
-        ...e,
-        uniqueId: e.id.toString(),
-        displayName: `${e.full_name} (Employee)`
-      }));
+      const allUsers = allUsersRes.data.data || [];
+      const combinedUsers = allUsers
+        .filter((u: any) => u.type === 'employee' || u.type === 'department_admin')
+        .map((u: any) => ({
+          ...u,
+          uniqueId: u.id,
+          displayName: u.type === 'employee' 
+            ? `${u.full_name} (Employee - ${u.department || 'N/A'})`
+            : `${u.full_name} (Sub Admin - ${u.department || 'N/A'})`
+        }));
 
       // Filter to only users with rack checker access enabled
       const allowedStaff = combinedUsers.filter((u: any) => rackAccess[u.uniqueId] === true);
       setStaffList(allowedStaff);
-      
+      setAllStaffList(combinedUsers);
       setRacks(rackRes.data.racks || []);
       
       // Filter assignments & discrepancies to only show those for department staff
@@ -177,7 +177,7 @@ export default function SubAdminRackChecker() {
     }
   };
 
-  const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected', assigneeId?: string) => {
+  const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected', assigneeId?: string, priority?: string) => {
     setReviewing(id);
     try {
       const reviewed_by = subAdmin ? `SA-${subAdmin.id}` : 'Sub Admin';
@@ -186,7 +186,8 @@ export default function SubAdminRackChecker() {
         status,
         reviewed_by,
         reviewed_by_name,
-        assign_task_to: assigneeId
+        assign_task_to: assigneeId,
+        priority
       });
       Alert.alert('Success', `Discrepancy correction request ${status}`);
       // Refresh discrepancies
@@ -564,6 +565,8 @@ export default function SubAdminRackChecker() {
                               onPress={() => {
                                 setPendingItemId(item.id);
                                 setSelectedAssigneeId('');
+                                setStaffSearchQuery('');
+                                setSelectedPriority('High');
                                 setAssignModalVisible(true);
                               }}
                             >
@@ -594,52 +597,81 @@ export default function SubAdminRackChecker() {
       {/* Assign Verification Task Modal */}
       <Modal visible={assignModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { padding: 20 }]}>
+          <View style={[styles.modalContent, { padding: 20, maxWidth: 500 }]}>
             <View style={[styles.modalHeader, { padding: 0, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }]}>
               <Text style={styles.modalTitle}>Approve & Assign Task</Text>
               <TouchableOpacity onPress={() => setAssignModalVisible(false)}>
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
-            <View style={{ marginVertical: 16 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 }}>
+            
+            <View style={{ marginVertical: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
                 Select Employee / Sub Admin to assign verification:
               </Text>
               
-              {Platform.OS === 'web' ? (
-                <select
-                  value={selectedAssigneeId}
-                  onChange={(e) => setSelectedAssigneeId(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: 10,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#cbd5e1',
-                    backgroundColor: '#f8fafc',
-                    fontSize: 14,
-                    color: '#334155',
-                    outlineWidth: 0
-                  } as any}
-                >
-                  <option value="">-- Choose Staff --</option>
-                  {staffList.map((s: any) => (
-                    <option key={s.uniqueId} value={s.uniqueId}>{s.displayName}</option>
-                  ))}
-                </select>
-              ) : (
-                <ScrollView style={{ maxHeight: 150 }}>
-                  {staffList.map((s: any) => (
+              <TextInput
+                style={[styles.textInput, { marginBottom: 8 }]}
+                placeholder="🔍 Search staff by name..."
+                value={staffSearchQuery}
+                onChangeText={setStaffSearchQuery}
+              />
+              
+              <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#f8fafc', marginBottom: 12 }}>
+                {allStaffList
+                  .filter(s => s.displayName.toLowerCase().includes(staffSearchQuery.toLowerCase()))
+                  .map((s: any) => (
                     <TouchableOpacity
                       key={s.uniqueId}
-                      style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: selectedAssigneeId === s.uniqueId ? '#e2e8f0' : 'transparent' }}
+                      style={{
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#e2e8f0',
+                        backgroundColor: selectedAssigneeId === s.uniqueId ? '#cbd5e1' : 'transparent'
+                      }}
                       onPress={() => setSelectedAssigneeId(s.uniqueId)}
                     >
-                      <Text style={{ fontSize: 14, color: '#334155' }}>{s.displayName}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: selectedAssigneeId === s.uniqueId ? '700' : '400', color: '#334155' }}>
+                        {s.displayName}
+                      </Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
-              )}
+                {allStaffList.filter(s => s.displayName.toLowerCase().includes(staffSearchQuery.toLowerCase())).length === 0 && (
+                  <Text style={{ padding: 12, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center' }}>No staff found</Text>
+                )}
+              </ScrollView>
+            </View>
+            
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 }}>
+                Select Task Priority:
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {['High', 'Moderate', 'Low'].map((prio) => (
+                  <TouchableOpacity
+                    key={prio}
+                    onPress={() => setSelectedPriority(prio as any)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      alignItems: 'center',
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: selectedPriority === prio ? Colors.light.primary : '#cbd5e1',
+                      backgroundColor: selectedPriority === prio ? `${Colors.light.primary}10` : '#f8fafc',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: selectedPriority === prio ? Colors.light.primary : '#475569',
+                    }}>
+                      {prio}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
             
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
@@ -658,7 +690,7 @@ export default function SubAdminRackChecker() {
                   }
                   setAssignModalVisible(false);
                   if (pendingItemId !== null) {
-                    handleReviewDiscrepancy(pendingItemId, 'approved', selectedAssigneeId);
+                    handleReviewDiscrepancy(pendingItemId, 'approved', selectedAssigneeId, selectedPriority);
                   }
                 }}
               >

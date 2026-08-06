@@ -127,7 +127,7 @@ exports.getVerifications = async (req, res) => {
 exports.reviewVerification = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewed_by, reviewed_by_name, assign_task_to } = req.body;
+    const { status, reviewed_by, reviewed_by_name, assign_task_to, priority } = req.body;
     
     const verRes = await pool.query('SELECT * FROM inventory_verifications WHERE id = $1', [id]);
     if (verRes.rows.length === 0) {
@@ -184,8 +184,8 @@ exports.reviewVerification = async (req, res) => {
           await pool.query(
             `INSERT INTO tasks 
              (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, priority, category) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'High', 'DB Update')`,
-            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'DB Update')`,
+            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department, priority || 'Moderate']
           );
 
           // Insert notification

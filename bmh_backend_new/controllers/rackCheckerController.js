@@ -183,7 +183,7 @@ exports.getDiscrepancies = async (req, res) => {
 exports.reviewDiscrepancy = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewed_by, reviewed_by_name, assign_task_to } = req.body;
+    const { status, reviewed_by, reviewed_by_name, assign_task_to, priority } = req.body;
     
     const discRes = await pool.query('SELECT * FROM rack_discrepancies WHERE id = $1', [id]);
     if (discRes.rows.length === 0) {
@@ -245,8 +245,8 @@ exports.reviewDiscrepancy = async (req, res) => {
           await pool.query(
             `INSERT INTO tasks 
              (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, priority, category) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'High', 'DB Update')`,
-            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'DB Update')`,
+            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department, priority || 'Moderate']
           );
 
           // Insert notification

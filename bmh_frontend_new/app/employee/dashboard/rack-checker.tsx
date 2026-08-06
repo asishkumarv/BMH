@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert as AlertRN, TextInput, Platform, Modal } from 'react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { CheckSquare, AlertTriangle, ChevronRight, X, ArrowLeft } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const Alert = {
+  alert: (title: string, message?: string) => {
+    if (Platform.OS === 'web') {
+      alert(message ? `${title}: ${message}` : title);
+    } else {
+      AlertRN.alert(title, message);
+    }
+  }
+};
 
 export default function EmployeeRackChecker() {
   const { isDesktop } = useResponsive();
@@ -173,7 +183,10 @@ export default function EmployeeRackChecker() {
 
     let reported_qty: number | null = null;
     let reported_mrp_val: number | null = null;
+    let reported_mrpbox_val: number | null = null;
+    let reported_expiry_val: string | null = null;
     let finalDescription = '';
+    let display_text = '';
 
     // Validate inputs based on discrepancy type
     if (discrepancyType === 'missing stock') {
@@ -183,6 +196,7 @@ export default function EmployeeRackChecker() {
       }
       reported_qty = parseInt(totalStock) - parseInt(missingQty);
       finalDescription = `${description} (Missing: ${missingQty}, Total: ${totalStock})`;
+      display_text = `${discrepancyType.toUpperCase()}: Missing ${missingQty} units (Observed: ${reported_qty})`;
     } else if (discrepancyType === 'excess stock') {
       if (!excessQty || !totalStock) {
         Alert.alert('Validation Error', 'Please specify excess quantity and total stock of batch.');
@@ -190,6 +204,7 @@ export default function EmployeeRackChecker() {
       }
       reported_qty = parseInt(totalStock) + parseInt(excessQty);
       finalDescription = `${description} (Excess: ${excessQty}, Total: ${totalStock})`;
+      display_text = `${discrepancyType.toUpperCase()}: Excess ${excessQty} units (Observed: ${reported_qty})`;
     } else if (discrepancyType === 'wrong item') {
       if (!selectedWrongMed || !wrongItemStock) {
         Alert.alert('Validation Error', 'Please search/select actual medicine and observed stock.');
@@ -201,6 +216,7 @@ export default function EmployeeRackChecker() {
         actual_item_name: selectedWrongMed.itemname,
         actual_item_stock: parseInt(wrongItemStock)
       });
+      display_text = `${discrepancyType.toUpperCase()}: Actual is ${selectedWrongMed.itemname} (Observed Stock: ${wrongItemStock})`;
     } else if (discrepancyType === 'damaged item') {
       if (!damagedQty || !totalStock) {
         Alert.alert('Validation Error', 'Please specify damaged quantity and total stock.');
@@ -208,6 +224,7 @@ export default function EmployeeRackChecker() {
       }
       reported_qty = parseInt(totalStock) - parseInt(damagedQty);
       finalDescription = `${description} (Damaged: ${damagedQty}, Total: ${totalStock})`;
+      display_text = `${discrepancyType.toUpperCase()}: Damaged ${damagedQty} units (Available: ${reported_qty})`;
     } else if (discrepancyType === 'expired') {
       if (!expiredQty || !totalStock) {
         Alert.alert('Validation Error', 'Please specify expired quantity and total stock.');
@@ -215,6 +232,7 @@ export default function EmployeeRackChecker() {
       }
       reported_qty = parseInt(totalStock) - parseInt(expiredQty);
       finalDescription = `${description} (Expired: ${expiredQty}, Total: ${totalStock})`;
+      display_text = `${discrepancyType.toUpperCase()}: Expired ${expiredQty} units (Good: ${reported_qty})`;
     } else if (discrepancyType === 'mrp') {
       if (!reportedMrp && !reportedMrpBox && !reportedExpiry) {
         Alert.alert('Validation Error', 'Please specify at least one verified field (MRP, MRP Box, or Expiry Date).');
@@ -226,25 +244,16 @@ export default function EmployeeRackChecker() {
         reported_mrp_val = parseFloat(reportedMrp);
         parts.push(`New MRP: ${reportedMrp}`);
       }
-      let reported_mrpbox_val = reportedMrpBox ? parseFloat(reportedMrpBox) : null;
-      let reported_expiry_val = reportedExpiry || null;
-      if (reportedMrpBox) parts.push(`New MRP Box: ${reportedMrpBox}`);
-      if (reportedExpiry) parts.push(`New Expiry: ${reportedExpiry}`);
+      if (reportedMrpBox) {
+        reported_mrpbox_val = parseFloat(reportedMrpBox);
+        parts.push(`New MRP Box: ${reportedMrpBox}`);
+      }
+      if (reportedExpiry) {
+        reported_expiry_val = reportedExpiry;
+        parts.push(`New Expiry: ${reportedExpiry}`);
+      }
       finalDescription = `${description} (${parts.join(', ')})`;
-
-      const newDisc = {
-        id: Date.now().toString(),
-        medicine_id: selectedMed.id,
-        product_name: selectedMed.itemname,
-        discrepancy_type: discrepancyType,
-        reported_qty,
-        reported_mrp: reported_mrp_val,
-        reported_mrpbox: reported_mrpbox_val,
-        reported_expiry: reported_expiry_val,
-        description: finalDescription,
-        display_text: `${discrepancyType.toUpperCase()}: Corrected [${parts.join(', ')}]`
-      };
-      setDiscrepancyList([...discrepancyList, newDisc]);
+      display_text = `${discrepancyType.toUpperCase()}: Corrected [${parts.join(', ')}]`;
     } else { // other
       if (!description) {
         Alert.alert('Validation Error', 'Please provide details about the mismatch.');
@@ -252,19 +261,23 @@ export default function EmployeeRackChecker() {
       }
       reported_qty = null;
       finalDescription = description;
-
-      const newDisc = {
-        id: Date.now().toString(),
-        medicine_id: selectedMed.id,
-        product_name: selectedMed.itemname,
-        discrepancy_type: discrepancyType,
-        reported_qty,
-        reported_mrp: null,
-        description: finalDescription,
-        display_text: `${discrepancyType.toUpperCase()}: ${description}`
-      };
-      setDiscrepancyList([...discrepancyList, newDisc]);
+      display_text = `${discrepancyType.toUpperCase()}: ${description}`;
     }
+
+    const newDisc = {
+      id: Date.now().toString(),
+      medicine_id: selectedMed.id,
+      product_name: selectedMed.itemname,
+      discrepancy_type: discrepancyType,
+      reported_qty,
+      reported_mrp: reported_mrp_val,
+      reported_mrpbox: reported_mrpbox_val,
+      reported_expiry: reported_expiry_val,
+      description: finalDescription,
+      display_text
+    };
+
+    setDiscrepancyList([...discrepancyList, newDisc]);
 
     // Clear item inputs
     setMissingQty('');
