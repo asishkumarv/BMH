@@ -377,20 +377,19 @@ export default function SubAdminInventoryChecker() {
               </Modal>
 
               <Text style={styles.label}>Search & Select Racks</Text>
+              {selectedRacks.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {selectedRacks.map(r => (
+                    <View key={r} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2e8f0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 13, color: '#334155', fontWeight: '600' }}>{r}</Text>
+                      <TouchableOpacity style={{ marginLeft: 6 }} onPress={() => setSelectedRacks(selectedRacks.filter(item => item !== r))}>
+                        <X size={14} color="#64748b" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
               <View style={{ position: 'relative', zIndex: 10, marginBottom: 16 }}>
-                {selectedRacks.length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                    {selectedRacks.map(r => (
-                      <View key={r} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2e8f0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                        <Text style={{ fontSize: 13, color: '#334155', fontWeight: '600' }}>{r}</Text>
-                        <TouchableOpacity style={{ marginLeft: 6 }} onPress={() => setSelectedRacks(selectedRacks.filter(item => item !== r))}>
-                          <X size={14} color="#64748b" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
                 <TextInput 
                   style={[styles.textInput, isFocused && { borderColor: Colors.light.primary, borderWidth: 1.5 }]}
                   placeholder="Type to search and select racks..."
@@ -425,21 +424,36 @@ export default function SubAdminInventoryChecker() {
                     />
                     <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 10000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
                       {racks
-                        .filter(r => r.rack.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r.rack))
-                        .map(r => (
-                          <TouchableOpacity 
-                            key={r.rack} 
-                            style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
-                            onPress={() => {
-                              toggleRackSelection(r.rack);
-                              setRackSearch('');
-                              setDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={{ fontSize: 14, color: '#334155' }}>{r.rack} ({r.product_count} Products, {r.batch_count} Batches)</Text>
-                          </TouchableOpacity>
-                        ))}
-                      {racks.filter(r => r.rack.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r.rack)).length === 0 && (
+                        .filter(r => {
+                          const rackName = r && typeof r === 'object' ? r.rack : r;
+                          if (!rackName) return false;
+                          return rackName.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(rackName);
+                        })
+                        .map(r => {
+                          const rackName = r && typeof r === 'object' ? r.rack : r;
+                          const pCount = r && typeof r === 'object' ? r.product_count : 0;
+                          const bCount = r && typeof r === 'object' ? r.batch_count : 0;
+                          return (
+                            <TouchableOpacity 
+                              key={rackName} 
+                              style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
+                              onPress={() => {
+                                toggleRackSelection(rackName);
+                                setRackSearch('');
+                                setDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, color: '#334155' }}>
+                                {rackName} {pCount > 0 || bCount > 0 ? `(${pCount} Products, ${bCount} Batches)` : ''}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      {racks.filter(r => {
+                        const rackName = r && typeof r === 'object' ? r.rack : r;
+                        if (!rackName) return false;
+                        return rackName.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(rackName);
+                      }).length === 0 && (
                         <Text style={{ padding: 12, color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>No matching racks found</Text>
                       )}
                     </View>
