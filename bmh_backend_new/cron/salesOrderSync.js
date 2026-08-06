@@ -72,8 +72,16 @@ async function syncSalesOrders() {
             try {
                 await client.query('BEGIN');
                 
-                const checkRes = await client.query('SELECT order_no FROM ecogreensales_orders WHERE order_no = ANY($1)', [orderNos]);
-                const existingOrderNos = new Set(checkRes.rows.map(r => r.order_no));
+                const checkRes = await client.query(
+                    'SELECT order_no, invoice_id, payment_status, delivered_by, createduser FROM ecogreensales_orders WHERE order_no = ANY($1)',
+                    [orderNos]
+                );
+                const existingOrders = new Map(checkRes.rows.map(r => [r.order_no, {
+                    invoice_id: r.invoice_id,
+                    payment_status: r.payment_status,
+                    delivered_by: r.delivered_by,
+                    createduser: r.createduser
+                }]));
                 
                 const insertQueryStart = `
                   INSERT INTO ecogreensales_orders (
@@ -91,7 +99,45 @@ async function syncSalesOrders() {
                 
                 for (const order of orders) {
                     if (!order.order_no) continue;
-                    if (existingOrderNos.has(order.order_no)) continue;
+                    
+                    if (existingOrders.has(order.order_no)) {
+                        const existing = existingOrders.get(order.order_no);
+                        let needsUpdate = false;
+                        const updateFields = [];
+                        const updateParams = [];
+                        
+                        if (order.invoice_id && order.invoice_id !== existing.invoice_id) {
+                            updateFields.push(`invoice_id = $${updateParams.length + 1}`);
+                            updateParams.push(order.invoice_id);
+                            needsUpdate = true;
+                        }
+                        if (order.payment_status && order.payment_status !== existing.payment_status) {
+                            updateFields.push(`payment_status = $${updateParams.length + 1}`);
+                            updateParams.push(order.payment_status);
+                            needsUpdate = true;
+                        }
+                        if (order.delivered_by && order.delivered_by !== existing.delivered_by) {
+                            updateFields.push(`delivered_by = $${updateParams.length + 1}`);
+                            updateParams.push(order.delivered_by);
+                            needsUpdate = true;
+                        }
+                        if (order.createduser && order.createduser !== existing.createduser) {
+                            updateFields.push(`createduser = $${updateParams.length + 1}`);
+                            updateParams.push(order.createduser);
+                            needsUpdate = true;
+                        }
+
+                        if (needsUpdate) {
+                            updateParams.push(order.order_no);
+                            await client.query(
+                                `UPDATE ecogreensales_orders SET ${updateFields.join(', ')} WHERE order_no = $${updateParams.length}`,
+                                updateParams
+                            );
+                            console.log(`🔄 [Sync] Updated details for existing order ${order.order_no}`);
+                        }
+                        continue;
+                    }
+                    
                     if (processedInThisBatch.has(order.order_no)) continue;
                     processedInThisBatch.add(order.order_no);
                     
