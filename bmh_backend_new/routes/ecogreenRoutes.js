@@ -1767,7 +1767,7 @@ router.post("/sales-order", async (req, res) => {
 // });
 router.get("/sales-orders", async (req, res) => {
   try {
-    const { status, delivery_boy_id, search, fromDate, toDate, page = 1, limit = 50 } = req.query;
+    const { status, delivery_boy_id, search, fromDate, toDate, page = 1, limit = 50, attention } = req.query;
     
     const parsedPage = parseInt(page, 10) || 1;
     const parsedLimit = parseInt(limit, 10) || 50;
@@ -1778,6 +1778,11 @@ router.get("/sales-orders", async (req, res) => {
     let queryParams = [];
     let paramIdx = 1;
     
+    if (attention === 'true') {
+      query += ` AND LOWER(status) NOT IN ('delivered', 'completed', 'cancelled', 'returned', 'failed', 'fail') AND (invoice_id IS NULL OR invoice_id = '' OR needs_review = true)`;
+      countQuery += ` AND LOWER(status) NOT IN ('delivered', 'completed', 'cancelled', 'returned', 'failed', 'fail') AND (invoice_id IS NULL OR invoice_id = '' OR needs_review = true)`;
+    }
+
     if (status && status !== 'All') {
       query += ` AND status = $${paramIdx}`;
       countQuery += ` AND status = $${paramIdx}`;
@@ -1814,13 +1819,17 @@ router.get("/sales-orders", async (req, res) => {
       paramIdx++;
     }
     
-    query += ` ORDER BY 
-      CASE WHEN status = 'Assigned' THEN 1 ELSE 0 END ASC,
-      CASE WHEN invoice_id IS NULL OR invoice_id = '' THEN 0 ELSE 1 END ASC,
-      CASE WHEN needs_review = TRUE THEN 0 ELSE 1 END ASC,
-      created_at DESC, 
-      order_no DESC 
-      LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    if (attention === 'true') {
+      query += ` ORDER BY 
+        CASE WHEN status = 'Assigned' THEN 1 ELSE 0 END ASC,
+        CASE WHEN invoice_id IS NULL OR invoice_id = '' THEN 0 ELSE 1 END ASC,
+        CASE WHEN needs_review = TRUE THEN 0 ELSE 1 END ASC,
+        created_at DESC, 
+        order_no DESC 
+        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    } else {
+      query += ` ORDER BY created_at DESC, order_no DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    }
     
     const totalRes = await pool.query(countQuery, queryParams.slice(0, paramIdx - 1));
     const totalCount = parseInt(totalRes.rows[0].count, 10);
@@ -1870,9 +1879,17 @@ router.get("/sales-orders", async (req, res) => {
       };
     });
     
+    const attentionRes = await pool.query(
+      `SELECT COUNT(*) FROM ecogreensales_orders 
+       WHERE LOWER(status) NOT IN ('delivered', 'completed', 'cancelled', 'returned', 'failed', 'fail') 
+         AND (invoice_id IS NULL OR invoice_id = '' OR needs_review = true)`
+    );
+    const attentionCount = parseInt(attentionRes.rows[0].count, 10);
+
     res.status(200).json({
       success: true,
       data: orders,
+      attentionCount,
       pagination: {
         page: parsedPage,
         totalPages: Math.ceil(totalCount / parsedLimit) || 1,

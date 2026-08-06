@@ -39,6 +39,8 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   // Buses list and manage states
   const [buses, setBuses] = useState([]);
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
+  const [filterAttention, setFilterAttention] = useState(false);
+  const [attentionCount, setAttentionCount] = useState(0);
 
   const fetchAutoAssignToggle = async () => {
     try {
@@ -98,12 +100,16 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
       if (selectedBoyId !== 'All') {
         params.push(`delivery_boy_id=${selectedBoyId}`);
       }
+      if (filterAttention) {
+        params.push('attention=true');
+      }
       
       url += `?${params.join('&')}`;
       
       const res = await axios.get(url);
       if (res.data && res.data.success) {
         setOrders(res.data.data);
+        setAttentionCount(res.data.attentionCount || 0);
         if (res.data.pagination) {
           setPagination(res.data.pagination);
         }
@@ -141,7 +147,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   useEffect(() => {
     setPage(1);
     fetchSalesOrders(false, 1);
-  }, [startDate, endDate, selectedBoyId, assignmentFilter]);
+  }, [startDate, endDate, selectedBoyId, assignmentFilter, filterAttention]);
 
   useEffect(() => {
     fetchSalesOrders(false, page);
@@ -152,7 +158,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
       fetchSalesOrders(true, page);
     }, 10000);
     return () => clearInterval(interval);
-  }, [page, searchQuery, startDate, endDate, selectedBoyId, assignmentFilter]);
+  }, [page, searchQuery, startDate, endDate, selectedBoyId, assignmentFilter, filterAttention]);
 
   const handleAssignBoy = async (orderId, boyId) => {
     try {
@@ -746,9 +752,34 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
             />
           </View>
           
+          {/* Needs Attention Filter Button */}
+          <TouchableOpacity 
+            onPress={() => {
+              const newVal = !filterAttention;
+              setFilterAttention(newVal);
+              setPage(1);
+            }}
+            style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              gap: 6, 
+              backgroundColor: filterAttention ? '#ef4444' : '#fee2e2', 
+              borderWidth: 1, 
+              borderColor: filterAttention ? '#dc2626' : '#fca5a5', 
+              paddingHorizontal: 12, 
+              borderRadius: 8, 
+              height: 32 
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: filterAttention ? '#ffffff' : '#b91c1c' }}>
+              ⚠️ Attention Needed {attentionCount > 0 ? `(${attentionCount})` : '(0)'}
+            </Text>
+          </TouchableOpacity>
+          
           {/* Status Filter */}
-          <View style={styles.dropdownWrapper}>
+          <View style={[styles.dropdownWrapper, filterAttention && { opacity: 0.5 }]}>
             <Picker
+              enabled={!filterAttention}
               selectedValue={assignmentFilter}
               onValueChange={(val) => setAssignmentFilter(val)}
               style={styles.picker}
@@ -910,28 +941,28 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
             renderItem={renderOrderItem}
           />
         )}
+      </View>
+      
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity 
+          disabled={page <= 1} 
+          onPress={() => setPage(p => Math.max(1, p - 1))}
+          style={[styles.pageButton, page <= 1 && styles.pageButtonDisabled]}
+        >
+          <Text style={[styles.pageButtonText, page <= 1 && styles.pageButtonTextDisabled]}>Previous</Text>
+        </TouchableOpacity>
         
-        <View style={styles.paginationContainer}>
-          <TouchableOpacity 
-            disabled={page <= 1} 
-            onPress={() => setPage(p => Math.max(1, p - 1))}
-            style={[styles.pageButton, page <= 1 && styles.pageButtonDisabled]}
-          >
-            <Text style={[styles.pageButtonText, page <= 1 && styles.pageButtonTextDisabled]}>Previous</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.pageInfoText}>
-            Page {pagination.page} of {pagination.totalPages || 1} (Showing {orders.length} of {pagination.total} total orders)
-          </Text>
-          
-          <TouchableOpacity 
-            disabled={page >= (pagination.totalPages || 1)} 
-            onPress={() => setPage(p => Math.min(pagination.totalPages || 1, p + 1))}
-            style={[styles.pageButton, page >= (pagination.totalPages || 1) && styles.pageButtonDisabled]}
-          >
-            <Text style={[styles.pageButtonText, page >= (pagination.totalPages || 1) && styles.pageButtonTextDisabled]}>Next</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.pageInfoText}>
+          Page {pagination.page} of {pagination.totalPages || 1} (Showing {orders.length} of {pagination.total} total orders)
+        </Text>
+        
+        <TouchableOpacity 
+          disabled={page >= (pagination.totalPages || 1)} 
+          onPress={() => setPage(p => Math.min(pagination.totalPages || 1, p + 1))}
+          style={[styles.pageButton, page >= (pagination.totalPages || 1) && styles.pageButtonDisabled]}
+        >
+          <Text style={[styles.pageButtonText, page >= (pagination.totalPages || 1) && styles.pageButtonTextDisabled]}>Next</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Assign Modal (Rider Select List) */}
@@ -1583,7 +1614,7 @@ const styles = StyleSheet.create({
   picker: { height: 32, width: '100%', maxWidth: '100%', borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: 'none' } }), fontSize: 13 },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  tableContainer: { height: 540, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
+  tableContainer: { height: 420, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, overflow: 'hidden' },
   tableHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerText: { fontSize: 12, fontWeight: '700', color: '#475569' },
   tableRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },
