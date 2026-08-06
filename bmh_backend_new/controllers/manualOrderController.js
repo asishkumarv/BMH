@@ -426,9 +426,9 @@ exports.updateOrder = async (req, res) => {
     addField('credit_amount', credit_amount);
     
     // Automatically capture exact time transitions
-    if (status === 'Picked Up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);
-    if (status === 'Out for Delivery') updateFields.push(`started_at = CURRENT_TIMESTAMP`);
-    if (status === 'Delivered') updateFields.push(`delivered_at = CURRENT_TIMESTAMP`);
+    if (status && status.toLowerCase() === 'picked up') updateFields.push(`picked_up_at = CURRENT_TIMESTAMP`);
+    if (status && status.toLowerCase() === 'out for delivery') updateFields.push(`started_at = CURRENT_TIMESTAMP`);
+    if (status && status.toLowerCase() === 'delivered') updateFields.push(`delivered_at = CURRENT_TIMESTAMP`);
 
     if (payment_attachment) addField('payment_attachment', payment_attachment);
     if (bus_front_image) addField('bus_front_image', bus_front_image);
@@ -445,7 +445,7 @@ exports.updateOrder = async (req, res) => {
       addField('delivery_otp', generatedOtp);
     }
 
-    if ((status === 'Delivered' || status === 'Cancelled') && (
+    if (status && (status.toLowerCase() === 'delivered' || status.toLowerCase() === 'cancelled') && (
       currentOrder.rows[0].mode_of_delivery === 'Local' || 
       currentOrder.rows[0].mode_of_delivery === 'Schedule Delivery' ||
       currentOrder.rows[0].mode_of_delivery === 'Store'
@@ -539,7 +539,7 @@ exports.updateOrder = async (req, res) => {
                   updatedOrder.payment_mode === 'Split';
 
     const isBus = String(updatedOrder.mode_of_delivery || '').toLowerCase() === 'bus';
-    if (updatedOrder.status === 'Delivered' && isPOD && updatedOrder.delivery_boy_id && !isBus) {
+    if (updatedOrder.status && updatedOrder.status.toLowerCase() === 'delivered' && isPOD && updatedOrder.delivery_boy_id && !isBus) {
       let targetEmployeeId = updatedOrder.delivery_boy_id.toString();
       if (updatedOrder.delivery_assigned_user_type === 'sub_admin') {
         targetEmployeeId = 'SA-' + targetEmployeeId;
@@ -551,7 +551,7 @@ exports.updateOrder = async (req, res) => {
 
       // Fallback for old system / unspecified split amounts
       const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
-      if (cAmt === 0 && oAmt === 0) {
+      if (cAmt === 0 && oAmt === 0 && crAmt === 0) {
         const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
         if (mode === 'Online') {
           oAmt = totalPaid;
@@ -569,7 +569,7 @@ exports.updateOrder = async (req, res) => {
         [(updatedOrder.order_no || updatedOrder.id || '').toString(), (updatedOrder.invoice_no || '').toString()]
       );
 
-      const txType = mode === 'Split' ? 'split_collection' : (mode === 'Online' ? 'online_collection' : 'cash_collection');
+      const txType = mode === 'Split' ? 'split_collection' : (mode === 'Online' ? 'online_collection' : (mode === 'Credit' ? 'credit_collection' : 'cash_collection'));
       const txMode = mode;
       const totalPaid = cAmt + oAmt;
 
@@ -632,7 +632,7 @@ exports.updateOrder = async (req, res) => {
           );
         }
 
-        if (cAmt > 0 || oAmt > 0) {
+        if (cAmt > 0 || oAmt > 0 || crAmt > 0) {
           await pool.query(
             `INSERT INTO wallet_transactions (
               employee_id, type, amount, note, status, payment_mode, payment_txn_id,

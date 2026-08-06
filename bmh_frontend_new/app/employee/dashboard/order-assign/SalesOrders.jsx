@@ -557,7 +557,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 }}>
             <View style={{ flex: 1 }}>
-              {item.status === 'Delivered' ? (
+              {false ? (
                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
                    <User size={14} color="#64748b" style={{marginRight: 4}}/>
                    <Text style={{ fontSize: 12, color: '#334155', flex: 1 }} numberOfLines={1}>{dboy?.full_name || item.delivered_by || 'Unassigned'}</Text>
@@ -644,7 +644,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
         {/* Delivery Boy */}
         <View style={[styles.cell, { flex: 1.5 }]}>
-          {item.status === 'Delivered' ? (
+          {false ? (
              <View style={{flexDirection: 'row', alignItems: 'center'}}>
                <User size={16} color="#94a3b8" style={{marginRight: 4}}/>
                <Text style={styles.cellText} numberOfLines={1}>{dboy?.full_name || item.delivered_by || 'Unassigned'}</Text>

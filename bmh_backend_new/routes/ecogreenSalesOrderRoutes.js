@@ -496,7 +496,7 @@ router.put('/:id/status', async (req, res) => {
       const crAmt = parseFloat(updatedOrder.credit_amount || 0);
 
       // Fallback for old system / unspecified split amounts
-      if (cAmt === 0 && oAmt === 0) {
+      if (cAmt === 0 && oAmt === 0 && crAmt === 0) {
         const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
         const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.amount || 0);
         if (mode === 'Online') {
@@ -518,8 +518,8 @@ router.put('/:id/status', async (req, res) => {
         );
       }
 
-      if (cAmt > 0 || oAmt > 0) {
-        const txType = pod_payment_mode === 'Split' ? 'split_collection' : (pod_payment_mode === 'Online' ? 'online_collection' : 'cash_collection');
+      if (cAmt > 0 || oAmt > 0 || crAmt > 0) {
+        const txType = pod_payment_mode === 'Split' ? 'split_collection' : (pod_payment_mode === 'Online' ? 'online_collection' : (pod_payment_mode === 'Credit' ? 'credit_collection' : 'cash_collection'));
         const txMode = pod_payment_mode || 'Cash';
         const totalPaid = cAmt + oAmt;
 
@@ -677,7 +677,7 @@ router.put('/:id/update', async (req, res) => {
         const crAmt = parseFloat(updatedOrder.credit_amount || 0);
 
         const mode = updatedOrder.pod_payment_mode || updatedOrder.payment_mode || 'Cash';
-        if (cAmt === 0 && oAmt === 0) {
+        if (cAmt === 0 && oAmt === 0 && crAmt === 0) {
           const totalPaid = parseFloat(updatedOrder.paid_amount || updatedOrder.total_price || 0);
           if (mode === 'Online') {
             oAmt = totalPaid;
@@ -689,7 +689,7 @@ router.put('/:id/update', async (req, res) => {
           }
         }
 
-        const txType = mode === 'Split' ? 'split_collection' : (mode === 'Online' ? 'online_collection' : 'cash_collection');
+        const txType = mode === 'Split' ? 'split_collection' : (mode === 'Online' ? 'online_collection' : (mode === 'Credit' ? 'credit_collection' : 'cash_collection'));
         const txMode = mode;
         const totalPaid = cAmt + oAmt;
 
@@ -752,7 +752,7 @@ router.put('/:id/update', async (req, res) => {
             );
           }
 
-          if (cAmt > 0 || oAmt > 0) {
+          if (cAmt > 0 || oAmt > 0 || crAmt > 0) {
             await pool.query(
               `INSERT INTO wallet_transactions (
                 employee_id, type, amount, note, status, payment_mode, payment_txn_id,
