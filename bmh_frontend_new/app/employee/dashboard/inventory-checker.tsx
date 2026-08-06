@@ -30,6 +30,7 @@ export default function EmployeeInventoryChecker() {
   const [verifiedSellingPrice, setVerifiedSellingPrice] = useState('');
   const [verifiedPurchasePrice, setVerifiedPurchasePrice] = useState('');
   const [verifiedMrp, setVerifiedMrp] = useState('');
+  const [verifiedMrpBox, setVerifiedMrpBox] = useState('');
   const [verifiedPackSize, setVerifiedPackSize] = useState('');
   const [purchaseEntryEmployee, setPurchaseEntryEmployee] = useState('');
   const [stockAvailability, setStockAvailability] = useState('Available');
@@ -147,7 +148,8 @@ export default function EmployeeInventoryChecker() {
     setVerifiedSellingPrice(med.salerate?.toString() || '0');
     setVerifiedPurchasePrice(med.purchaserate?.toString() || '0');
     setVerifiedMrp(med.mrp?.toString() || '0');
-    setVerifiedPackSize(med.packsize || med.pack_size || '');
+    setVerifiedMrpBox(med.mrpbox?.toString() || '0');
+    setVerifiedPackSize(med.pack_size?.toString() || med.packsize?.toString() || '');
     setPurchaseEntryEmployee('');
     setStockAvailability(med.stockbalqty > 0 ? 'Available' : 'Out of Stock');
     
@@ -177,15 +179,15 @@ export default function EmployeeInventoryChecker() {
       mismatchDetails['quantity'] = { current: selectedMed.stockbalqty, verified: parseFloat(verifiedQty) };
       isMismatch = true;
     }
-    if (parseFloat(verifiedSellingPrice) !== parseFloat(selectedMed.salerate)) {
-      mismatchDetails['selling_price'] = { current: selectedMed.salerate, verified: parseFloat(verifiedSellingPrice) };
-      isMismatch = true;
-    }
     if (parseFloat(verifiedMrp) !== parseFloat(selectedMed.mrp)) {
       mismatchDetails['mrp'] = { current: selectedMed.mrp, verified: parseFloat(verifiedMrp) };
       isMismatch = true;
     }
-    const currentPack = selectedMed.packsize || selectedMed.pack_size || '';
+    if (parseFloat(verifiedMrpBox) !== parseFloat(selectedMed.mrpbox || 0)) {
+      mismatchDetails['mrpbox'] = { current: selectedMed.mrpbox || 0, verified: parseFloat(verifiedMrpBox) };
+      isMismatch = true;
+    }
+    const currentPack = selectedMed.pack_size || selectedMed.packsize || '';
     if (verifiedPackSize !== currentPack) {
       mismatchDetails['pack_size'] = { current: currentPack, verified: verifiedPackSize };
       isMismatch = true;
@@ -200,9 +202,10 @@ export default function EmployeeInventoryChecker() {
         batch_number: verifiedBatch,
         expiry_date: verifiedExpiry || null,
         quantity: parseFloat(verifiedQty),
-        selling_price: parseFloat(verifiedSellingPrice),
-        purchase_price: parseFloat(verifiedPurchasePrice) || 0,
+        selling_price: parseFloat(selectedMed.salerate) || 0,
+        purchase_price: parseFloat(selectedMed.purchaserate) || 0,
         mrp: parseFloat(verifiedMrp),
+        mrpbox: parseFloat(verifiedMrpBox),
         stock_availability: stockAvailability,
         is_mismatch: isMismatch,
         mismatch_details: mismatchDetails,
@@ -282,51 +285,133 @@ export default function EmployeeInventoryChecker() {
             <ActivityIndicator size="small" color={Colors.light.primary} />
           ) : (
             <View>
-              {medicines.map((med) => {
-                const ver = verificationsMap[med.id];
-                const isVerified = !!ver;
-                const hasMismatch = ver?.is_mismatch;
+              {isDesktop ? (
+                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                  <View style={{ minWidth: 920 }}>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.th, { width: 90 }]}>Item Code</Text>
+                      <Text style={[styles.th, { width: 200 }]}>Medicine Name</Text>
+                      <Text style={[styles.th, { width: 110 }]}>Batch No</Text>
+                      <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>Qty</Text>
+                      <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>MRP</Text>
+                      <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>MRP Box</Text>
+                      <Text style={[styles.th, { width: 110, textAlign: 'center' }]}>Expiry Date</Text>
+                      <Text style={[styles.th, { width: 150, textAlign: 'center' }]}>Status</Text>
+                      <Text style={[styles.th, { width: 100, textAlign: 'center' }]}>Action</Text>
+                    </View>
+                    {medicines.map((med) => {
+                      const ver = verificationsMap[med.id];
+                      const isVerified = !!ver;
+                      const hasMismatch = ver?.is_mismatch;
 
-                return (
-                  <TouchableOpacity 
-                    key={med.id} 
-                    style={styles.verificationRow}
-                    onPress={() => {
-                      if (selectedTask.status === 'pending') {
-                        Alert.alert('Warning', 'Please click "Start Task" before verifying items.');
-                        return;
-                      }
-                      openVerificationModal(med);
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.medName}>{med.itemname}</Text>
-                      <Text style={styles.medSub}>
-                        Batch: {med.batchno || '-'} • Qty: {med.stockbalqty} • MRP: {med.mrp}
-                      </Text>
-                    </View>
-                    
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      {isVerified ? (
-                        hasMismatch ? (
-                          <View style={styles.badgeMismatch}>
-                            <AlertTriangle size={12} color="#ef4444" style={{ marginRight: 4 }} />
-                            <Text style={styles.badgeMismatchText}>Mismatch Pending</Text>
+                      return (
+                        <View key={med.id} style={styles.tableRow}>
+                          <Text style={[styles.td, { width: 90, color: '#64748b' }]} numberOfLines={1}>
+                            {med.c_item_code || '-'}
+                          </Text>
+                          <Text style={[styles.td, { width: 200, fontWeight: '700' }]} numberOfLines={2}>
+                            {med.itemname}
+                          </Text>
+                          <Text style={[styles.td, { width: 110, color: '#64748b' }]} numberOfLines={1}>
+                            {med.batchno || '-'}
+                          </Text>
+                          <Text style={[styles.td, { width: 80, textAlign: 'right', fontWeight: 'bold' }]}>
+                            {med.stockbalqty}
+                          </Text>
+                          <Text style={[styles.td, { width: 80, textAlign: 'right', fontWeight: 'bold' }]}>
+                            {med.mrp || '-'}
+                          </Text>
+                          <Text style={[styles.td, { width: 80, textAlign: 'right', fontWeight: 'bold' }]}>
+                            {med.mrpbox || '-'}
+                          </Text>
+                          <Text style={[styles.td, { width: 110, textAlign: 'center', color: '#64748b' }]}>
+                            {med.expirydate || '-'}
+                          </Text>
+                          <View style={{ width: 150, alignItems: 'center' }}>
+                            {isVerified ? (
+                              hasMismatch ? (
+                                <View style={styles.badgeMismatch}>
+                                  <AlertTriangle size={12} color="#ef4444" style={{ marginRight: 4 }} />
+                                  <Text style={styles.badgeMismatchText}>Mismatch Pending</Text>
+                                </View>
+                              ) : (
+                                <View style={styles.badgeVerified}>
+                                  <Check size={12} color="#10b981" style={{ marginRight: 4 }} />
+                                  <Text style={styles.badgeVerifiedText}>Verified</Text>
+                                </View>
+                              )
+                            ) : (
+                              <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>Pending Check</Text>
+                            )}
                           </View>
-                        ) : (
-                          <View style={styles.badgeVerified}>
-                            <Check size={12} color="#10b981" style={{ marginRight: 4 }} />
-                            <Text style={styles.badgeVerifiedText}>Verified</Text>
+                          <View style={{ width: 100, alignItems: 'center' }}>
+                            <TouchableOpacity 
+                              style={{ backgroundColor: Colors.light.primary, paddingVertical: 4, paddingHorizontal: 12, borderRadius: 6 }}
+                              onPress={() => {
+                                if (selectedTask.status === 'pending') {
+                                  Alert.alert('Warning', 'Please click "Start Task" before verifying items.');
+                                  return;
+                                }
+                                openVerificationModal(med);
+                              }}
+                            >
+                              <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Verify</Text>
+                            </TouchableOpacity>
                           </View>
-                        )
-                      ) : (
-                        <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>Pending Check</Text>
-                      )}
-                      <ChevronRight size={18} color="#94a3b8" />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              ) : (
+                <View>
+                  {medicines.map((med) => {
+                    const ver = verificationsMap[med.id];
+                    const isVerified = !!ver;
+                    const hasMismatch = ver?.is_mismatch;
+
+                    return (
+                      <TouchableOpacity 
+                        key={med.id} 
+                        style={styles.verificationRow}
+                        onPress={() => {
+                          if (selectedTask.status === 'pending') {
+                            Alert.alert('Warning', 'Please click "Start Task" before verifying items.');
+                            return;
+                          }
+                          openVerificationModal(med);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.medName}>{med.itemname}</Text>
+                          <Text style={styles.medSub}>
+                            Batch: {med.batchno || '-'} • Qty: {med.stockbalqty} • MRP: {med.mrp}
+                          </Text>
+                        </View>
+                        
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          {isVerified ? (
+                            hasMismatch ? (
+                              <View style={styles.badgeMismatch}>
+                                <AlertTriangle size={12} color="#ef4444" style={{ marginRight: 4 }} />
+                                <Text style={styles.badgeMismatchText}>Mismatch Pending</Text>
+                              </View>
+                            ) : (
+                              <View style={styles.badgeVerified}>
+                                <Check size={12} color="#10b981" style={{ marginRight: 4 }} />
+                                <Text style={styles.badgeVerifiedText}>Verified</Text>
+                              </View>
+                            )
+                          ) : (
+                            <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>Pending Check</Text>
+                          )}
+                          <ChevronRight size={18} color="#94a3b8" />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
               {medicines.length === 0 && (
                 <Text style={styles.emptyText}>No medicines in this rack.</Text>
               )}
@@ -354,7 +439,7 @@ export default function EmployeeInventoryChecker() {
                     <Text style={styles.infoText}>Name: {selectedMed.itemname}</Text>
                     <Text style={styles.infoText}>Batch: {selectedMed.batchno || '-'}</Text>
                     <Text style={styles.infoText}>Expiry: {selectedMed.expirydate || '-'}</Text>
-                    <Text style={styles.infoText}>Qty: {selectedMed.stockbalqty} • MRP: {selectedMed.mrp} • Sale: {selectedMed.salerate}</Text>
+                    <Text style={styles.infoText}>Qty: {selectedMed.stockbalqty} • MRP: {selectedMed.mrp} • MRP Box: {selectedMed.mrpbox || '-'}</Text>
                   </View>
                 )}
 
@@ -367,7 +452,7 @@ export default function EmployeeInventoryChecker() {
                     <TextInput style={styles.textInput} value={verifiedBatch} onChangeText={setVerifiedBatch} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.modalLabel}>Pack Size</Text>
+                    <Text style={styles.modalLabel}>Pack Size (Qty/Box)</Text>
                     <TextInput style={styles.textInput} value={verifiedPackSize} onChangeText={setVerifiedPackSize} />
                   </View>
                 </View>
@@ -388,12 +473,8 @@ export default function EmployeeInventoryChecker() {
 
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.modalLabel}>Selling Price</Text>
-                    <TextInput style={styles.textInput} keyboardType="numeric" value={verifiedSellingPrice} onChangeText={setVerifiedSellingPrice} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalLabel}>Purchase Price</Text>
-                    <TextInput style={styles.textInput} keyboardType="numeric" value={verifiedPurchasePrice} onChangeText={setVerifiedPurchasePrice} />
+                    <Text style={styles.modalLabel}>MRP Box</Text>
+                    <TextInput style={styles.textInput} keyboardType="numeric" value={verifiedMrpBox} onChangeText={setVerifiedMrpBox} />
                   </View>
                 </View>
 
@@ -519,5 +600,9 @@ const styles = StyleSheet.create({
   selectInput: { width: '100%', padding: 12, fontSize: 14, color: '#334155', borderWidth: 0, backgroundColor: 'transparent' } as any,
   textInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', marginBottom: 16 },
   submitVerBtn: { backgroundColor: Colors.light.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
-  submitVerBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 }
+  submitVerBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#f8fafc', paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  th: { fontSize: 12, fontWeight: '700', color: '#64748b', textTransform: 'uppercase' },
+  tableRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },
+  td: { fontSize: 14, color: '#334155' }
 });

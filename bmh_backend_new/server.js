@@ -624,7 +624,15 @@ app.listen(PORT, () => {
       ALTER TABLE rack_discrepancies ADD COLUMN IF NOT EXISTS reported_mrp DECIMAL(10,2);
     `);
   }).then(() => {
-    console.log('✅ rack_discrepancies reported_mrp column ensured.');
+    return pool.query(`
+      ALTER TABLE rack_discrepancies ADD COLUMN IF NOT EXISTS reported_mrpbox DECIMAL(10,2);
+    `);
+  }).then(() => {
+    return pool.query(`
+      ALTER TABLE rack_discrepancies ADD COLUMN IF NOT EXISTS reported_expiry VARCHAR(50);
+    `);
+  }).then(() => {
+    console.log('✅ rack_discrepancies reported_mrp, reported_mrpbox, and reported_expiry columns ensured.');
     return pool.query(`
       CREATE TABLE IF NOT EXISTS inventory_tasks (
         id SERIAL PRIMARY KEY,
@@ -690,7 +698,8 @@ app.listen(PORT, () => {
       ALTER TABLE inventory_verifications
       ADD COLUMN IF NOT EXISTS purchase_entry_employee VARCHAR(255),
       ADD COLUMN IF NOT EXISTS pack_size VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS purchase_entry_error BOOLEAN DEFAULT FALSE;
+      ADD COLUMN IF NOT EXISTS purchase_entry_error BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS mrpbox DECIMAL(10,2);
     `);
   }).then(() => console.log('✅ Checker tables layout columns ensured.'))
     .catch(e => console.error('Error creating Checker tables:', e.message));

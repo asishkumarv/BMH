@@ -53,6 +53,8 @@ export default function EmployeeRackChecker() {
   const [expiredQty, setExpiredQty] = useState('');
   const [totalStock, setTotalStock] = useState('');
   const [reportedMrp, setReportedMrp] = useState('');
+  const [reportedMrpBox, setReportedMrpBox] = useState('');
+  const [reportedExpiry, setReportedExpiry] = useState('');
   const [description, setDescription] = useState('');
 
   // Wrong Item search states
@@ -214,13 +216,35 @@ export default function EmployeeRackChecker() {
       reported_qty = parseInt(totalStock) - parseInt(expiredQty);
       finalDescription = `${description} (Expired: ${expiredQty}, Total: ${totalStock})`;
     } else if (discrepancyType === 'mrp') {
-      if (!reportedMrp) {
-        Alert.alert('Validation Error', 'Please specify verified MRP.');
+      if (!reportedMrp && !reportedMrpBox && !reportedExpiry) {
+        Alert.alert('Validation Error', 'Please specify at least one verified field (MRP, MRP Box, or Expiry Date).');
         return;
       }
       reported_qty = null;
-      reported_mrp_val = parseFloat(reportedMrp);
-      finalDescription = `${description} (New MRP: ${reportedMrp})`;
+      let parts = [];
+      if (reportedMrp) {
+        reported_mrp_val = parseFloat(reportedMrp);
+        parts.push(`New MRP: ${reportedMrp}`);
+      }
+      let reported_mrpbox_val = reportedMrpBox ? parseFloat(reportedMrpBox) : null;
+      let reported_expiry_val = reportedExpiry || null;
+      if (reportedMrpBox) parts.push(`New MRP Box: ${reportedMrpBox}`);
+      if (reportedExpiry) parts.push(`New Expiry: ${reportedExpiry}`);
+      finalDescription = `${description} (${parts.join(', ')})`;
+
+      const newDisc = {
+        id: Date.now().toString(),
+        medicine_id: selectedMed.id,
+        product_name: selectedMed.itemname,
+        discrepancy_type: discrepancyType,
+        reported_qty,
+        reported_mrp: reported_mrp_val,
+        reported_mrpbox: reported_mrpbox_val,
+        reported_expiry: reported_expiry_val,
+        description: finalDescription,
+        display_text: `${discrepancyType.toUpperCase()}: Corrected [${parts.join(', ')}]`
+      };
+      setDiscrepancyList([...discrepancyList, newDisc]);
     } else { // other
       if (!description) {
         Alert.alert('Validation Error', 'Please provide details about the mismatch.');
@@ -228,26 +252,19 @@ export default function EmployeeRackChecker() {
       }
       reported_qty = null;
       finalDescription = description;
+
+      const newDisc = {
+        id: Date.now().toString(),
+        medicine_id: selectedMed.id,
+        product_name: selectedMed.itemname,
+        discrepancy_type: discrepancyType,
+        reported_qty,
+        reported_mrp: null,
+        description: finalDescription,
+        display_text: `${discrepancyType.toUpperCase()}: ${description}`
+      };
+      setDiscrepancyList([...discrepancyList, newDisc]);
     }
-
-    const newDisc = {
-      id: Date.now().toString(),
-      medicine_id: selectedMed.id,
-      product_name: selectedMed.itemname,
-      discrepancy_type: discrepancyType,
-      reported_qty,
-      reported_mrp: reported_mrp_val,
-      description: finalDescription,
-      display_text: `${discrepancyType.toUpperCase()}: ${
-        discrepancyType === 'wrong item'
-          ? `Replace with "${selectedWrongMed.itemname}" (Stock: ${wrongItemStock})`
-          : discrepancyType === 'mrp'
-          ? `MRP corrected to ${reportedMrp}`
-          : `Stock adjusted (System updated to: ${reported_qty})`
-      }`
-    };
-
-    setDiscrepancyList([...discrepancyList, newDisc]);
 
     // Clear item inputs
     setMissingQty('');
@@ -256,6 +273,8 @@ export default function EmployeeRackChecker() {
     setExpiredQty('');
     setTotalStock('');
     setReportedMrp('');
+    setReportedMrpBox('');
+    setReportedExpiry('');
     setDescription('');
     setWrongItemSearch('');
     setWrongItemStock('');
@@ -286,6 +305,8 @@ export default function EmployeeRackChecker() {
           discrepancy_type: disc.discrepancy_type,
           reported_qty: disc.reported_qty,
           reported_mrp: disc.reported_mrp,
+          reported_mrpbox: disc.reported_mrpbox,
+          reported_expiry: disc.reported_expiry,
           description: disc.description
         });
       });
@@ -438,20 +459,23 @@ export default function EmployeeRackChecker() {
             <ActivityIndicator size="small" color={Colors.light.primary} />
           ) : (
             <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-              <View style={{ minWidth: isDesktop ? '100%' : 610 }}>
+              <View style={{ minWidth: isDesktop ? '100%' : 920 }}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.th, { width: 90 }]}>Item Code</Text>
-                  <Text style={[styles.th, { width: 220 }]}>Medicine Name</Text>
+                  <Text style={[styles.th, { width: 180 }]}>Medicine Name</Text>
                   <Text style={[styles.th, { width: 110 }]}>Batch No</Text>
                   <Text style={[styles.th, { width: 110, textAlign: 'right' }]}>Stock Bal Qty</Text>
                   <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>MRP</Text>
+                  <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>MRP Box</Text>
+                  <Text style={[styles.th, { width: 110, textAlign: 'center' }]}>Expiry Date</Text>
+                  <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>Actions</Text>
                 </View>
                 {medicines.map((med) => (
                   <View key={med.id} style={styles.tableRow}>
                     <Text style={[styles.td, { width: 90, color: '#64748b' }]} numberOfLines={1} ellipsizeMode="tail">
                       {med.c_item_code || '-'}
                     </Text>
-                    <Text style={[styles.td, { width: 220, fontWeight: '700' }]} numberOfLines={2} ellipsizeMode="tail">
+                    <Text style={[styles.td, { width: 180, fontWeight: '700' }]} numberOfLines={2} ellipsizeMode="tail">
                       {med.itemname}
                     </Text>
                     <Text style={[styles.td, { width: 110, color: '#64748b' }]} numberOfLines={1} ellipsizeMode="tail">
@@ -463,6 +487,23 @@ export default function EmployeeRackChecker() {
                     <Text style={[styles.td, { width: 80, textAlign: 'right', fontWeight: 'bold' }]}>
                       {med.mrp || '-'}
                     </Text>
+                    <Text style={[styles.td, { width: 80, textAlign: 'right', fontWeight: 'bold' }]}>
+                      {med.mrpbox || '-'}
+                    </Text>
+                    <Text style={[styles.td, { width: 110, textAlign: 'center', color: '#64748b' }]}>
+                      {med.expirydate || '-'}
+                    </Text>
+                    <View style={{ width: 120, alignItems: 'center' }}>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#ef4444', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 }}
+                        onPress={() => {
+                          setSelectedMedicineId(med.id.toString());
+                          setDiscModalVisible(true);
+                        }}
+                      >
+                        <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Report Mismatch</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
                 {medicines.length === 0 && (
@@ -746,15 +787,36 @@ export default function EmployeeRackChecker() {
                 )}
 
                 {discrepancyType === 'mrp' && (
-                  <View>
-                    <Text style={styles.modalLabel}>Observed Actual MRP</Text>
-                    <TextInput 
-                      style={styles.textInput}
-                      placeholder="Enter actual mrp"
-                      keyboardType="numeric"
-                      value={reportedMrp}
-                      onChangeText={setReportedMrp}
-                    />
+                  <View style={{ gap: 12, marginBottom: 12 }}>
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={styles.modalLabel}>Observed Actual MRP</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Enter actual mrp"
+                        keyboardType="numeric"
+                        value={reportedMrp}
+                        onChangeText={setReportedMrp}
+                      />
+                    </View>
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={styles.modalLabel}>Observed Actual MRP Box</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="Enter actual mrp box"
+                        keyboardType="numeric"
+                        value={reportedMrpBox}
+                        onChangeText={setReportedMrpBox}
+                      />
+                    </View>
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={styles.modalLabel}>Observed Actual Expiry Date (YYYY-MM-DD)</Text>
+                      <TextInput 
+                        style={styles.textInput}
+                        placeholder="e.g. 2027-02-01"
+                        value={reportedExpiry}
+                        onChangeText={setReportedExpiry}
+                      />
+                    </View>
                   </View>
                 )}
 

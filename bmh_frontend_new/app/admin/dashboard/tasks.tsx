@@ -2487,7 +2487,7 @@ export default function AdminTasksScreen() {
                 multiline
                 autoFocus
               />
-              <View style={{ flexDirection: 'row', justifyInRow: 'flex-end', gap: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
                 <Pressable style={[styles.cancelBtn, { backgroundColor: '#ef4444' }]} onPress={() => { setShowDirectRejectModal(false); setDirectRejectTask(null); }}>
                   <Text style={{ color: '#fff', fontWeight: 'bold' }}>Cancel</Text>
                 </Pressable>

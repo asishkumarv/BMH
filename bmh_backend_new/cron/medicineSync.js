@@ -16,6 +16,7 @@ async function initMedicineDB() {
             expiryDate VARCHAR(50),
             mrp DECIMAL(10,2),
             saleRate DECIMAL(10,2),
+            mrpbox DECIMAL(10,2),
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (c_item_code, batchNo)
         );
@@ -30,6 +31,16 @@ async function initMedicineDB() {
         console.log("✅ ecogreen_medicines 'rack' column ensured.");
     } catch (alterErr) {
         console.error("⚠️ Failed to ensure 'rack' column in ecogreen_medicines:", alterErr.message);
+    }
+
+    // Ensure mrpbox column exists in case the table was created previously without it
+    try {
+        await pool.query(`
+            ALTER TABLE ecogreen_medicines ADD COLUMN IF NOT EXISTS mrpbox DECIMAL(10,2);
+        `);
+        console.log("✅ ecogreen_medicines 'mrpbox' column ensured.");
+    } catch (alterErr) {
+        console.error("⚠️ Failed to ensure 'mrpbox' column in ecogreen_medicines:", alterErr.message);
     }
 
     console.log("✅ ecogreen_medicines table ensured in DB.");
@@ -71,8 +82,8 @@ async function syncMedicines(inputDateTime) {
                 
                 const queryText = `
                     INSERT INTO ecogreen_medicines 
-                        (c_item_code, itemName, rack, itemQtyPerBox, batchNo, stockBalQty, expiryDate, mrp, saleRate, updated_at) 
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+                        (c_item_code, itemName, rack, itemQtyPerBox, batchNo, stockBalQty, expiryDate, mrp, saleRate, mrpbox, updated_at) 
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
                     ON CONFLICT (c_item_code, batchNo) 
                     DO UPDATE SET 
                         itemName = EXCLUDED.itemName,
@@ -82,6 +93,7 @@ async function syncMedicines(inputDateTime) {
                         expiryDate = EXCLUDED.expiryDate,
                         mrp = EXCLUDED.mrp,
                         saleRate = EXCLUDED.saleRate,
+                        mrpbox = EXCLUDED.mrpbox,
                         updated_at = CURRENT_TIMESTAMP;
                 `;
                 
@@ -96,7 +108,8 @@ async function syncMedicines(inputDateTime) {
                         item.stockBalQty || 0,
                         item.expiryDate,
                         item.mrp || 0,
-                        item.saleRate || 0
+                        item.saleRate || 0,
+                        item.mrpbox || 0
                     ]);
                 }
                 
@@ -135,10 +148,10 @@ async function startMedicineCron() {
         await syncMedicines("2023-01-01 10:10:00");
     } else {
         // If there are existing records but rack is NULL, trigger a background full sync to update old records
-        const nullRackRes = await pool.query("SELECT COUNT(*) FROM ecogreen_medicines WHERE rack IS NULL");
+        const nullRackRes = await pool.query("SELECT COUNT(*) FROM ecogreen_medicines WHERE rack IS NULL OR mrpbox IS NULL");
         const nullRackCount = parseInt(nullRackRes.rows[0].count, 10);
         if (nullRackCount > 0) {
-            console.log(`📦 Found ${nullRackCount} items without rack info. Running full sync to update old data...`);
+            console.log(`📦 Found ${nullRackCount} items without rack or mrpbox info. Running full sync to update old data...`);
             syncMedicines("2023-01-01 10:10:00").catch(err => console.error("❌ Background full sync failed:", err));
         }
     }

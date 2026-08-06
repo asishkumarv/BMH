@@ -22,6 +22,9 @@ export default function SubAdminInventoryChecker() {
   const [racks, setRacks] = useState<string[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [mismatches, setMismatches] = useState<any[]>([]);
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [pendingItemId, setPendingItemId] = useState<number | null>(null);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
 
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -150,7 +153,7 @@ export default function SubAdminInventoryChecker() {
     }
   };
 
-  const handleReviewMismatch = async (id: number, status: 'approved' | 'rejected') => {
+  const handleReviewMismatch = async (id: number, status: 'approved' | 'rejected', assigneeId?: string) => {
     setReviewing(id);
     try {
       const reviewed_by = subAdmin ? `SA-${subAdmin.id}` : 'Sub Admin';
@@ -158,7 +161,8 @@ export default function SubAdminInventoryChecker() {
       await axios.put(`https://napi.bharatmedicalhallplus.com/inventory-checker/verification/${id}/review`, { 
         status,
         reviewed_by,
-        reviewed_by_name
+        reviewed_by_name,
+        assign_task_to: assigneeId
       });
       Alert.alert('Success', `Inventory mismatch verification ${status}`);
       // Refresh mismatches
@@ -459,10 +463,14 @@ export default function SubAdminInventoryChecker() {
                               <TouchableOpacity 
                                 style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
                                 disabled={reviewing === item.id}
-                                onPress={() => handleReviewMismatch(item.id, 'approved')}
+                                onPress={() => {
+                                  setPendingItemId(item.id);
+                                  setSelectedAssigneeId('');
+                                  setAssignModalVisible(true);
+                                }}
                               >
                                 <Check size={16} color="white" style={{ marginRight: 4 }} />
-                                <Text style={styles.approveText}>Approve & Update DB</Text>
+                                <Text style={styles.approveText}>Approve & Assign Task</Text>
                               </TouchableOpacity>
                             </View>
                           ) : (
@@ -485,6 +493,84 @@ export default function SubAdminInventoryChecker() {
           )}
         </ScrollView>
       )}
+
+      {/* Assign Verification Task Modal */}
+      <Modal visible={assignModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 20 }]}>
+            <View style={[styles.modalHeader, { padding: 0, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }]}>
+              <Text style={styles.modalTitle}>Approve & Assign Task</Text>
+              <TouchableOpacity onPress={() => setAssignModalVisible(false)}>
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ marginVertical: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 }}>
+                Select Employee / Sub Admin to assign verification:
+              </Text>
+              
+              {Platform.OS === 'web' ? (
+                <select
+                  value={selectedAssigneeId}
+                  onChange={(e) => setSelectedAssigneeId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    fontSize: 14,
+                    color: '#334155',
+                    outlineWidth: 0
+                  } as any}
+                >
+                  <option value="">-- Choose Staff --</option>
+                  {staffList.map((s: any) => (
+                    <option key={s.uniqueId} value={s.uniqueId}>{s.displayName}</option>
+                  ))}
+                </select>
+              ) : (
+                <ScrollView style={{ maxHeight: 150 }}>
+                  {staffList.map((s: any) => (
+                    <TouchableOpacity
+                      key={s.uniqueId}
+                      style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: selectedAssigneeId === s.uniqueId ? '#e2e8f0' : 'transparent' }}
+                      onPress={() => setSelectedAssigneeId(s.uniqueId)}
+                    >
+                      <Text style={{ fontSize: 14, color: '#334155' }}>{s.displayName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.rejectBtn, { paddingHorizontal: 16 }]} 
+                onPress={() => setAssignModalVisible(false)}
+              >
+                <Text style={styles.rejectText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.approveBtn, { paddingHorizontal: 16, backgroundColor: Colors.light.primary, borderColor: Colors.light.primary }]} 
+                onPress={() => {
+                  if (!selectedAssigneeId) {
+                    Alert.alert('Validation Error', 'Please select a staff member to assign the task.');
+                    return;
+                  }
+                  setAssignModalVisible(false);
+                  if (pendingItemId !== null) {
+                    handleReviewMismatch(pendingItemId, 'approved', selectedAssigneeId);
+                  }
+                }}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>Confirm & Assign</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

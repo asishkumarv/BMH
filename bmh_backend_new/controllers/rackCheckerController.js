@@ -19,7 +19,7 @@ exports.getRackMedicines = async (req, res) => {
   try {
     const { rack } = req.params;
     const result = await pool.query(`
-      SELECT id, c_item_code, itemname, rack, batchno, stockbalqty, expirydate, mrp, salerate
+      SELECT id, c_item_code, itemname, rack, batchno, stockbalqty, expirydate, mrp, salerate, mrpbox, itemqtyperbox as pack_size
       FROM ecogreen_medicines 
       WHERE rack = $1 
       ORDER BY itemname ASC
@@ -143,12 +143,12 @@ exports.updateAssignmentStatus = async (req, res) => {
 
 exports.submitDiscrepancy = async (req, res) => {
   try {
-    const { assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp } = req.body;
+    const { assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp, reported_mrpbox, reported_expiry } = req.body;
     await pool.query(
       `INSERT INTO rack_discrepancies 
-       (assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp]
+       (assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp, reported_mrpbox, reported_expiry)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [assignment_id, reported_by, reported_by_name, medicine_id, product_name, discrepancy_type, reported_qty, description, reported_mrp, reported_mrpbox, reported_expiry]
     );
     res.json({ success: true, message: 'Discrepancy reported successfully' });
   } catch (error) {
@@ -183,7 +183,7 @@ exports.getDiscrepancies = async (req, res) => {
 exports.reviewDiscrepancy = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewed_by, reviewed_by_name } = req.body;
+    const { status, reviewed_by, reviewed_by_name, assign_task_to } = req.body;
     
     const discRes = await pool.query('SELECT * FROM rack_discrepancies WHERE id = $1', [id]);
     if (discRes.rows.length === 0) {
@@ -200,38 +200,62 @@ exports.reviewDiscrepancy = async (req, res) => {
     );
     
     if (status === 'approved') {
-      const { medicine_id, reported_qty, discrepancy_type, reported_mrp } = discrepancy;
-      if (reported_qty !== null && (discrepancy_type === 'missing stock' || discrepancy_type === 'excess stock' || discrepancy_type === 'damaged item' || discrepancy_type === 'expired')) {
-        await pool.query(
-          'UPDATE ecogreen_medicines SET stockbalqty = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-          [reported_qty, medicine_id]
-        );
-      }
-      if (reported_mrp !== null) {
-        await pool.query(
-          'UPDATE ecogreen_medicines SET mrp = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-          [reported_mrp, medicine_id]
-        );
-      }
-      if (discrepancy_type === 'wrong item') {
+      const { medicine_id, product_name, discrepancy_type, reported_qty, reported_mrp, reported_mrpbox, reported_expiry, description, assignment_id } = discrepancy;
+      
+      if (assign_task_to) {
         try {
-          const wrongDetails = JSON.parse(description);
-          if (wrongDetails.actual_item_id) {
-            // Update actual item's stock and rack number
-            await pool.query(
-              `UPDATE ecogreen_medicines 
-               SET stockbalqty = $1, rack = (SELECT rack_number FROM rack_assignments WHERE id = $2), updated_at = CURRENT_TIMESTAMP 
-               WHERE id = $3`,
-              [wrongDetails.actual_item_stock, assignment_id, wrongDetails.actual_item_id]
-            );
-            // Clear rack of the wrong medicine assigned
-            await pool.query(
-              "UPDATE ecogreen_medicines SET rack = '', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-              [medicine_id]
-            );
+          const userInfo = await getUserInfo(assign_task_to);
+          
+          let taskDesc = `A discrepancy correction has been approved by ${reviewed_by_name || 'Admin'}. Please check, verify physical stock, and update the main external database with the following details:\n\n` +
+            `• Product: ${product_name}\n` +
+            `• Medicine ID: ${medicine_id}\n` +
+            `• Type: ${discrepancy_type}\n`;
+            
+          if (reported_qty !== null) {
+            taskDesc += `• Reported Qty Change: ${reported_qty}\n`;
           }
-        } catch (e) {
-          console.error('Error parsing wrong item details:', e);
+          if (reported_mrp !== null) {
+            taskDesc += `• Reported MRP Change: ${reported_mrp}\n`;
+          }
+          if (reported_mrpbox !== null) {
+            taskDesc += `• Reported MRP Box Change: ${reported_mrpbox}\n`;
+          }
+          if (reported_expiry !== null && reported_expiry !== '') {
+            taskDesc += `• Reported Expiry Change: ${reported_expiry}\n`;
+          }
+          if (description) {
+            taskDesc += `• Comments/Remarks: ${description}\n`;
+          }
+          
+          taskDesc += `\nTask Instructions:\n1. Verify physical items in the pharmacy.\n2. Access the main external database management system.\n3. Make the necessary update and ensure accuracy.\n4. Mark this task as completed once updated.`;
+
+          const taskTitle = `Verify & Update DB: ${product_name}`;
+          
+          let assignerIdOnly = '1';
+          let assignerTypeOnly = 'super_admin';
+          if (reviewed_by && reviewed_by.toString().startsWith('SA-')) {
+            assignerTypeOnly = 'department_admin';
+            assignerIdOnly = reviewed_by.toString().replace('SA-', '');
+          } else if (reviewed_by && reviewed_by.toString().startsWith('ADMIN-')) {
+            assignerTypeOnly = 'super_admin';
+            assignerIdOnly = reviewed_by.toString().replace('ADMIN-', '');
+          }
+
+          // Insert task
+          await pool.query(
+            `INSERT INTO tasks 
+             (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, priority, category) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'High', 'DB Update')`,
+            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department]
+          );
+
+          // Insert notification
+          await pool.query(
+            'INSERT INTO notifications (user_type, user_id, message) VALUES ($1, $2, $3)',
+            [userInfo.type, userInfo.id, `You have been assigned a new task: "${taskTitle}" by ${reviewed_by_name || 'Admin'}.`]
+          );
+        } catch (taskErr) {
+          console.error('Failed to create verification task:', taskErr);
         }
       }
     }
@@ -332,3 +356,48 @@ exports.getPerformanceStats = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
+
+async function getUserInfo(userIdStr) {
+  let type = 'employee';
+  let id = userIdStr;
+  if (userIdStr.startsWith('SA-')) {
+    type = 'department_admin';
+    id = userIdStr.replace('SA-', '');
+  } else if (userIdStr.startsWith('ADMIN-')) {
+    type = 'super_admin';
+    id = userIdStr.replace('ADMIN-', '');
+  } else if (userIdStr.startsWith('DOC-')) {
+    type = 'doctor';
+    id = userIdStr.replace('DOC-', '');
+  }
+  
+  let name = 'Unknown';
+  let department = 'General';
+  
+  if (type === 'employee') {
+    const res = await pool.query('SELECT full_name, department FROM employees WHERE id = $1', [id]);
+    if (res.rows.length > 0) {
+      name = res.rows[0].full_name;
+      department = res.rows[0].department;
+    }
+  } else if (type === 'department_admin') {
+    const res = await pool.query(`
+      SELECT da.full_name, d.name as department 
+      FROM department_admins da 
+      JOIN departments d ON da.department_id = d.id 
+      WHERE da.id = $1
+    `, [id]);
+    if (res.rows.length > 0) {
+      name = res.rows[0].full_name;
+      department = res.rows[0].department;
+    }
+  } else if (type === 'super_admin') {
+    const res = await pool.query('SELECT full_name FROM super_admins WHERE id = $1', [id]);
+    if (res.rows.length > 0) {
+      name = res.rows[0].full_name;
+      department = 'Management';
+    }
+  }
+  
+  return { type, id, name, department };
+}
