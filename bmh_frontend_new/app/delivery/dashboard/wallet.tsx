@@ -606,7 +606,7 @@ export default function EmployeeWalletScreen() {
 
     // Add Order Collections
     transactions.forEach((tx: any) => {
-      if (tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection') {
+      if (tx.type === 'cash_collection' || tx.type === 'online_collection' || tx.type === 'split_collection' || tx.type === 'credit_collection') {
         const cashVal = tx.cash_amount !== undefined && tx.cash_amount !== null 
           ? parseFloat(tx.cash_amount) 
           : (tx.payment_mode === 'Cash' || tx.type === 'cash_collection' ? parseFloat(tx.amount || '0') : 0);
@@ -617,10 +617,10 @@ export default function EmployeeWalletScreen() {
           ? parseFloat(tx.credit_amount)
           : (tx.payment_mode === 'Credit' || tx.payment_mode === 'Unpaid' ? parseFloat(tx.amount || '0') : 0);
         
-        if (cashVal > 0) {
+        if (cashVal > 0 || onlineVal > 0 || creditVal > 0) {
           let label = '';
           const parts = [];
-          parts.push(`Cash ₹${cashVal.toFixed(2)}`);
+          if (cashVal > 0) parts.push(`Cash ₹${cashVal.toFixed(2)}`);
           if (onlineVal > 0) parts.push(`Online ₹${onlineVal.toFixed(2)}`);
           if (creditVal > 0) parts.push(`Credit ₹${creditVal.toFixed(2)}`);
           label = parts.join(' + ');
@@ -631,7 +631,7 @@ export default function EmployeeWalletScreen() {
             particulars: `Order Collection - Customer: ${tx.customer_name || 'N/A'} (Order: ${tx.order_no || 'N/A'})`,
             roleDept: `${tx.delivery_method ? `Order • ${tx.delivery_method}` : 'Order Collection'} [${label}]`,
             debit: '-',
-            credit: `₹${cashVal.toFixed(2)}`,
+            credit: cashVal > 0 ? `₹${cashVal.toFixed(2)}` : '-',
             amount: cashVal,
             cashAmount: cashVal,
             onlineAmount: onlineVal,
@@ -1125,12 +1125,13 @@ export default function EmployeeWalletScreen() {
                     exportToCSV(
                       printRows,
                       'Cash_Ledger',
-                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Credit (Unpaid)', 'Balance'],
+                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Online', 'Credit (Unpaid)', 'Balance'],
                       (item) => [
                         item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
                         `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
                         item.debit,
                         item.credit,
+                        item.onlineAmount ? `₹${parseFloat(item.onlineAmount).toFixed(2)}` : '-',
                         item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-',
                         item.runningBalance
                       ],
@@ -1166,13 +1167,14 @@ export default function EmployeeWalletScreen() {
                     });
                     handlePrint(
                       'Cash Ledger',
-                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Credit (Unpaid)', 'Balance'],
+                      ['Date', 'Particulars', 'Debit (Withdrawal)', 'Credit (Deposit)', 'Online', 'Credit (Unpaid)', 'Balance'],
                       printRows,
                       (item) => [
                         item.dateStr ? formatDateDMY(item.dateStr, true) : '-',
                         `${item.particulars}${item.note ? ` (${item.note})` : ''}`,
                         item.debit,
                         item.credit,
+                        item.onlineAmount ? `₹${parseFloat(item.onlineAmount).toFixed(2)}` : '-',
                         item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-',
                         item.runningBalance
                       ],
@@ -1300,13 +1302,14 @@ export default function EmployeeWalletScreen() {
               ) : (
                 // Desktop Table Layout
                 <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-                  <View style={{ minWidth: isDesktop ? '100%' : 750, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
+                  <View style={{ minWidth: isDesktop ? '100%' : 850, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
                     <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 12 }}>
                       <Text style={{ flex: 1.5, fontWeight: '700', fontSize: 13, color: '#475569' }}>Date & Time</Text>
                       <Text style={{ flex: 2.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Particulars (Narration)</Text>
                       <Text style={{ flex: 1.2, fontWeight: '700', fontSize: 13, color: '#475569' }}>Staff/Details</Text>
                       <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: '#ef4444', textAlign: 'right' }}>Debit (-)</Text>
                       <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: '#22c55e', textAlign: 'right' }}>Credit (+)</Text>
+                      <Text style={{ flex: 0.9, fontWeight: '700', fontSize: 13, color: Colors.light.primary, textAlign: 'right' }}>Online</Text>
                       <Text style={{ flex: 1.0, fontWeight: '700', fontSize: 13, color: '#f59e0b', textAlign: 'right' }}>Credit (Unpaid)</Text>
                       <Text style={{ flex: 1.1, fontWeight: '700', fontSize: 13, color: '#0f172a', textAlign: 'right' }}>Balance</Text>
                     </View>
@@ -1316,6 +1319,7 @@ export default function EmployeeWalletScreen() {
                       <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
                       <Text style={{ flex: 2.2, fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Closing Balance</Text>
                       <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
+                      <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
                       <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
                       <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
                       <Text style={{ flex: 1.0, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
@@ -1351,6 +1355,9 @@ export default function EmployeeWalletScreen() {
                             <Text style={{ flex: 1.2, fontSize: 12, color: '#64748b' }}>{item.roleDept}</Text>
                             <Text style={{ flex: 0.9, fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: '500' }}>{item.debit}</Text>
                             <Text style={{ flex: 0.9, fontSize: 13, color: '#22c55e', textAlign: 'right', fontWeight: '500' }}>{item.credit}</Text>
+                            <Text style={{ flex: 0.9, fontSize: 13, color: Colors.light.primary, textAlign: 'right', fontWeight: '500' }}>
+                              {item.onlineAmount ? `₹${parseFloat(item.onlineAmount).toFixed(2)}` : '-'}
+                            </Text>
                             <Text style={{ flex: 1.0, fontSize: 13, color: '#f59e0b', textAlign: 'right', fontWeight: '500' }}>
                               {item.creditAmount ? `₹${parseFloat(item.creditAmount).toFixed(2)}` : '-'}
                             </Text>
@@ -1367,6 +1374,7 @@ export default function EmployeeWalletScreen() {
                       <Text style={{ flex: 1.5, fontSize: 13, color: '#64748b' }}>-</Text>
                       <Text style={{ flex: 2.2, fontSize: 13, fontWeight: '700', color: '#475569' }}>Opening Balance</Text>
                       <Text style={{ flex: 1.2, fontSize: 13, color: '#64748b' }}>-</Text>
+                      <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
                       <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
                       <Text style={{ flex: 0.9, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>
                       <Text style={{ flex: 1.0, fontSize: 13, color: '#64748b', textAlign: 'right' }}>-</Text>

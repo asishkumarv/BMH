@@ -502,7 +502,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                item.delivery_type === 'Local' ? <MapPin size={14} color="#64748b" /> :
                <Package size={14} color="#64748b" />}
               <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1e293b' }}>
-                {item.order_no}
+                {item.order_no ? (item.order_no.length > 6 ? item.order_no.slice(-6) : item.order_no) : ''}
               </Text>
             </View>
             <View style={[styles.badge, { backgroundColor: statusColor }]}>
@@ -638,7 +638,9 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
         {/* Order/Invoice No */}
         <View style={[styles.cell, { flex: 1 }]}>
-          <Text style={styles.cellTextBold}>{item.order_no}</Text>
+          <Text style={styles.cellTextBold}>
+            {item.order_no ? (item.order_no.length > 6 ? item.order_no.slice(-6) : item.order_no) : ''}
+          </Text>
           {item.invoice_id ? <Text style={styles.cellSubText}>{item.invoice_id}</Text> : null}
         </View>
 
