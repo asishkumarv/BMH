@@ -51,9 +51,9 @@ const notifyAssignee = async (assigneeType, assigneeId, taskTitle, assignerType,
   try {
     let tokenQuery = '';
     if (assigneeType === 'department_admin' || assigneeType === 'sub_admin') {
-      tokenQuery = 'SELECT push_token FROM department_admins WHERE id = $1';
+      tokenQuery = 'SELECT push_token, full_name, NULL::text as mobile FROM department_admins WHERE id = $1';
     } else if (assigneeType === 'employee') {
-      tokenQuery = 'SELECT push_token FROM employees WHERE id = $1';
+      tokenQuery = 'SELECT push_token, full_name, mobile FROM employees WHERE id = $1';
     } else {
       return;
     }
@@ -61,8 +61,10 @@ const notifyAssignee = async (assigneeType, assigneeId, taskTitle, assignerType,
     const userRes = await pool.query(tokenQuery, [assigneeId]);
     if (userRes.rowCount > 0 && userRes.rows[0].push_token) {
       const pushToken = userRes.rows[0].push_token;
-      const title = 'New Task Assigned';
-      const body = `You have been assigned a new task: "${taskTitle}"`;
+      const name = userRes.rows[0].full_name || 'N/A';
+      const phone = userRes.rows[0].mobile || 'N/A';
+      const title = 'New Task Assigned 🚨';
+      const body = `You have been assigned a new task: "${taskTitle}". Assignee: ${name}, Phone: ${phone}`;
       
       await sendExpoPushNotification(pushToken, title, body, {
         type: 'task',

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, Pressa
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
 import axios from 'axios';
-import { CheckSquare, Plus, Clock, User } from 'lucide-react-native';
+import { CheckSquare, Plus, Clock, User, X } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -30,6 +30,8 @@ export default function DepartmentTasksScreen() {
   };
 
   const [tasks, setTasks] = useState<any[]>([]);
+  const [selectedViewTask, setSelectedViewTask] = useState<any>(null);
+  const [showViewTaskModal, setShowViewTaskModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -1018,8 +1020,28 @@ export default function DepartmentTasksScreen() {
                   <View key={task.id} style={styles.tableRow}>
                     <Text style={[styles.cell, { width: 50 }]}>{sn}</Text>
                     <Text style={[styles.cell, { width: 150 }]}>{createdDate}</Text>
-                    <Text style={[styles.cell, { width: 180, fontWeight: '700' }]}>{task.title}</Text>
-                    <Text style={[styles.cell, { width: 220 }]} numberOfLines={2}>{task.description}</Text>
+                    <Pressable
+                      style={{ width: 180 }}
+                      onPress={() => {
+                        setSelectedViewTask(task);
+                        setShowViewTaskModal(true);
+                      }}
+                    >
+                      <Text style={[styles.cell, { width: '100%', fontWeight: '700', color: Colors.light.primary }]} numberOfLines={2}>
+                        {task.title}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={{ width: 220 }}
+                      onPress={() => {
+                        setSelectedViewTask(task);
+                        setShowViewTaskModal(true);
+                      }}
+                    >
+                      <Text style={[styles.cell, { width: '100%' }]} numberOfLines={2}>
+                        {task.description}
+                      </Text>
+                    </Pressable>
                     <Text style={[styles.cell, { width: 140 }]}>{assignedByStr}</Text>
                     <Text style={[styles.cell, { width: 140 }]}>{assignedToStr}</Text>
                     <Text style={[styles.cell, { width: 140 }]}>
@@ -2507,6 +2529,96 @@ export default function DepartmentTasksScreen() {
           </View>
         </View>
       )}
+
+      {/* View Task Details Modal */}
+      <Modal visible={showViewTaskModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 24, maxWidth: 600, width: '90%' }]}>
+            <View style={[styles.modalHeader, { padding: 0, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }]}>
+              <Text style={styles.modalTitle}>Task Details</Text>
+              <Pressable onPress={() => setShowViewTaskModal(false)}>
+                <X size={20} color="#64748b" />
+              </Pressable>
+            </View>
+
+            {selectedViewTask && (
+              <ScrollView style={{ marginVertical: 16, maxHeight: 400 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Task Title
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 }}>
+                  {selectedViewTask.title}
+                </Text>
+
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Description / Instructions
+                </Text>
+                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 14, color: '#334155', lineHeight: 20 }}>
+                    {selectedViewTask.description}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
+                  <View style={{ width: '47%' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Assigned By</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginTop: 2 }}>
+                      {selectedViewTask.assigner_type 
+                        ? `${selectedViewTask.assigner_name || 'Admin'} (${selectedViewTask.assigner_type.replace('_', ' ')})`
+                        : 'System'}
+                    </Text>
+                  </View>
+                  <View style={{ width: '47%' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Assigned To</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginTop: 2 }}>
+                      {selectedViewTask.is_group_task 
+                        ? 'Group Task' 
+                        : `${selectedViewTask.assignee_name || 'Unknown'} (${selectedViewTask.assignee_type ? selectedViewTask.assignee_type.replace('_', ' ') : 'employee'})`}
+                    </Text>
+                  </View>
+                  <View style={{ width: '47%' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Category</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginTop: 2 }}>
+                      {selectedViewTask.category || 'General'}
+                    </Text>
+                  </View>
+                  <View style={{ width: '47%' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Priority</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: selectedViewTask.priority === 'High' ? '#ef4444' : selectedViewTask.priority === 'Moderate' ? '#f59e0b' : '#3b82f6', marginTop: 2 }}>
+                      {selectedViewTask.priority || 'Moderate'}
+                    </Text>
+                  </View>
+                  <View style={{ width: '47%' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Status</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: getStatusColor(selectedViewTask.status), marginTop: 2 }}>
+                      {selectedViewTask.status.toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ width: '47%' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>
+                      {selectedViewTask.is_recurring ? 'Schedule' : 'Due Date'}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginTop: 2 }}>
+                      {selectedViewTask.is_recurring 
+                        ? `${selectedViewTask.frequency?.toUpperCase()} ${selectedViewTask.specific_days ? '(' + (Array.isArray(selectedViewTask.specific_days) ? selectedViewTask.specific_days : JSON.parse(selectedViewTask.specific_days)).join(', ') + ')' : ''}`
+                        : formatTaskDate(selectedViewTask.due_date) || 'No Due Date'}
+                    </Text>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 12 }}>
+              <Pressable 
+                style={[styles.cancelBtn, { paddingHorizontal: 20 }]} 
+                onPress={() => setShowViewTaskModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

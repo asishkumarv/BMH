@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { notifyAssignee } = require('../utils/pushNotification');
 
 exports.getRacksList = async (req, res) => {
   try {
@@ -183,9 +184,16 @@ exports.getDiscrepancies = async (req, res) => {
 exports.reviewDiscrepancy = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewed_by, reviewed_by_name, assign_task_to, priority } = req.body;
+    const { status, reviewed_by, reviewed_by_name, assign_task_to, priority, due_date } = req.body;
     
-    const discRes = await pool.query('SELECT * FROM rack_discrepancies WHERE id = $1', [id]);
+    const discRes = await pool.query(`
+      SELECT rd.*, ra.rack_number, em.batchno as batch_no 
+      FROM rack_discrepancies rd
+      JOIN rack_assignments ra ON rd.assignment_id = ra.id
+      LEFT JOIN ecogreen_medicines em ON rd.medicine_id = em.id
+      WHERE rd.id = $1
+    `, [id]);
+    
     if (discRes.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Discrepancy not found' });
     }
@@ -200,34 +208,33 @@ exports.reviewDiscrepancy = async (req, res) => {
     );
     
     if (status === 'approved') {
-      const { medicine_id, product_name, discrepancy_type, reported_qty, reported_mrp, reported_mrpbox, reported_expiry, description, assignment_id } = discrepancy;
+      const { medicine_id, product_name, discrepancy_type, reported_qty, reported_mrp, reported_mrpbox, reported_expiry, description, assignment_id, rack_number, batch_no } = discrepancy;
       
       if (assign_task_to) {
         try {
           const userInfo = await getUserInfo(assign_task_to);
           
-          let taskDesc = `A discrepancy correction has been approved by ${reviewed_by_name || 'Admin'}. Please check, verify physical stock, and update the main external database with the following details:\n\n` +
-            `• Product: ${product_name}\n` +
-            `• Medicine ID: ${medicine_id}\n` +
+          let taskDesc = `• Product: ${product_name}\n` +
+            `• Batch No: ${batch_no || 'N/A'}\n` +
+            `• Rack No: ${rack_number || 'N/A'}\n` +
             `• Type: ${discrepancy_type}\n`;
             
           if (reported_qty !== null) {
-            taskDesc += `• Reported Qty Change: ${reported_qty}\n`;
+            taskDesc += `• Actual Stock: ${reported_qty}\n`;
+          } else {
+            taskDesc += `• Actual Stock: N/A\n`;
           }
           if (reported_mrp !== null) {
-            taskDesc += `• Reported MRP Change: ${reported_mrp}\n`;
+            taskDesc += `• New MRP: ${reported_mrp}\n`;
           }
           if (reported_mrpbox !== null) {
-            taskDesc += `• Reported MRP Box Change: ${reported_mrpbox}\n`;
+            taskDesc += `• New MRP Box: ${reported_mrpbox}\n`;
           }
           if (reported_expiry !== null && reported_expiry !== '') {
-            taskDesc += `• Reported Expiry Change: ${reported_expiry}\n`;
-          }
-          if (description) {
-            taskDesc += `• Comments/Remarks: ${description}\n`;
+            taskDesc += `• New Expiry: ${reported_expiry}\n`;
           }
           
-          taskDesc += `\nTask Instructions:\n1. Verify physical items in the pharmacy.\n2. Access the main external database management system.\n3. Make the necessary update and ensure accuracy.\n4. Mark this task as completed once updated.`;
+          taskDesc += `• Comments: ${description || 'N/A'}`;
 
           const taskTitle = `Verify & Update DB: ${product_name}`;
           
@@ -242,18 +249,22 @@ exports.reviewDiscrepancy = async (req, res) => {
           }
 
           // Insert task
-          await pool.query(
+          const insertedTaskRes = await pool.query(
             `INSERT INTO tasks 
-             (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, priority, category) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'DB Update')`,
-            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department, priority || 'Moderate']
+             (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, priority, category, due_date) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'DB Update', $9) RETURNING id`,
+            [taskTitle, taskDesc, assignerTypeOnly, assignerIdOnly, userInfo.type, userInfo.id, userInfo.department, priority || 'Moderate', due_date || null]
           );
+          const taskId = insertedTaskRes.rows[0].id;
 
           // Insert notification
           await pool.query(
             'INSERT INTO notifications (user_type, user_id, message) VALUES ($1, $2, $3)',
             [userInfo.type, userInfo.id, `You have been assigned a new task: "${taskTitle}" by ${reviewed_by_name || 'Admin'}.`]
           );
+
+          // Send Expo push notification with custom sound
+          await notifyAssignee(userInfo.type, userInfo.id, taskTitle, assignerTypeOnly, assignerIdOnly, taskId);
         } catch (taskErr) {
           console.error('Failed to create verification task:', taskErr);
         }

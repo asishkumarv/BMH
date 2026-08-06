@@ -22,6 +22,7 @@ export default function SubAdminRackChecker() {
   const [allStaffList, setAllStaffList] = useState<any[]>([]);
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<'High' | 'Moderate' | 'Low'>('High');
+  const [selectedDueDate, setSelectedDueDate] = useState<string>(new Date(Date.now() + 86400000).toISOString());
 
   const handleReviewAssignment = async (id: number, status: 'Verified' | 'Rejected', remarks?: string) => {
     setReviewing(id);
@@ -177,7 +178,7 @@ export default function SubAdminRackChecker() {
     }
   };
 
-  const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected', assigneeId?: string, priority?: string) => {
+  const handleReviewDiscrepancy = async (id: number, status: 'approved' | 'rejected', assigneeId?: string, priority?: string, dueDate?: string) => {
     setReviewing(id);
     try {
       const reviewed_by = subAdmin ? `SA-${subAdmin.id}` : 'Sub Admin';
@@ -187,7 +188,8 @@ export default function SubAdminRackChecker() {
         reviewed_by,
         reviewed_by_name,
         assign_task_to: assigneeId,
-        priority
+        priority,
+        due_date: dueDate
       });
       Alert.alert('Success', `Discrepancy correction request ${status}`);
       // Refresh discrepancies
@@ -563,11 +565,12 @@ export default function SubAdminRackChecker() {
                               style={[styles.actionBtn, styles.approveBtn, reviewing === item.id && { opacity: 0.5 }]}
                               disabled={reviewing === item.id}
                               onPress={() => {
-                                setPendingItemId(item.id);
-                                setSelectedAssigneeId('');
-                                setStaffSearchQuery('');
-                                setSelectedPriority('High');
-                                setAssignModalVisible(true);
+                                 setPendingItemId(item.id);
+                                 setSelectedAssigneeId('');
+                                 setStaffSearchQuery('');
+                                 setSelectedPriority('High');
+                                 setSelectedDueDate(new Date(Date.now() + 86400000).toISOString());
+                                 setAssignModalVisible(true);
                               }}
                             >
                               <Check size={16} color="white" style={{ marginRight: 4 }} />
@@ -673,6 +676,27 @@ export default function SubAdminRackChecker() {
                 ))}
               </View>
             </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 }}>
+                Select Due Date & Time:
+              </Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="datetime-local" 
+                  style={{ padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc', fontSize: 14, color: '#334155', width: '100%' }}
+                  value={selectedDueDate ? new Date(new Date(selectedDueDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                  onChange={(e) => setSelectedDueDate(new Date(e.target.value).toISOString())}
+                />
+              ) : (
+                <TextInput 
+                  style={[styles.textInput, { backgroundColor: '#f8fafc' }]}
+                  placeholder="YYYY-MM-DD HH:MM"
+                  value={selectedDueDate}
+                  onChangeText={setSelectedDueDate}
+                />
+              )}
+            </View>
             
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
               <TouchableOpacity 
@@ -690,7 +714,7 @@ export default function SubAdminRackChecker() {
                   }
                   setAssignModalVisible(false);
                   if (pendingItemId !== null) {
-                    handleReviewDiscrepancy(pendingItemId, 'approved', selectedAssigneeId, selectedPriority);
+                    handleReviewDiscrepancy(pendingItemId, 'approved', selectedAssigneeId, selectedPriority, selectedDueDate);
                   }
                 }}
               >
