@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, TextInput, useWindowDimensions, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Modal, TextInput, useWindowDimensions, ScrollView, Image, Switch } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
 import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Calendar, FileText, Eye, Share2, Trash2, Plus, Phone, Navigation, ChevronDown, X } from 'lucide-react-native';
@@ -38,6 +38,31 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
   // Buses list and manage states
   const [buses, setBuses] = useState([]);
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
+
+  const fetchAutoAssignToggle = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
+      if (res.data && res.data.success && res.data.settings) {
+        setAutoAssignEnabled(res.data.settings.sales_order_auto_assign_toggle === true);
+      }
+    } catch (e) {
+      console.log('Error fetching auto assign toggle setting:', e);
+    }
+  };
+
+  const handleToggleAutoAssign = async (val) => {
+    try {
+      setAutoAssignEnabled(val);
+      await axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+        key: 'sales_order_auto_assign_toggle',
+        value: val
+      });
+    } catch (e) {
+      alert('Failed to update Auto-Assign setting');
+      setAutoAssignEnabled(!val); // Revert
+    }
+  };
   const [busesModalVisible, setBusesModalVisible] = useState(false);
   const [editingBus, setEditingBus] = useState(null);
   const [isAddingBus, setIsAddingBus] = useState(false);
@@ -63,6 +88,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   const fetchSalesOrders = async (silent = false, targetPage = page) => {
     try {
       if (!silent) setLoading(true);
+      fetchAutoAssignToggle();
       let url = 'https://napi.bharatmedicalhallplus.com/ecogreen/sales-orders';
       const params = [`page=${targetPage}`, 'limit=50'];
       if (assignmentFilter !== 'All') params.push(`status=${assignmentFilter}`);
@@ -480,6 +506,19 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
 
           <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a', marginBottom: 4 }}>{item.patient_name || 'Walk-in'}</Text>
           {item.patient_contact_no ? <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Phone: {item.patient_contact_no}</Text> : null}
+          
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, marginBottom: 4 }}>
+            {!item.invoice_id && (
+              <View style={{backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+                <Text style={{fontSize: 9, color: '#ef4444', fontWeight: 'bold'}}>⚠️ NO INVOICE ID</Text>
+              </View>
+            )}
+            {item.needs_review && (
+              <View style={{backgroundColor: '#ffedd5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+                <Text style={{fontSize: 9, color: '#ea580c', fontWeight: 'bold'}}>⚠️ NEEDS REVIEW</Text>
+              </View>
+            )}
+          </View>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }}>
             <View style={{ flex: 1 }}>
@@ -573,8 +612,21 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
         <View style={[styles.cell, { flex: 1.5 }]}>
           <Text style={styles.cellTextBold}>{item.patient_name || 'Walk-in'}</Text>
           {item.patient_contact_no ? <Text style={styles.cellSubText}>{item.patient_contact_no}</Text> : null}
-          <View style={{backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, alignSelf: 'flex-start'}}>
-            <Text style={{fontSize: 9, color: '#b45309', fontWeight: 'bold'}}>SALES ORDER</Text>
+          
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+            <View style={{backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+              <Text style={{fontSize: 9, color: '#b45309', fontWeight: 'bold'}}>SALES ORDER</Text>
+            </View>
+            {!item.invoice_id && (
+              <View style={{backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+                <Text style={{fontSize: 9, color: '#ef4444', fontWeight: 'bold'}}>⚠️ NO INVOICE ID</Text>
+              </View>
+            )}
+            {item.needs_review && (
+              <View style={{backgroundColor: '#ffedd5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+                <Text style={{fontSize: 9, color: '#ea580c', fontWeight: 'bold'}}>⚠️ NEEDS REVIEW</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -679,6 +731,18 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
               placeholder="Search Sales Orders..."
               value={searchQuery}
               onChangeText={setSearchQuery}
+            />
+          </View>
+
+          {/* Auto Assign Toggle */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, height: 32 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>Auto-Assign</Text>
+            <Switch 
+              value={autoAssignEnabled}
+              onValueChange={handleToggleAutoAssign}
+              trackColor={{ false: '#cbd5e1', true: '#818cf8' }}
+              thumbColor={autoAssignEnabled ? '#4f46e5' : '#94a3b8'}
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
           </View>
           

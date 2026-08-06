@@ -69,4 +69,18 @@ cron.schedule('30 0 * * *', async () => {
   }
 });
 
+// Run daily at 5:30 AM IST (12:00 AM UTC) to reset the sales order auto-assign toggle to false
+cron.schedule('0 0 * * *', async () => {
+  console.log('⏰ [Cron] Resetting sales_order_auto_assign_toggle to OFF (5:30 AM IST)...');
+  try {
+    await pool.query(
+      "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP",
+      ['sales_order_auto_assign_toggle', JSON.stringify(false)]
+    );
+    console.log('✅ [Cron] sales_order_auto_assign_toggle is now OFF');
+  } catch (err) {
+    console.error('❌ [Cron] Failed to reset sales_order_auto_assign_toggle:', err.message);
+  }
+});
+
 module.exports = cron;

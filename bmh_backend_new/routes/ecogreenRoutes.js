@@ -1814,7 +1814,13 @@ router.get("/sales-orders", async (req, res) => {
       paramIdx++;
     }
     
-    query += ` ORDER BY created_at DESC, order_no DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    query += ` ORDER BY 
+      CASE WHEN status = 'Assigned' THEN 1 ELSE 0 END ASC,
+      CASE WHEN invoice_id IS NULL OR invoice_id = '' THEN 0 ELSE 1 END ASC,
+      CASE WHEN needs_review = TRUE THEN 0 ELSE 1 END ASC,
+      created_at DESC, 
+      order_no DESC 
+      LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
     
     const totalRes = await pool.query(countQuery, queryParams.slice(0, paramIdx - 1));
     const totalCount = parseInt(totalRes.rows[0].count, 10);

@@ -7,6 +7,9 @@ let lastSyncTime = null;
 async function syncSalesOrders() {
     console.log(`🔄 Syncing sales orders...`);
     try {
+        const toggleRes = await pool.query("SELECT value FROM settings WHERE key = 'sales_order_auto_assign_toggle'");
+        const autoAssignToggleOn = toggleRes.rows.length > 0 ? (typeof toggleRes.rows[0].value === 'string' ? JSON.parse(toggleRes.rows[0].value) : toggleRes.rows[0].value) : false;
+
         const token = cache.get("default_token") || (await fetchToken()).apiKey;
         const now = new Date();
         const pad = (n) => n.toString().padStart(2, '0');
@@ -82,6 +85,8 @@ async function syncSalesOrders() {
                     delivered_by: r.delivered_by,
                     createduser: r.createduser
                 }]));
+
+                const ordersToAutoAssign = [];
                 
                 const insertQueryStart = `
                   INSERT INTO ecogreensales_orders (
@@ -110,6 +115,8 @@ async function syncSalesOrders() {
                             updateFields.push(`invoice_id = $${updateParams.length + 1}`);
                             updateParams.push(order.invoice_id);
                             needsUpdate = true;
+                            // Add to autoassign list if a new invoice id is added
+                            ordersToAutoAssign.push(order);
                         }
                         if (order.payment_status && order.payment_status !== existing.payment_status) {
                             updateFields.push(`payment_status = $${updateParams.length + 1}`);
@@ -140,6 +147,7 @@ async function syncSalesOrders() {
                     
                     if (processedInThisBatch.has(order.order_no)) continue;
                     processedInThisBatch.add(order.order_no);
+                    ordersToAutoAssign.push(order);
                     
                     const rowParams = [
                         order.order_id || null,
@@ -175,6 +183,13 @@ async function syncSalesOrders() {
                 
                 await client.query('COMMIT');
                 console.log(`✅ Successfully synced ${orders.length} sales orders into DB.`);
+
+                if (autoAssignToggleOn && ordersToAutoAssign.length > 0) {
+                    console.log(`🤖 Auto-Assign is ON. Processing ${ordersToAutoAssign.length} orders...`);
+                    for (const order of ordersToAutoAssign) {
+                        await tryAutoAssign(pool, order);
+                    }
+                }
             } catch (err) {
                 await client.query('ROLLBACK');
                 console.error("Error saving sales orders to database:", err.message);
@@ -186,6 +201,163 @@ async function syncSalesOrders() {
         }
     } catch (err) {
         console.error("❌ salesOrderSync failed:", err.message);
+    }
+}
+
+async function tryAutoAssign(client, order) {
+    if (!order.invoice_id) {
+        return; // No invoice ID -> do not assign
+    }
+
+    const phone = order.patient_contact_no;
+    if (!phone) {
+        return; // No phone number -> cannot look up history
+    }
+
+    try {
+        // Query historical orders for this customer phone
+        const historyRes = await client.query(
+            `SELECT patient_address, delivery_type, bus_details, location_lat, location_lng, created_at 
+             FROM ecogreensales_orders 
+             WHERE patient_contact_no = $1 
+               AND patient_address IS NOT NULL 
+               AND status IN ('Delivered', 'Completed', 'Assigned')
+             ORDER BY created_at DESC`,
+            [phone]
+        );
+
+        if (historyRes.rows.length === 0) {
+            return; // No history -> cannot auto assign
+        }
+
+        // Extract unique normalized addresses
+        const uniqueAddresses = [];
+        const normAddresses = new Set();
+        
+        const getNormAddress = (addr) => {
+            if (!addr) return '';
+            const obj = typeof addr === 'string' ? JSON.parse(addr) : addr;
+            return `${obj.address || ''}|${obj.locality || ''}|${obj.pincode || ''}`.toLowerCase().replace(/\s+/g, '');
+        };
+
+        for (const row of historyRes.rows) {
+            const norm = getNormAddress(row.patient_address);
+            if (norm && !normAddresses.has(norm)) {
+                normAddresses.add(norm);
+                uniqueAddresses.push(row);
+            }
+        }
+
+        if (uniqueAddresses.length === 1) {
+            // SINGLE ADDRESS -> Auto fill & assign using workload balancing
+            const matchedOrder = uniqueAddresses[0];
+            const delType = matchedOrder.delivery_type || 'Local';
+            const busDetails = matchedOrder.bus_details;
+            const lat = matchedOrder.location_lat;
+            const lng = matchedOrder.location_lng;
+            const addressObj = typeof matchedOrder.patient_address === 'string' 
+                ? JSON.parse(matchedOrder.patient_address) 
+                : matchedOrder.patient_address;
+
+            // Find active checked-in rider with the least workload
+            const riderRes = await client.query(`
+                SELECT e.id, 
+                  (
+                    (SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = e.id AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available', 'delivered', 'completed', 'cancelled', 'returned', 'failed')) +
+                    (SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed')) +
+                    (SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed'))
+                  ) as pending_count
+                FROM employees e
+                WHERE e.department = 'Delivery' 
+                  AND e.status = 'approved'
+                  AND e.id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)
+                ORDER BY pending_count ASC
+                LIMIT 1
+            `);
+
+            if (riderRes.rows.length > 0) {
+                const assignedBoyId = riderRes.rows[0].id;
+                const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+                
+                // Update ecogreensales_orders
+                await client.query(`
+                    UPDATE ecogreensales_orders
+                    SET delivery_boy_id = $1,
+                        delivery_type = $2,
+                        bus_details = $3,
+                        location_lat = $4,
+                        location_lng = $5,
+                        patient_address = $6,
+                        delivery_otp = $7,
+                        status = 'Assigned',
+                        assigned_by = NULL,
+                        delivery_assigned_user_type = 'employee',
+                        needs_review = FALSE
+                    WHERE order_no = $8
+                `, [
+                    assignedBoyId,
+                    delType,
+                    busDetails ? (typeof busDetails === 'string' ? busDetails : JSON.stringify(busDetails)) : null,
+                    lat,
+                    lng,
+                    JSON.stringify(addressObj),
+                    deliveryOtp,
+                    order.order_no
+                ]);
+
+                // Update ecogreen_sales_orders
+                await client.query(`
+                    UPDATE ecogreen_sales_orders
+                    SET delivery_boy_id = $1,
+                        delivery_type = $2,
+                        bus_details = $3,
+                        location_lat = $4,
+                        location_lng = $5,
+                        patient_address = $6,
+                        delivery_otp = $7,
+                        status = 'Assigned',
+                        assigned_by = NULL,
+                        delivery_assigned_user_type = 'employee',
+                        needs_review = FALSE
+                    WHERE order_no = $8
+                `, [
+                    assignedBoyId,
+                    delType,
+                    busDetails ? (typeof busDetails === 'string' ? busDetails : JSON.stringify(busDetails)) : null,
+                    lat,
+                    lng,
+                    JSON.stringify(addressObj),
+                    deliveryOtp,
+                    order.order_no
+                ]);
+
+                console.log(`🤖 [Auto-Assign] Assigned order ${order.order_no} to active workload-balanced rider ${assignedBoyId}`);
+
+                // Push Notification
+                try {
+                    const empRes = await client.query('SELECT push_token FROM employees WHERE id = $1', [assignedBoyId]);
+                    if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+                        const { sendExpoPushNotification } = require('../utils/pushNotification');
+                        sendExpoPushNotification(
+                            empRes.rows[0].push_token, 
+                            'New Auto-Assigned Order', 
+                            `Order #${order.order_no} has been auto-assigned to you.`
+                        );
+                    }
+                } catch (pe) {
+                    console.error('Push notification error in auto assignment:', pe.message);
+                }
+            } else {
+                console.log(`⚠️ [Auto-Assign] No active checked-in rider found for order ${order.order_no}`);
+            }
+        } else if (uniqueAddresses.length > 1) {
+            // MULTIPLE ADDRESSES -> Needs Review
+            await client.query(`UPDATE ecogreensales_orders SET needs_review = TRUE WHERE order_no = $1`, [order.order_no]);
+            await client.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE WHERE order_no = $1`, [order.order_no]);
+            console.log(`⚠️ [Auto-Assign] Order ${order.order_no} has multiple addresses. Flagged needs_review = TRUE`);
+        }
+    } catch (err) {
+        console.error(`❌ [Auto-Assign] Failed to auto assign order ${order.order_no}:`, err.message);
     }
 }
 

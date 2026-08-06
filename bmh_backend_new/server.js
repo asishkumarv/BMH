@@ -285,6 +285,11 @@ app.listen(PORT, () => {
   pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'POD'").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'POD'").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreen_sales_invoices ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'POD'").catch(e => console.error(e.message));
+  
+  // Add needs_review columns
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS needs_review BOOLEAN DEFAULT FALSE").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS needs_review BOOLEAN DEFAULT FALSE").catch(e => console.error(e.message));
+
 
   // Department employee and sub-admin requirements / targets
   pool.query("ALTER TABLE departments ADD COLUMN IF NOT EXISTS required_employees INTEGER DEFAULT 0").catch(e => console.error(e.message));
