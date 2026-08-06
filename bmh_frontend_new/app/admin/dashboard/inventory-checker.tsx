@@ -22,6 +22,8 @@ export default function AdminInventoryChecker() {
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<'High' | 'Moderate' | 'Low'>('High');
   const [selectedDueDate, setSelectedDueDate] = useState<string>(new Date(Date.now() + 86400000).toISOString());
+  const [dailyAutoAssignments, setDailyAutoAssignments] = useState<any[]>([]);
+  const [assignDaily, setAssignDaily] = useState(false);
 
   const handleDispatchReorg = async (item: any) => {
     if (!selectedReorgStaffId) {
@@ -64,14 +66,14 @@ export default function AdminInventoryChecker() {
 
   // Data states
   const [staffList, setStaffList] = useState<any[]>([]);
-  const [racks, setRacks] = useState<string[]>([]);
+  const [racks, setRacks] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [mismatches, setMismatches] = useState<any[]>([]);
 
   // Selection states
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedRacks, setSelectedRacks] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'pending' | 'history'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'pending' | 'history' | 'daily'>('tasks');
   const [rackSearch, setRackSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -102,7 +104,7 @@ export default function AdminInventoryChecker() {
       // 2. Fetch all staff (employees and sub-admins)
       const [allUsersRes, rackRes, taskRes, verRes] = await Promise.all([
         axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users'),
-        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/racks'),
+        axios.get('https://napi.bharatmedicalhallplus.com/rack-checker/racks?include_counts=true'),
         axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/tasks'),
         axios.get('https://napi.bharatmedicalhallplus.com/inventory-checker/verifications?is_mismatch=true')
       ]);
@@ -125,6 +127,10 @@ export default function AdminInventoryChecker() {
       setRacks(rackRes.data.racks || []);
       setTasks(taskRes.data.data || []);
       setMismatches(verRes.data.data || []);
+
+      let dailyAssign = settingsRes.data?.settings?.inventory_auto_assignments || [];
+      if (typeof dailyAssign === 'string') dailyAssign = JSON.parse(dailyAssign);
+      setDailyAutoAssignments(dailyAssign);
     } catch (error) {
       console.error('Failed to load inventory checker data:', error);
       Alert.alert('Error', 'Failed to load initial data');
@@ -156,6 +162,23 @@ export default function AdminInventoryChecker() {
         rack_number: selectedRacks
       });
 
+      if (assignDaily) {
+        const newConfig = {
+          id: Date.now().toString(),
+          userId: selectedStaffId,
+          userName: targetStaff.full_name,
+          userRole: selectedStaffId.startsWith('SA-') ? 'Sub Admin' : 'Employee',
+          racks: selectedRacks
+        };
+        const updatedList = [...dailyAutoAssignments, newConfig];
+        await axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+          key: 'inventory_auto_assignments',
+          value: updatedList
+        });
+        setDailyAutoAssignments(updatedList);
+        setAssignDaily(false);
+      }
+
       Alert.alert('Success', 'Inventory task(s) assigned successfully!');
       setSelectedRacks([]);
       // Refresh tasks
@@ -166,6 +189,21 @@ export default function AdminInventoryChecker() {
       Alert.alert('Error', 'Failed to assign inventory task');
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleDeleteDailyAssignment = async (id: string) => {
+    const updatedList = dailyAutoAssignments.filter(item => item.id !== id);
+    try {
+      await axios.post('https://napi.bharatmedicalhallplus.com/settings', {
+        key: 'inventory_auto_assignments',
+        value: updatedList
+      });
+      setDailyAutoAssignments(updatedList);
+      Alert.alert('Success', 'Daily auto-assignment configuration removed.');
+    } catch (error) {
+      console.error('Failed to delete daily assignment:', error);
+      Alert.alert('Error', 'Failed to update auto-assignments settings.');
     }
   };
 
@@ -314,29 +352,49 @@ export default function AdminInventoryChecker() {
               />
               <View style={{ position: 'absolute', top: 45, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as any, zIndex: 10000, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 }}>
                 {racks
-                  .filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r))
+                  .filter(r => r.rack.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r.rack))
                   .slice(0, 50)
                   .map(r => (
                     <TouchableOpacity 
-                      key={r}
+                      key={r.rack}
                       style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}
                       onPress={() => {
-                        setSelectedRacks([...selectedRacks, r]);
+                        setSelectedRacks([...selectedRacks, r.rack]);
                         setRackSearch('');
                         setDropdownOpen(false);
                       }}
                     >
-                      <Text style={{ fontSize: 14, color: '#334155' }}>{r}</Text>
+                      <Text style={{ fontSize: 14, color: '#334155' }}>{r.rack} ({r.product_count} Products, {r.batch_count} Batches)</Text>
                     </TouchableOpacity>
                   ))}
-                {racks.filter(r => r.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r)).length === 0 && (
+                {racks.filter(r => r.rack.toLowerCase().includes(rackSearch.toLowerCase()) && !selectedRacks.includes(r.rack)).length === 0 && (
                   <Text style={{ padding: 12, color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>No matching racks found</Text>
                 )}
               </View>
             </>
           )}
         </View>
-
+        <TouchableOpacity 
+          style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, marginTop: 8 }}
+          onPress={() => setAssignDaily(!assignDaily)}
+        >
+          <View style={{
+            width: 18,
+            height: 18,
+            borderWidth: 1.5,
+            borderColor: Colors.light.primary,
+            borderRadius: 4,
+            backgroundColor: assignDaily ? Colors.light.primary : 'transparent',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 8
+          }}>
+            {assignDaily && <Check size={12} color="white" />}
+          </View>
+          <Text style={{ fontSize: 14, color: '#334155', fontWeight: '500' }}>
+            Assign Daily (Auto-Assignment Schedule)
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.assignBtn, assigning && { opacity: 0.7 }]} 
           onPress={handleAssign}
@@ -377,6 +435,14 @@ export default function AdminInventoryChecker() {
             Mismatch History ({mismatches.filter((m: any) => m.status !== 'pending').length})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'daily' && styles.tabActive]}
+          onPress={() => setActiveTab('daily')}
+        >
+          <Text style={[styles.tabText, activeTab === 'daily' && styles.tabTextActive]}>
+            Daily Auto-Assignments
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'tasks' ? (
@@ -401,7 +467,39 @@ export default function AdminInventoryChecker() {
                 </View>
               ))}
               {tasks.length === 0 && (
-                <Text style={styles.emptyText}>No tasks found.</Text>
+                <Text style={styles.emptyText}>No statistics found.</Text>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      ) : activeTab === 'daily' ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Configured Daily Auto-Assignments</Text>
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+            <View style={{ minWidth: isDesktop ? '100%' : 600 }}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.th, { flex: 2 }]}>Checker Staff</Text>
+                <Text style={[styles.th, { flex: 1 }]}>Role</Text>
+                <Text style={[styles.th, { flex: 3 }]}>Assigned Racks</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: 'right' }]}>Actions</Text>
+              </View>
+              {dailyAutoAssignments.map((item, idx) => (
+                <View key={item.id || idx} style={{ borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingVertical: 12, flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{item.userName}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>{item.userRole}</Text>
+                  <Text style={[styles.td, { flex: 3 }]}>{item.racks.join(', ')}</Text>
+                  <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: 8 }}>
+                    <TouchableOpacity 
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#ef4444', borderRadius: 6 }}
+                      onPress={() => handleDeleteDailyAssignment(item.id)}
+                    >
+                      <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              {dailyAutoAssignments.length === 0 && (
+                <Text style={[styles.emptyText, { padding: 24 }]}>No daily auto-assignments configured.</Text>
               )}
             </View>
           </ScrollView>

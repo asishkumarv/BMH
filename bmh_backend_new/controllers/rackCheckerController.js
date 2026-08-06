@@ -3,13 +3,29 @@ const { notifyAssignee } = require('../utils/pushNotification');
 
 exports.getRacksList = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT DISTINCT rack 
-      FROM ecogreen_medicines 
-      WHERE rack IS NOT NULL AND rack != '' AND rack != '-'
-      ORDER BY rack ASC
-    `);
-    res.json({ success: true, racks: result.rows.map(r => r.rack) });
+    const { include_counts } = req.query;
+    
+    if (include_counts === 'true') {
+      const result = await pool.query(`
+        SELECT 
+          rack, 
+          COUNT(DISTINCT c_item_code) as product_count, 
+          COUNT(DISTINCT batchNo) as batch_count
+        FROM ecogreen_medicines
+        WHERE rack IS NOT NULL AND rack != '' AND rack != '-'
+        GROUP BY rack
+        ORDER BY rack ASC
+      `);
+      res.json({ success: true, racks: result.rows });
+    } else {
+      const result = await pool.query(`
+        SELECT DISTINCT rack 
+        FROM ecogreen_medicines 
+        WHERE rack IS NOT NULL AND rack != '' AND rack != '-'
+        ORDER BY rack ASC
+      `);
+      res.json({ success: true, racks: result.rows.map(r => r.rack) });
+    }
   } catch (error) {
     console.error('getRacksList error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
