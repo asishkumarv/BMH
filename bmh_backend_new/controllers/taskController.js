@@ -1,6 +1,45 @@
 const pool = require('../db');
 const { sendExpoPushNotification, notifyAssignee } = require('../utils/pushNotification');
 
+// Run database migrations for the new tables and columns immediately at startup
+const runMigrations = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS task_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Add default categories if empty
+    const catCheck = await pool.query('SELECT COUNT(*) FROM task_categories');
+    if (parseInt(catCheck.rows[0].count) === 0) {
+      const defaultCats = ['Cleaning', 'Maintenance', 'Delivery', 'Billing', 'Counter', 'Doctor Visit', 'General'];
+      for (const cat of defaultCats) {
+        await pool.query('INSERT INTO task_categories (name) VALUES ($1) ON CONFLICT DO NOTHING', [cat]);
+      }
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS predefined_tasks (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(255) DEFAULT 'General',
+        priority VARCHAR(50) DEFAULT 'Moderate',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category VARCHAR(255) DEFAULT \'General\'');
+    await pool.query('ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS category VARCHAR(255) DEFAULT \'General\'');
+  } catch (err) {
+    console.error('Error running task system migrations:', err);
+  }
+};
+runMigrations();
+
 // Helper to check today's check-in status
 const checkCheckedIn = async (employeeId, userType) => {
   if (!employeeId || !userType) return true;
@@ -41,7 +80,7 @@ const createNotification = async (userType, userId, message) => {
 
 exports.createTask = async (req, res) => {
   try {
-    const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees } = req.body;
+    const { title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees, category } = req.body;
 
     // Check attendance for assigner (if employee or department admin)
     const isCheckedIn = await checkCheckedIn(assigner_id, assigner_type);
@@ -51,8 +90,8 @@ exports.createTask = async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO tasks 
-      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees, category) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [
         title,
         description,
@@ -64,7 +103,8 @@ exports.createTask = async (req, res) => {
         due_date || null,
         priority || 'Moderate',
         is_group_task || false,
-        is_group_task ? (typeof group_assignees === 'string' ? group_assignees : JSON.stringify(group_assignees || [])) : '[]'
+        is_group_task ? (typeof group_assignees === 'string' ? group_assignees : JSON.stringify(group_assignees || [])) : '[]',
+        category || 'General'
       ]
     );
 
@@ -356,7 +396,7 @@ exports.createRecurringTask = async (req, res) => {
     const { 
       title, description, department, assigner_type, assigner_id, 
       assignee_type, assignee_id, priority, frequency, specific_days,
-      due_time_type, due_time_hours, due_time_days
+      due_time_type, due_time_hours, due_time_days, category
     } = req.body;
     
     if (!title || !assignee_id || !frequency) {
@@ -369,14 +409,15 @@ exports.createRecurringTask = async (req, res) => {
       return res.status(200).json({ success: false, checkInRequired: true, message: 'Please check in to assign tasks.' });
     }
 
-    const query = 'INSERT INTO recurring_tasks (title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days, due_time_type, due_time_hours, due_time_days) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *';
+    const query = 'INSERT INTO recurring_tasks (title, description, department, assigner_type, assigner_id, assignee_type, assignee_id, priority, frequency, specific_days, due_time_type, due_time_hours, due_time_days, category) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *';
     const values = [
       title, description, department, assigner_type, assigner_id,
       assignee_type, assignee_id, priority || 'Medium', frequency,
       specific_days ? JSON.stringify(specific_days) : null,
       due_time_type || 'default',
       parseInt(due_time_hours) || 0,
-      parseInt(due_time_days) || 0
+      parseInt(due_time_days) || 0,
+      category || 'General'
     ];
     const result = await pool.query(query, values);
     const rTask = result.rows[0];
@@ -431,12 +472,12 @@ exports.createRecurringTask = async (req, res) => {
             const insertTask = `
                 INSERT INTO tasks (
                     title, description, department, assigner_type, assigner_id, 
-                    assignee_type, assignee_id, priority, due_date, status, is_recurring
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'assigned', true)
+                    assignee_type, assignee_id, priority, due_date, status, is_recurring, category
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'assigned', true, $10)
             `;
             const tValues = [
                 rTask.title, rTask.description, rTask.department, rTask.assigner_type, rTask.assigner_id,
-                rTask.assignee_type, rTask.assignee_id, rTask.priority, dueAt.toISOString()
+                rTask.assignee_type, rTask.assignee_id, rTask.priority, dueAt.toISOString(), rTask.category
             ];
             await pool.query(insertTask, tValues);
             await pool.query(`UPDATE recurring_tasks SET last_generated_at = CURRENT_TIMESTAMP WHERE id = $1`, [rTask.id]);
@@ -464,13 +505,24 @@ exports.getRecurringTasks = async (req, res) => {
     await pool.query(`ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS due_time_hours INTEGER DEFAULT 0`);
     await pool.query(`ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS due_time_days INTEGER DEFAULT 0`);
     
-    let query = 'SELECT r.*, emp.full_name as assignee_name, emp.profile_data as assignee_profile FROM recurring_tasks r LEFT JOIN employees emp ON r.assignee_id = emp.id AND r.assignee_type = \'employee\' ORDER BY r.created_at DESC';
+    const fields = `
+      r.*,
+      (CASE 
+        WHEN r.assignee_type = 'employee' THEN (SELECT full_name FROM employees WHERE id = r.assignee_id)
+        WHEN r.assignee_type = 'department_admin' THEN (SELECT full_name FROM department_admins WHERE id = r.assignee_id)
+        WHEN r.assignee_type = 'super_admin' THEN (SELECT full_name FROM super_admins WHERE id = r.assignee_id)
+        ELSE 'Unknown'
+      END) as assignee_name
+    `;
+
+    let query = `SELECT ${fields} FROM recurring_tasks r ORDER BY r.created_at DESC`;
        
     if (user_type === 'department_admin') {
-       query = 'SELECT r.*, emp.full_name as assignee_name, emp.profile_data as assignee_profile FROM recurring_tasks r LEFT JOIN employees emp ON r.assignee_id = emp.id AND r.assignee_type = \'employee\' WHERE r.department = \'' + department + '\' OR r.assigner_id = ' + user_id + ' ORDER BY r.created_at DESC';
+       query = `SELECT ${fields} FROM recurring_tasks r WHERE r.department = $1 OR r.assigner_id = $2 ORDER BY r.created_at DESC`;
     }
 
-    const result = await pool.query(query);
+    const params = user_type === 'department_admin' ? [department, user_id] : [];
+    const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error('Error fetching recurring tasks:', err);
@@ -510,15 +562,15 @@ exports.deleteRecurringTask = async (req, res) => {
 exports.updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, due_date } = req.body;
+    const { title, description, due_date, category } = req.body;
     
     const query = `
       UPDATE tasks 
-      SET title = $1, description = $2, due_date = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
+      SET title = $1, description = $2, due_date = $3, category = $4, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $5
       RETURNING *
     `;
-    const result = await pool.query(query, [title, description, due_date, id]);
+    const result = await pool.query(query, [title, description, due_date, category || 'General', id]);
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
@@ -534,22 +586,22 @@ exports.updateRecurringTask = async (req, res) => {
     const { id } = req.params;
     const { 
       title, description, frequency, specific_days, priority, 
-      assignee_type, assignee_id, department, due_time_type, due_time_hours, due_time_days 
+      assignee_type, assignee_id, department, due_time_type, due_time_hours, due_time_days, category 
     } = req.body;
     
     const query = `
       UPDATE recurring_tasks 
       SET title = $1, description = $2, frequency = $3, specific_days = $4, priority = $5,
           assignee_type = $6, assignee_id = $7, department = $8,
-          due_time_type = $9, due_time_hours = $10, due_time_days = $11
-      WHERE id = $12
+          due_time_type = $9, due_time_hours = $10, due_time_days = $11, category = $12
+      WHERE id = $13
       RETURNING *
     `;
     const sDays = typeof specific_days === 'string' ? specific_days : JSON.stringify(specific_days || []);
     const values = [
       title, description, frequency, sDays, priority,
       assignee_type, assignee_id, department,
-      due_time_type, due_time_hours, due_time_days, id
+      due_time_type, due_time_hours, due_time_days, category || 'General', id
     ];
     
     const result = await pool.query(query, values);
@@ -560,6 +612,82 @@ exports.updateRecurringTask = async (req, res) => {
   } catch (err) {
     console.error('Error updating recurring task:', err);
     res.status(500).json({ success: false, message: 'Failed to update recurring task' });
+  }
+};
+
+// Categories CRUD implementation
+exports.getCategories = async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM task_categories ORDER BY name ASC');
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching categories' });
+  }
+};
+
+exports.createCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
+    
+    const result = await pool.query(
+      'INSERT INTO task_categories (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING *',
+      [name]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ success: false, message: 'Server error creating category' });
+  }
+};
+
+exports.deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM task_categories WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ success: false, message: 'Server error deleting category' });
+  }
+};
+
+// Predefined Tasks CRUD implementation
+exports.getPredefinedTasks = async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM predefined_tasks ORDER BY created_at DESC');
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching predefined tasks:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching predefined tasks' });
+  }
+};
+
+exports.createPredefinedTask = async (req, res) => {
+  try {
+    const { title, description, category, priority } = req.body;
+    if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
+    
+    const result = await pool.query(
+      'INSERT INTO predefined_tasks (title, description, category, priority) VALUES ($1, $2, $3, $4) RETURNING *',
+      [title, description || '', category || 'General', priority || 'Moderate']
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating predefined task:', error);
+    res.status(500).json({ success: false, message: 'Server error creating predefined task' });
+  }
+};
+
+exports.deletePredefinedTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM predefined_tasks WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Predefined task deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting predefined task:', error);
+    res.status(500).json({ success: false, message: 'Server error deleting predefined task' });
   }
 };
 

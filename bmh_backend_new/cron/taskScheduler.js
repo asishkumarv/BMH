@@ -90,8 +90,8 @@ function calculateDueDate(today, rTask) {
                     const insertTask = `
                         INSERT INTO tasks (
                             title, description, department, assigner_type, assigner_id, 
-                            assignee_type, assignee_id, priority, due_date, status, is_recurring
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', true)
+                            assignee_type, assignee_id, priority, due_date, status, is_recurring, category
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', true, $10)
                         RETURNING id
                     `;
                     const values = [
@@ -103,7 +103,8 @@ function calculateDueDate(today, rTask) {
                         rTask.assignee_type,
                         rTask.assignee_id,
                         rTask.priority,
-                        dueAt.toISOString()
+                        dueAt.toISOString(),
+                        rTask.category || 'General'
                     ];
                     
                     const insertRes = await pool.query(insertTask, values);

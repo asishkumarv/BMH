@@ -107,7 +107,8 @@ export default function EmployeeTasksScreen() {
       if (taskRes.data.success) setTasks(taskRes.data.data);
       if (deptRes.data.success) setDepts(deptRes.data.data);
       if (usersRes.data.success) {
-        setGlobalUsers(usersRes.data.data);
+        const nonDoctors = usersRes.data.data.filter((u: any) => u.type !== 'doctor' && u.role !== 'doctor');
+        setGlobalUsers(nonDoctors);
       }
       
     } catch (e) {

@@ -16,6 +16,16 @@ router.put('/recurring/:id/status', taskController.updateRecurringTaskStatus);
 router.delete('/recurring/:id', taskController.deleteRecurringTask);
 router.put('/recurring/:id', taskController.updateRecurringTask);
 
+// Categories routes
+router.get('/categories', taskController.getCategories);
+router.post('/categories', taskController.createCategory);
+router.delete('/categories/:id', taskController.deleteCategory);
+
+// Predefined tasks routes
+router.get('/predefined', taskController.getPredefinedTasks);
+router.post('/predefined', taskController.createPredefinedTask);
+router.delete('/predefined/:id', taskController.deletePredefinedTask);
+
 router.get('/create-recurring-table', async (req, res) => {
   try {
     const pool = require('../db');

@@ -12,11 +12,19 @@ export default function DepartmentTasksScreen() {
   const [customAlert, setCustomAlert] = useState<{ visible: boolean; title: string; message: string } | null>(null);
 
   const Alert = {
-    alert: (title: string, message?: string) => {
+    alert: (title: string, message?: string, buttons?: any[]) => {
       if (Platform.OS === 'web') {
-        setCustomAlert({ visible: true, title, message: message || '' });
+        if (buttons && buttons.length > 1) {
+          const confirmBtn = buttons.find(b => b.style !== 'cancel');
+          const confirmed = window.confirm(`${title}\n\n${message || ''}`);
+          if (confirmed && confirmBtn?.onPress) {
+            confirmBtn.onPress();
+          }
+        } else {
+          setCustomAlert({ visible: true, title, message: message || '' });
+        }
       } else {
-        RNAlert.alert(title, message);
+        RNAlert.alert(title, message, buttons);
       }
     }
   };
@@ -38,6 +46,29 @@ export default function DepartmentTasksScreen() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState('daily');
   const [specificDays, setSpecificDays] = useState('');
+
+  // Category and Predefined Tasks States
+  const [categories, setCategories] = useState<any[]>([]);
+  const [predefinedTasks, setPredefinedTasks] = useState<any[]>([]);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('General');
+  const [recurringFrequencyFilter, setRecurringFrequencyFilter] = useState('all');
+
+  // Category management UI
+  const [showManageCatsModal, setShowManageCatsModal] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+
+  // Predefined tasks management UI
+  const [showManagePredefModal, setShowManagePredefModal] = useState(false);
+  const [predefTitle, setPredefTitle] = useState('');
+  const [predefDesc, setPredefDesc] = useState('');
+  const [predefCategory, setPredefCategory] = useState('General');
+  const [predefPriority, setPredefPriority] = useState('Moderate');
+
+  // Switching toggle: All Tasks Table vs Assignee-wise Summary View
+  const [viewMode, setViewMode] = useState<'table' | 'summary'>('table');
+  const [selectedUserSummary, setSelectedUserSummary] = useState<any | null>(null);
+  const [selectedUserTab, setSelectedUserTab] = useState<'normal' | 'recurring'>('normal');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -71,6 +102,7 @@ export default function DepartmentTasksScreen() {
   const [editDueDate, setEditDueDate] = useState('');
   const [editIsRecurring, setEditIsRecurring] = useState(false);
   const [editPriority, setEditPriority] = useState('Moderate');
+  const [editCategory, setEditCategory] = useState('General');
   const [editDueTimeType, setEditDueTimeType] = useState('default');
   const [editDueTimeHours, setEditDueTimeHours] = useState('0');
   const [editDueTimeDays, setEditDueTimeDays] = useState('0');
@@ -92,7 +124,94 @@ export default function DepartmentTasksScreen() {
 
   useEffect(() => {
     fetchInitData();
+    fetchCategories();
+    fetchPredefinedTasks();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/tasks/categories');
+      if (res.data.success) {
+        setCategories(res.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchPredefinedTasks = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/tasks/predefined');
+      if (res.data.success) {
+        setPredefinedTasks(res.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCatName) return Alert.alert('Error', 'Name is required');
+    try {
+      await axios.post('https://napi.bharatmedicalhallplus.com/tasks/categories', { name: newCatName });
+      setNewCatName('');
+      fetchCategories();
+      Alert.alert('Success', 'Category added');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to add category');
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    try {
+      await axios.delete(`https://napi.bharatmedicalhallplus.com/tasks/categories/${id}`);
+      fetchCategories();
+      Alert.alert('Success', 'Category deleted');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to delete category');
+    }
+  };
+
+  const handleAddPredefTask = async () => {
+    if (!predefTitle) return Alert.alert('Error', 'Title is required');
+    try {
+      await axios.post('https://napi.bharatmedicalhallplus.com/tasks/predefined', {
+        title: predefTitle,
+        description: predefDesc,
+        category: predefCategory,
+        priority: predefPriority
+      });
+      setPredefTitle('');
+      setPredefDesc('');
+      setPredefCategory('General');
+      setPredefPriority('Moderate');
+      fetchPredefinedTasks();
+      Alert.alert('Success', 'Predefined task added');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to add predefined task');
+    }
+  };
+
+  const handleDeletePredefTask = async (id: number) => {
+    try {
+      await axios.delete(`https://napi.bharatmedicalhallplus.com/tasks/predefined/${id}`);
+      fetchPredefinedTasks();
+      Alert.alert('Success', 'Predefined task deleted');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to delete predefined task');
+    }
+  };
+
+  const handleLoadPredefTask = (task: any) => {
+    setTitle(task.title);
+    setDescription(task.description);
+    setSelectedCategory(task.category);
+    setPriority(task.priority);
+  };
 
   const fetchInitData = async () => {
     try {
@@ -107,7 +226,6 @@ export default function DepartmentTasksScreen() {
       setMyDeptName(dName);
 
       const [taskRes, usersRes, recurringRes] = await Promise.all([
-
         axios.get(`https://napi.bharatmedicalhallplus.com/tasks?user_type=department_admin&user_id=${adminUser.id}&department=${dName}`),
         axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users'),
         axios.get(`https://napi.bharatmedicalhallplus.com/tasks/recurring?user_type=department_admin&user_id=${adminUser.id}&department=${dName}`)
@@ -116,7 +234,8 @@ export default function DepartmentTasksScreen() {
       if (taskRes.data.success) setTasks(taskRes.data.data);
       if (recurringRes.data.success) setRecurringTasks(recurringRes.data.data);
       if (usersRes.data.success) {
-        setGlobalUsers(usersRes.data.data);
+        const nonDoctors = usersRes.data.data.filter((u: any) => u.type !== 'doctor' && u.role !== 'doctor');
+        setGlobalUsers(nonDoctors);
       }
       
     } catch (e) {
@@ -188,7 +307,8 @@ export default function DepartmentTasksScreen() {
           priority, frequency, specific_days: parsedDays,
           due_time_type: dueTimeType,
           due_time_hours: parseInt(dueTimeHours) || 0,
-          due_time_days: parseInt(dueTimeDays) || 0
+          due_time_days: parseInt(dueTimeDays) || 0,
+          category: selectedCategory
         });
         if (res.data && res.data.success === false) {
           Alert.alert('Error', res.data.message || 'Failed to assign task');
@@ -207,7 +327,8 @@ export default function DepartmentTasksScreen() {
           due_date: dueDate ? new Date(dueDate.replace(' ', 'T')).toISOString() : null,
           priority,
           is_group_task: isGroupTask,
-          group_assignees: resolvedGroupAssignees
+          group_assignees: resolvedGroupAssignees,
+          category: selectedCategory
         });
         if (res.data && res.data.success === false) {
           Alert.alert('Error', res.data.message || 'Failed to assign task');
@@ -220,6 +341,7 @@ export default function DepartmentTasksScreen() {
       setDescription('');
       setDueDate('');
       setPriority('Moderate');
+      setSelectedCategory('General');
       setIsRecurring(false);
       setFrequency('daily');
       setSpecificDays('');
@@ -390,6 +512,7 @@ export default function DepartmentTasksScreen() {
     setEditIsRecurring(isRec);
     setEditTitle(task.title || '');
     setEditDescription(task.description || '');
+    setEditCategory(task.category || 'General');
     if (isRec) {
       setEditPriority(task.priority || 'Moderate');
       setEditDueTimeType(task.due_time_type || 'default');
@@ -411,13 +534,15 @@ export default function DepartmentTasksScreen() {
           priority: editPriority,
           due_time_type: editDueTimeType,
           due_time_hours: parseInt(editDueTimeHours) || 0,
-          due_time_days: parseInt(editDueTimeDays) || 0
+          due_time_days: parseInt(editDueTimeDays) || 0,
+          category: editCategory
         });
       } else {
         await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/${editTaskId}`, {
           title: editTitle,
           description: editDescription,
-          due_date: editDueDate ? new Date(editDueDate).toISOString() : null
+          due_date: editDueDate ? new Date(editDueDate).toISOString() : null,
+          category: editCategory
         });
       }
       setShowEditModal(false);
@@ -667,7 +792,33 @@ export default function DepartmentTasksScreen() {
     }
   };
 
-  const tabTasks = getTasksForTab();
+  const matchesEmployee = (t: any) => {
+    if (!searchQuery) return true;
+    if (searchQuery.startsWith('SA-')) {
+      const id = searchQuery.replace('SA-', '');
+      return t.assignee_type === 'department_admin' && String(t.assignee_id) === id;
+    }
+    if (searchQuery.startsWith('ADMIN-')) {
+      const id = searchQuery.replace('ADMIN-', '');
+      return t.assignee_type === 'super_admin' && String(t.assignee_id) === id;
+    }
+    if (searchQuery.startsWith('DOC-')) {
+      const id = searchQuery.replace('DOC-', '');
+      return t.assignee_type === 'doctor' && String(t.assignee_id) === id;
+    }
+    // Check name matching
+    return (
+      t.assignee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.assigner_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
+  const matchesCategory = (t: any) => {
+    if (selectedCategoryFilter === 'all') return true;
+    return t.category === selectedCategoryFilter;
+  };
 
   const matchesDate = (t: any) => {
     if (dateFilter === 'all') return true;
@@ -695,17 +846,6 @@ export default function DepartmentTasksScreen() {
     return true;
   };
 
-  const matchesSearch = (t: any) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      t.title?.toLowerCase().includes(query) ||
-      t.description?.toLowerCase().includes(query) ||
-      t.assignee_name?.toLowerCase().includes(query) ||
-      t.assigner_name?.toLowerCase().includes(query)
-    );
-  };
-
   const matchesStat = (t: any) => {
     if (selectedStatFilter === 'all') return true;
     if (selectedStatFilter === 'completed') return t.status === 'completed';
@@ -717,30 +857,50 @@ export default function DepartmentTasksScreen() {
     return true;
   };
 
-  const getFilteredTasks = () => {
-    return tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && matchesStat(t));
+  const handleStatCardPress = (filterType: string) => {
+    if (selectedStatFilter === filterType) {
+      setSelectedStatFilter('all');
+    } else {
+      setSelectedStatFilter(filterType);
+    }
   };
 
+  const getFilteredTasks = () => {
+    const tabTasks = getTasksForTab();
+    return tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesStat(t) && matchesCategory(t));
+  };
+
+  const getFilteredRecurringTasks = () => {
+    return recurringTasks.filter(t => {
+      if (!matchesEmployee(t)) return false;
+      if (!matchesCategory(t)) return false;
+      if (recurringFrequencyFilter !== 'all' && t.frequency !== recurringFrequencyFilter) return false;
+      return true;
+    });
+  };
+
+  const tabTasks = getTasksForTab();
+
   const getStatCounts = () => {
-    const totalFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t)).length;
+    const totalFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t)).length;
     const totalOverall = tabTasks.length;
     
-    const completedFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.status === 'completed').length;
+    const completedFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t) && t.status === 'completed').length;
     const completedOverall = tabTasks.filter(t => t.status === 'completed').length;
     
-    const pendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const pendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const pendingOverall = tabTasks.filter(t => !['completed', 'terminated', 'rejected'].includes(t.status)).length;
 
-    const rejectedFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.status === 'rejected').length;
+    const rejectedFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t) && t.status === 'rejected').length;
     const rejectedOverall = tabTasks.filter(t => t.status === 'rejected').length;
     
-    const highPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'High' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const highPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t) && t.priority === 'High' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const highOverall = tabTasks.filter(t => t.priority === 'High').length;
     
-    const moderatePendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const moderatePendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t) && (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const moderateOverall = tabTasks.filter(t => t.priority === 'Moderate' || !t.priority).length;
     
-    const lowPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesSearch(t) && t.priority === 'Low' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const lowPendingFiltered = tabTasks.filter(t => matchesDate(t) && matchesEmployee(t) && matchesCategory(t) && t.priority === 'Low' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
     const lowOverall = tabTasks.filter(t => t.priority === 'Low').length;
     
     return {
@@ -754,36 +914,330 @@ export default function DepartmentTasksScreen() {
     };
   };
 
-  const stats = getStatCounts();
-
-  const handleStatCardPress = (filterType: string) => {
-    if (selectedStatFilter === filterType) {
-      setSelectedStatFilter('all');
-    } else {
-      setSelectedStatFilter(filterType);
+  const getUserTaskStats = (user: any) => {
+    let targetId = String(user.id);
+    let targetType = user.type;
+    if (targetId.startsWith('SA-')) {
+      targetId = targetId.replace('SA-', '');
+      targetType = 'department_admin';
+    } else if (targetId.startsWith('ADMIN-')) {
+      targetId = targetId.replace('ADMIN-', '');
+      targetType = 'super_admin';
+    } else if (targetId.startsWith('DOC-')) {
+      targetId = targetId.replace('DOC-', '');
+      targetType = 'doctor';
     }
+
+    const userTasks = tasks.filter(t => {
+      if (t.is_group_task) {
+        const members = typeof t.group_assignees === 'string' ? JSON.parse(t.group_assignees) : (t.group_assignees || []);
+        return members.some((m: any) => String(m.assignee_id) === targetId && m.assignee_type === targetType);
+      }
+      return String(t.assignee_id) === targetId && t.assignee_type === targetType;
+    });
+
+    const total = userTasks.length;
+    const completed = userTasks.filter(t => t.status === 'completed').length;
+    const pending = userTasks.filter(t => !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    
+    const highPending = userTasks.filter(t => t.priority === 'High' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const moderatePending = userTasks.filter(t => (t.priority === 'Moderate' || !t.priority) && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+    const lowPending = userTasks.filter(t => t.priority === 'Low' && !['completed', 'terminated', 'rejected'].includes(t.status)).length;
+
+    const todayStr = new Date().toDateString();
+    const todayDuePending = userTasks.filter(t => {
+      if (!t.due_date || ['completed', 'terminated', 'rejected'].includes(t.status)) return false;
+      return new Date(t.due_date).toDateString() === todayStr;
+    }).length;
+
+    const userRecurring = recurringTasks.filter(t => {
+      return String(t.assignee_id) === targetId && t.assignee_type === targetType;
+    });
+
+    return {
+      total,
+      completed,
+      pending,
+      highPending,
+      moderatePending,
+      lowPending,
+      todayDuePending,
+      userTasks,
+      userRecurring
+    };
   };
+
+  const renderTasksTable = (taskList: any[], isRecurringList: boolean) => {
+    return (
+      <View style={styles.tableCard}>
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+          <View style={{ minWidth: 1200 }}>
+            <View style={[styles.tableRow, styles.tableHeader]}>
+              <Text style={[styles.headerCell, { width: 50 }]}>S.No</Text>
+              <Text style={[styles.headerCell, { width: 150 }]}>Created Date & Time</Text>
+              <Text style={[styles.headerCell, { width: 180 }]}>Title</Text>
+              <Text style={[styles.headerCell, { width: 220 }]}>Description</Text>
+              <Text style={[styles.headerCell, { width: 140 }]}>Assigned By</Text>
+              <Text style={[styles.headerCell, { width: 140 }]}>Assigned To</Text>
+              <Text style={[styles.headerCell, { width: 140 }]}>{isRecurringList ? 'Schedule' : 'Due Date'}</Text>
+              <Text style={[styles.headerCell, { width: 100 }]}>Category</Text>
+              <Text style={[styles.headerCell, { width: 90 }]}>Type</Text>
+              <Text style={[styles.headerCell, { width: 100 }]}>Status</Text>
+              <Text style={[styles.headerCell, { width: 120, textAlign: 'right' }]}>Actions</Text>
+            </View>
+
+            {taskList.length === 0 ? (
+              <View style={{ padding: 24, alignItems: 'center' }}>
+                <Text style={{ color: Colors.light.icon }}>No tasks found.</Text>
+              </View>
+            ) : (
+              taskList.map((task, index) => {
+                const sn = index + 1;
+                const createdDate = formatTaskDate(task.created_at || task.created_date);
+                
+                let assignedByStr = 'System';
+                if (task.assigner_type) {
+                  assignedByStr = `${task.assigner_name || 'Admin'} (${task.assigner_type.replace('_', ' ')})`;
+                }
+                
+                let assignedToStr = 'N/A';
+                if (task.is_group_task) {
+                  const members = typeof task.group_assignees === 'string' ? JSON.parse(task.group_assignees) : (task.group_assignees || []);
+                  assignedToStr = `Group (${members.length} members)`;
+                } else {
+                  assignedToStr = `${task.assignee_name || 'Unknown'} (${task.assignee_type ? task.assignee_type.replace('_', ' ') : 'employee'})`;
+                }
+
+                let typeStr = 'Single';
+                if (isRecurringList || task.is_recurring) typeStr = 'Recurring';
+                else if (task.is_group_task) typeStr = 'Group';
+
+                const statusColor = getStatusColor(task.status);
+
+                return (
+                  <View key={task.id} style={styles.tableRow}>
+                    <Text style={[styles.cell, { width: 50 }]}>{sn}</Text>
+                    <Text style={[styles.cell, { width: 150 }]}>{createdDate}</Text>
+                    <Text style={[styles.cell, { width: 180, fontWeight: '700' }]}>{task.title}</Text>
+                    <Text style={[styles.cell, { width: 220 }]} numberOfLines={2}>{task.description}</Text>
+                    <Text style={[styles.cell, { width: 140 }]}>{assignedByStr}</Text>
+                    <Text style={[styles.cell, { width: 140 }]}>{assignedToStr}</Text>
+                    <Text style={[styles.cell, { width: 140 }]}>
+                      {isRecurringList 
+                        ? `${task.frequency.toUpperCase()} ${task.specific_days ? '(' + (Array.isArray(task.specific_days) ? task.specific_days : JSON.parse(task.specific_days)).join(', ') + ')' : ''}`
+                        : formatTaskDate(task.due_date) || 'No Due Date'}
+                    </Text>
+                    <Text style={[styles.cell, { width: 100 }]}>
+                      <View style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>{task.category || 'General'}</Text>
+                      </View>
+                    </Text>
+                    <Text style={[styles.cell, { width: 90 }]}>
+                      <View style={{ backgroundColor: typeStr === 'Recurring' ? '#e0e7ff' : typeStr === 'Group' ? '#fae8ff' : '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 12, color: typeStr === 'Recurring' ? '#4338ca' : typeStr === 'Group' ? '#d946ef' : '#475569', fontWeight: '600' }}>{typeStr}</Text>
+                      </View>
+                    </Text>
+                    <Text style={[styles.cell, { width: 100 }]}>
+                      <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                        <Text style={[styles.statusText, { color: statusColor }]}>{task.status.toUpperCase()}</Text>
+                      </View>
+                    </Text>
+                    <View style={[styles.cell, { width: 120, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 }]}>
+                      {isRecurringList ? (
+                        <>
+                          <Pressable
+                            style={{ backgroundColor: task.status === 'active' ? '#f59e0b' : '#10b981', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 }}
+                            onPress={async () => {
+                              try {
+                                const newStatus = task.status === 'active' ? 'paused' : 'active';
+                                await axios.put(`https://napi.bharatmedicalhallplus.com/tasks/recurring/${task.id}/status`, { status: newStatus });
+                                fetchInitData();
+                                Alert.alert('Success', `Schedule ${newStatus}`);
+                              } catch(e) {
+                                Alert.alert('Error', 'Failed to update status');
+                              }
+                            }}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{task.status === 'active' ? 'Pause' : 'Resume'}</Text>
+                          </Pressable>
+                          <Pressable
+                            style={{ backgroundColor: '#ef4444', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 }}
+                            onPress={async () => {
+                              if (Platform.OS === 'web') {
+                                const confirmed = window.confirm('Are you sure you want to delete this schedule?');
+                                if (confirmed) {
+                                  try {
+                                    await axios.delete(`https://napi.bharatmedicalhallplus.com/tasks/recurring/${task.id}`);
+                                    fetchInitData();
+                                  } catch(e) {
+                                    alert('Failed to delete schedule');
+                                  }
+                                }
+                              } else {
+                                Alert.alert('Delete Schedule', 'Are you sure?', [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Delete', style: 'destructive', onPress: async () => {
+                                    try {
+                                      await axios.delete(`https://napi.bharatmedicalhallplus.com/tasks/recurring/${task.id}`);
+                                      fetchInitData();
+                                    } catch(e) {
+                                      Alert.alert('Error', 'Failed to delete schedule');
+                                    }
+                                  }}
+                                ]);
+                              }
+                            }}
+                          >
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>Delete</Text>
+                          </Pressable>
+                          {task.assigner_type === 'department_admin' && String(task.assigner_id) === String(adminUser.id) && (
+                            <Pressable
+                              style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 }}
+                              onPress={() => handleOpenEditModal(task, true)}
+                            >
+                              <Text style={{ color: '#0369a1', fontSize: 10, fontWeight: '700' }}>Edit</Text>
+                            </Pressable>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {task.assigner_type === 'department_admin' && String(task.assigner_id) === String(adminUser.id) && (
+                            <Pressable
+                              style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                              onPress={() => handleOpenEditModal(task, false)}
+                            >
+                              <Text style={{ color: '#0369a1', fontSize: 11, fontWeight: '700' }}>Edit</Text>
+                            </Pressable>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderUserSummary = () => {
+    // Filter globalUsers to show only those in the same department
+    const deptUsers = globalUsers.filter(u => {
+      // Sub admin can see employees & co-admins in their department
+      return u.department === myDeptName;
+    });
+
+    return (
+      <View style={styles.tableCard}>
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+          <View style={{ minWidth: 1100 }}>
+            <View style={[styles.tableRow, styles.tableHeader]}>
+              <Text style={[styles.headerCell, { width: 50 }]}>S.No</Text>
+              <Text style={[styles.headerCell, { width: 200 }]}>Assigned To Name</Text>
+              <Text style={[styles.headerCell, { width: 150 }]}>Role</Text>
+              <Text style={[styles.headerCell, { width: 150 }]}>Department</Text>
+              <Text style={[styles.headerCell, { width: 90, textAlign: 'center' }]}>Total Tasks</Text>
+              <Text style={[styles.headerCell, { width: 90, textAlign: 'center' }]}>Completed</Text>
+              <Text style={[styles.headerCell, { width: 90, textAlign: 'center' }]}>Pending</Text>
+              <Text style={[styles.headerCell, { width: 100, textAlign: 'center' }]}>High Pending</Text>
+              <Text style={[styles.headerCell, { width: 100, textAlign: 'center' }]}>Mod Pending</Text>
+              <Text style={[styles.headerCell, { width: 100, textAlign: 'center' }]}>Low Pending</Text>
+              <Text style={[styles.headerCell, { width: 120, textAlign: 'center' }]}>Today Due Pending</Text>
+            </View>
+
+            {deptUsers.map((user, index) => {
+              const stats = getUserTaskStats(user);
+              return (
+                <Pressable
+                  key={user.id}
+                  style={({ pressed }) => [styles.tableRow, pressed && { backgroundColor: '#f1f5f9' }]}
+                  onPress={() => setSelectedUserSummary(user)}
+                >
+                  <Text style={[styles.cell, { width: 50 }]}>{index + 1}</Text>
+                  <Text style={[styles.cell, { width: 200, fontWeight: '700', color: Colors.light.primary }]}>{user.full_name}</Text>
+                  <Text style={[styles.cell, { width: 150 }]}>{user.role}</Text>
+                  <Text style={[styles.cell, { width: 150 }]}>{user.department}</Text>
+                  <Text style={[styles.cell, { width: 90, textAlign: 'center' }]}>{stats.total}</Text>
+                  <Text style={[styles.cell, { width: 90, textAlign: 'center', color: '#10b981', fontWeight: 'bold' }]}>{stats.completed}</Text>
+                  <Text style={[styles.cell, { width: 90, textAlign: 'center', color: '#f59e0b', fontWeight: 'bold' }]}>{stats.pending}</Text>
+                  <Text style={[styles.cell, { width: 100, textAlign: 'center', color: '#ef4444', fontWeight: 'bold' }]}>{stats.highPending}</Text>
+                  <Text style={[styles.cell, { width: 100, textAlign: 'center', color: '#ea580c' }]}>{stats.moderatePending}</Text>
+                  <Text style={[styles.cell, { width: 100, textAlign: 'center', color: '#3b82f6' }]}>{stats.lowPending}</Text>
+                  <Text style={[styles.cell, { width: 120, textAlign: 'center', color: '#ef4444', fontWeight: 'bold', backgroundColor: stats.todayDuePending > 0 ? '#fee2e2' : 'transparent', borderRadius: 4 }]}>
+                    {stats.todayDuePending}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const stats = getStatCounts();
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
-          <Text style={styles.title}>{adminUser.department} Tasks</Text>
-          <Text style={styles.subtitle}>Manage workload for your department</Text>
+          <Text style={styles.title}>{myDeptName} Task Management</Text>
+          <Text style={styles.subtitle}>Oversee tasks for your department</Text>
         </View>
-        <Pressable style={styles.createBtn} onPress={() => setShowCreateModal(true)}>
-          <Plus color="#FFF" size={20} />
-          <Text style={styles.createBtnText}>New Task</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Pressable style={styles.createBtn} onPress={() => setShowCreateModal(true)}>
+            <Plus color="#FFF" size={20} />
+            <Text style={styles.createBtnText}>New Task</Text>
+          </Pressable>
+        </View>
       </View>
 
+      {/* Quick Management Buttons & Toggle Toolbar */}
+      <View style={{ paddingHorizontal: isDesktop ? 32 : 16, paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+          <Pressable 
+            style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE' }}
+            onPress={() => setShowManageCatsModal(true)}
+          >
+            <Text style={{ fontWeight: '600', color: Colors.light.primary }}>Manage Categories</Text>
+          </Pressable>
+          <Pressable 
+            style={{ backgroundColor: '#F5F3FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#DDD6FE' }}
+            onPress={() => setShowManagePredefModal(true)}
+          >
+            <Text style={{ fontWeight: '600', color: '#7C3AED' }}>Manage Predefined Tasks</Text>
+          </Pressable>
+        </View>
+        
+        {/* Toggle Mode Selector */}
+        <View style={styles.userTypeToggle}>
+          <Pressable 
+            style={[styles.toggleBtn, viewMode === 'table' && styles.toggleBtnActive]} 
+            onPress={() => setViewMode('table')}
+          >
+            <Text style={[styles.toggleText, viewMode === 'table' && styles.toggleTextActive]}>All Tasks Table</Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.toggleBtn, viewMode === 'summary' && styles.toggleBtnActive]} 
+            onPress={() => setViewMode('summary')}
+          >
+            <Text style={[styles.toggleText, viewMode === 'summary' && styles.toggleTextActive]}>Assignee Summary</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Tabs */}
       <View style={[styles.tabsContainer, !isDesktop && styles.tabsContainerMobile]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[
             { id: 'all', label: 'All Department Tasks' },
             { id: 'my', label: 'My Tasks' },
             { id: 'co_admins', label: 'Co-Admin Tasks' },
-            { id: 'employees', label: 'Employee Tasks' }
+            { id: 'employees', label: 'Employee Tasks' },
+            { id: 'recurring', label: 'Recurring Schedules' }
           ].map(tab => (
             <Pressable key={tab.id} style={[styles.tab, activeTab === tab.id && styles.activeTab]} onPress={() => setActiveTab(tab.id as any)}>
               <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>{tab.label}</Text>
@@ -796,119 +1250,7 @@ export default function DepartmentTasksScreen() {
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: isDesktop ? 32 : 16 }}>
-          {/* Filters Section */}
-          <View style={[styles.filterSection, !isDesktop && styles.filterSectionMobile]}>
-            {/* Keyword Search */}
-            <View style={styles.filterItem}>
-              <Text style={styles.filterLabel}>Keyword Search</Text>
-              <View style={styles.searchContainer}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search task, assignee, details..."
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery ? (
-                  <Pressable
-                    style={styles.clearBtn}
-                    onPress={() => setSearchQuery('')}
-                  >
-                    <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-
-            {/* Date Filter Dropdown */}
-            <View style={styles.filterItem}>
-              <Text style={styles.filterLabel}>Due Date Filter</Text>
-              <View style={styles.dateSelectContainer}>
-                {Platform.OS === 'web' ? (
-                  <select
-                    style={styles.webSelect}
-                    value={dateFilter}
-                    onChange={(e) => {
-                      setDateFilter(e.target.value);
-                      if (e.target.value !== 'custom') {
-                        setCustomDateStr('');
-                      }
-                    }}
-                  >
-                    <option value="all">All Dates</option>
-                    <option value="today">Today</option>
-                    <option value="yesterday">Yesterday</option>
-                    <option value="this_week">This Week</option>
-                    <option value="custom">Custom Date...</option>
-                  </select>
-                ) : (
-                  <Picker
-                    selectedValue={dateFilter}
-                    onValueChange={(val: string) => {
-                      setDateFilter(val);
-                      if (val !== 'custom') {
-                        setCustomDateStr('');
-                      }
-                    }}
-                    style={{ height: 44, color: Colors.light.text }}
-                  >
-                    <Picker.Item label="All Dates" value="all" />
-                    <Picker.Item label="Today" value="today" />
-                    <Picker.Item label="Yesterday" value="yesterday" />
-                    <Picker.Item label="This Week" value="this_week" />
-                    <Picker.Item label="Custom Date..." value="custom" />
-                  </Picker>
-                )}
-              </View>
-
-              {dateFilter === 'custom' && (
-                <View style={{ zIndex: 10 }}>
-                  {Platform.OS === 'web' ? (
-                    <input
-                      type="date"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '10px',
-                        border: `1px solid ${Colors.light.border}`,
-                        backgroundColor: Colors.light.card,
-                        color: Colors.light.text,
-                        marginTop: 8,
-                        boxSizing: 'border-box'
-                      }}
-                      value={customDateStr}
-                      onChange={(e) => setCustomDateStr(e.target.value)}
-                    />
-                  ) : (
-                    <>
-                      <Pressable
-                        style={styles.customDateBtn}
-                        onPress={() => setShowFilterDatePicker(true)}
-                      >
-                        <Text style={{ color: customDateStr ? Colors.light.text : Colors.light.icon }}>
-                          {customDateStr || 'Pick specific date'}
-                        </Text>
-                      </Pressable>
-                      {showFilterDatePicker && (
-                        <DateTimePicker
-                          value={new Date()}
-                          mode="date"
-                          display="default"
-                          onChange={(event: any, date?: Date) => {
-                            setShowFilterDatePicker(false);
-                            if (date && event.type !== 'dismissed') {
-                              const formatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                              setCustomDateStr(formatted);
-                            }
-                          }}
-                        />
-                      )}
-                    </>
-                  )}
-                </View>
-              )}
-            </View>
-          </View>
-
+          
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
             <Pressable 
@@ -993,7 +1335,7 @@ export default function DepartmentTasksScreen() {
               style={[
                 styles.statCard, 
                 { borderLeftColor: '#0EA5E9' },
-                selectedStatFilter === 'Low' && { borderColor: '#0EA5E9', borderWidth: 2, backgroundColor: '#e0f2fe' }
+                selectedStatFilter === 'Low' && { borderColor: '#0EA5E9', borderWidth: 2, backgroundColor: '#f0f9ff' }
               ]}
               onPress={() => handleStatCardPress('Low')}
             >
@@ -1003,153 +1345,583 @@ export default function DepartmentTasksScreen() {
             </Pressable>
           </View>
 
-          {getFilteredTasks().length === 0 ? (
-            <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 40 }}>No tasks found.</Text>
+          {/* Unified Filters Section */}
+          <View style={[styles.filterSection, !isDesktop && styles.filterSectionMobile]}>
+            {/* Keyword Search */}
+            <View style={styles.filterItem}>
+              <Text style={styles.filterLabel}>Search Query</Text>
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search title, assignee, etc..."
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery ? (
+                  <Pressable
+                    style={styles.clearBtn}
+                    onPress={() => setSearchQuery('')}
+                  >
+                    <Text style={{ color: Colors.light.icon, fontSize: 16 }}>✕</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Category Filter */}
+            <View style={styles.filterItem}>
+              <Text style={styles.filterLabel}>Category Filter</Text>
+              <View style={styles.dateSelectContainer}>
+                {Platform.OS === 'web' ? (
+                  <select
+                    style={styles.webSelect}
+                    value={selectedCategoryFilter}
+                    onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Picker
+                    selectedValue={selectedCategoryFilter}
+                    onValueChange={(val: string) => setSelectedCategoryFilter(val)}
+                    style={{ height: 44, color: Colors.light.text }}
+                  >
+                    <Picker.Item label="All Categories" value="all" />
+                    {categories.map(cat => (
+                      <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
+                    ))}
+                  </Picker>
+                )}
+              </View>
+            </View>
+
+            {/* Conditional Filter: Date Filter (for Normal Tasks) OR Frequency Filter (for Recurring Tasks) */}
+            {activeTab !== 'recurring' ? (
+              <View style={styles.filterItem}>
+                <Text style={styles.filterLabel}>Due Date Filter</Text>
+                <View style={styles.dateSelectContainer}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={styles.webSelect}
+                      value={dateFilter}
+                      onChange={(e) => {
+                        setDateFilter(e.target.value);
+                        if (e.target.value !== 'custom') {
+                          setCustomDateStr('');
+                        }
+                      }}
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="tomorrow">Tomorrow</option>
+                      <option value="this_week">This Week</option>
+                      <option value="overdue">Overdue Tasks</option>
+                      <option value="custom">Custom Date...</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={dateFilter}
+                      onValueChange={(val: string) => {
+                        setDateFilter(val);
+                        if (val !== 'custom') {
+                          setCustomDateStr('');
+                        }
+                      }}
+                      style={{ height: 44, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="All Dates" value="all" />
+                      <Picker.Item label="Today" value="today" />
+                      <Picker.Item label="Tomorrow" value="tomorrow" />
+                      <Picker.Item label="This Week" value="this_week" />
+                      <Picker.Item label="Overdue Tasks" value="overdue" />
+                      <Picker.Item label="Custom Date..." value="custom" />
+                    </Picker>
+                  )}
+                </View>
+                {/* Custom Date Pickers */}
+                {dateFilter === 'custom' && (
+                  <View style={{ zIndex: 10 }}>
+                    {Platform.OS === 'web' ? (
+                      <input
+                        type="date"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '10px',
+                          border: `1px solid ${Colors.light.border}`,
+                          backgroundColor: Colors.light.card,
+                          color: Colors.light.text,
+                          marginTop: 8,
+                          boxSizing: 'border-box'
+                        }}
+                        value={customDateStr}
+                        onChange={(e) => setCustomDateStr(e.target.value)}
+                      />
+                    ) : (
+                      <>
+                        <Pressable
+                          style={styles.customDateBtn}
+                          onPress={() => setShowFilterDatePicker(true)}
+                        >
+                          <Text style={{ color: customDateStr ? Colors.light.text : Colors.light.icon }}>
+                            {customDateStr || 'Pick specific date'}
+                          </Text>
+                        </Pressable>
+                        {showFilterDatePicker && (
+                          <DateTimePicker
+                            value={new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={(event: any, date?: Date) => {
+                              setShowFilterDatePicker(false);
+                              if (date && event.type !== 'dismissed') {
+                                const formatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                setCustomDateStr(formatted);
+                              }
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.filterItem}>
+                <Text style={styles.filterLabel}>Frequency Filter</Text>
+                <View style={styles.dateSelectContainer}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={styles.webSelect}
+                      value={recurringFrequencyFilter}
+                      onChange={(e) => setRecurringFrequencyFilter(e.target.value)}
+                    >
+                      <option value="all">All Frequencies</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={recurringFrequencyFilter}
+                      onValueChange={(val: string) => setRecurringFrequencyFilter(val)}
+                      style={{ height: 44, color: Colors.light.text }}
+                    >
+                      <Picker.Item label="All Frequencies" value="all" />
+                      <Picker.Item label="Daily" value="daily" />
+                      <Picker.Item label="Weekly" value="weekly" />
+                      <Picker.Item label="Monthly" value="monthly" />
+                    </Picker>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Table / Summary Listing */}
+          {viewMode === 'summary' ? (
+            renderUserSummary()
           ) : (
-            getFilteredTasks().map(renderTaskCard)
+            activeTab === 'recurring' 
+              ? renderTasksTable(getFilteredRecurringTasks(), true) 
+              : renderTasksTable(getFilteredTasks(), false)
           )}
         </ScrollView>
       )}
+
+      {/* Category Management Modal */}
+      <Modal visible={showManageCatsModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: 400 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Manage Categories</Text>
+              <Pressable onPress={() => setShowManageCatsModal(false)}>
+                <Text style={{ fontSize: 20, color: Colors.light.icon }}>✕</Text>
+              </Pressable>
+            </View>
+            
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              <TextInput 
+                style={[styles.input, { flex: 1, marginBottom: 0 }]} 
+                placeholder="New Category Name" 
+                value={newCatName} 
+                onChangeText={setNewCatName} 
+              />
+              <Pressable style={[styles.saveBtn, { paddingHorizontal: 16, borderRadius: 8 }]} onPress={handleAddCategory}>
+                <Text style={styles.saveBtnText}>Add</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 250 }}>
+              {categories.map(cat => (
+                <View key={cat.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                  <Text style={{ fontSize: 15, color: Colors.light.text }}>{cat.name}</Text>
+                  <Pressable onPress={() => handleDeleteCategory(cat.id)}>
+                    <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 13 }}>Delete</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 16 }]}>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowManageCatsModal(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Predefined Tasks Management Modal */}
+      <Modal visible={showManagePredefModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: 500, maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Predefined Tasks</Text>
+              <Pressable onPress={() => setShowManagePredefModal(false)}>
+                <Text style={{ fontSize: 20, color: Colors.light.icon }}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontWeight: '700', fontSize: 14, color: '#334155', marginBottom: 12 }}>Add New Predefined Task</Text>
+                
+                <Text style={styles.label}>Title</Text>
+                <TextInput style={styles.input} placeholder="Task Title" value={predefTitle} onChangeText={setPredefTitle} />
+                
+                <Text style={styles.label}>Description</Text>
+                <TextInput style={[styles.input, { height: 60 }]} multiline placeholder="Task details..." value={predefDesc} onChangeText={setPredefDesc} />
+                
+                <Text style={styles.label}>Category</Text>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#fff', marginBottom: 12 }}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent' }}
+                      value={predefCategory}
+                      onChange={(e) => setPredefCategory(e.target.value)}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={predefCategory}
+                      onValueChange={(val) => setPredefCategory(val)}
+                    >
+                      {categories.map(cat => (
+                        <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
+                      ))}
+                    </Picker>
+                  )}
+                </View>
+
+                <Text style={styles.label}>Priority</Text>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#fff', marginBottom: 16 }}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent' }}
+                      value={predefPriority}
+                      onChange={(e) => setPredefPriority(e.target.value)}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Moderate">Moderate</option>
+                      <option value="High">High</option>
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={predefPriority}
+                      onValueChange={(val) => setPredefPriority(val)}
+                    >
+                      <Picker.Item label="Low" value="Low" />
+                      <Picker.Item label="Moderate" value="Moderate" />
+                      <Picker.Item label="High" value="High" />
+                    </Picker>
+                  )}
+                </View>
+
+                <Pressable style={styles.saveBtn} onPress={handleAddPredefTask}>
+                  <Text style={styles.saveBtnText}>Save Predefined Task</Text>
+                </Pressable>
+              </View>
+
+              <Text style={{ fontWeight: '700', fontSize: 14, color: '#334155', marginBottom: 8 }}>Existing Predefined Tasks</Text>
+              {predefinedTasks.map(task => (
+                <View key={task.id} style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text }}>{task.title}</Text>
+                    <Pressable onPress={() => handleDeletePredefTask(task.id)}>
+                      <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 13 }}>Delete</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>{task.description}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                    <View style={{ backgroundColor: '#eff6ff', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#1d4ed8', fontWeight: '600' }}>{task.category}</Text>
+                    </View>
+                    <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#d97706', fontWeight: '600' }}>{task.priority}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 16 }]}>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowManagePredefModal(false)}>
+                <Text style={styles.cancelBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* User Detailed Summary Modal */}
+      <Modal visible={!!selectedUserSummary} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: '90%', maxWidth: 1100, maxHeight: '90%' }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View>
+                <Text style={[styles.modalTitle, { marginBottom: 4 }]}>{selectedUserSummary?.full_name}'s Tasks</Text>
+                <Text style={{ color: Colors.light.icon, fontWeight: '600' }}>{selectedUserSummary?.role} &bull; {selectedUserSummary?.department}</Text>
+              </View>
+              <Pressable style={styles.cancelBtn} onPress={() => setSelectedUserSummary(null)}>
+                <Text style={styles.cancelBtnText}>✕ Close</Text>
+              </Pressable>
+            </View>
+
+            {/* Modal Tabs */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 8 }}>
+              <Pressable 
+                style={[styles.tab, selectedUserTab === 'normal' && styles.activeTab]}
+                onPress={() => setSelectedUserTab('normal')}
+              >
+                <Text style={[styles.tabText, selectedUserTab === 'normal' && styles.activeTabText]}>Assigned Tasks</Text>
+              </Pressable>
+              <Pressable 
+                style={[styles.tab, selectedUserTab === 'recurring' && styles.activeTab]}
+                onPress={() => setSelectedUserTab('recurring')}
+              >
+                <Text style={[styles.tabText, selectedUserTab === 'recurring' && styles.activeTabText]}>Recurring Schedules</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ flex: 1 }}>
+              {(() => {
+                if (!selectedUserSummary) return null;
+                const userStats = getUserTaskStats(selectedUserSummary);
+                if (selectedUserTab === 'normal') {
+                  const sortedTasks = [...userStats.userTasks].sort((a, b) => new Date(b.created_at || b.created_date || 0).getTime() - new Date(a.created_at || a.created_date || 0).getTime());
+                  return renderTasksTable(sortedTasks, false);
+                } else {
+                  return renderTasksTable(userStats.userRecurring, true);
+                }
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Create Task Modal */}
       <Modal visible={showCreateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
-            <Text style={styles.modalTitle}>Assign New Task</Text>
+            <Text style={styles.modalTitle}>Create New Task</Text>
             
             <ScrollView style={{ maxHeight: isDesktop ? 600 : 500 }} showsVerticalScrollIndicator={false}>
               <View style={{ paddingBottom: 8 }}>
+                {/* Predefined Loader Dropdown */}
+                {predefinedTasks.length > 0 && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.label}>Load Predefined Task</Text>
+                    <View style={{ borderWidth: 1, borderColor: '#DDD6FE', borderRadius: 8, backgroundColor: '#F5F3FF' }}>
+                      {Platform.OS === 'web' ? (
+                        <select
+                          style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', color: '#7C3AED', fontWeight: '600' }}
+                          value=""
+                          onChange={(e) => {
+                            const selected = predefinedTasks.find(t => String(t.id) === e.target.value);
+                            if (selected) handleLoadPredefTask(selected);
+                          }}
+                        >
+                          <option value="">-- Load Predefined Template --</option>
+                          {predefinedTasks.map(t => (
+                            <option key={t.id} value={t.id}>{t.title} ({t.category})</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Picker
+                          selectedValue=""
+                          onValueChange={(val) => {
+                            const selected = predefinedTasks.find(t => String(t.id) === val);
+                            if (selected) handleLoadPredefTask(selected);
+                          }}
+                        >
+                          <Picker.Item label="-- Load Predefined Template --" value="" />
+                          {predefinedTasks.map(t => (
+                            <Picker.Item key={t.id} label={`${t.title} (${t.category})`} value={t.id} />
+                          ))}
+                        </Picker>
+                      )}
+                    </View>
+                  </View>
+                )}
+
                 <Text style={styles.label}>Title</Text>
                 <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Task Title" />
                 
                 <Text style={styles.label}>Description</Text>
                 <TextInput style={[styles.input, { height: 50 }]} multiline value={description} onChangeText={setDescription} placeholder="Task Details..." />
 
-                <Text style={styles.label}>Task Mode</Text>
-                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                  <Pressable style={[styles.radioBtn, !isGroupTask && styles.radioActive]} onPress={() => { setIsGroupTask(false); setGroupAssigneeIds([]); }}>
-                    <Text style={{ color: !isGroupTask ? '#FFF' : Colors.light.text }}>Single Assignee</Text>
-                  </Pressable>
-                  <Pressable style={[styles.radioBtn, isGroupTask && styles.radioActive]} onPress={() => { setIsGroupTask(true); setAssigneeId(''); }}>
-                    <Text style={{ color: isGroupTask ? '#FFF' : Colors.light.text }}>Group Task</Text>
-                  </Pressable>
+                <Text style={styles.label}>Task Category</Text>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#fff', marginBottom: 12 }}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent' }}
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={selectedCategory}
+                      onValueChange={(val) => setSelectedCategory(val)}
+                    >
+                      {categories.map(cat => (
+                        <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
+                      ))}
+                    </Picker>
+                  )}
                 </View>
 
-                <Text style={styles.label}>Assignee Type</Text>
-                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                  {[
-                    { value: 'employee', label: 'Employee' },
-                    { value: 'department_admin', label: 'Co-Admin' },
-                    { value: 'self', label: 'Self' }
-                  ].map(opt => (
-                    <Pressable key={opt.value} style={[styles.radioBtn, assigneeType === opt.value && styles.radioActive]} onPress={() => { setAssigneeType(opt.value); setAssigneeId(''); setGroupAssigneeIds([]); }}>
-                      <Text style={{ color: assigneeType === opt.value ? '#FFF' : Colors.light.text }}>{opt.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+            <Text style={styles.label}>Task Mode</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+              <Pressable style={[styles.radioBtn, !isGroupTask && styles.radioActive]} onPress={() => { setIsGroupTask(false); setGroupAssigneeIds([]); }}>
+                <Text style={{ color: !isGroupTask ? '#FFF' : Colors.light.text }}>Single Assignee</Text>
+              </Pressable>
+              <Pressable style={[styles.radioBtn, isGroupTask && styles.radioActive]} onPress={() => { setIsGroupTask(true); setAssigneeId(''); }}>
+                <Text style={{ color: isGroupTask ? '#FFF' : Colors.light.text }}>Group Task</Text>
+              </Pressable>
+            </View>
 
-                {assigneeType !== 'self' && (
-                  <>
-                    <Text style={styles.label}>Select Department (Optional)</Text>
-                    <View style={{ position: 'relative', zIndex: 99999, marginBottom: 12 }}>
-                      <Pressable 
-                        style={{ 
-                          borderWidth: 1, 
-                          borderColor: Colors.light.border, 
-                          borderRadius: 8, 
-                          backgroundColor: Colors.light.background,
-                          padding: 12,
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                        onPress={() => setDeptDropdownOpen(!deptDropdownOpen)}
-                      >
-                        <Text style={{ fontSize: 15, color: selectedDeptId ? Colors.light.text : Colors.light.icon }}>
-                          {selectedDeptId 
-                            ? (depts.find(d => String(d.id) === String(selectedDeptId))?.name || '-- All Departments --')
-                            : '-- All Departments --'}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
-                      </Pressable>
+            <Text style={styles.label}>Assigned To Type</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
+              {['employee', 'department_admin', 'self'].map(type => (
+                <Pressable key={type} style={[styles.radioBtn, assigneeType === type && styles.radioActive]} onPress={() => { setAssigneeType(type); setAssigneeId(''); setSelectedDeptId(''); setGroupAssigneeIds([]); }}>
+                  <Text style={{ color: assigneeType === type ? '#FFF' : Colors.light.text }}>{type.replace('_', ' ')}</Text>
+                </Pressable>
+              ))}
+            </View>
 
-                      {deptDropdownOpen && (
-                        <View style={{
-                          position: 'absolute',
-                          top: 50,
-                          left: 0,
-                          right: 0,
-                          backgroundColor: '#FFF',
-                          borderWidth: 1,
-                          borderColor: Colors.light.border,
-                          borderRadius: 8,
-                          maxHeight: 250,
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.1,
-                          shadowRadius: 4,
-                          elevation: 4,
-                          padding: 8,
-                          zIndex: 100000
-                        }}>
-                          <TextInput
-                            style={{ 
-                              borderWidth: 1, 
-                              borderColor: Colors.light.border, 
-                              borderRadius: 6, 
-                              padding: 8, 
-                              fontSize: 14,
-                              marginBottom: 8,
-                              backgroundColor: '#f8fafc'
-                            }}
-                            placeholder="Search department..."
-                            value={deptSearchQuery}
-                            onChangeText={setDeptSearchQuery}
-                            autoFocus
-                          />
-                          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+            {assigneeType !== 'self' && (
+              <>
+                <Text style={styles.label}>{isGroupTask ? 'Select Group Members' : 'Select Assigned To User'}</Text>
+                {isGroupTask ? (
+                  <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 8, backgroundColor: '#f8fafc', marginBottom: 8 }}>
+                    <TextInput
+                      style={{ 
+                        borderWidth: 1, 
+                        borderColor: Colors.light.border, 
+                        borderRadius: 6, 
+                        padding: 8, 
+                        fontSize: 14,
+                        marginBottom: 8,
+                        backgroundColor: '#fff'
+                      }}
+                      placeholder="Search users..."
+                      value={assigneeSearchQuery}
+                      onChangeText={setAssigneeSearchQuery}
+                    />
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                      {(() => {
+                        const list = globalUsers
+                          .filter(u => u.type === assigneeType && u.department === myDeptName)
+                          .filter(u => {
+                            const q = assigneeSearchQuery.toLowerCase();
+                            return !assigneeSearchQuery || 
+                                   u.full_name?.toLowerCase().includes(q) || 
+                                   u.role?.toLowerCase().includes(q);
+                          });
+                        if (list.length === 0) return <Text style={{ color: Colors.light.icon, textAlign: 'center', padding: 12 }}>No members found.</Text>;
+                        return list.map(u => {
+                          const isSelected = groupAssigneeIds.includes(String(u.id));
+                          return (
                             <Pressable 
-                              style={{ padding: 10, borderRadius: 6 }}
+                              key={u.id}
+                              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 0.5, borderBottomColor: '#cbd5e1', backgroundColor: isSelected ? '#e0e7ff' : 'transparent', borderRadius: 6, marginBottom: 4 }}
                               onPress={() => {
-                                setSelectedDeptId('');
-                                setDeptDropdownOpen(false);
-                                setDeptSearchQuery('');
-                                setAssigneeId('');
-                                setGroupAssigneeIds([]);
+                                if (isSelected) {
+                                  setGroupAssigneeIds(groupAssigneeIds.filter(id => id !== String(u.id)));
+                                } else {
+                                  setGroupAssigneeIds([...groupAssigneeIds, String(u.id)]);
+                                }
                               }}
                             >
-                              <Text style={{ fontSize: 14, color: Colors.light.text, fontWeight: 'bold' }}>-- All Departments --</Text>
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={{ fontWeight: '600', color: Colors.light.text }}>{u.full_name}</Text>
+                                <Text style={{ fontSize: 11, color: '#64748b' }}>{u.department} - {u.role}</Text>
+                              </View>
+                              <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#4338ca', justifyContent: 'center', alignItems: 'center', backgroundColor: isSelected ? '#4338ca' : 'transparent' }}>
+                                {isSelected && <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                              </View>
                             </Pressable>
-                            {depts.filter(d => 
-                              !deptSearchQuery || d.name?.toLowerCase().includes(deptSearchQuery.toLowerCase())
-                            ).map(d => (
-                              <Pressable 
-                                key={d.id}
-                                style={{ 
-                                  padding: 10, 
-                                  borderRadius: 6, 
-                                  backgroundColor: String(selectedDeptId) === String(d.id) ? '#f1f5f9' : 'transparent',
-                                  marginTop: 2
-                                }}
-                                onPress={() => {
-                                  setSelectedDeptId(String(d.id));
-                                  setDeptDropdownOpen(false);
-                                  setDeptSearchQuery('');
-                                  setAssigneeId('');
-                                  setGroupAssigneeIds([]);
-                                }}
-                              >
-                                <Text style={{ fontSize: 14, color: Colors.light.text }}>{d.name}</Text>
-                              </Pressable>
-                            ))}
-                          </ScrollView>
-                        </View>
-                      )}
-                    </View>
+                          );
+                        });
+                      })()}
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <View style={{ position: 'relative', zIndex: 9998, marginBottom: 8 }}>
+                    <Pressable 
+                      style={{ 
+                        borderWidth: 1, 
+                        borderColor: Colors.light.border, 
+                        borderRadius: 8, 
+                        backgroundColor: Colors.light.background,
+                        padding: 12,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                      onPress={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+                    >
+                      <Text style={{ fontSize: 15, color: assigneeId ? Colors.light.text : Colors.light.icon }}>
+                        {assigneeId 
+                          ? (() => {
+                              const found = globalUsers.find(u => String(u.id) === String(assigneeId));
+                              return found ? `${found.full_name} (${found.email || found.role || found.department || ''})` : '-- Choose User --';
+                            })()
+                          : '-- Choose User --'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
+                    </Pressable>
 
-                    <Text style={styles.label}>{isGroupTask ? 'Select Group Members' : 'Select Assignee'}</Text>
-                    {isGroupTask ? (
-                      <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, padding: 8, backgroundColor: '#f8fafc', marginBottom: 16 }}>
+                    {assigneeDropdownOpen && (
+                      <View style={{
+                        position: 'absolute',
+                        top: 50,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: '#FFF',
+                        borderWidth: 1,
+                        borderColor: Colors.light.border,
+                        borderRadius: 8,
+                        maxHeight: 250,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 4,
+                        elevation: 4,
+                        padding: 8,
+                        zIndex: 10000
+                      }}>
                         <TextInput
                           style={{ 
                             borderWidth: 1, 
@@ -1158,168 +1930,63 @@ export default function DepartmentTasksScreen() {
                             padding: 8, 
                             fontSize: 14,
                             marginBottom: 8,
-                            backgroundColor: '#fff'
+                            backgroundColor: '#f8fafc'
                           }}
-                          placeholder="Search group members..."
+                          placeholder="Search user..."
                           value={assigneeSearchQuery}
                           onChangeText={setAssigneeSearchQuery}
+                          autoFocus
                         />
                         <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+                          <Pressable 
+                            style={{ padding: 10, borderRadius: 6 }}
+                            onPress={() => {
+                              setAssigneeId('');
+                              setAssigneeDropdownOpen(false);
+                              setAssigneeSearchQuery('');
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, color: Colors.light.text }}>-- Choose User --</Text>
+                          </Pressable>
                           {(() => {
                             const list = globalUsers
-                              .filter(u => u.type === assigneeType)
+                              .filter(u => u.type === assigneeType && u.department === myDeptName)
                               .filter(u => {
-                                if (!selectedDeptId) return true;
-                                const d = depts.find(dept => String(dept.id) === String(selectedDeptId));
-                                return d && u.department === d.name;
-                              })
-                              .filter(u => 
-                                !assigneeSearchQuery || 
-                                u.full_name?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
-                                u.department?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
-                                u.role?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())
-                              );
-                            if (list.length === 0) return <Text style={{ color: Colors.light.icon, textAlign: 'center', padding: 12 }}>No assignees found.</Text>;
-                            return list.map(u => {
-                              const isSelected = groupAssigneeIds.includes(String(u.id));
-                              return (
-                                <Pressable 
-                                  key={u.id}
-                                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 0.5, borderBottomColor: '#cbd5e1', backgroundColor: isSelected ? '#e0e7ff' : 'transparent', borderRadius: 6, marginBottom: 4 }}
-                                  onPress={() => {
-                                    if (isSelected) {
-                                      setGroupAssigneeIds(groupAssigneeIds.filter(id => id !== String(u.id)));
-                                    } else {
-                                      setGroupAssigneeIds([...groupAssigneeIds, String(u.id)]);
-                                    }
-                                  }}
-                                >
-                                  <View style={{ flex: 1, paddingRight: 8 }}>
-                                    <Text style={{ fontWeight: '600', color: Colors.light.text }}>{u.full_name}</Text>
-                                    <Text style={{ fontSize: 11, color: '#64748b' }}>{u.department} - {u.role}</Text>
-                                  </View>
-                                  <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#4338ca', justifyContent: 'center', alignItems: 'center', backgroundColor: isSelected ? '#4338ca' : 'transparent' }}>
-                                    {isSelected && <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
-                                  </View>
-                                </Pressable>
-                              );
-                            });
-                          })()}
-                        </ScrollView>
-                      </View>
-                    ) : (
-                      <View style={{ position: 'relative', zIndex: 9998, marginBottom: 16 }}>
-                        <Pressable 
-                          style={{ 
-                            borderWidth: 1, 
-                            borderColor: Colors.light.border, 
-                            borderRadius: 8, 
-                            backgroundColor: Colors.light.background,
-                            padding: 12,
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}
-                          onPress={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
-                        >
-                          <Text style={{ fontSize: 15, color: assigneeId ? Colors.light.text : Colors.light.icon }}>
-                            {assigneeId 
-                              ? (globalUsers.find(u => String(u.id) === String(assigneeId))
-                                  ? `${globalUsers.find(u => String(u.id) === String(assigneeId)).full_name} - ${globalUsers.find(u => String(u.id) === String(assigneeId)).department} (${globalUsers.find(u => String(u.id) === String(assigneeId)).role})`
-                                  : '-- Choose Assignee --')
-                              : '-- Choose Assignee --'}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
-                        </Pressable>
-
-                        {assigneeDropdownOpen && (
-                          <View style={{
-                            position: 'absolute',
-                            top: 50,
-                            left: 0,
-                            right: 0,
-                            backgroundColor: '#FFF',
-                            borderWidth: 1,
-                            borderColor: Colors.light.border,
-                            borderRadius: 8,
-                            maxHeight: 250,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 4,
-                            elevation: 4,
-                            padding: 8,
-                            zIndex: 10000
-                          }}>
-                            <TextInput
-                              style={{ 
-                                borderWidth: 1, 
-                                borderColor: Colors.light.border, 
-                                borderRadius: 6, 
-                                padding: 8, 
-                                fontSize: 14,
-                                marginBottom: 8,
-                                backgroundColor: '#f8fafc'
-                              }}
-                              placeholder="Search employee..."
-                              value={assigneeSearchQuery}
-                              onChangeText={setAssigneeSearchQuery}
-                              autoFocus
-                            />
-                            <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+                                const q = assigneeSearchQuery.toLowerCase();
+                                return !assigneeSearchQuery || 
+                                       u.full_name?.toLowerCase().includes(q) || 
+                                       u.role?.toLowerCase().includes(q);
+                              });
+                            return list.map(u => (
                               <Pressable 
-                                style={{ padding: 10, borderRadius: 6 }}
+                                key={u.id}
+                                style={{ 
+                                  padding: 10, 
+                                  borderRadius: 6, 
+                                  backgroundColor: String(assigneeId) === String(u.id) ? '#f1f5f9' : 'transparent',
+                                  marginTop: 2
+                                }}
                                 onPress={() => {
-                                  setAssigneeId('');
+                                  setAssigneeId(String(u.id));
                                   setAssigneeDropdownOpen(false);
                                   setAssigneeSearchQuery('');
                                 }}
                               >
-                                <Text style={{ fontSize: 14, color: Colors.light.text }}>-- Choose Assignee --</Text>
+                                <Text style={{ fontSize: 14, color: Colors.light.text }}>
+                                  {u.full_name} - {u.role || u.email || ''}
+                                </Text>
                               </Pressable>
-                              {(() => {
-                                const list = globalUsers
-                                  .filter(u => u.type === assigneeType)
-                                  .filter(u => {
-                                    if (!selectedDeptId) return true;
-                                    const d = depts.find(dept => String(dept.id) === String(selectedDeptId));
-                                    return d && u.department === d.name;
-                                  })
-                                  .filter(u => 
-                                    u.full_name?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
-                                    u.department?.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
-                                    u.role?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())
-                                  );
-                                return list.map(u => (
-                                  <Pressable 
-                                    key={u.id}
-                                    style={{ 
-                                      padding: 10, 
-                                      borderRadius: 6, 
-                                      backgroundColor: String(assigneeId) === String(u.id) ? '#f1f5f9' : 'transparent',
-                                      marginTop: 2
-                                    }}
-                                    onPress={() => {
-                                      setAssigneeId(String(u.id));
-                                      setAssigneeDropdownOpen(false);
-                                      setAssigneeSearchQuery('');
-                                    }}
-                                  >
-                                    <Text style={{ fontSize: 14, color: Colors.light.text }}>
-                                      {u.full_name} - {u.department} ({u.role})
-                                    </Text>
-                                  </Pressable>
-                                ));
-                              })()}
-                            </ScrollView>
-                          </View>
-                        )}
+                            ));
+                          })()}
+                        </ScrollView>
                       </View>
                     )}
-                  </>
+                  </View>
                 )}
+              </>
+            )}
 
-                
+            
             <Text style={styles.label}>Schedule Type</Text>
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
               <Pressable style={[styles.radioBtn, !isRecurring && styles.radioActive]} onPress={() => setIsRecurring(false)}>
@@ -1414,80 +2081,80 @@ export default function DepartmentTasksScreen() {
             )}
 
             <Text style={styles.label}>Priority</Text>
-                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
-                  {Platform.OS === 'web' ? (
-                    <select 
-                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
-                      value={priority}
-                      onChange={(e) => setPriority(e.target.value)}
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Moderate">Moderate</option>
-                      <option value="High">High</option>
-                    </select>
-                  ) : (
-                    <Picker
-                      selectedValue={priority}
-                      onValueChange={(val) => setPriority(val)}
-                      style={{ width: '100%', height: 50 }}
-                    >
-                      <Picker.Item label="Low" value="Low" />
-                      <Picker.Item label="Moderate" value="Moderate" />
-                      <Picker.Item label="High" value="High" />
-                    </Picker>
-                  )}
-                </View>
+            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 8 }}>
+              {Platform.OS === 'web' ? (
+                <select 
+                  style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent', boxSizing: 'border-box' }}
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="High">High</option>
+                </select>
+              ) : (
+                <Picker
+                  selectedValue={priority}
+                  onValueChange={(val: string) => setPriority(val)}
+                  style={{ height: 50, color: Colors.light.text }}
+                >
+                  <Picker.Item label="Low" value="Low" />
+                  <Picker.Item label="Moderate" value="Moderate" />
+                  <Picker.Item label="High" value="High" />
+                </Picker>
+              )}
+            </View>
 
-                {!isRecurring && (
+            {!isRecurring && (
               <>
                 <Text style={styles.label}>Due Date & Time</Text>
-                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: Colors.light.background }}>
-                  {Platform.OS === 'web' ? (
-                    <input 
-                      type="datetime-local"
-                      style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', color: Colors.light.text, fontFamily: 'inherit', fontSize: '15px', boxSizing: 'border-box' }}
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
+            <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: Colors.light.background }}>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="datetime-local"
+                  style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', color: Colors.light.text, fontFamily: 'inherit', fontSize: '15px', boxSizing: 'border-box' }}
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+              ) : (
+                <>
+                  <Pressable onPress={() => { setTempDate(new Date()); setShowDatePicker(true); }} style={{ padding: 14 }}>
+                    <Text style={{ fontSize: 15, color: dueDate ? Colors.light.text : Colors.light.icon }}>
+                      {dueDate || 'Select Date and Time'}
+                    </Text>
+                  </Pressable>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={tempDate}
+                      mode="date"
+                      display="default"
+                      onChange={(event: any, date?: Date) => {
+                        setShowDatePicker(false);
+                        if (date && event.type !== 'dismissed') {
+                          setTempDate(date);
+                          setShowTimePicker(true);
+                        }
+                      }}
                     />
-                  ) : (
-                    <>
-                      <Pressable onPress={() => { setTempDate(new Date()); setShowDatePicker(true); }} style={{ padding: 14 }}>
-                        <Text style={{ fontSize: 15, color: dueDate ? Colors.light.text : Colors.light.icon }}>
-                          {dueDate || 'Select Date and Time'}
-                        </Text>
-                      </Pressable>
-                      {showDatePicker && (
-                        <DateTimePicker
-                          value={tempDate}
-                          mode="date"
-                          display="default"
-                          onChange={(event: any, date?: Date) => {
-                            setShowDatePicker(false);
-                            if (date && event.type !== 'dismissed') {
-                              setTempDate(date);
-                              setShowTimePicker(true);
-                            }
-                          }}
-                        />
-                      )}
-                      {showTimePicker && (
-                        <DateTimePicker
-                          value={tempDate}
-                          mode="time"
-                          display="default"
-                          onChange={(event: any, date?: Date) => {
-                            setShowTimePicker(false);
-                            if (date && event.type !== 'dismissed') {
-                              setTempDate(date);
-                              const formattedStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                              setDueDate(formattedStr);
-                            }
-                          }}
-                        />
-                      )}
-                    </>
                   )}
-                </View>
+                  {showTimePicker && (
+                    <DateTimePicker
+                      value={tempDate}
+                      mode="time"
+                      display="default"
+                      onChange={(event: any, date?: Date) => {
+                        setShowTimePicker(false);
+                        if (date && event.type !== 'dismissed') {
+                          setTempDate(date);
+                          const formattedStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                          setDueDate(formattedStr);
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </View>
               </>
             )}
               </View>
@@ -1505,7 +2172,7 @@ export default function DepartmentTasksScreen() {
         </View>
       </Modal>
 
-      {/* Status Modal (Shared from Admin) */}
+      {/* Status Modal */}
       <Modal visible={showStatusModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
@@ -1514,10 +2181,7 @@ export default function DepartmentTasksScreen() {
             <Text style={styles.label}>Notes</Text>
             <TextInput style={[styles.input, { height: 80 }]} multiline value={statusNotes} onChangeText={setStatusNotes} placeholder="Add progress notes..." />
 
-
-
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-
               {(() => {
                 const isAssigneeOfTask = selectedTask && (
                   (!selectedTask.is_group_task && selectedTask.assignee_type === 'department_admin' && String(selectedTask.assignee_id) === String(adminUser.id)) ||
@@ -1578,8 +2242,8 @@ export default function DepartmentTasksScreen() {
                   onChange={(e) => setAssigneeId(e.target.value)}
                 >
                   <option value="">-- Choose New Assignee --</option>
-                  {globalUsers.map((u: any) => (
-                    <option key={u.id} value={u.id}>{u.full_name} - {u.department} ({u.role})</option>
+                  {globalUsers.filter(u => u.department === myDeptName).map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.full_name} - {u.role}</option>
                   ))}
                 </select>
               ) : (
@@ -1589,8 +2253,8 @@ export default function DepartmentTasksScreen() {
                   style={{ width: '100%', height: 50 }}
                 >
                   <Picker.Item label="-- Choose New Assignee --" value="" />
-                  {globalUsers.map((u: any) => (
-                    <Picker.Item key={u.id} label={`${u.full_name} - ${u.department} (${u.role})`} value={u.id} />
+                  {globalUsers.filter(u => u.department === myDeptName).map((u: any) => (
+                    <Picker.Item key={u.id} label={`${u.full_name} - ${u.role}`} value={u.id} />
                   ))}
                 </Picker>
               )}
@@ -1608,7 +2272,7 @@ export default function DepartmentTasksScreen() {
         </View>
       </Modal>
 
-          {/* Direct Rejection Reason Modal */}
+      {/* Direct Rejection Reason Modal */}
       {directRejectTask && (
         <Modal visible={showDirectRejectModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -1653,6 +2317,30 @@ export default function DepartmentTasksScreen() {
                 
                 <Text style={styles.label}>Description</Text>
                 <TextInput style={[styles.input, { height: 70 }]} multiline value={editDescription} onChangeText={setEditDescription} placeholder="Task Details..." />
+
+                <Text style={styles.label}>Category</Text>
+                <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, backgroundColor: '#fff', marginBottom: 12 }}>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', backgroundColor: 'transparent' }}
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Picker
+                      selectedValue={editCategory}
+                      onValueChange={(val) => setEditCategory(val)}
+                    >
+                      {categories.map(cat => (
+                        <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
+                      ))}
+                    </Picker>
+                  )}
+                </View>
 
                 {editIsRecurring ? (
                   <>
@@ -1715,7 +2403,7 @@ export default function DepartmentTasksScreen() {
                           style={styles.input} 
                           keyboardType="numeric" 
                           value={editDueTimeDays} 
-                          onChangeText={setEditDueTimeDays} 
+                          onChangeText={setDueTimeDays} 
                         />
                       </View>
                     )}
@@ -1727,7 +2415,7 @@ export default function DepartmentTasksScreen() {
                           style={styles.input} 
                           keyboardType="numeric" 
                           value={editDueTimeHours} 
-                          onChangeText={setEditDueTimeHours} 
+                          onChangeText={setDueTimeHours} 
                         />
                       </View>
                     )}
@@ -1787,6 +2475,7 @@ export default function DepartmentTasksScreen() {
           </View>
         </View>
       </Modal>
+
       {customAlert?.visible && (
         <View style={[styles.modalOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }]}>
           <View style={[styles.modalContent, { width: isDesktop ? 400 : '90%', padding: 24, alignItems: 'center' }]}>
@@ -1818,7 +2507,7 @@ export default function DepartmentTasksScreen() {
           </View>
         </View>
       )}
-</View>
+    </View>
   );
 }
 
@@ -1995,5 +2684,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 44,
     marginTop: 8,
+  },
+  userTypeToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  toggleBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  toggleTextActive: {
+    color: Colors.light.primary,
+  },
+  tableCard: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    padding: 16,
+    marginBottom: 20,
+    ...Platform.select({
+      web: { boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      default: { elevation: 2 }
+    })
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  tableHeader: {
+    backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: '#e2e8f0',
+  },
+  headerCell: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#475569',
+    textTransform: 'uppercase',
+    paddingHorizontal: 8,
+  },
+  cell: {
+    fontSize: 14,
+    color: '#334155',
+    paddingHorizontal: 8,
+    justifyContent: 'center',
   },
 });
