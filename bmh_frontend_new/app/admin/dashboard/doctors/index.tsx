@@ -146,6 +146,180 @@ export default function DoctorManagement() {
     slotConfigs: [{ start_time: '', end_time: '', total_tokens: '', fee: '' }]
   });
   const [addingSlot, setAddingSlot] = useState(false);
+
+  // Slots View mode
+  const [slotsViewMode, setSlotsViewMode] = useState<'classic' | 'visual'>('classic');
+  const [selectedVisualDate, setSelectedVisualDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedVisualDept, setSelectedVisualDept] = useState<string>('All');
+  const [selectedVisualDoc, setSelectedVisualDoc] = useState<string>('All');
+  const [selectedMonthlyPeriod, setSelectedMonthlyPeriod] = useState<string>(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  );
+
+  const adjustVisualDate = (days: number) => {
+    const d = new Date(selectedVisualDate);
+    d.setDate(d.getDate() + days);
+    setSelectedVisualDate(d.toISOString().split('T')[0]);
+  };
+
+  const getDailyVisualRows = () => {
+    let daySlots = slots.filter((s: any) => s.date.split('T')[0] === selectedVisualDate);
+    if (selectedVisualDept !== 'All') {
+      daySlots = daySlots.filter((s: any) => s.doctor_department === selectedVisualDept);
+    }
+    if (selectedVisualDoc !== 'All') {
+      daySlots = daySlots.filter((s: any) => s.doctor_id === selectedVisualDoc);
+    }
+
+    const grouped: { [docId: string]: { doctorName: string, department: string, slots: any[], status: string } } = {};
+    daySlots.forEach((s: any) => {
+      if (!grouped[s.doctor_id]) {
+        grouped[s.doctor_id] = {
+          doctorName: s.doctor_name,
+          department: s.doctor_department || '',
+          slots: [],
+          status: s.doctor_status || 'Available'
+        };
+      }
+      grouped[s.doctor_id].slots.push(s);
+    });
+
+    return Object.keys(grouped).map(docId => {
+      const data = grouped[docId];
+      data.slots.sort((a, b) => a.start_time.localeCompare(b.start_time));
+      const phases = data.slots.map(s => `${s.start_time} - ${s.end_time}`);
+      const hasUnpublished = data.slots.some(s => !s.published);
+      return {
+        doctorId: docId,
+        doctorName: data.doctorName,
+        department: data.department,
+        phases: [phases[0] || '', phases[1] || '', phases[2] || ''],
+        status: data.status,
+        hasUnpublished,
+        slots: data.slots
+      };
+    });
+  };
+
+  const getDaysInSelectedMonth = () => {
+    const [year, month] = selectedMonthlyPeriod.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    const days = [];
+    const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    while (date.getMonth() === month - 1) {
+      days.push({
+        dateStr: date.toISOString().split('T')[0],
+        dayNum: String(date.getDate()).padStart(2, '0'),
+        dayName: dayNames[date.getDay()]
+      });
+      date.setDate(date.getDate() + 1);
+    }
+    return days;
+  };
+
+  const handlePublishSingleSlot = async (slotId: number) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${slotId}/publish`);
+      if (res.data.success) {
+        alert('Slot published successfully!');
+        fetchData();
+      }
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to publish slot');
+    }
+  };
+
+  const handlePublishAllForDoctorOnDate = async (doctorId: string, dateStr: string) => {
+    const doctorDateSlots = slots.filter((s: any) => s.doctor_id === doctorId && s.date.split('T')[0] === dateStr && !s.published);
+    if (doctorDateSlots.length === 0) return;
+    try {
+      const ids = doctorDateSlots.map((s: any) => s.id);
+      const res = await axios.post(`https://napi.bharatmedicalhallplus.com/doctors/slots/publish`, { ids });
+      if (res.data.success) {
+        alert(`Published ${ids.length} slots successfully!`);
+        fetchData();
+      }
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to publish slots');
+    }
+  };
+
+  const handlePrintDailySchedule = async () => {
+    const targetDateStr = formatDateDDMMYYYY(selectedVisualDate);
+    const dailyData = getDailyVisualRows();
+    const htmlContent = `
+      <html>
+        <head>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #0f766e; margin-bottom: 5px; }
+            .subtitle { text-align: center; font-size: 14px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; font-size: 13px; }
+            th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
+            .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+            .badge-available { background-color: #d1fae5; color: #065f46; }
+            .badge-unavailable { background-color: #fecaca; color: #991b1b; }
+          </style>
+        </head>
+        <body>
+          <h1>Daily Doctor Schedule</h1>
+          <div class="subtitle">Date: ${targetDateStr} | Department: ${selectedVisualDept}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>SL. NO</th>
+                <th>DOCTOR NAME</th>
+                <th>DEPARTMENT</th>
+                <th>1st PHASE TIME</th>
+                <th>2nd PHASE TIME</th>
+                <th>3rd PHASE TIME</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dailyData.map((row, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td><strong>${row.doctorName}</strong></td>
+                  <td>${row.department}</td>
+                  <td>${row.phases[0] || '--'}</td>
+                  <td>${row.phases[1] || '--'}</td>
+                  <td>${row.phases[2] || '--'}</td>
+                  <td>
+                    <span class="badge ${row.status === 'Available' ? 'badge-available' : 'badge-unavailable'}">
+                      ${row.status}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    try {
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        iframe.contentDocument?.write(htmlContent);
+        iframe.contentDocument?.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 250);
+      } else {
+        // @ts-ignore
+        if (typeof Print !== 'undefined') await Print.printAsync({ html: htmlContent });
+      }
+    } catch (err) {
+      console.error('Print error', err);
+    }
+  };
   
   // Manage Tokens
   const [manageTokenSlot, setManageTokenSlot] = useState<any>(null);
@@ -1098,43 +1272,284 @@ const fetchData = async () => {
             )}
 
              {activeTab === 'Slots' && (
-              <View style={styles.card}>
-                <View style={styles.tableRowHeader}>
-                  <Text style={styles.tableCellHeader}>Date</Text>
-                  <Text style={styles.tableCellHeader}>Doctor</Text>
-                  <Text style={styles.tableCellHeader}>Time</Text>
-                  <Text style={styles.tableCellHeader}>Tokens/Fee</Text>
-                  <Text style={styles.tableCellHeader}>Assigned Peon</Text>
-                  <Text style={styles.tableCellHeader}>Doctor Status</Text>
-                  <Text style={styles.tableCellHeader}>Actions</Text>
-                </View>
-                {slots.map((s, i) => (
-                  <View key={i} style={styles.tableRow}>
-                    <Text style={styles.tableCell}>{formatDateDDMMYYYY(s.date)}</Text>
-                    <Text style={styles.tableCell}>{s.doctor_name}</Text>
-                    <Text style={styles.tableCell}>{s.start_time} - {s.end_time}</Text>
-                    <Text style={styles.tableCell}>{s.total_tokens} tokens / ₹{s.fee}</Text>
-                    <Text style={styles.tableCell}>{s.peon_name || 'Unassigned'}</Text>
-                    <View style={styles.tableCell}>
-                      <Text style={{ fontWeight: 'bold', color: s.doctor_status === 'Available' ? '#16a34a' : s.doctor_status === 'Delayed' ? '#ca8a04' : s.doctor_status === 'Absent' ? '#dc2626' : '#64748b' }}>
-                        {s.doctor_status === 'Available' ? 'Present' : s.doctor_status === 'Delayed' ? `Delayed (${s.doctor_available_time})` : s.doctor_status === 'Absent' ? 'Absent' : 'Not Marked'}
-                      </Text>
-                    </View>
-                    <Text style={styles.tableCell}>
-                      <TouchableOpacity style={{backgroundColor: '#3b82f6', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => handleManageTokens(s)}>
-                        <Text style={{color: 'white', fontSize: 12}}>Tokens</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={{backgroundColor: '#10b981', padding: 6, borderRadius: 6, alignItems: 'center', marginTop: 4}} onPress={() => { setReassignSlot(s); setReassignPeonId(s.assigned_peon_id || ''); }}>
-                        <Text style={{color: 'white', fontSize: 12}}>Reassign</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={{backgroundColor: '#eab308', padding: 6, borderRadius: 6, alignItems: 'center', marginTop: 4}} onPress={() => openEditSlotModal(s)}>
-                        <Text style={{color: 'white', fontSize: 12}}>Edit Slot</Text>
-                      </TouchableOpacity>
-                    </Text>
+              <View>
+                {/* View switcher toggle */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, backgroundColor: '#FFF', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', flexWrap: 'wrap', gap: 12 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity 
+                      style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: slotsViewMode === 'classic' ? Colors.light.primary : '#f1f5f9' }}
+                      onPress={() => setSlotsViewMode('classic')}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: slotsViewMode === 'classic' ? '#FFF' : '#475569' }}>Classic List View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, backgroundColor: slotsViewMode === 'visual' ? Colors.light.primary : '#f1f5f9' }}
+                      onPress={() => setSlotsViewMode('visual')}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: slotsViewMode === 'visual' ? '#FFF' : '#475569' }}>Visual Schedule View</Text>
+                    </TouchableOpacity>
                   </View>
-                ))}
-                {slots.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No slots found.</Text>}
+                </View>
+
+                {slotsViewMode === 'classic' ? (
+                  <View style={styles.card}>
+                    <View style={styles.tableRowHeader}>
+                      <Text style={styles.tableCellHeader}>Date</Text>
+                      <Text style={styles.tableCellHeader}>Doctor</Text>
+                      <Text style={styles.tableCellHeader}>Time</Text>
+                      <Text style={styles.tableCellHeader}>Tokens/Fee</Text>
+                      <Text style={styles.tableCellHeader}>Assigned Peon</Text>
+                      <Text style={styles.tableCellHeader}>Publish Status</Text>
+                      <Text style={styles.tableCellHeader}>Actions</Text>
+                    </View>
+                    {slots.map((s, i) => (
+                      <View key={i} style={styles.tableRow}>
+                        <Text style={styles.tableCell}>{formatDateDDMMYYYY(s.date)}</Text>
+                        <Text style={styles.tableCell}>{s.doctor_name}</Text>
+                        <Text style={styles.tableCell}>{s.start_time} - {s.end_time}</Text>
+                        <Text style={styles.tableCell}>{s.total_tokens} tokens / ₹{s.fee}</Text>
+                        <Text style={styles.tableCell}>{s.peon_name || 'Unassigned'}</Text>
+                        <View style={styles.tableCell}>
+                          <Text style={{ fontWeight: 'bold', color: s.published ? '#16a34a' : '#d97706' }}>
+                            {s.published ? 'Published' : 'Draft (Unpublished)'}
+                          </Text>
+                        </View>
+                        <View style={[styles.tableCell, { flexDirection: 'row', gap: 6, flexWrap: 'wrap' }]}>
+                          {!s.published && (
+                            <TouchableOpacity style={{backgroundColor: '#10b981', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => handlePublishSingleSlot(s.id)}>
+                              <Text style={{color: 'white', fontSize: 12}}>Publish</Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity style={{backgroundColor: '#3b82f6', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => handleManageTokens(s)}>
+                            <Text style={{color: 'white', fontSize: 12}}>Tokens</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={{backgroundColor: '#e2e8f0', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => { setReassignSlot(s); setReassignPeonId(s.assigned_peon_id || ''); }}>
+                            <Text style={{color: '#334155', fontSize: 12}}>Reassign</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={{backgroundColor: '#eab308', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => openEditSlotModal(s)}>
+                            <Text style={{color: 'white', fontSize: 12}}>Edit</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                    {slots.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No slots found.</Text>}
+                  </View>
+                ) : (
+                  <View style={{ gap: 24 }}>
+                    
+                    {/* A. DAILY DOCTOR SCHEDULE (LIVE VIEW) */}
+                    <View style={styles.card}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12, marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.light.primary }}>A. DAILY DOCTOR SCHEDULE (LIVE VIEW)</Text>
+                        
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <TouchableOpacity style={{ backgroundColor: '#f1f5f9', padding: 8, borderRadius: 6 }} onPress={() => adjustVisualDate(-1)}>
+                            <Text style={{ fontWeight: 'bold' }}>&lt;</Text>
+                          </TouchableOpacity>
+                          
+                          {Platform.OS === 'web' ? (
+                            <input 
+                              type="date" 
+                              value={selectedVisualDate} 
+                              onChange={(e) => setSelectedVisualDate(e.target.value)} 
+                              style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8 } as any}
+                            />
+                          ) : (
+                            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>{formatDateDDMMYYYY(selectedVisualDate)}</Text>
+                          )}
+
+                          <TouchableOpacity style={{ backgroundColor: '#f1f5f9', padding: 8, borderRadius: 6 }} onPress={() => adjustVisualDate(1)}>
+                            <Text style={{ fontWeight: 'bold' }}>&gt;</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }} onPress={() => setSelectedVisualDate(new Date().toISOString().split('T')[0])}>
+                            <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>Today</Text>
+                          </TouchableOpacity>
+
+                          <View style={{ width: 150, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, overflow: 'hidden', height: 35, justifyContent: 'center' }}>
+                            <Picker selectedValue={selectedVisualDept} onValueChange={setSelectedVisualDept} style={{ height: 35 }}>
+                              <Picker.Item label="All Specialties" value="All" />
+                              {departments.filter(d => d.type === 'consultant').map((d, i) => (
+                                <Picker.Item key={i} label={d.name} value={d.name} />
+                              ))}
+                            </Picker>
+                          </View>
+
+                          <TouchableOpacity style={{ backgroundColor: '#0f766e', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 }} onPress={handlePrintDailySchedule}>
+                            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Print / Export</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Daily schedule grid table */}
+                      <View style={styles.tableRowHeader}>
+                        <Text style={[styles.tableCellHeader, { flex: 0.5 }]}>SL. NO</Text>
+                        <Text style={[styles.tableCellHeader, { flex: 1.5 }]}>DOCTOR NAME</Text>
+                        <Text style={[styles.tableCellHeader, { flex: 1.5 }]}>DEPARTMENT</Text>
+                        <Text style={styles.tableCellHeader}>1st PHASE TIME</Text>
+                        <Text style={styles.tableCellHeader}>2nd PHASE TIME</Text>
+                        <Text style={styles.tableCellHeader}>3rd PHASE TIME</Text>
+                        <Text style={styles.tableCellHeader}>STATUS</Text>
+                        <Text style={styles.tableCellHeader}>PUBLISH ACTION</Text>
+                      </View>
+
+                      {getDailyVisualRows().map((row, idx) => (
+                        <View key={row.doctorId} style={styles.tableRow}>
+                          <Text style={[styles.tableCell, { flex: 0.5 }]}>{idx + 1}</Text>
+                          <Text style={[styles.tableCell, { flex: 1.5, fontWeight: '700' }]}>{row.doctorName}</Text>
+                          <Text style={[styles.tableCell, { flex: 1.5 }]}>{row.department}</Text>
+                          <Text style={styles.tableCell}>{row.phases[0] || '--'}</Text>
+                          <Text style={styles.tableCell}>{row.phases[1] || '--'}</Text>
+                          <Text style={styles.tableCell}>{row.phases[2] || '--'}</Text>
+                          <View style={styles.tableCell}>
+                            <Text style={{ fontWeight: 'bold', color: row.status === 'Available' ? '#16a34a' : '#dc2626' }}>
+                              {row.status}
+                            </Text>
+                          </View>
+                          <View style={styles.tableCell}>
+                            {row.hasUnpublished ? (
+                              <TouchableOpacity 
+                                style={{ backgroundColor: '#10b981', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }} 
+                                onPress={() => handlePublishAllForDoctorOnDate(row.doctorId, selectedVisualDate)}
+                              >
+                                <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Publish Slots</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <Text style={{ color: '#64748b', fontSize: 12 }}>Published</Text>
+                            )}
+                          </View>
+                        </View>
+                      ))}
+                      {getDailyVisualRows().length === 0 && (
+                        <Text style={{ padding: 20, textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No doctors scheduled for this date.</Text>
+                      )}
+                    </View>
+
+                    {/* B. MONTHLY DOCTOR SCHEDULE (GLOBAL VIEW) */}
+                    <View style={styles.card}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12, marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.light.primary }}>B. MONTHLY DOCTOR SCHEDULE (GLOBAL VIEW)</Text>
+                        
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>Select Month:</Text>
+                          {Platform.OS === 'web' ? (
+                            <input 
+                              type="month" 
+                              value={selectedMonthlyPeriod} 
+                              onChange={(e) => setSelectedMonthlyPeriod(e.target.value)} 
+                              style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8 } as any}
+                            />
+                          ) : (
+                            <TextInput 
+                              style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, padding: 6, width: 100, fontSize: 12 }} 
+                              value={selectedMonthlyPeriod} 
+                              onChangeText={setSelectedMonthlyPeriod} 
+                              placeholder="YYYY-MM"
+                            />
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Legend box */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#16a34a' }} />
+                          <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>Full Day Available</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#3b82f6' }} />
+                          <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>Partial Day / Booked</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#eab308' }} />
+                          <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>Draft / Unpublished</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#dc2626' }} />
+                          <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>Absent / On Leave</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#94a3b8' }} />
+                          <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600' }}>Not Available</Text>
+                        </View>
+                      </View>
+
+                      {/* Month horizontal scroll schedule matrix */}
+                      <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+                        <View style={{ flexDirection: 'column' }}>
+                          
+                          {/* Calendar headers */}
+                          <View style={{ flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: '#cbd5e1', backgroundColor: '#f1f5f9', paddingVertical: 8 }}>
+                            <View style={{ width: 220, paddingHorizontal: 12, justifyContent: 'center' }}>
+                              <Text style={{ fontWeight: '800', color: '#475569', fontSize: 12 }}>DOCTOR / DATE</Text>
+                            </View>
+                            {getDaysInSelectedMonth().map((day) => (
+                              <View key={day.dateStr} style={{ width: 60, alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748b' }}>{day.dayName}</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#1e293b', marginTop: 2 }}>{day.dayNum}</Text>
+                              </View>
+                            ))}
+                          </View>
+
+                          {/* Calendar body rows */}
+                          {doctors.filter(doc => doc.status === 'Approved').map((doc) => (
+                            <View key={doc.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingVertical: 8, alignItems: 'center' }}>
+                              <View style={{ width: 220, paddingHorizontal: 12 }}>
+                                <Text style={{ fontWeight: '700', color: '#1e293b', fontSize: 13 }} numberOfLines={1}>{doc.full_name}</Text>
+                                <Text style={{ fontSize: 11, color: '#0d9488', fontWeight: '600' }} numberOfLines={1}>{doc.department}</Text>
+                              </View>
+
+                              {getDaysInSelectedMonth().map((day) => {
+                                // Match doctor slots for this date
+                                const dSlots = slots.filter((s: any) => s.doctor_id === doc.id && s.date.split('T')[0] === day.dateStr);
+                                
+                                let dotColor = '#94a3b8'; // Grey dot (default no slots)
+                                let clickAction = null;
+                                let titleTooltip = 'Not Scheduled';
+
+                                if (dSlots.length > 0) {
+                                  const isAbsent = dSlots.some(s => s.doctor_status === 'Absent');
+                                  const hasUnpublished = dSlots.some(s => !s.published);
+                                  const isFullBooked = dSlots.every(s => s.booked_count >= s.total_tokens);
+
+                                  if (isAbsent) {
+                                    dotColor = '#dc2626'; // Red dot
+                                    titleTooltip = 'Absent / On Leave';
+                                  } else if (hasUnpublished) {
+                                    dotColor = '#eab308'; // Orange dot
+                                    titleTooltip = 'Draft / Click to Publish';
+                                    clickAction = () => handlePublishAllForDoctorOnDate(doc.id, day.dateStr);
+                                  } else if (isFullBooked) {
+                                    dotColor = '#3b82f6'; // Blue dot (Full booked)
+                                    titleTooltip = 'Fully Booked';
+                                  } else {
+                                    dotColor = '#16a34a'; // Green dot (Available)
+                                    titleTooltip = 'Available';
+                                  }
+                                }
+
+                                return (
+                                  <TouchableOpacity 
+                                    key={day.dateStr} 
+                                    style={{ width: 60, alignItems: 'center', justifyContent: 'center', height: 40 }}
+                                    disabled={!clickAction}
+                                    onPress={clickAction || undefined}
+                                  >
+                                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: dotColor, borderWidth: dotColor === '#eab308' ? 1 : 0, borderColor: '#d97706', borderStyle: dotColor === '#eab308' ? 'dashed' : 'solid' }} />
+                                    {dotColor === '#eab308' && (
+                                      <Text style={{ fontSize: 8, color: '#d97706', fontWeight: 'bold', marginTop: 2 }}>Draft</Text>
+                                    )}
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </View>
+
+                  </View>
+                )}
               </View>
             )}
 

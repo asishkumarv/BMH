@@ -656,6 +656,16 @@ app.listen(PORT, () => {
     console.error("Failed to start Refill Reminder scheduler:", err.message);
   }
 
+  // Initialize Doctor Slots Autogeneration Scheduler
+  try {
+    const { startDoctorSlotAutogeneratorCron, generateAllDoctorSlots } = require('./cron/doctorSlotAutogenerator');
+    startDoctorSlotAutogeneratorCron();
+    // Run generation check on startup to ensure slots are generated immediately
+    generateAllDoctorSlots();
+  } catch (err) {
+    console.error("Failed to start Doctor Slot Autogeneration scheduler:", err.message);
+  }
+
   // Initialize and Seed Doctor Schedules DB Table
   pool.query(`
     CREATE TABLE IF NOT EXISTS doctor_schedules (
@@ -672,6 +682,27 @@ app.listen(PORT, () => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `).then(async () => {
+    // Patch doctor_schedules
+    await pool.query(`
+      ALTER TABLE doctor_schedules ADD COLUMN IF NOT EXISTS doctor_id VARCHAR(50);
+      ALTER TABLE doctor_schedules ADD COLUMN IF NOT EXISTS timing_config JSONB;
+      ALTER TABLE doctor_schedules ADD COLUMN IF NOT EXISTS recurrence_rule JSONB;
+      ALTER TABLE doctor_schedules ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
+    `).catch(e => console.error('Failed to alter doctor_schedules:', e.message));
+
+    // Patch doctor_slots
+    await pool.query(`
+      ALTER TABLE doctor_slots ADD COLUMN IF NOT EXISTS published BOOLEAN DEFAULT TRUE;
+      ALTER TABLE doctor_slots ADD COLUMN IF NOT EXISTS is_autocreated BOOLEAN DEFAULT FALSE;
+    `).catch(e => console.error('Failed to alter doctor_slots:', e.message));
+
+    // Resolve doctor_id matching names
+    await pool.query(`
+      UPDATE doctor_schedules ds 
+      SET doctor_id = (SELECT id FROM doctors d WHERE d.full_name ILIKE ds.name LIMIT 1)
+      WHERE ds.doctor_id IS NULL;
+    `).catch(e => console.error('Failed to resolve doctor_id names:', e.message));
+
     console.log('Successfully checked/patched doctor_schedules table.');
     const checkEmpty = await pool.query('SELECT COUNT(*)::integer FROM doctor_schedules');
     if (checkEmpty.rows[0].count === 0) {

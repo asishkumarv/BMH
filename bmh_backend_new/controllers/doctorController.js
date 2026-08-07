@@ -165,7 +165,7 @@ exports.approveDoctor = async (req, res) => {
 // Slot Management
 exports.createSlot = async (req, res) => {
   try {
-    const { doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id } = req.body;
+    const { doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id, published, is_autocreated } = req.body;
     
     // Check doctor status
     const docRes = await pool.query('SELECT status FROM doctors WHERE id = $1', [doctor_id]);
@@ -173,9 +173,14 @@ exports.createSlot = async (req, res) => {
     if (docRes.rows[0].status === 'Inactive') return res.status(403).json({ success: false, message: 'Cannot create slots for deactivated doctors' });
 
     await pool.query(
-      `INSERT INTO doctor_slots (doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id || null]
+      `INSERT INTO doctor_slots (doctor_id, date, start_time, end_time, total_tokens, fee, assigned_peon_id, published, is_autocreated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        doctor_id, date, start_time, end_time, total_tokens, fee, 
+        assigned_peon_id || null,
+        published !== undefined ? published : true,
+        is_autocreated !== undefined ? is_autocreated : false
+      ]
     );
     res.json({ success: true, message: 'Slot created successfully' });
   } catch (error) {
@@ -186,7 +191,7 @@ exports.createSlot = async (req, res) => {
 
 exports.getSlots = async (req, res) => {
   try {
-    const { doctor_id, date } = req.query;
+    const { doctor_id, date, published_only } = req.query;
     let query = `
       SELECT ds.*, 
              (SELECT COUNT(*) FROM patient_bookings pb WHERE pb.slot_id = ds.id AND pb.status != 'Cancelled') as booked_count,
@@ -205,6 +210,9 @@ exports.getSlots = async (req, res) => {
     if (date) {
       params.push(date);
       query += ` AND ds.date = $${params.length}`;
+    }
+    if (published_only === 'true') {
+      query += ` AND ds.published = true`;
     }
 
     query += ' ORDER BY ds.date DESC, ds.start_time ASC';
@@ -431,6 +439,31 @@ exports.updateSlot = async (req, res) => {
     res.json({ success: true, message: 'Slot updated successfully' });
   } catch (error) {
     console.error('Update Slot Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.publishSlots = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid or empty IDs array' });
+    }
+    await pool.query('UPDATE doctor_slots SET published = true WHERE id = ANY($1)', [ids]);
+    res.json({ success: true, message: 'Slots published successfully' });
+  } catch (error) {
+    console.error('Publish Slots Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.publishSingleSlot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE doctor_slots SET published = true WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Slot published successfully' });
+  } catch (error) {
+    console.error('Publish Single Slot Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

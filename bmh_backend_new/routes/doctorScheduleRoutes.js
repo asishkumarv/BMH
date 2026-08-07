@@ -15,17 +15,30 @@ router.get('/', async (req, res) => {
 
 // POST a new doctor schedule
 router.post('/', async (req, res) => {
-  const { name, qualification, department, schedule_type, timing, cabin, fee, notes } = req.body;
+  const { name, qualification, department, schedule_type, timing, cabin, fee, notes, doctor_id, timing_config, recurrence_rule, status } = req.body;
   if (!name) {
     return res.status(400).json({ success: false, message: 'Doctor Name is required' });
   }
   try {
     const query = `
-      INSERT INTO doctor_schedules (name, qualification, department, schedule_type, timing, cabin, fee, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO doctor_schedules (name, qualification, department, schedule_type, timing, cabin, fee, notes, doctor_id, timing_config, recurrence_rule, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
-    const result = await pool.query(query, [name, qualification || '', department || '', schedule_type || 'Daily', timing || '', cabin || '', fee || '', notes || '']);
+    const result = await pool.query(query, [
+      name, 
+      qualification || '', 
+      department || '', 
+      schedule_type || 'Daily', 
+      timing || '', 
+      cabin || '', 
+      fee || '', 
+      notes || '',
+      doctor_id || null,
+      timing_config ? JSON.stringify(timing_config) : null,
+      recurrence_rule ? JSON.stringify(recurrence_rule) : null,
+      status || 'Active'
+    ]);
     res.json({ success: true, message: 'Doctor schedule created successfully', data: result.rows[0] });
   } catch (err) {
     console.error('Error creating doctor schedule:', err.message);
@@ -36,7 +49,7 @@ router.post('/', async (req, res) => {
 // PUT update a doctor schedule
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, qualification, department, schedule_type, timing, cabin, fee, notes } = req.body;
+  const { name, qualification, department, schedule_type, timing, cabin, fee, notes, doctor_id, timing_config, recurrence_rule, status } = req.body;
   if (!name) {
     return res.status(400).json({ success: false, message: 'Doctor Name is required' });
   }
@@ -51,11 +64,29 @@ router.put('/:id', async (req, res) => {
           cabin = $6,
           fee = $7,
           notes = $8,
+          doctor_id = $9,
+          timing_config = $10,
+          recurrence_rule = $11,
+          status = $12,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $9
+      WHERE id = $13
       RETURNING *
     `;
-    const result = await pool.query(query, [name, qualification || '', department || '', schedule_type || 'Daily', timing || '', cabin || '', fee || '', notes || '', id]);
+    const result = await pool.query(query, [
+      name, 
+      qualification || '', 
+      department || '', 
+      schedule_type || 'Daily', 
+      timing || '', 
+      cabin || '', 
+      fee || '', 
+      notes || '',
+      doctor_id || null,
+      timing_config ? JSON.stringify(timing_config) : null,
+      recurrence_rule ? JSON.stringify(recurrence_rule) : null,
+      status || 'Active',
+      id
+    ]);
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Doctor schedule not found' });
     }
@@ -70,7 +101,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query('DELETE FROM doctor_schedules WHERE id = $1 RETURNING *');
+    const result = await pool.query('DELETE FROM doctor_schedules WHERE id = $1 RETURNING *', [id]);
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Doctor schedule not found' });
     }

@@ -12,6 +12,23 @@ type StationaryItem = { id: string; name: string; stock: number; image: string; 
 type RequestItem = { id: string; item_id: string; name: string; requested_qty: number; approved_qty: number; };
 type RequestHistory = { id: string; employee_name: string; employee_department: string; status: string; notes: string; created_at: string; approved_by: string; approved_by_name?: string; approved_by_role?: string; approved_by_dept?: string; items: RequestItem[]; };
 
+const formatDate = (dateStr: any) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = pad(d.getMinutes());
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const timeStr = `${pad(hours)}:${minutes} ${ampm}`;
+  return `${day}-${month}-${year}, ${timeStr}`;
+};
+
 export default function SubAdminStationaryScreen() {
   const { isDesktop } = useResponsive();
   const [activeTab, setActiveTab] = useState<'inventory' | 'requests' | 'my_requests' | 'task_assigning' | 'fillups' | 'my_tasks'>('inventory');
@@ -796,7 +813,7 @@ export default function SubAdminStationaryScreen() {
             <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold' }}>REQUEST DETAILS</Text>
             <Text style={{ fontSize: 13, color: '#475569', marginTop: 2 }}>By: {item.requester_name || 'Sub Admin'}</Text>
             <Text style={{ fontSize: 12, color: '#64748b' }}>Dept: {item.requested_by_dept || 'N/A'} • Role: {item.requested_by_role || 'N/A'}</Text>
-            <Text style={{ fontSize: 12, color: '#94a3b8' }}>On: {new Date(item.created_at).toLocaleString()}</Text>
+            <Text style={{ fontSize: 12, color: '#94a3b8' }}>On: {formatDate(item.created_at)}</Text>
             {item.notes ? <Text style={{ fontSize: 13, color: '#475569', fontStyle: 'italic', marginTop: 4 }}>Notes: "{item.notes}"</Text> : null}
           </View>
 
@@ -834,7 +851,7 @@ export default function SubAdminStationaryScreen() {
           <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10, backgroundColor: '#fef2f2', padding: 10, borderRadius: 8 }}>
             <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>REJECTED AUDIT TRAIL</Text>
             <Text style={{ fontSize: 13, color: '#991b1b', marginTop: 2 }}>Rejected By: {item.rejected_by_name} ({item.rejected_by_role})</Text>
-            {item.rejected_at && <Text style={{ fontSize: 12, color: '#b91c1c' }}>Rejected On: {new Date(item.rejected_at).toLocaleString()}</Text>}
+            {item.rejected_at && <Text style={{ fontSize: 12, color: '#b91c1c' }}>Rejected On: {formatDate(item.rejected_at)}</Text>}
           </View>
         )}
 
@@ -843,7 +860,7 @@ export default function SubAdminStationaryScreen() {
             <Text style={{ fontSize: 11, color: '#64748b', fontWeight: 'bold' }}>APPROVAL & AUDIT TRAIL</Text>
             <Text style={{ fontSize: 13, color: '#1e293b', marginTop: 2 }}>Filled Qty: +{item.fillup_qty} items added to stock</Text>
             <Text style={{ fontSize: 12, color: '#475569' }}>Approved By: {item.approved_by_name} ({item.approved_by_role})</Text>
-            {item.approved_at && <Text style={{ fontSize: 12, color: '#94a3b8' }}>Approved On: {new Date(item.approved_at).toLocaleString()}</Text>}
+            {item.approved_at && <Text style={{ fontSize: 12, color: '#94a3b8' }}>Approved On: {formatDate(item.approved_at)}</Text>}
           </View>
         )}
 
@@ -899,7 +916,7 @@ export default function SubAdminStationaryScreen() {
       <View style={{ flex: 1.5 }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.light.text }}>{item.employee_name}</Text>
         <Text style={{ fontSize: 14, color: Colors.light.icon }}>Dept: {item.employee_department}</Text>
-        <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>Date: {new Date(item.created_at).toLocaleString()}</Text>
+        <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>Date: {formatDate(item.created_at)}</Text>
       </View>
       <View style={{ flex: 1.5 }}>
         <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.text }}>{item.items?.length || 0} items requested</Text>
@@ -925,7 +942,7 @@ export default function SubAdminStationaryScreen() {
     <View style={[styles.requestRow, { marginBottom: 16 }]}>
       <View style={{ flex: 1.5 }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text }}>Request ID: #{item.id}</Text>
-        <Text style={{ fontSize: 13, color: Colors.light.icon }}>Requested On: {new Date(item.created_at).toLocaleString()}</Text>
+        <Text style={{ fontSize: 13, color: Colors.light.icon }}>Requested On: {formatDate(item.created_at)}</Text>
         {item.notes ? <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>Note: "{item.notes}"</Text> : null}
       </View>
       <View style={{ flex: 1.5 }}>

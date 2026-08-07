@@ -10,6 +10,8 @@ router.put('/:id', doctorController.updateDoctor);
 router.put('/:id/status', doctorController.updateDoctorStatus);
 router.put('/:id/approve', doctorController.approveDoctor);
 router.post('/slots', doctorController.createSlot);
+router.post('/slots/publish', doctorController.publishSlots);
+router.put('/slots/:id/publish', doctorController.publishSingleSlot);
 router.get('/slots', doctorController.getSlots);
 router.get('/peons', doctorController.getAvailablePeons);
 router.put('/slots/:id/peon', doctorController.assignPeonToSlot);

@@ -53,7 +53,7 @@ export default function FindDoctor() {
         }
         
         // 2. Fetch all slots
-        const slotRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots');
+        const slotRes = await axios.get('https://napi.bharatmedicalhallplus.com/doctors/slots?published_only=true');
         if (slotRes.data.success && slotRes.data.data) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
