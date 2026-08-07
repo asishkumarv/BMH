@@ -228,7 +228,7 @@ async function syncSalesInvoices() {
                              SET reminder_date = $1 
                              WHERE id = (SELECT sales_order_id FROM ecogreen_sales_invoices WHERE id = $2)
                                 OR ip_no = $3 
-                                OR order_no = $4`,
+                                OR ip_no = $4`,
                             [invoice.reminder_date, salesInvoiceId, invoice.invoice_id, invoice.order_no]
                         ).catch(e => console.error('[Sync] Error propagating reminder_date to ecogreen_sales_orders:', e.message));
 

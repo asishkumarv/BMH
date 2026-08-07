@@ -66,8 +66,7 @@ router.post('/', async (req, res) => {
         `UPDATE ecogreen_sales_orders 
          SET reminder_date = $1 
          WHERE id = $2 
-            OR ip_no = $3 
-            OR order_no = $3`,
+            OR ip_no = $3`,
         [rDate, salesOrderId || null, ipNo || orderId || null]
       );
       
