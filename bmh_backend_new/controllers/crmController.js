@@ -492,7 +492,20 @@ exports.handleDoubleTickWebhook = async (req, res) => {
     
     if (event === 'incoming_message' && data && data.message) {
       const fromPhone = data.from; // e.g. "919439085126"
-      const textBody = data.message.text?.body?.trim();
+      let textBody = '';
+      if (data.message.text?.body) {
+        textBody = data.message.text.body.trim();
+      } else if (data.message.button?.text) {
+        textBody = data.message.button.text.trim();
+      } else if (data.message.button?.payload) {
+        textBody = data.message.button.payload.trim();
+      } else if (data.message.button_reply?.title) {
+        textBody = data.message.button_reply.title.trim();
+      } else if (data.message.button_reply?.text) {
+        textBody = data.message.button_reply.text.trim();
+      } else if (data.message.interactive?.button_reply?.title) {
+        textBody = data.message.interactive.button_reply.title.trim();
+      }
       
       if (fromPhone && textBody) {
         // Clean phone number to get 10-digit mobile
