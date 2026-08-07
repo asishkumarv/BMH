@@ -516,9 +516,9 @@ export default function DoctorScheduleTV() {
     }
     const nextGroupedList = Array.from(nextMap.values());
 
-    const daily = allDocs.filter((d: any) => d.schedule_type === 'Daily');
-    const weekly = allDocs.filter((d: any) => d.schedule_type === 'Weekly');
-    const monthly = allDocs.filter((d: any) => d.schedule_type === 'Monthly');
+    const daily = allDocs.filter((d: any) => d.schedule_type === 'Daily' && d.show_on_tv !== false);
+    const weekly = allDocs.filter((d: any) => d.schedule_type === 'Weekly' && d.show_on_tv !== false);
+    const monthly = allDocs.filter((d: any) => d.schedule_type === 'Monthly' && d.show_on_tv !== false);
 
     const tempSlides: Slide[] = [];
     const chunkSize = 6; // Max 6 doctors per slide page

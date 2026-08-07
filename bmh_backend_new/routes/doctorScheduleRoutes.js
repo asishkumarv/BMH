@@ -112,4 +112,20 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// PUT toggle TV visibility for schedule
+router.put('/:id/tv', async (req, res) => {
+  const { id } = req.params;
+  const { show_on_tv } = req.body;
+  try {
+    const result = await pool.query('UPDATE doctor_schedules SET show_on_tv = $1 WHERE id = $2 RETURNING *', [show_on_tv, id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Doctor schedule not found' });
+    }
+    res.json({ success: true, message: 'TV visibility updated successfully' });
+  } catch (err) {
+    console.error('Error updating TV visibility:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;

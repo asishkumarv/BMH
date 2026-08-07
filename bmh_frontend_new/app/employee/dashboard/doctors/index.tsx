@@ -145,8 +145,40 @@ export default function DepartmentDoctorManagement() {
   });
   const [addingSlot, setAddingSlot] = useState(false);
 
-  // Slots View mode
   const [slotsViewMode, setSlotsViewMode] = useState<'classic' | 'visual'>('classic');
+  const [filterDocName, setFilterDocName] = useState('');
+  const [filterPeonName, setFilterPeonName] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
+  const getFilteredSlots = () => {
+    return slots.filter((s: any) => {
+      if (filterDocName.trim() !== '') {
+        const docNameLower = (s.doctor_name || '').toLowerCase();
+        if (!docNameLower.includes(filterDocName.toLowerCase())) return false;
+      }
+      if (filterPeonName.trim() !== '') {
+        const peonNameLower = (s.peon_name || 'unassigned').toLowerCase();
+        if (!peonNameLower.includes(filterPeonName.toLowerCase())) return false;
+      }
+      if (s.date) {
+        const slotTime = new Date(s.date).getTime();
+        if (filterStartDate) {
+          const startTime = new Date(filterStartDate).getTime();
+          if (slotTime < startTime) return false;
+        }
+        if (filterEndDate) {
+          const endTime = new Date(filterEndDate).getTime();
+          const endTimeAdjusted = endTime + 24 * 60 * 60 * 1000 - 1;
+          if (slotTime > endTimeAdjusted) return false;
+        }
+      }
+      return true;
+    });
+  };
+
   const [selectedVisualDate, setSelectedVisualDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedVisualDept, setSelectedVisualDept] = useState<string>('All');
   const [selectedVisualDoc, setSelectedVisualDoc] = useState<string>('All');
@@ -1385,18 +1417,113 @@ const fetchData = async () => {
                 </View>
 
                 {slotsViewMode === 'classic' ? (
-                  <View style={styles.card}>
-                    <View style={styles.tableRowHeader}>
-                      <Text style={styles.tableCellHeader}>Date</Text>
-                      <Text style={styles.tableCellHeader}>Doctor</Text>
-                      <Text style={styles.tableCellHeader}>Time</Text>
-                      <Text style={styles.tableCellHeader}>Tokens/Fee</Text>
-                      <Text style={styles.tableCellHeader}>Assigned Peon</Text>
-                      <Text style={styles.tableCellHeader}>Publish Status</Text>
-                      <Text style={styles.tableCellHeader}>Actions</Text>
+                  <View>
+                    {/* Classic Slots Filters Row */}
+                    <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12, gap: 12 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#334155' }}>Filter Slots</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                        <View style={{ flex: 1, minWidth: 150 }}>
+                          <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: '600' }}>Search Doctor</Text>
+                          <TextInput
+                            style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, fontSize: 12, backgroundColor: '#FFF' }}
+                            value={filterDocName}
+                            onChangeText={setFilterDocName}
+                            placeholder="Doctor name..."
+                          />
+                        </View>
+                        
+                        <View style={{ flex: 1, minWidth: 150 }}>
+                          <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: '600' }}>Search Peon</Text>
+                          <TextInput
+                            style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, fontSize: 12, backgroundColor: '#FFF' }}
+                            value={filterPeonName}
+                            onChangeText={setFilterPeonName}
+                            placeholder="Peon name..."
+                          />
+                        </View>
+
+                        <View style={{ flex: 1, minWidth: 120 }}>
+                          <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: '600' }}>Start Date</Text>
+                          {Platform.OS === 'web' ? (
+                            <input
+                              type="date"
+                              value={filterStartDate}
+                              onChange={(e) => setFilterStartDate(e.target.value)}
+                              style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, fontSize: 12, width: '100%' } as any}
+                            />
+                          ) : (
+                            <TouchableOpacity onPress={() => setShowStartPicker(true)} style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: '#FFF' }}>
+                              <Text style={{ fontSize: 12 }}>{filterStartDate ? formatDateDDMMYYYY(filterStartDate) : 'Select Start'}</Text>
+                            </TouchableOpacity>
+                          )}
+                          {!Platform.OS === 'web' && showStartPicker && (
+                            <DateTimePicker
+                              value={filterStartDate ? new Date(filterStartDate) : new Date()}
+                              mode="date"
+                              display="default"
+                              onChange={(event, selectedDate) => {
+                                setShowStartPicker(false);
+                                if (selectedDate) setFilterStartDate(selectedDate.toISOString().split('T')[0]);
+                              }}
+                            />
+                          )}
+                        </View>
+
+                        <View style={{ flex: 1, minWidth: 120 }}>
+                          <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: '600' }}>End Date</Text>
+                          {Platform.OS === 'web' ? (
+                            <input
+                              type="date"
+                              value={filterEndDate}
+                              onChange={(e) => setFilterEndDate(e.target.value)}
+                              style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, fontSize: 12, width: '100%' } as any}
+                            />
+                          ) : (
+                            <TouchableOpacity onPress={() => setShowEndPicker(true)} style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: '#FFF' }}>
+                              <Text style={{ fontSize: 12 }}>{filterEndDate ? formatDateDDMMYYYY(filterEndDate) : 'Select End'}</Text>
+                            </TouchableOpacity>
+                          )}
+                          {!Platform.OS === 'web' && showEndPicker && (
+                            <DateTimePicker
+                              value={filterEndDate ? new Date(filterEndDate) : new Date()}
+                              mode="date"
+                              display="default"
+                              onChange={(event, selectedDate) => {
+                                setShowEndPicker(false);
+                                if (selectedDate) setFilterEndDate(selectedDate.toISOString().split('T')[0]);
+                              }}
+                            />
+                          )}
+                        </View>
+
+                        {(filterDocName || filterPeonName || filterStartDate || filterEndDate) ? (
+                          <TouchableOpacity
+                            style={{ backgroundColor: '#e2e8f0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, marginTop: 15 }}
+                            onPress={() => {
+                              setFilterDocName('');
+                              setFilterPeonName('');
+                              setFilterStartDate('');
+                              setFilterEndDate('');
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>Clear</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
                     </View>
-                    {slots.map((s, i) => (
-                      <View key={i} style={styles.tableRow}>
+
+                    <View style={styles.card}>
+                      <View style={styles.tableRowHeader}>
+                        <Text style={styles.tableCellHeader}>Date</Text>
+                        <Text style={styles.tableCellHeader}>Doctor</Text>
+                        <Text style={styles.tableCellHeader}>Time</Text>
+                        <Text style={styles.tableCellHeader}>Tokens/Fee</Text>
+                        <Text style={styles.tableCellHeader}>Assigned Peon</Text>
+                        <Text style={styles.tableCellHeader}>Publish Status</Text>
+                        <Text style={styles.tableCellHeader}>Actions</Text>
+                      </View>
+                      {getFilteredSlots().map((s, i) => (
+                        <View key={i} style={styles.tableRow}>
                         <Text style={styles.tableCell}>{formatDateDDMMYYYY(s.date)}</Text>
                         <Text style={styles.tableCell}>{s.doctor_name}</Text>
                         <Text style={styles.tableCell}>{s.start_time} - {s.end_time}</Text>
@@ -1438,7 +1565,8 @@ const fetchData = async () => {
                         </View>
                       </View>
                     ))}
-                    {slots.length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No slots found.</Text>}
+                    {getFilteredSlots().length === 0 && <Text style={{padding: 20, textAlign: 'center', color: '#64748b'}}>No slots found.</Text>}
+                  </View>
                   </View>
                 ) : (
                   <View style={{ gap: 24 }}>

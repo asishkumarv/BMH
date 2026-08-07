@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Modal, Alert, Platform } from 'react-native';
-import { Plus, Edit, Trash2, Calendar, MapPin, Clock, X, Search, Pause, Play, Trash } from 'lucide-react-native';
+import { Plus, Edit, Trash2, Calendar, MapPin, Clock, X, Search, Pause, Play, Trash, Tv } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 
@@ -197,6 +197,16 @@ export default function DoctorSchedulesEditor() {
           { text: 'Delete', onPress: proceed, style: 'destructive' },
         ]
       );
+  };
+
+  const handleToggleTv = async (id: number, currentVal: boolean) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctor-schedules/${id}/tv`, { show_on_tv: !currentVal });
+      if (res.data.success) {
+        fetchSchedules();
+      }
+    } catch (err: any) {
+      alert('Failed to update TV visibility for schedule');
     }
   };
 
@@ -345,9 +355,14 @@ export default function DoctorSchedulesEditor() {
                 </View>
                 <View style={styles.actions}>
                   <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: doc.show_on_tv !== false ? '#E0F2FE' : '#F1F5F9' }]} 
+                    onPress={() => handleToggleTv(doc.id, doc.show_on_tv !== false)}
+                  >
+                    <Tv color={doc.show_on_tv !== false ? '#0284C7' : '#64748B'} size={16} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
                     style={[styles.actionBtn, { backgroundColor: isActive ? '#FEF3C7' : '#D1FAE5' }]} 
                     onPress={() => handleToggleStatus(doc)}
-                    title={isActive ? 'Pause' : 'Resume'}
                   >
                     {isActive ? <Pause color="#D97706" size={16} /> : <Play color="#059669" size={16} />}
                   </TouchableOpacity>
