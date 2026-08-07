@@ -468,3 +468,40 @@ exports.publishSingleSlot = async (req, res) => {
   }
 };
 
+exports.deleteSlot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const checkRes = await pool.query(
+      "SELECT COUNT(*) FROM patient_bookings WHERE slot_id = $1 AND status != 'Cancelled'",
+      [id]
+    );
+    const bookingsCount = parseInt(checkRes.rows[0].count, 10);
+    if (bookingsCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete slot. Bookings already exist for this slot.'
+      });
+    }
+    const delRes = await pool.query('DELETE FROM doctor_slots WHERE id = $1 RETURNING *', [id]);
+    if (delRes.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Slot not found' });
+    }
+    res.json({ success: true, message: 'Slot deleted successfully' });
+  } catch (error) {
+    console.error('Delete Slot Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.toggleShowOnTv = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { show_on_tv } = req.body;
+    await pool.query('UPDATE doctor_slots SET show_on_tv = $1 WHERE id = $2', [show_on_tv, id]);
+    res.json({ success: true, message: 'TV visibility updated successfully' });
+  } catch (error) {
+    console.error('Toggle Show on TV Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+

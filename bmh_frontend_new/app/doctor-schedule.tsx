@@ -473,7 +473,8 @@ export default function DoctorScheduleTV() {
     }
   };
 
-  const buildSlides = (allDocs: any[], allSlots: any[]) => {
+  const buildSlides = (allDocs: any[], rawSlots: any[]) => {
+    const allSlots = rawSlots.filter((s: any) => s.show_on_tv !== false);
     const pad = (n: number) => n.toString().padStart(2, '0');
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;

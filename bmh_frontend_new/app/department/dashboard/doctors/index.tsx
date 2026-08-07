@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Image, Modal, Alert, Platform, KeyboardAvoidingView } from 'react-native';
-import {  Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X , RefreshCcw } from 'lucide-react-native';
+import {  Users, Calendar, DollarSign, ListOrdered, CheckCircle, XCircle, Plus, X , RefreshCcw, Tv } from 'lucide-react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../../../constants/Colors';
@@ -239,6 +239,44 @@ export default function DepartmentDoctorManagement() {
       }
     } catch (e: any) {
       alert(e.response?.data?.message || 'Failed to publish slots');
+    }
+  };
+
+  const handleDeleteSlot = async (slotId: number) => {
+    const confirmed = Platform.OS === 'web' 
+      ? window.confirm('Are you sure you want to delete this slot?')
+      : await new Promise((resolve) => {
+          Alert.alert(
+            'Confirm Delete',
+            'Are you sure you want to delete this slot?',
+            [
+              { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
+              { text: 'Delete', onPress: () => resolve(true), style: 'destructive' }
+            ]
+          );
+        });
+
+    if (!confirmed) return;
+
+    try {
+      const res = await axios.delete(`https://napi.bharatmedicalhallplus.com/doctors/slots/${slotId}`);
+      if (res.data.success) {
+        alert('Slot deleted successfully!');
+        fetchData();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete slot');
+    }
+  };
+
+  const handleToggleTv = async (slotId: number, currentVal: boolean) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/doctors/slots/${slotId}/tv`, { show_on_tv: !currentVal });
+      if (res.data.success) {
+        fetchData();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update TV visibility');
     }
   };
 
@@ -1383,6 +1421,19 @@ const fetchData = async () => {
                           </TouchableOpacity>
                           <TouchableOpacity style={{backgroundColor: '#eab308', padding: 6, borderRadius: 6, alignItems: 'center'}} onPress={() => openEditSlotModal(s)}>
                             <Text style={{color: 'white', fontSize: 12}}>Edit</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={{backgroundColor: s.show_on_tv !== false ? '#10b981' : '#64748b', padding: 6, borderRadius: 6, alignItems: 'center', flexDirection: 'row', gap: 4}} 
+                            onPress={() => handleToggleTv(s.id, s.show_on_tv !== false)}
+                          >
+                            <Tv color="white" size={12} />
+                            <Text style={{color: 'white', fontSize: 12}}>{s.show_on_tv !== false ? 'TV: On' : 'TV: Off'}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={{backgroundColor: '#ef4444', padding: 6, borderRadius: 6, alignItems: 'center'}} 
+                            onPress={() => handleDeleteSlot(s.id)}
+                          >
+                            <Text style={{color: 'white', fontSize: 12}}>Delete</Text>
                           </TouchableOpacity>
                         </View>
                       </View>

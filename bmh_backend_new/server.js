@@ -201,6 +201,10 @@ app.listen(PORT, () => {
     .then(() => console.log('Successfully checked/patched notes in online_orders.'))
     .catch(err => console.error('Error patching online_orders (notes):', err.message));
 
+  pool.query('ALTER TABLE doctor_slots ADD COLUMN IF NOT EXISTS show_on_tv BOOLEAN DEFAULT true')
+    .then(() => console.log('Successfully checked/patched show_on_tv in doctor_slots.'))
+    .catch(err => console.error('Error patching doctor_slots (show_on_tv):', err.message));
+
   // ecogreen_sales_orders modifications
   pool.query('ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP')
     .then(() => console.log('Successfully checked/patched delivered_at in ecogreen_sales_orders.'))
