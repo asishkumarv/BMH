@@ -409,6 +409,16 @@ app.listen(PORT, () => {
     ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS approved_by_dept VARCHAR(100);
     ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
     ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS due_date TIMESTAMP;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS priority VARCHAR(50);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS task_id INTEGER;
+
+    CREATE TABLE IF NOT EXISTS stationary_vendors (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      address TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `).catch(e => console.error(e.message));
 
   pool.query(`

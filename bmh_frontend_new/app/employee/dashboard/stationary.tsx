@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
-import { Package, Plus, Minus, ShoppingCart, Clock, Eye, Upload, X, Calendar, DollarSign } from 'lucide-react-native';
+import { Package, Plus, Minus, ShoppingCart, Clock, Eye, Upload, X, Calendar, DollarSign, Trash2 } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,6 +42,8 @@ export default function EmployeeStationaryScreen() {
   const [shopAddress, setShopAddress] = useState('');
   const [qtyToBuy, setQtyToBuy] = useState('');
   const [assigningTask, setAssigningTask] = useState(false);
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
 
   // Task Completion Modal States
   const [completeModalVisible, setCompleteModalVisible] = useState(false);
@@ -53,8 +55,18 @@ export default function EmployeeStationaryScreen() {
   // Preview Bill Image
   const [previewBillImage, setPreviewBillImage] = useState<string | null>(null);
 
+  // Vendor Management States
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [manageVendorsModalOpen, setManageVendorsModalOpen] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorAddress, setNewVendorAddress] = useState('');
+  const [selectedPredefinedVendor, setSelectedPredefinedVendor] = useState('');
+  const [taskPriority, setTaskPriority] = useState('Moderate');
+  const [taskDueDate, setTaskDueDate] = useState('');
+
   useEffect(() => {
     fetchData();
+    fetchVendors();
   }, [activeTab]);
 
   const getCurrentUser = () => {
@@ -124,19 +136,109 @@ export default function EmployeeStationaryScreen() {
     }
   };
 
+  const fetchVendors = async () => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/vendors');
+      if (res.data.success) {
+        setVendors(res.data.data);
+      }
+    } catch (e) {
+      console.log('Error fetching vendors:', e);
+    }
+  };
+
+  const handleAddVendor = async () => {
+    if (!newVendorName) return Alert.alert('Error', 'Vendor name is required');
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/vendors', {
+        name: newVendorName,
+        address: newVendorAddress
+      });
+      if (res.data.success) {
+        setNewVendorName('');
+        setNewVendorAddress('');
+        fetchVendors();
+        Alert.alert('Success', 'Vendor added successfully!');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to add vendor');
+    }
+  };
+
+  const handleDeleteVendor = async (vendorId: string) => {
+    try {
+      const res = await axios.delete(`https://napi.bharatmedicalhallplus.com/stationary/vendors/${vendorId}`);
+      if (res.data.success) {
+        fetchVendors();
+        Alert.alert('Success', 'Vendor deleted successfully!');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to delete vendor');
+    }
+  };
+
+  const handleRejectRefill = async (refillId: string) => {
+    const executeReject = async () => {
+      try {
+        const u = getCurrentUser();
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/refills/${refillId}/reject`, {
+          rejected_by_name: u ? u.full_name : 'Employee',
+          rejected_by_role: u ? u.role || u.label : 'Employee',
+          rejected_by_dept: u ? u.department || 'N/A' : 'N/A'
+        });
+        if (res.data.success) {
+          Alert.alert('Success', 'Refill request rejected successfully.');
+          fetchData();
+        }
+      } catch (err) {
+        Alert.alert('Error', 'Failed to reject refill request.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm("Are you sure you want to reject this refill request?")) {
+        executeReject();
+      }
+    } else {
+      Alert.alert(
+        "Reject Request",
+        "Are you sure you want to reject this refill request?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Reject", style: "destructive", onPress: executeReject }
+        ]
+      );
+    }
+  };
+
+  const handleSelectPredefinedVendor = (vendorId: string) => {
+    setSelectedPredefinedVendor(vendorId);
+    if (vendorId === '') {
+      setShopName('');
+      setShopAddress('');
+    } else {
+      const selected = vendors.find(v => String(v.id) === String(vendorId));
+      if (selected) {
+        setShopName(selected.name);
+        setShopAddress(selected.address || '');
+      }
+    }
+  };
+
   const fetchUsersForAssignment = async () => {
     try {
-      const [empRes, subAdminRes] = await Promise.all([
-        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
-        axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins')
-      ]);
-      const emps = empRes.data.data || empRes.data || [];
-      const subAdmins = subAdminRes.data.data || subAdminRes.data || [];
-      const combined = [
-        ...emps.map((e: any) => ({ id: e.id.toString(), name: e.full_name, type: 'employee', label: `${e.full_name} (Employee)` })),
-        ...subAdmins.map((s: any) => ({ id: s.id.toString(), name: s.full_name, type: 'sub_admin', label: `${s.full_name} (Sub Admin)` }))
-      ];
-      setEmployeesAndSubAdmins(combined);
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/employees/all-users');
+      if (res.data.success) {
+        const nonDoctors = (res.data.data || []).filter((u: any) => u.type !== 'doctor' && u.role !== 'doctor');
+        const formatted = nonDoctors.map((u: any) => ({
+          id: u.id.toString(),
+          name: u.full_name,
+          type: u.type === 'department_admin' ? 'sub_admin' : 'employee',
+          department: u.department || 'N/A',
+          role: u.type === 'department_admin' ? 'Sub Admin' : (u.role || 'Employee')
+        }));
+        setEmployeesAndSubAdmins(formatted);
+      }
     } catch (err) {
       console.log('Error fetching users:', err);
     }
@@ -198,6 +300,9 @@ export default function EmployeeStationaryScreen() {
     setShopName('');
     setShopAddress('');
     setQtyToBuy(refill.qty_to_buy ? refill.qty_to_buy.toString() : '');
+    setTaskPriority('Moderate');
+    setTaskDueDate('');
+    setSelectedPredefinedVendor('');
     setAssignModalVisible(true);
     fetchUsersForAssignment();
   };
@@ -210,6 +315,10 @@ export default function EmployeeStationaryScreen() {
     const assigneeObj = employeesAndSubAdmins.find(e => e.id === selectedAssignee);
     if (!assigneeObj) return;
 
+    const u = getCurrentUser();
+    let assignerId = u ? u.id : 1;
+    let assignerType = u ? u.type : 'employee';
+
     setAssigningTask(true);
     try {
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/refills/${selectedRefill.id}/assign`, {
@@ -218,11 +327,17 @@ export default function EmployeeStationaryScreen() {
         task_notes: taskNotes,
         shop_name: shopName,
         shop_address: shopAddress,
-        qty_to_buy: parseInt(qtyToBuy) || 0
+        qty_to_buy: parseInt(qtyToBuy) || 0,
+        due_date: taskDueDate || null,
+        priority: taskPriority || 'Moderate',
+        assigner_type: assignerType,
+        assigner_id: assignerId
       });
       if (res.data.success) {
         Alert.alert('Success', 'Refill task assigned successfully!');
         setAssignModalVisible(false);
+        setTaskPriority('Moderate');
+        setTaskDueDate('');
         fetchData();
       }
     } catch (err) {
@@ -407,7 +522,7 @@ export default function EmployeeStationaryScreen() {
   );
 
   const renderRefillItem = ({ item }: { item: any }) => {
-    const statusColor = item.status === 'Filled' ? '#10b981' : item.status === 'Completed' ? '#3b82f6' : item.status === 'Assigned' ? '#f59e0b' : '#64748b';
+    const statusColor = item.status === 'Filled' ? '#10b981' : item.status === 'Completed' ? '#3b82f6' : item.status === 'Assigned' ? '#f59e0b' : item.status === 'Rejected' ? '#ef4444' : '#64748b';
     return (
       <View style={[styles.requestRow, { flexDirection: 'column', alignItems: 'stretch', gap: 12, marginBottom: 16 }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -466,6 +581,13 @@ export default function EmployeeStationaryScreen() {
               )}
             </View>
           )}
+        {item.status === 'Rejected' && (
+          <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10, backgroundColor: '#fef2f2', padding: 10, borderRadius: 8 }}>
+            <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>REJECTED AUDIT TRAIL</Text>
+            <Text style={{ fontSize: 13, color: '#991b1b', marginTop: 2 }}>Rejected By: {item.rejected_by_name} ({item.rejected_by_role})</Text>
+            {item.rejected_at && <Text style={{ fontSize: 12, color: '#b91c1c' }}>Rejected On: {new Date(item.rejected_at).toLocaleString()}</Text>}
+          </View>
+        )}
         </View>
 
         {item.status === 'Filled' && (
@@ -479,9 +601,14 @@ export default function EmployeeStationaryScreen() {
 
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }}>
           {hasRefillAccess && item.status === 'Requested' && (
-            <Pressable style={styles.actionBtn} onPress={() => openAssignModal(item)}>
-              <Text style={{ color: Colors.light.primary, fontWeight: '700' }}>Approve & Assign Task</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Pressable style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => handleRejectRefill(item.id)}>
+                <Text style={{ color: '#DC2626', fontWeight: '700' }}>Reject Request</Text>
+              </Pressable>
+              <Pressable style={styles.actionBtn} onPress={() => openAssignModal(item)}>
+                <Text style={{ color: Colors.light.primary, fontWeight: '700' }}>Approve & Assign Task</Text>
+              </Pressable>
+            </View>
           )}
           {hasRefillAccess && item.status === 'Completed' && (
             <Pressable style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => handleFillupSubmit(item.id, item.qty_to_buy || 0)}>
@@ -539,6 +666,15 @@ export default function EmployeeStationaryScreen() {
             </View>
             {isDesktop && <Text style={styles.cartBtnText}>View Cart</Text>}
           </Pressable>
+        )}
+
+        {hasRefillAccess && activeTab === 'task_assigning' && (
+          <View style={styles.headerButtons}>
+            <Pressable style={styles.secondaryBtn} onPress={() => setManageVendorsModalOpen(true)}>
+              <Plus size={18} color={Colors.light.primary} />
+              <Text style={styles.secondaryBtnText}>Manage Vendors</Text>
+            </Pressable>
+          </View>
         )}
       </View>
 
@@ -673,19 +809,117 @@ export default function EmployeeStationaryScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.label}>Select Assignee (Employee / Sub Admin)</Text>
+              <View style={{ position: 'relative', zIndex: 9999, marginBottom: 16 }}>
+                <Pressable 
+                  style={{ 
+                    borderWidth: 1, 
+                    borderColor: Colors.light.border, 
+                    borderRadius: 8, 
+                    backgroundColor: '#FFF',
+                    padding: 12,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+                >
+                  <Text style={{ fontSize: 15, color: selectedAssignee ? Colors.light.text : Colors.light.icon }}>
+                    {selectedAssignee 
+                      ? (() => {
+                          const found = employeesAndSubAdmins.find(u => String(u.id) === String(selectedAssignee));
+                          return found ? `${found.name} (${found.role} | Dept: ${found.department})` : '-- Choose User --';
+                        })()
+                      : '-- Choose User --'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: Colors.light.icon }}>▼</Text>
+                </Pressable>
+
+                {assigneeDropdownOpen && (
+                  <View style={{
+                    position: 'absolute',
+                    top: 50,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#FFF',
+                    borderWidth: 1,
+                    borderColor: Colors.light.border,
+                    borderRadius: 8,
+                    maxHeight: 250,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 4,
+                    padding: 8,
+                    zIndex: 10000
+                  }}>
+                    <TextInput
+                      style={{ 
+                        borderWidth: 1, 
+                        borderColor: Colors.light.border, 
+                        borderRadius: 6, 
+                        padding: 8, 
+                        fontSize: 14,
+                        marginBottom: 8,
+                        backgroundColor: '#f8fafc'
+                      }}
+                      placeholder="Search assignee..."
+                      value={assigneeSearchQuery}
+                      onChangeText={setAssigneeSearchQuery}
+                      autoFocus
+                    />
+                    <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled={true}>
+                      <Pressable 
+                        style={{ padding: 10, borderRadius: 6 }}
+                        onPress={() => {
+                          setSelectedAssignee('');
+                          setAssigneeDropdownOpen(false);
+                          setAssigneeSearchQuery('');
+                        }}
+                      >
+                        <Text style={{ color: Colors.light.icon }}>-- Choose User --</Text>
+                      </Pressable>
+                      {employeesAndSubAdmins
+                        .filter(u => {
+                          const q = assigneeSearchQuery.toLowerCase();
+                          return !assigneeSearchQuery || 
+                                 u.name?.toLowerCase().includes(q) || 
+                                 u.department?.toLowerCase().includes(q) ||
+                                 u.role?.toLowerCase().includes(q);
+                        })
+                        .map(u => (
+                          <Pressable 
+                            key={`${u.type}-${u.id}`}
+                            style={{ padding: 10, borderRadius: 6, borderBottomWidth: 0.5, borderBottomColor: '#f1f5f9' }}
+                            onPress={() => {
+                              setSelectedAssignee(u.id);
+                              setAssigneeDropdownOpen(false);
+                              setAssigneeSearchQuery('');
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.text }}>{u.name}</Text>
+                            <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{u.role} | Dept: {u.department}</Text>
+                          </Pressable>
+                        ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.label}>Predefined Vendor (Optional)</Text>
               <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
                 {Platform.OS === 'web' ? (
                   <select 
                     style={{ width: '100%', height: 40, border: 'none', backgroundColor: 'transparent', paddingLeft: 8, paddingRight: 8 }}
-                    value={selectedAssignee} onChange={(e) => setSelectedAssignee(e.target.value)}
+                    value={selectedPredefinedVendor} onChange={(e) => handleSelectPredefinedVendor(e.target.value)}
                   >
-                    <option value="">-- Choose User --</option>
-                    {employeesAndSubAdmins.map(u => <option key={u.id} value={u.id}>{u.label}</option>)}
+                    <option value="">-- Choose Predefined Vendor / Custom --</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
                 ) : (
-                  <Picker selectedValue={selectedAssignee} onValueChange={(v) => setSelectedAssignee(v)}>
-                    <Picker.Item label="-- Choose User --" value="" />
-                    {employeesAndSubAdmins.map(u => <Picker.Item key={u.id} label={u.label} value={u.id} />)}
+                  <Picker selectedValue={selectedPredefinedVendor} onValueChange={(v) => handleSelectPredefinedVendor(v)}>
+                    <Picker.Item label="-- Choose Predefined Vendor / Custom --" value="" />
+                    {vendors.map(v => <Picker.Item key={v.id} label={v.name} value={v.id} />)}
                   </Picker>
                 )}
               </View>
@@ -701,6 +935,54 @@ export default function EmployeeStationaryScreen() {
 
               <Text style={styles.label}>Task Instructions / Notes</Text>
               <TextInput style={styles.input} placeholder="e.g. Buy high quality A4 papers" value={taskNotes} onChangeText={setTaskNotes} />
+
+              <Text style={styles.label}>Task Priority</Text>
+              <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+                {Platform.OS === 'web' ? (
+                  <select 
+                    style={{ width: '100%', height: 40, border: 'none', backgroundColor: 'transparent', paddingLeft: 8, paddingRight: 8 }}
+                    value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="High">High</option>
+                  </select>
+                ) : (
+                  <Picker selectedValue={taskPriority} onValueChange={(v) => setTaskPriority(v)}>
+                    <Picker.Item label="Low" value="Low" />
+                    <Picker.Item label="Moderate" value="Moderate" />
+                    <Picker.Item label="High" value="High" />
+                  </Picker>
+                )}
+              </View>
+
+              <Text style={styles.label}>Due Date</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  style={{ 
+                    width: '100%', 
+                    height: 40, 
+                    border: '1px solid #cbd5e1', 
+                    borderRadius: 8, 
+                    paddingLeft: 8, 
+                    paddingRight: 8, 
+                    fontSize: 14, 
+                    color: Colors.light.text,
+                    backgroundColor: '#FFF',
+                    marginBottom: 20
+                  }}
+                  value={taskDueDate} 
+                  onChange={(e) => setTaskDueDate(e.target.value)} 
+                />
+              ) : (
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="YYYY-MM-DD" 
+                  value={taskDueDate} 
+                  onChangeText={setTaskDueDate} 
+                />
+              )}
 
               <View style={styles.modalActions}>
                 <Pressable style={styles.cancelBtn} onPress={() => setAssignModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
@@ -757,9 +1039,72 @@ export default function EmployeeStationaryScreen() {
         </Modal>
       )}
 
+      {customVendorModalMarkup(
+        vendors,
+        manageVendorsModalOpen,
+        () => setManageVendorsModalOpen(false),
+        newVendorName,
+        setNewVendorName,
+        newVendorAddress,
+        setNewVendorAddress,
+        handleAddVendor,
+        handleDeleteVendor,
+        isDesktop
+      )}
+
     </View>
   );
 }
+
+const customVendorModalMarkup = (
+  vendors: any[],
+  open: boolean,
+  onClose: () => void,
+  name: string,
+  setName: (v: string) => void,
+  addr: string,
+  setAddr: (v: string) => void,
+  onAdd: () => void,
+  onDel: (id: string) => void,
+  isDesktop: boolean
+) => (
+  <Modal visible={open} transparent animationType="fade">
+    <View style={styles.modalOverlay}>
+      <View style={[styles.modalContent, isDesktop && { width: 500 }, { maxHeight: '90%' }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <Text style={styles.modalTitle}>Manage Predefined Vendors</Text>
+          <Pressable onPress={onClose}><X size={24} color={Colors.light.icon}/></Pressable>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+          <Text style={[styles.label, { fontSize: 15, marginBottom: 12 }]}>Add New Vendor</Text>
+          <TextInput style={styles.input} placeholder="Vendor Shop Name" value={name} onChangeText={setName} />
+          <TextInput style={styles.input} placeholder="Vendor Shop Address" value={addr} onChangeText={setAddr} />
+          <Pressable style={[styles.submitBtn, { marginBottom: 24, alignSelf: 'flex-start' }]} onPress={onAdd}>
+            <Text style={styles.submitBtnText}>Add Vendor</Text>
+          </Pressable>
+
+          <Text style={[styles.label, { fontSize: 15, marginBottom: 12 }]}>Predefined Vendors List</Text>
+          {vendors.length === 0 ? (
+            <Text style={styles.emptyText}>No predefined vendors added yet.</Text>
+          ) : (
+            vendors.map(v => (
+              <View key={v.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text }}>{v.name}</Text>
+                  <Text style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>📍 {v.address || 'No Address'}</Text>
+                </View>
+                <Pressable onPress={() => onDel(v.id)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                  <Trash2 size={16} color="#ef4444" />
+                </Pressable>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>
+);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background, padding: 32 },

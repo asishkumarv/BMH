@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { notifyAssignee } = require('../utils/pushNotification');
 
 // --- Inventory Management ---
 
@@ -421,7 +422,33 @@ exports.getRefills = async (req, res) => {
 exports.assignRefillTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { assigned_to_id, assigned_to_type, task_notes, shop_name, shop_address, qty_to_buy } = req.body;
+    const { 
+      assigned_to_id, 
+      assigned_to_type, 
+      task_notes, 
+      shop_name, 
+      shop_address, 
+      qty_to_buy,
+      due_date,
+      priority,
+      assigner_type,
+      assigner_id
+    } = req.body;
+
+    // Self-healing database check
+    await pool.query(`
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS due_date TIMESTAMP;
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS priority VARCHAR(50);
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS task_id INTEGER;
+    `).catch(() => {});
+
+    // Resolve refill item details
+    const refillQuery = await pool.query('SELECT item_name FROM stationary_refills WHERE id = $1', [id]);
+    if (refillQuery.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Refill request not found' });
+    }
+    const itemName = refillQuery.rows[0].item_name;
+
     let assName = '';
     let assRole = '';
     let assDept = '';
@@ -448,13 +475,73 @@ exports.assignRefillTask = async (req, res) => {
       }
     }
 
+    // 1. Create a normal task in the tasks table
+    const taskInsert = await pool.query(
+      `INSERT INTO tasks 
+      (title, description, assigner_type, assigner_id, assignee_type, assignee_id, department, due_date, priority, is_group_task, group_assignees, category) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [
+        `Buy Stationary: ${itemName}`,
+        `Please buy ${qty_to_buy} items of ${itemName} from vendor "${shop_name}" located at "${shop_address}". Notes: ${task_notes || ''}`,
+        assigner_type || 'super_admin',
+        assigner_id || 1,
+        assigned_to_type === 'sub_admin' ? 'department_admin' : 'employee',
+        assigned_to_id,
+        assDept || 'Stationary',
+        due_date || null,
+        priority || 'Moderate',
+        false,
+        '[]',
+        'Stationary'
+      ]
+    );
+    const normalTaskId = taskInsert.rows[0].id;
+
+    // 2. Update the stationary refills request
     const result = await pool.query(
       `UPDATE stationary_refills 
        SET assigned_to_id = $1, assigned_to_type = $2, assigned_to_name = $3, assigned_to_role = $4, assigned_to_dept = $5,
-           task_notes = $6, shop_name = $7, shop_address = $8, qty_to_buy = $9, status = 'Assigned', updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $10 RETURNING *`,
-      [assigned_to_id, assigned_to_type, assName, assRole, assDept, task_notes, shop_name, shop_address, qty_to_buy, id]
+           task_notes = $6, shop_name = $7, shop_address = $8, qty_to_buy = $9, 
+           due_date = $10, priority = $11, task_id = $12, status = 'Assigned', updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $13 RETURNING *`,
+      [
+        assigned_to_id, 
+        assigned_to_type, 
+        assName, 
+        assRole, 
+        assDept, 
+        task_notes, 
+        shop_name, 
+        shop_address, 
+        qty_to_buy,
+        due_date || null,
+        priority || 'Moderate',
+        normalTaskId,
+        id
+      ]
     );
+
+    // 3. Create db notification
+    const notificationMessage = `You have been assigned a new stationary refill task: "${itemName}".`;
+    await pool.query(
+      'INSERT INTO notifications (user_type, user_id, message) VALUES ($1, $2, $3)',
+      [
+        assigned_to_type === 'sub_admin' ? 'department_admin' : 'employee', 
+        assigned_to_id, 
+        notificationMessage
+      ]
+    ).catch(e => console.error('Failed to write db notification:', e));
+
+    // 4. Trigger push notification
+    await notifyAssignee(
+      assigned_to_type === 'sub_admin' ? 'department_admin' : 'employee',
+      assigned_to_id,
+      `Buy Stationary: ${itemName}`,
+      assigner_type || 'super_admin',
+      assigner_id || 1,
+      normalTaskId
+    ).catch(e => console.error('Failed to trigger push notification:', e));
+
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error assigning refill task:', error);
@@ -521,5 +608,72 @@ exports.fillupRefillStock = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   } finally {
     client.release();
+  }
+};
+
+exports.rejectRefillRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejected_by_name, rejected_by_role, rejected_by_dept } = req.body;
+    
+    // Self-healing database check
+    await pool.query(`
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS rejected_by_name VARCHAR(255);
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS rejected_by_role VARCHAR(100);
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS rejected_by_dept VARCHAR(100);
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP;
+    `).catch(() => {});
+
+    const result = await pool.query(
+      `UPDATE stationary_refills 
+       SET status = 'Rejected', 
+           rejected_by_name = $1, rejected_by_role = $2, rejected_by_dept = $3,
+           rejected_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $4 RETURNING *`,
+      [rejected_by_name || null, rejected_by_role || null, rejected_by_dept || null, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Refill request not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error rejecting refill request:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getVendors = async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM stationary_vendors ORDER BY name ASC');
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching vendors:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.addVendor = async (req, res) => {
+  try {
+    const { name, address } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Vendor name is required' });
+    const result = await pool.query(
+      'INSERT INTO stationary_vendors (name, address) VALUES ($1, $2) RETURNING *',
+      [name, address]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error adding vendor:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.deleteVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM stationary_vendors WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Vendor deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting vendor:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
