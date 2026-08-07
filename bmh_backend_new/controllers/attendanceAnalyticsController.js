@@ -148,7 +148,7 @@ exports.getAdvancedReports = async (req, res) => {
         a.timestamp as check_in, a.checkout_timestamp as check_out, 
         NULL as check_in_image,
         NULL as check_out_image,
-        a.status, a.late_duration,
+        a.status, a.late_duration, a.remarks,
         ${extraFields},
         (
           SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
@@ -205,7 +205,7 @@ exports.getAdvancedReports = async (req, res) => {
             a.timestamp as check_in, a.checkout_timestamp as check_out, 
             NULL as check_in_image,
             NULL as check_out_image,
-            a.status, a.late_duration,
+            a.status, a.late_duration, a.remarks,
             ${extraFields},
             (
               SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
@@ -233,7 +233,7 @@ exports.getAdvancedReports = async (req, res) => {
             a.timestamp as check_in, a.checkout_timestamp as check_out, 
             NULL as check_in_image,
             NULL as check_out_image,
-            a.status, a.late_duration,
+            a.status, a.late_duration, a.remarks,
             ${extraFields},
             (
               SELECT json_agg(json_build_object('break_type', bl.break_type, 'timestamp', bl.timestamp AT TIME ZONE 'UTC', 'status', bl.status))
@@ -410,7 +410,7 @@ exports.getEmployeeAnalytics = async (req, res) => {
     // Fetch all attendance records with breaks
     let attendanceQuery = `
       SELECT 
-        a.id, a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status,
+        a.id, a.date, a.timestamp as check_in, a.checkout_timestamp as check_out, a.status, a.remarks,
         CASE WHEN a.image_url IS NOT NULL AND a.image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_in') ELSE NULL END as check_in_image,
         CASE WHEN a.checkout_image_url IS NOT NULL AND a.checkout_image_url != '' THEN CONCAT('https://napi.bharatmedicalhallplus.com/attendance/image/', a.id, '/check_out') ELSE NULL END as check_out_image,
         (

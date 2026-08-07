@@ -706,6 +706,11 @@ app.listen(PORT, () => {
       ADD COLUMN IF NOT EXISTS purchase_entry_error BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS mrpbox DECIMAL(10,2);
     `);
-  }).then(() => console.log('✅ Checker tables layout columns ensured.'))
+  }).then(() => {
+    return pool.query(`
+      ALTER TABLE attendance 
+      ADD COLUMN IF NOT EXISTS remarks VARCHAR(255);
+    `);
+  }).then(() => console.log('✅ Checker and Attendance tables layout columns ensured.'))
     .catch(e => console.error('Error creating Checker tables:', e.message));
 });

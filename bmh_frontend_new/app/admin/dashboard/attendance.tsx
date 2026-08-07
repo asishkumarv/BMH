@@ -1168,7 +1168,10 @@ export default function AdminAttendanceScreen() {
                   ))
                 ) : null}
               </View>
-              <Text style={[styles.tableCell, { width: 100 }]}>{r.status}</Text>
+              <View style={[styles.tableCellView, { width: 100, justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 14, color: Colors.light.text }}>{r.status}</Text>
+                {r.remarks ? <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '700', marginTop: 2 }}>{r.remarks}</Text> : null}
+              </View>
               <View style={[styles.tableCellView, { width: 100, alignItems: 'center', gap: 5 }]}>
                 <TouchableOpacity style={styles.actionBtnText} onPress={() => openEditModal(r)}>
                   <Edit2 size={16} color={Colors.light.primary} />

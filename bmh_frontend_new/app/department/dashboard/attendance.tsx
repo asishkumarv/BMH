@@ -1324,7 +1324,10 @@ export default function SubAdminAttendanceDashboard() {
                 {r.extra_break_mins > 0 ? <Text style={{fontSize: 12, color: '#ef4444'}}>Extra Break: {formatMins(r.extra_break_mins)}</Text> : null}
                 {(!r.late_checkin_mins && !r.early_checkin_mins && !r.early_checkout_mins && !r.extra_break_mins) ? <Text style={{fontSize: 12, color: '#10b981'}}>On Time</Text> : null}
               </View>
-              <Text style={[styles.tableCell, { width: 120 }]}>{r.status}</Text>
+              <View style={[styles.tableCellView, { width: 120, justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 14, color: Colors.light.text }}>{r.status}</Text>
+                {r.remarks ? <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '700', marginTop: 2 }}>{r.remarks}</Text> : null}
+              </View>
               <View style={[styles.tableCellView, { width: 100, alignItems: 'center', justifyContent: 'center' }]}>
                 <TouchableOpacity 
                   style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eff6ff', borderRadius: 8 }} 

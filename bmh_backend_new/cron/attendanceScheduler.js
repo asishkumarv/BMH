@@ -102,9 +102,49 @@ const checkAttendanceSchedules = async () => {
   }
 };
 
+const autoCheckoutShift = async () => {
+  try {
+    console.log('Running auto-checkout scheduler at 11:59 PM Asia/Kolkata...');
+    
+    // Auto-checkout users who checked in today and haven't checked out
+    const activeAttendances = await pool.query(
+      `SELECT id, employee_id, user_type FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL`
+    );
+    
+    console.log(`Found ${activeAttendances.rowCount} active shift(s) to auto-checkout.`);
+    
+    for (const att of activeAttendances.rows) {
+      await pool.query(
+        `UPDATE attendance 
+         SET checkout_timestamp = CURRENT_TIMESTAMP, remarks = 'System Checkout'
+         WHERE id = $1`,
+        [att.id]
+      );
+      
+      await pool.query(
+        `INSERT INTO attendance_audit_logs (employee_id, action_type, details) 
+         VALUES ($1, 'SYSTEM_CHECKOUT', 'Automatically checked out by system at 11:59 PM')`,
+        [att.employee_id]
+      );
+      
+      console.log(`Auto-checked out employee/subadmin ID: ${att.employee_id} (user_type: ${att.user_type})`);
+    }
+  } catch (error) {
+    console.error('Error running auto-checkout scheduler:', error);
+  }
+};
+
 // Run exactly every minute
 cron.schedule('* * * * *', () => {
   checkAttendanceSchedules();
 });
 
-module.exports = { checkAttendanceSchedules };
+// Run at 11:59 PM (23:59) Asia/Kolkata daily
+cron.schedule('59 23 * * *', () => {
+  autoCheckoutShift();
+}, {
+  scheduled: true,
+  timezone: "Asia/Kolkata"
+});
+
+module.exports = { checkAttendanceSchedules, autoCheckoutShift };

@@ -6,6 +6,19 @@ import { useResponsive } from '../../../hooks/useResponsive';
 import { ShieldCheck, Plus, Check, X, AlertTriangle } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const formatTimestamp = (ts: string | null) => {
+  if (!ts) return 'N/A';
+  const d = new Date(ts);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const timeStr = `${pad(hours)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
+  return `${dateStr} ${timeStr}`;
+};
+
 export default function AdminInventoryChecker() {
   const { isDesktop } = useResponsive();
   const [loading, setLoading] = useState(true);
@@ -471,13 +484,34 @@ export default function AdminInventoryChecker() {
                 <Text style={[styles.th, { flex: 2 }]}>Assigned On</Text>
               </View>
               {tasks.map((item, idx) => (
-                <View key={item.id || idx} style={styles.tableRow}>
-                  <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
-                  <Text style={[styles.td, { flex: 1.5 }]}>{item.rack_number}</Text>
-                  <Text style={[styles.td, { flex: 1.5, color: item.status === 'completed' ? '#10b981' : '#f59e0b', fontWeight: 'bold', textTransform: 'capitalize' }]}>
-                    {item.status}
-                  </Text>
-                  <Text style={[styles.td, { flex: 2 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                <View key={item.id || idx} style={{ borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingVertical: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.td, { flex: 2, fontWeight: '700' }]}>{item.assigned_to_name}</Text>
+                    <Text style={[styles.td, { flex: 1.5 }]}>{item.rack_number}</Text>
+                    <Text style={[styles.td, { flex: 1.5, color: item.status === 'completed' ? '#10b981' : '#f59e0b', fontWeight: 'bold', textTransform: 'capitalize' }]}>
+                      {item.status}
+                    </Text>
+                    <Text style={[styles.td, { flex: 2 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                  </View>
+                  
+                  {/* Detailed metrics and timestamps for inventory task */}
+                  <View style={{ marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, gap: 4 }}>
+                    <Text style={{ fontSize: 12, color: '#64748b' }}>
+                      📅 Assigned: {formatTimestamp(item.created_at)}
+                      {item.start_time ? ` | ⏱️ Started: ${formatTimestamp(item.start_time)}` : ''}
+                      {item.end_time ? ` | 🏁 Ended: ${formatTimestamp(item.end_time)}` : ''}
+                    </Text>
+                    {item.status === 'completed' && (
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>
+                        Duration: {item.duration ? Math.round(item.duration / 60) + 'm ' + (item.duration % 60) + 's' : 'N/A'}
+                      </Text>
+                    )}
+                    {item.remarks && (
+                      <Text style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
+                        Remarks: {item.remarks}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               ))}
               {tasks.length === 0 && (

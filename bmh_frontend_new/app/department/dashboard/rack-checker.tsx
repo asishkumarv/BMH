@@ -7,6 +7,19 @@ import { ShieldCheck, Plus, Check, X, AlertTriangle } from 'lucide-react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EmployeeRackChecker from '../../employee/dashboard/rack-checker';
 
+const formatTimestamp = (ts: string | null) => {
+  if (!ts) return 'N/A';
+  const d = new Date(ts);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const timeStr = `${pad(hours)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
+  return `${dateStr} ${timeStr}`;
+};
+
 export default function SubAdminRackChecker() {
   const { isDesktop } = useResponsive();
   const [loading, setLoading] = useState(true);
@@ -545,64 +558,71 @@ export default function SubAdminRackChecker() {
                         <Text style={[styles.td, { flex: 2 }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
                       </View>
 
-                      {/* Detailed metrics for completed/verified/rejected rack organization */}
-                      {(item.status === 'Completed' || item.status === 'Verified' || item.status === 'Rejected') && (
-                        <View style={{ marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, gap: 4 }}>
-                          <Text style={{ fontSize: 12, color: '#64748b' }}>
-                            Duration: {item.duration ? Math.round(item.duration / 60) + 'm ' + (item.duration % 60) + 's' : 'N/A'} | 
-                            SKUs: {item.sku_count || 0} | Batches: {item.batch_count || 0} | Total Qty: {item.total_qty || 0}
-                          </Text>
-                          {item.remarks && (
-                            <Text style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
-                              Remarks: {item.remarks}
+                      {/* Detailed metrics and timestamps for rack organization */}
+                      <View style={{ marginTop: 8, padding: 10, backgroundColor: '#f8fafc', borderRadius: 8, gap: 4 }}>
+                        <Text style={{ fontSize: 12, color: '#64748b' }}>
+                          📅 Assigned: {formatTimestamp(item.created_at)}
+                          {item.start_time ? ` | ⏱️ Started: ${formatTimestamp(item.start_time)}` : ''}
+                          {item.end_time ? ` | 🏁 Ended: ${formatTimestamp(item.end_time)}` : ''}
+                        </Text>
+                        {(item.status === 'Completed' || item.status === 'Verified' || item.status === 'Rejected') && (
+                          <>
+                            <Text style={{ fontSize: 12, color: '#64748b' }}>
+                              Duration: {item.duration ? Math.round(item.duration / 60) + 'm ' + (item.duration % 60) + 's' : 'N/A'} | 
+                              SKUs: {item.sku_count || 0} | Batches: {item.batch_count || 0} | Total Qty: {item.total_qty || 0}
                             </Text>
-                          )}
-                          
-                          {item.status === 'Completed' && (
-                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
-                              {rejectingId === item.id ? (
-                                <View style={{ flex: 1, gap: 6 }}>
-                                  <TextInput 
-                                    style={[styles.textInput, { marginBottom: 0, height: 35, fontSize: 12 }]} 
-                                    placeholder="Enter rejection reason..."
-                                    value={rejectRemarks}
-                                    onChangeText={setRejectRemarks}
-                                  />
-                                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                                    <TouchableOpacity 
-                                      style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#ef4444', borderRadius: 4 }}
-                                      onPress={() => handleReviewAssignment(item.id, 'Rejected', rejectRemarks)}
-                                    >
-                                      <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Confirm Reject</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity 
-                                      style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#64748b', borderRadius: 4 }}
-                                      onPress={() => setRejectingId(null)}
-                                    >
-                                      <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Cancel</Text>
-                                    </TouchableOpacity>
+                            {item.remarks && (
+                              <Text style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
+                                Remarks: {item.remarks}
+                              </Text>
+                            )}
+                            
+                            {item.status === 'Completed' && (
+                              <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+                                {rejectingId === item.id ? (
+                                  <View style={{ flex: 1, gap: 6 }}>
+                                    <TextInput 
+                                      style={[styles.textInput, { marginBottom: 0, height: 35, fontSize: 12 }]} 
+                                      placeholder="Enter rejection reason..."
+                                      value={rejectRemarks}
+                                      onChangeText={setRejectRemarks}
+                                    />
+                                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                                      <TouchableOpacity 
+                                        style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#ef4444', borderRadius: 4 }}
+                                        onPress={() => handleReviewAssignment(item.id, 'Rejected', rejectRemarks)}
+                                      >
+                                        <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Confirm Reject</Text>
+                                      </TouchableOpacity>
+                                      <TouchableOpacity 
+                                        style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#64748b', borderRadius: 4 }}
+                                        onPress={() => setRejectingId(null)}
+                                      >
+                                        <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>Cancel</Text>
+                                      </TouchableOpacity>
+                                    </View>
                                   </View>
-                                </View>
-                              ) : (
-                                <>
-                                  <TouchableOpacity 
-                                    style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#10b981', borderRadius: 6 }}
-                                    onPress={() => handleReviewAssignment(item.id, 'Verified')}
-                                  >
-                                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Approve & Store</Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity 
-                                    style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'white', borderWidth: 1, borderColor: '#ef4444', borderRadius: 6 }}
-                                    onPress={() => setRejectingId(item.id)}
-                                  >
-                                    <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Reject / Reopen</Text>
-                                  </TouchableOpacity>
-                                </>
-                              )}
-                            </View>
-                          )}
-                        </View>
-                      )}
+                                ) : (
+                                  <>
+                                    <TouchableOpacity 
+                                      style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#10b981', borderRadius: 6 }}
+                                      onPress={() => handleReviewAssignment(item.id, 'Verified')}
+                                    >
+                                      <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Approve & Store</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                      style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'white', borderWidth: 1, borderColor: '#ef4444', borderRadius: 6 }}
+                                      onPress={() => setRejectingId(item.id)}
+                                    >
+                                      <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Reject / Reopen</Text>
+                                    </TouchableOpacity>
+                                  </>
+                                )}
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
                     </View>
                   ))}
                   {assignments.length === 0 && (
