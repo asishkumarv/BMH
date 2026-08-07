@@ -12,5 +12,7 @@ router.delete('/templates/:name', crmController.deleteTemplate);
 router.post('/voice-call', crmController.initiateVoiceCall);
 router.post('/webhook', crmController.handleDoubleTickWebhook);
 router.post('/trigger-refill-reminders', crmController.triggerRefillReminders);
+router.get('/reorders', crmController.getReorders);
+router.put('/reorders/:id/status', crmController.updateReorderStatus);
 
 module.exports = router;

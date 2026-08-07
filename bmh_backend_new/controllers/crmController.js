@@ -545,91 +545,47 @@ exports.handleDoubleTickWebhook = async (req, res) => {
               [invoice.id]
             );
             
-            // Create sales order with same details and same items/quantity
             const client = await pool.connect();
             try {
               await client.query('BEGIN');
               
-              const ordDate = new Date().toISOString().split('T')[0];
-              const ordTime = new Date().toTimeString().split(' ')[0];
-              
               const insertHeader = `
-                INSERT INTO ecogreen_sales_orders (
-                  ip_no, mobile_no, patient_name, patient_address, patient_email, counter_sale,
-                  ord_date, ord_time, user_id, act_code, act_name, dr_code, dr_name, dr_address,
-                  dr_reg_no, dr_office_code, dman_code, order_total, order_disc_per, ref_no,
-                  order_id, remark, urgent_flag, ord_conversion_flag, dc_conversion_flag,
-                  ord_ref_no, sys_name, sys_ip, sys_user, status, delivery_type, payment_mode
-                ) VALUES (
-                  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                  $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
-                ) RETURNING id;
+                INSERT INTO refill_reorders (
+                  patient_name, mobile_no, patient_address, invoice_id, reminder_date, status
+                ) VALUES ($1, $2, $3, $4, $5, 'Pending') RETURNING id;
               `;
               
               const headerValues = [
-                invoice.invoice_id ? (invoice.invoice_id + '-REORDER') : ('REORDER-' + invoice.id),
-                cleanPhone,
                 invoice.patient_name || 'Walk-in Patient',
+                cleanPhone,
                 invoice.patient_address || '',
-                null, // patient_email
-                invoice.counter_sale || null,
-                ordDate,
-                ordTime,
-                invoice.user_id || 'system',
-                invoice.act_code || null,
-                invoice.act_name || null,
-                invoice.dr_code || null,
-                invoice.dr_name || null,
-                invoice.dr_address || null,
-                invoice.dr_reg_no || null,
-                invoice.dr_office_code || null,
-                invoice.dman_code || null,
-                invoice.order_total ? parseFloat(invoice.order_total) : 0,
-                invoice.order_disc_per ? parseFloat(invoice.order_disc_per) : 0,
-                invoice.ref_no || null,
-                invoice.order_id || null,
-                'Auto Reordered from Refill Reminder (Invoice: ' + (invoice.invoice_id || invoice.id) + ')',
-                invoice.urgent_flag || null,
-                invoice.ord_conversion_flag || null,
-                invoice.dc_conversion_flag || null,
-                invoice.ord_ref_no || null,
-                invoice.sys_name || null,
-                invoice.sys_ip || null,
-                invoice.sys_user || null,
-                'Pending', // status
-                invoice.delivery_type || 'Local',
-                invoice.payment_mode || 'POD'
+                invoice.invoice_id || null,
+                invoice.reminder_date || null
               ];
               
               const headerRes = await client.query(insertHeader, headerValues);
-              const savedOrderId = headerRes.rows[0].id;
+              const savedReorderId = headerRes.rows[0].id;
               
               // Insert Items
               for (const item of itemsRes.rows) {
                 const insertItem = `
-                  INSERT INTO ecogreen_sales_order_items (
-                    sales_order_id, item_seq, itemcode, item_name, total_loose_qty, total_loose_sch_qty,
-                    service_qty, sale_rate, disc_per, sch_disc_per
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                  INSERT INTO refill_reorder_items (
+                    refill_reorder_id, itemcode, item_name, quantity, rate
+                  ) VALUES ($1, $2, $3, $4, $5)
                 `;
                 const itemValues = [
-                  savedOrderId,
-                  item.item_seq || 1,
+                  savedReorderId,
                   item.itemcode || null,
                   item.item_name || null,
-                  item.total_loose_qty || 0,
-                  item.total_loose_sch_qty || 0,
-                  item.service_qty || 0,
-                  item.sale_rate || 0,
-                  item.disc_per || '0.00',
-                  item.sch_disc_per || '0.00'
+                  item.total_loose_qty || 1,
+                  item.sale_rate || 0
                 ];
                 await client.query(insertItem, itemValues);
               }
               
               await client.query('COMMIT');
-              console.log(`[DoubleTick Webhook] Successfully created reorder sales order ID: ${savedOrderId}`);
-              responseMessage = 'Order created successfully! Our home delivery team will contact you soon.';
+              console.log(`[DoubleTick Webhook] Successfully created reorder ID: ${savedReorderId}`);
+              responseMessage = 'Order request created successfully! Our team will contact you soon to confirm and place your order.';
             } catch (err) {
               await client.query('ROLLBACK');
               console.error('[DoubleTick Webhook] Transaction error creating reorder:', err.stack);
@@ -730,5 +686,32 @@ exports.triggerRefillReminders = async (req, res) => {
   } catch (error) {
     console.error('Error triggering refill reminders:', error.message);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getReorders = async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM refill_reorders ORDER BY created_at DESC');
+    const reorders = result.rows;
+    for (let r of reorders) {
+      const itemsRes = await pool.query('SELECT * FROM refill_reorder_items WHERE refill_reorder_id = $1', [r.id]);
+      r.items = itemsRes.rows;
+    }
+    res.json({ success: true, data: reorders });
+  } catch (err) {
+    console.error('Error fetching reorders:', err.message);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.updateReorderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await pool.query('UPDATE refill_reorders SET status = $1 WHERE id = $2', [status, id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating reorder status:', err.message);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

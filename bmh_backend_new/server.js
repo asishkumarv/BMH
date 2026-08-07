@@ -337,6 +337,31 @@ app.listen(PORT, () => {
     ADD COLUMN IF NOT EXISTS refill_followup_sent_at TIMESTAMP DEFAULT NULL
   `).catch(e => console.error(e.message));
 
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS refill_reorders (
+      id SERIAL PRIMARY KEY,
+      patient_name VARCHAR(255),
+      mobile_no VARCHAR(50),
+      patient_address TEXT,
+      invoice_id VARCHAR(100),
+      reminder_date VARCHAR(50),
+      status VARCHAR(50) DEFAULT 'Pending',
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).then(() => {
+    return pool.query(`
+      CREATE TABLE IF NOT EXISTS refill_reorder_items (
+        id SERIAL PRIMARY KEY,
+        refill_reorder_id INTEGER REFERENCES refill_reorders(id) ON DELETE CASCADE,
+        itemcode VARCHAR(100),
+        item_name VARCHAR(255),
+        quantity NUMERIC,
+        rate NUMERIC
+      )
+    `);
+  }).catch(e => console.error(e.message));
+
   pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS reminder_date VARCHAR(255)").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS reminder_date VARCHAR(255)").catch(e => console.error(e.message));
 

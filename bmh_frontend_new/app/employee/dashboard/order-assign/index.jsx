@@ -6,6 +6,7 @@ import { Package, MapPin, Bus, User, Map, CheckCircle, Search, Filter, Calendar,
 import ManualOrders from './ManualOrders';
 import SalesOrders from './SalesOrders';
 import PurchaseOrders from './PurchaseOrders';
+import RefillReorders from './RefillReorders';
 
 export default function OrderAssignScreen() {
   const { width } = useWindowDimensions();
@@ -384,6 +385,11 @@ export default function OrderAssignScreen() {
               Purchase Orders ({poStats.total} | {poStats.assigned} | {poStats.delivered})
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveTab('Refill Reorders')} style={{paddingVertical: 10, borderBottomWidth: activeTab === 'Refill Reorders' ? 2 : 0, borderBottomColor: '#4338ca'}}>
+            <Text style={{fontWeight: activeTab === 'Refill Reorders' ? 'bold' : 'normal', color: activeTab === 'Refill Reorders' ? '#4338ca' : '#64748b', fontSize: 13}}>
+              Refill Reorders
+            </Text>
+          </TouchableOpacity>
           <Text style={{ fontSize: 11, color: '#94a3b8', marginLeft: 16 }}>(Today's Total | Assigned | Delivered)</Text>
         </ScrollView>
       </View>
@@ -394,6 +400,8 @@ export default function OrderAssignScreen() {
         <SalesOrders deliveryBoys={deliveryBoys} storeDeliveryFleet={storeDeliveryFleet} onStartAssignment={openAssignModal} />
       ) : activeTab === 'Purchase Orders' ? (
         <PurchaseOrders deliveryBoys={deliveryBoys} storeDeliveryFleet={storeDeliveryFleet} onStartAssignment={openAssignModal} />
+      ) : activeTab === 'Refill Reorders' ? (
+        <RefillReorders />
       ) : (
       <>
         {/* Header */}
