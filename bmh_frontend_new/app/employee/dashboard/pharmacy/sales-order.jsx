@@ -96,6 +96,7 @@ export default function SalesOrder() {
     ordDate: new Date().toISOString().split('T')[0],
     ordTime: new Date().toTimeString().split(' ')[0],
     userId: "",
+    reminderDate: "",
     actCode: "GC01",
     actName: "",
     drCode: "GD01",
@@ -397,6 +398,34 @@ export default function SalesOrder() {
             <View style={styles.fieldRow}>
               <Text style={styles.fieldLabel}>E-mail</Text>
               <TextInput style={[styles.input, {flex: 1}]} value={formData.patientEmail} onChangeText={t => updateField('patientEmail', t)} />
+            </View>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Reminder Date</Text>
+              {Platform.OS === 'web' ? (
+                <input 
+                  type="date"
+                  value={formData.reminderDate || ''}
+                  onChange={(e) => updateField('reminderDate', e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    backgroundColor: '#fff',
+                    color: '#000',
+                    height: '32px'
+                  }}
+                />
+              ) : (
+                <TextInput 
+                  style={[styles.input, {flex: 1}]} 
+                  placeholder="YYYY-MM-DD"
+                  value={formData.reminderDate} 
+                  onChangeText={t => updateField('reminderDate', t)} 
+                />
+              )}
             </View>
           </View>
           

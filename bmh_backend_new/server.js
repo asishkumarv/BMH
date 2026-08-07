@@ -328,6 +328,18 @@ app.listen(PORT, () => {
     pool.query("UPDATE ecogreen_sales_invoices SET crm_greetings_sent = TRUE WHERE crm_greetings_sent IS NULL").catch(e => {});
   }).catch(e => console.error(e.message));
 
+  pool.query(`
+    ALTER TABLE ecogreen_sales_invoices 
+    ADD COLUMN IF NOT EXISTS refill_reminder_sent BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS refill_reminder_status VARCHAR(100) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS refill_reminder_sent_at TIMESTAMP DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS refill_followup_sent BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS refill_followup_sent_at TIMESTAMP DEFAULT NULL
+  `).catch(e => console.error(e.message));
+
+  pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS reminder_date VARCHAR(255)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS reminder_date VARCHAR(255)").catch(e => console.error(e.message));
+
   pool.query("ALTER TABLE ecogreensales_invoices ADD COLUMN IF NOT EXISTS crm_greetings_sent BOOLEAN DEFAULT FALSE").then(() => {
     pool.query("UPDATE ecogreensales_invoices SET crm_greetings_sent = TRUE WHERE crm_greetings_sent IS NULL").catch(e => {});
   }).catch(e => console.error(e.message));
@@ -540,6 +552,14 @@ app.listen(PORT, () => {
     startCrmGreetingsCron();
   } catch (err) {
     console.error("Failed to start CRM greetings scan cron:", err.message);
+  }
+
+  // Initialize Medicine Refill Reminder Scheduler
+  try {
+    const { startRefillReminderCron } = require('./cron/refillReminderScheduler');
+    startRefillReminderCron();
+  } catch (err) {
+    console.error("Failed to start Refill Reminder scheduler:", err.message);
   }
 
   // Initialize and Seed Doctor Schedules DB Table

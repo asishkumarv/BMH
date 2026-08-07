@@ -1339,7 +1339,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                   }}
                 >
                   <Text style={[styles.toggleBtnText, messageType === 'template' && styles.toggleBtnTextActive]}>
-                    Approved Template
+                    Templates (Approved/Pending)
                   </Text>
                 </Pressable>
               </View>
@@ -1378,12 +1378,12 @@ export default function CRMView({ userType }: CRMViewProps) {
                             selectedTemplateName === t.name && styles.templatePickerTextActive
                           ]}
                         >
-                          {t.name} ({t.category})
+                          {t.name} ({t.category}) - {t.status}
                         </Text>
                       </Pressable>
                     ))}
                     {templates.length === 0 && (
-                      <Text style={styles.emptyText}>No approved templates found in DoubleTick.</Text>
+                      <Text style={styles.emptyText}>No templates found in DoubleTick.</Text>
                     )}
                   </ScrollView>
 
@@ -1511,7 +1511,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                       }}
                     >
                       <Text style={[styles.toggleBtnText, indivMessageType === 'template' && styles.toggleBtnTextActive]}>
-                        Approved Template
+                        Templates (Approved/Pending)
                       </Text>
                     </Pressable>
                   </View>
@@ -1550,7 +1550,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                                 indivTemplateName === t.name && styles.templatePickerTextActive
                               ]}
                             >
-                              {t.name} ({t.category})
+                              {t.name} ({t.category}) - {t.status}
                             </Text>
                           </Pressable>
                         ))}
@@ -2064,7 +2064,7 @@ export default function CRMView({ userType }: CRMViewProps) {
                           selectedVoiceTemplateName === t.name && styles.templatePickerTextActive
                         ]}
                       >
-                        {t.name} ({t.category})
+                        {t.name} ({t.category}) - {t.status}
                       </Text>
                     </Pressable>
                   ))}

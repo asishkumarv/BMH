@@ -65,6 +65,19 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
       setAutoAssignEnabled(!val); // Revert
     }
   };
+  const handleTriggerRefillReminders = async () => {
+    try {
+      const res = await axios.post('https://napi.bharatmedicalhallplus.com/crm/trigger-refill-reminders');
+      if (res.data && res.data.success) {
+        alert('Refill reminders cron triggered and executed successfully!');
+      } else {
+        alert('Failed to trigger refill reminders');
+      }
+    } catch (e) {
+      console.log('Error triggering refill reminders:', e);
+      alert('Error triggering refill reminders: ' + (e.response?.data?.message || e.message));
+    }
+  };
   const [busesModalVisible, setBusesModalVisible] = useState(false);
   const [editingBus, setEditingBus] = useState(null);
   const [isAddingBus, setIsAddingBus] = useState(false);
@@ -900,6 +913,9 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
         
         {/* Buses Button next to filters */}
         <View style={{flexDirection: 'row', gap: 10}}>
+          <TouchableOpacity style={[styles.addBtn, {backgroundColor: '#10b981'}]} onPress={handleTriggerRefillReminders}>
+            <Text style={styles.addBtnText}>Trigger Refill Reminders</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.addBtn, {backgroundColor: '#4f46e5'}]} onPress={() => setBusesModalVisible(true)}>
             <Bus size={18} color="#fff" style={{marginRight: 6}} />
             <Text style={styles.addBtnText}>Buses</Text>

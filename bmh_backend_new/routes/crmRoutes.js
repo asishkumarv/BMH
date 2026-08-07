@@ -10,5 +10,7 @@ router.get('/templates', crmController.getTemplates);
 router.post('/templates', crmController.createTemplate);
 router.delete('/templates/:name', crmController.deleteTemplate);
 router.post('/voice-call', crmController.initiateVoiceCall);
+router.post('/webhook', crmController.handleDoubleTickWebhook);
+router.post('/trigger-refill-reminders', crmController.triggerRefillReminders);
 
 module.exports = router;

@@ -13,7 +13,7 @@ router.post('/', async (req, res) => {
       ordDate, ordTime, userId, actCode, actName, drCode, drName, drAddress,
       drRegNo, drOfficeCode, dmanCode, orderTotal, orderDiscPer, refNo,
       orderId, remark, urgentFlag, ordConversionFlag, dcConversionFlag,
-      ordRefNo, sysName, sysIp, sysUser, materialInfo
+      ordRefNo, sysName, sysIp, sysUser, materialInfo, reminderDate, reminder_date
     } = req.body;
 
     await client.query('BEGIN');
@@ -31,6 +31,8 @@ router.post('/', async (req, res) => {
       }
     }
 
+    const rDate = reminderDate || reminder_date || null;
+
     // 1. Insert Sales Order Header
     const insertHeader = `
       INSERT INTO ecogreen_sales_orders (
@@ -38,10 +40,10 @@ router.post('/', async (req, res) => {
         ord_date, ord_time, user_id, act_code, act_name, dr_code, dr_name, dr_address,
         dr_reg_no, dr_office_code, dman_code, order_total, order_disc_per, ref_no,
         order_id, remark, urgent_flag, ord_conversion_flag, dc_conversion_flag,
-        ord_ref_no, sys_name, sys_ip, sys_user, status
+        ord_ref_no, sys_name, sys_ip, sys_user, status, reminder_date
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
       ) RETURNING id;
     `;
     const headerValues = [
@@ -50,7 +52,8 @@ router.post('/', async (req, res) => {
       drRegNo, drOfficeCode, dmanCode, orderTotal, orderDiscPer, refNo,
       orderId, remark, urgentFlag, ordConversionFlag, dcConversionFlag,
       ordRefNo, sysName, sysIp, sysUser,
-      'Delivered'
+      'Delivered',
+      rDate
     ];
 
     const resHeader = await client.query(insertHeader, headerValues);

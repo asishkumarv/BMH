@@ -328,6 +328,9 @@ exports.getTemplates = async (req, res) => {
       headers: {
         'accept': 'application/json',
         'Authorization': config.apiKey
+      },
+      params: {
+        status: 'ALL'
       }
     });
 
@@ -477,5 +480,242 @@ exports.initiateVoiceCall = async (req, res) => {
   } catch (error) {
     console.error('CRM Voice Call Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: error.response?.data?.message || error.message });
+  }
+};
+
+exports.handleDoubleTickWebhook = async (req, res) => {
+  try {
+    console.log('Received DoubleTick webhook payload:', JSON.stringify(req.body));
+    
+    const event = req.body.event;
+    const data = req.body.data;
+    
+    if (event === 'incoming_message' && data && data.message) {
+      const fromPhone = data.from; // e.g. "919439085126"
+      const textBody = data.message.text?.body?.trim();
+      
+      if (fromPhone && textBody) {
+        // Clean phone number to get 10-digit mobile
+        let cleanPhone = fromPhone.replace(/\D/g, '');
+        if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+          cleanPhone = cleanPhone.substring(2);
+        }
+        
+        console.log(`[DoubleTick Webhook] Processing incoming reply "${textBody}" from phone: ${cleanPhone}`);
+        
+        // Find if this customer has a reminder sent
+        const reminderRes = await pool.query(
+          `SELECT id, patient_name, order_total, delivery_type, patient_address, invoice_id, reminder_date, patient_address_details, pharmacy_details, mobile_no, user_id, act_code, act_name, dr_code, dr_name, dr_address, dr_reg_no, dr_office_code, dman_code, order_disc_per, ref_no, order_id, remark, urgent_flag, ord_conversion_flag, dc_conversion_flag, ord_ref_no, sys_name, sys_ip, sys_user, payment_mode
+           FROM ecogreen_sales_invoices 
+           WHERE (mobile_no = $1 OR mobile_no = $2)
+             AND refill_reminder_sent = TRUE
+           ORDER BY refill_reminder_sent_at DESC
+           LIMIT 1`,
+          [cleanPhone, '91' + cleanPhone]
+        );
+        
+        if (reminderRes.rowCount > 0) {
+          const invoice = reminderRes.rows[0];
+          const replyUpper = textBody.toUpperCase();
+          
+          let responseMessage = '';
+          let statusUpdate = null;
+          
+          if (replyUpper === 'YES' || replyUpper.includes('YES') || replyUpper.includes('REORDER')) {
+            statusUpdate = 'Reordered';
+            
+            // Fetch items from the original invoice
+            const itemsRes = await pool.query(
+              `SELECT item_seq, itemcode, item_name, total_loose_qty, total_loose_sch_qty, service_qty, sale_rate, disc_per, sch_disc_per 
+               FROM ecogreen_sales_invoice_items 
+               WHERE sales_invoice_id = $1`,
+              [invoice.id]
+            );
+            
+            // Create sales order with same details and same items/quantity
+            const client = await pool.connect();
+            try {
+              await client.query('BEGIN');
+              
+              const ordDate = new Date().toISOString().split('T')[0];
+              const ordTime = new Date().toTimeString().split(' ')[0];
+              
+              const insertHeader = `
+                INSERT INTO ecogreen_sales_orders (
+                  ip_no, mobile_no, patient_name, patient_address, patient_email, counter_sale,
+                  ord_date, ord_time, user_id, act_code, act_name, dr_code, dr_name, dr_address,
+                  dr_reg_no, dr_office_code, dman_code, order_total, order_disc_per, ref_no,
+                  order_id, remark, urgent_flag, ord_conversion_flag, dc_conversion_flag,
+                  ord_ref_no, sys_name, sys_ip, sys_user, status, delivery_type, payment_mode
+                ) VALUES (
+                  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+                  $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
+                ) RETURNING id;
+              `;
+              
+              const headerValues = [
+                invoice.invoice_id ? (invoice.invoice_id + '-REORDER') : ('REORDER-' + invoice.id),
+                cleanPhone,
+                invoice.patient_name || 'Walk-in Patient',
+                invoice.patient_address || '',
+                null, // patient_email
+                invoice.counter_sale || null,
+                ordDate,
+                ordTime,
+                invoice.user_id || 'system',
+                invoice.act_code || null,
+                invoice.act_name || null,
+                invoice.dr_code || null,
+                invoice.dr_name || null,
+                invoice.dr_address || null,
+                invoice.dr_reg_no || null,
+                invoice.dr_office_code || null,
+                invoice.dman_code || null,
+                invoice.order_total ? parseFloat(invoice.order_total) : 0,
+                invoice.order_disc_per ? parseFloat(invoice.order_disc_per) : 0,
+                invoice.ref_no || null,
+                invoice.order_id || null,
+                'Auto Reordered from Refill Reminder (Invoice: ' + (invoice.invoice_id || invoice.id) + ')',
+                invoice.urgent_flag || null,
+                invoice.ord_conversion_flag || null,
+                invoice.dc_conversion_flag || null,
+                invoice.ord_ref_no || null,
+                invoice.sys_name || null,
+                invoice.sys_ip || null,
+                invoice.sys_user || null,
+                'Pending', // status
+                invoice.delivery_type || 'Local',
+                invoice.payment_mode || 'POD'
+              ];
+              
+              const headerRes = await client.query(insertHeader, headerValues);
+              const savedOrderId = headerRes.rows[0].id;
+              
+              // Insert Items
+              for (const item of itemsRes.rows) {
+                const insertItem = `
+                  INSERT INTO ecogreen_sales_order_items (
+                    sales_order_id, item_seq, itemcode, item_name, total_loose_qty, total_loose_sch_qty,
+                    service_qty, sale_rate, disc_per, sch_disc_per
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                `;
+                const itemValues = [
+                  savedOrderId,
+                  item.item_seq || 1,
+                  item.itemcode || null,
+                  item.item_name || null,
+                  item.total_loose_qty || 0,
+                  item.total_loose_sch_qty || 0,
+                  item.service_qty || 0,
+                  item.sale_rate || 0,
+                  item.disc_per || '0.00',
+                  item.sch_disc_per || '0.00'
+                ];
+                await client.query(insertItem, itemValues);
+              }
+              
+              await client.query('COMMIT');
+              console.log(`[DoubleTick Webhook] Successfully created reorder sales order ID: ${savedOrderId}`);
+              responseMessage = 'Order created successfully! Our home delivery team will contact you soon.';
+            } catch (err) {
+              await client.query('ROLLBACK');
+              console.error('[DoubleTick Webhook] Transaction error creating reorder:', err.stack);
+              responseMessage = 'Sorry, there was an error processing your reorder request. Please contact us directly.';
+            } finally {
+              client.release();
+            }
+            
+          } else if (replyUpper.includes('ALREADY') || replyUpper.includes('PURCHASED')) {
+            statusUpdate = 'Completed Elsewhere';
+            responseMessage = 'Thank you. We have marked this refill reminder as completed.';
+          } else if (replyUpper.includes('DOCTOR') || replyUpper.includes('CHANGED') || replyUpper.includes('TREATMENT')) {
+            statusUpdate = 'Treatment Changed';
+            responseMessage = 'Thank you for updating us. We have paused future reminders for this prescription.';
+          } else if (replyUpper.includes('LATER') || replyUpper.includes('REMIND')) {
+            statusUpdate = 'Remind Later';
+            
+            // Reschedule reminder to 3 days from now
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 3);
+            const futureDateStr = futureDate.toISOString().split('T')[0];
+            
+            await pool.query(
+              `UPDATE ecogreen_sales_invoices 
+               SET reminder_date = $1, refill_reminder_sent = FALSE, refill_reminder_sent_at = NULL, refill_reminder_status = NULL 
+               WHERE id = $2`,
+              [futureDateStr, invoice.id]
+            );
+            
+            responseMessage = 'Sure, we will remind you again in 3 days.';
+          } else if (replyUpper === 'STOP' || replyUpper.includes('STOP') || replyUpper.includes('UNSUBSCRIBE')) {
+            statusUpdate = 'Opted Out';
+            responseMessage = 'You have successfully opted out of refill reminders. We will not send you any more reminders.';
+          } else {
+            // Fallback response showing options
+            responseMessage = `Please reply with one of the options below:
+1. YES - to reorder the medicine
+2. Already Purchased - if you bought it elsewhere
+3. Doctor Changed Medicine - if your treatment has changed
+4. Remind Me Later - to get a reminder in 3 days
+5. STOP - to unsubscribe from refill reminders`;
+          }
+          
+          if (statusUpdate) {
+            await pool.query(
+              `UPDATE ecogreen_sales_invoices 
+               SET refill_reminder_status = $1 
+               WHERE id = $2`,
+              [statusUpdate, invoice.id]
+            );
+          }
+          
+          // Send back the auto-response message via DoubleTick
+          const resultDT = await pool.query("SELECT value FROM settings WHERE key = 'doubletick_config'");
+          if (resultDT.rowCount > 0) {
+            let val = resultDT.rows[0].value;
+            if (typeof val === 'string') val = JSON.parse(val);
+            
+            if (val && val.apiKey && val.wabaNumber) {
+              await axios.post(
+                'https://public.doubletick.io/whatsapp/message/text',
+                {
+                  to: fromPhone,
+                  from: val.wabaNumber,
+                  content: {
+                    text: responseMessage
+                  }
+                },
+                {
+                  headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json',
+                    'Authorization': val.apiKey
+                  }
+                }
+              );
+              console.log(`[DoubleTick Webhook] Auto-response message sent to ${fromPhone}`);
+            }
+          }
+        } else {
+          console.log(`[DoubleTick Webhook] No active reminder found for phone: ${cleanPhone}`);
+        }
+      }
+    }
+    
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[DoubleTick Webhook] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.triggerRefillReminders = async (req, res) => {
+  try {
+    const { checkAndSendRefillReminders } = require('../cron/refillReminderScheduler');
+    await checkAndSendRefillReminders();
+    res.json({ success: true, message: 'Refill reminders cron triggered and executed successfully.' });
+  } catch (error) {
+    console.error('Error triggering refill reminders:', error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
