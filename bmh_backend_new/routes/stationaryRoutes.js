@@ -15,4 +15,11 @@ router.get('/requests', stationaryController.getRequests);
 router.post('/requests', stationaryController.createRequest);
 router.put('/requests/:id/approve', stationaryController.approveRequest);
 
+// Refills
+router.post('/refills', stationaryController.createRefillRequest);
+router.get('/refills', stationaryController.getRefills);
+router.put('/refills/:id/assign', stationaryController.assignRefillTask);
+router.put('/refills/:id/complete', stationaryController.completeRefillTask);
+router.put('/refills/:id/fillup', stationaryController.fillupRefillStock);
+
 module.exports = router;

@@ -18,6 +18,7 @@ export default function AdminSettings() {
   const [todaysAppointmentsAccess, setTodaysAppointmentsAccess] = useState<Record<string, boolean>>({});
   const [todaysBillingAccess, setTodaysBillingAccess] = useState<Record<string, boolean>>({});
   const [clinicOverviewAccess, setClinicOverviewAccess] = useState<Record<string, boolean>>({});
+  const [stationaryRefillAccess, setStationaryRefillAccess] = useState<Record<string, boolean>>({});
   
   const [doubleTickApiKey, setDoubleTickApiKey] = useState('');
   const [doubleTickWaba, setDoubleTickWaba] = useState('');
@@ -75,6 +76,7 @@ export default function AdminSettings() {
       setTodaysAppointmentsAccess(parseSetting('todays_appointments_access'));
       setTodaysBillingAccess(parseSetting('todays_billing_access'));
       setClinicOverviewAccess(parseSetting('clinic_overview_access'));
+      setStationaryRefillAccess(parseSetting('stationary_refill_access'));
       
       const configVal = parseSetting('doubletick_config');
       setDoubleTickApiKey(configVal.apiKey || '');
@@ -223,6 +225,7 @@ export default function AdminSettings() {
         {renderCard('Today\'s Appointments Access', 'Control which Employees and Sub-Admins can view and manage Today\'s Appointments & Patient Queue.', 'Today\'s Appointments Access')}
         {renderCard('Clinic Operations Command Center Access', 'Control which Employees and Sub-Admins can access Today\'s Clinic Operations Command Center KPI analytics.', 'Clinic Operations Access')}
         {renderCard('Granular Collections & Billing Access', 'Control which Employees and Sub-Admins can view and manage Today\'s Collections, Manual Orders billing, and Sales Invoices.', 'Today\'s Billing Access')}
+        {renderCard('Stationary Refill & Task Assign Access', 'Control which Employees and Sub-Admins can assign tasks and process stock fillups in the Stationary module.', 'Stationary Refill Access')}
 
         {/* DoubleTick Configuration Section */}
         <View style={styles.card}>
@@ -283,6 +286,7 @@ export default function AdminSettings() {
       {renderAccessList('Today\'s Appointments Access', 'todays_appointments_access', todaysAppointmentsAccess, setTodaysAppointmentsAccess)}
       {renderAccessList('Clinic Operations Access', 'clinic_overview_access', clinicOverviewAccess, setClinicOverviewAccess)}
       {renderAccessList('Today\'s Billing Access', 'todays_billing_access', todaysBillingAccess, setTodaysBillingAccess)}
+      {renderAccessList('Stationary Refill Access', 'stationary_refill_access', stationaryRefillAccess, setStationaryRefillAccess)}
     </View>
   );
 }

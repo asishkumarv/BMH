@@ -143,8 +143,21 @@ exports.createRequest = async (req, res) => {
       await client.query('BEGIN');
       
       let empId = employee_id;
+      let reqName = '';
+      let reqRole = 'Employee';
+      let reqDept = '';
+
       if (requester_type === 'department_admin' && requester_id) {
-        // Query the corresponding employee ID by matching email of this department admin
+        const adminRes = await client.query(
+          'SELECT da.full_name, d.name as department FROM department_admins da LEFT JOIN departments d ON da.department_id = d.id WHERE da.id = $1',
+          [requester_id]
+        );
+        if (adminRes.rows.length > 0) {
+          reqName = adminRes.rows[0].full_name;
+          reqRole = 'Sub Admin';
+          reqDept = adminRes.rows[0].department || '';
+        }
+        
         const empRes = await client.query(
           'SELECT id FROM employees WHERE email = (SELECT email FROM department_admins WHERE id = $1)',
           [requester_id]
@@ -152,11 +165,21 @@ exports.createRequest = async (req, res) => {
         if (empRes.rows.length > 0) {
           empId = empRes.rows[0].id;
         }
+      } else {
+        const empRes = await client.query(
+          'SELECT full_name, role, department FROM employees WHERE id = $1',
+          [requester_id || employee_id]
+        );
+        if (empRes.rows.length > 0) {
+          reqName = empRes.rows[0].full_name;
+          reqRole = empRes.rows[0].role || 'Employee';
+          reqDept = empRes.rows[0].department || '';
+        }
       }
 
       const reqResult = await client.query(
-        'INSERT INTO stationary_requests (employee_id, notes, status, requester_type, requester_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [empId, notes, 'pending', requester_type || 'employee', requester_id || empId]
+        'INSERT INTO stationary_requests (employee_id, notes, status, requester_type, requester_id, requester_name, requester_role, requester_dept) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+        [empId, notes, 'pending', requester_type || 'employee', requester_id || empId, reqName, reqRole, reqDept]
       );
       const requestId = reqResult.rows[0].id;
 
@@ -194,14 +217,14 @@ exports.getRequests = async (req, res) => {
     let query = `
       SELECT 
         sr.*,
-        (CASE 
+        COALESCE(sr.requester_name, (CASE 
           WHEN sr.requester_type = 'department_admin' THEN (SELECT full_name FROM department_admins WHERE id = sr.requester_id)
           ELSE (SELECT full_name FROM employees WHERE id = COALESCE(sr.requester_id, sr.employee_id))
-        END) as employee_name,
-        (CASE 
+        END)) as employee_name,
+        COALESCE(sr.requester_dept, (CASE 
           WHEN sr.requester_type = 'department_admin' THEN (SELECT d.name FROM departments d JOIN department_admins da ON da.department_id = d.id WHERE da.id = sr.requester_id)
           ELSE (SELECT department FROM employees WHERE id = COALESCE(sr.requester_id, sr.employee_id))
-        END) as employee_department,
+        END)) as employee_department,
         (
           SELECT json_agg(json_build_object(
             'id', sri.id,
@@ -266,7 +289,7 @@ exports.getRequests = async (req, res) => {
 exports.approveRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, approved_items, approved_by } = req.body; 
+    const { status, approved_items, approved_by, approved_by_name, approved_by_role, approved_by_dept } = req.body; 
     // status: 'approved', 'partially_approved', 'rejected'
     // approved_items: array of { item_id, approved_qty } (only needed if approving)
 
@@ -276,8 +299,11 @@ exports.approveRequest = async (req, res) => {
 
       // Update request status and approved_by
       const reqResult = await client.query(
-        'UPDATE stationary_requests SET status = $1, approved_by = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-        [status, approved_by || null, id]
+        `UPDATE stationary_requests 
+         SET status = $1, approved_by = $2, approved_by_name = $3, approved_by_role = $4, approved_by_dept = $5, 
+             approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $6 RETURNING *`,
+        [status, approved_by || null, approved_by_name || null, approved_by_role || null, approved_by_dept || null, id]
       );
 
       if (reqResult.rows.length === 0) {
@@ -311,5 +337,189 @@ exports.approveRequest = async (req, res) => {
   } catch (error) {
     console.error('Error approving request:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+exports.createRefillRequest = async (req, res) => {
+  try {
+    const { item_id, notes, requester_type, requester_id } = req.body;
+    let reqName = '';
+    let reqRole = '';
+    let reqDept = '';
+
+    if (requester_type === 'department_admin') {
+      const adminRes = await pool.query(
+        'SELECT da.full_name, d.name as department FROM department_admins da LEFT JOIN departments d ON da.department_id = d.id WHERE da.id = $1',
+        [requester_id]
+      );
+      if (adminRes.rows.length > 0) {
+        reqName = adminRes.rows[0].full_name;
+        reqRole = 'Sub Admin';
+        reqDept = adminRes.rows[0].department || '';
+      }
+    } else {
+      const empRes = await pool.query(
+        'SELECT full_name, role, department FROM employees WHERE id = $1',
+        [requester_id]
+      );
+      if (empRes.rows.length > 0) {
+        reqName = empRes.rows[0].full_name;
+        reqRole = empRes.rows[0].role || 'Employee';
+        reqDept = empRes.rows[0].department || '';
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO stationary_refills (
+        item_id, requested_by_type, requested_by_id, requested_by_name, requested_by_role, requested_by_dept, notes, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Requested') RETURNING *`,
+      [item_id, requester_type || 'sub_admin', requester_id, reqName, reqRole, reqDept, notes]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating refill request:', error);
+    res.status(500).json({ success: false, message: 'Server error creating refill request' });
+  }
+};
+
+exports.getRefills = async (req, res) => {
+  try {
+    const { assigned_to_id, assigned_to_type } = req.query;
+    let query = `
+      SELECT 
+        r.*, 
+        si.name as item_name, 
+        si.image as item_image,
+        si.stock as current_stock,
+        COALESCE(r.requested_by_name, (CASE 
+          WHEN r.requested_by_type = 'department_admin' THEN (SELECT full_name FROM department_admins WHERE id = r.requested_by_id)
+          ELSE (SELECT full_name FROM employees WHERE id = r.requested_by_id)
+        END)) as requester_name,
+        COALESCE(r.assigned_to_name, (CASE 
+          WHEN r.assigned_to_type = 'sub_admin' THEN (SELECT full_name FROM department_admins WHERE id = r.assigned_to_id)
+          ELSE (SELECT full_name FROM employees WHERE id = r.assigned_to_id)
+        END)) as assignee_name
+      FROM stationary_refills r
+      JOIN stationary_items si ON r.item_id = si.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+    if (assigned_to_id && assigned_to_type) {
+      query += ` AND r.assigned_to_id = $${paramIndex} AND r.assigned_to_type = $${paramIndex + 1}`;
+      params.push(assigned_to_id, assigned_to_type);
+    }
+    query += ' ORDER BY r.created_at DESC';
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error getting refills:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.assignRefillTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assigned_to_id, assigned_to_type, task_notes, shop_name, shop_address, qty_to_buy } = req.body;
+    let assName = '';
+    let assRole = '';
+    let assDept = '';
+
+    if (assigned_to_type === 'sub_admin') {
+      const adminRes = await pool.query(
+        'SELECT da.full_name, d.name as department FROM department_admins da LEFT JOIN departments d ON da.department_id = d.id WHERE da.id = $1',
+        [assigned_to_id]
+      );
+      if (adminRes.rows.length > 0) {
+        assName = adminRes.rows[0].full_name;
+        assRole = 'Sub Admin';
+        assDept = adminRes.rows[0].department || '';
+      }
+    } else {
+      const empRes = await pool.query(
+        'SELECT full_name, role, department FROM employees WHERE id = $1',
+        [assigned_to_id]
+      );
+      if (empRes.rows.length > 0) {
+        assName = empRes.rows[0].full_name;
+        assRole = empRes.rows[0].role || 'Employee';
+        assDept = empRes.rows[0].department || '';
+      }
+    }
+
+    const result = await pool.query(
+      `UPDATE stationary_refills 
+       SET assigned_to_id = $1, assigned_to_type = $2, assigned_to_name = $3, assigned_to_role = $4, assigned_to_dept = $5,
+           task_notes = $6, shop_name = $7, shop_address = $8, qty_to_buy = $9, status = 'Assigned', updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $10 RETURNING *`,
+      [assigned_to_id, assigned_to_type, assName, assRole, assDept, task_notes, shop_name, shop_address, qty_to_buy, id]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error assigning refill task:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.completeRefillTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { bill_amount, bill_image } = req.body;
+    const result = await pool.query(
+      `UPDATE stationary_refills 
+       SET status = 'Completed', bill_amount = $1, bill_image = $2, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3 RETURNING *`,
+      [bill_amount || null, bill_image || null, id]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error completing refill task:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.fillupRefillStock = async (req, res) => {
+  const { id } = req.params;
+  const { quantity, approved_by_name, approved_by_role, approved_by_dept } = req.body;
+  const qty = parseInt(quantity, 10);
+  if (isNaN(qty) || qty <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid quantity' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const refillRes = await client.query('SELECT item_id FROM stationary_refills WHERE id = $1', [id]);
+    if (refillRes.rowCount === 0) {
+      throw new Error('Refill request not found');
+    }
+    const itemId = refillRes.rows[0].item_id;
+
+    // 1. Update refill status, qty, and approver details
+    await client.query(
+      `UPDATE stationary_refills 
+       SET status = 'Filled', fillup_qty = $1, 
+           approved_by_name = $2, approved_by_role = $3, approved_by_dept = $4,
+           approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $5`,
+      [qty, approved_by_name || null, approved_by_role || null, approved_by_dept || null, id]
+    );
+
+    // 2. Increase stock of item
+    await client.query(
+      'UPDATE stationary_items SET stock = stock + $1 WHERE id = $2',
+      [qty, itemId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Stock filled up successfully' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error in fillup:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    client.release();
   }
 };

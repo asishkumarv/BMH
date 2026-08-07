@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
-import { Package, Plus, MoreVertical, Check, X, Upload, Search, Trash2, Edit2, AlertCircle, CheckCircle, Clock, XCircle, Info, Minus, ShoppingCart } from 'lucide-react-native';
+import { Package, Plus, MoreVertical, Check, X, Upload, Search, Trash2, Edit2, AlertCircle, CheckCircle, Clock, XCircle, Info, Minus, ShoppingCart, Eye, Calendar, DollarSign } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import { useResponsive } from '../../../hooks/useResponsive';
@@ -10,17 +10,19 @@ import { Picker } from '@react-native-picker/picker';
 
 type StationaryItem = { id: string; name: string; stock: number; image: string; status: string; created_at: string; };
 type RequestItem = { id: string; item_id: string; name: string; requested_qty: number; approved_qty: number; };
-type RequestHistory = { id: string; employee_name: string; employee_department: string; status: string; notes: string; created_at: string; approved_by: string; items: RequestItem[]; };
+type RequestHistory = { id: string; employee_name: string; employee_department: string; status: string; notes: string; created_at: string; approved_by: string; approved_by_name?: string; approved_by_role?: string; approved_by_dept?: string; items: RequestItem[]; };
 
 export default function SubAdminStationaryScreen() {
   const { isDesktop } = useResponsive();
-  const [activeTab, setActiveTab] = useState<'inventory' | 'requests' | 'my_requests'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'requests' | 'my_requests' | 'task_assigning' | 'fillups' | 'my_tasks'>('inventory');
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [subAdminUser, setSubAdminUser] = useState<any>(null);
   
   const [items, setItems] = useState<StationaryItem[]>([]);
   const [requests, setRequests] = useState<RequestHistory[]>([]);
   const [myRequests, setMyRequests] = useState<RequestHistory[]>([]);
+  const [refills, setRefills] = useState<any[]>([]);
+  const [myTasks, setMyTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Cart & Request states for Sub-Admin
@@ -61,6 +63,30 @@ export default function SubAdminStationaryScreen() {
   const [approvalQuantities, setApprovalQuantities] = useState<{[key: string]: string}>({});
   const [reviewing, setReviewing] = useState(false);
 
+  // Access Permission State
+  const [hasRefillAccess, setHasRefillAccess] = useState(false);
+
+  // Task Assigning States
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [selectedRefill, setSelectedRefill] = useState<any>(null);
+  const [employeesAndSubAdmins, setEmployeesAndSubAdmins] = useState<any[]>([]);
+  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [taskNotes, setTaskNotes] = useState('');
+  const [shopName, setShopName] = useState('');
+  const [shopAddress, setShopAddress] = useState('');
+  const [qtyToBuy, setQtyToBuy] = useState('');
+  const [assigningTask, setAssigningTask] = useState(false);
+
+  // Task Completion Modal States
+  const [completeModalVisible, setCompleteModalVisible] = useState(false);
+  const [completingRefillId, setCompletingRefillId] = useState<string | null>(null);
+  const [billAmount, setBillAmount] = useState('');
+  const [billImage, setBillImage] = useState('');
+  const [completingTask, setCompletingTask] = useState(false);
+
+  // Preview Bill Image
+  const [previewBillImage, setPreviewBillImage] = useState<string | null>(null);
+
   useEffect(() => {
     const init = async () => {
       let userStr = null;
@@ -82,9 +108,33 @@ export default function SubAdminStationaryScreen() {
     fetchData();
   }, [activeTab, departmentId, subAdminUser]);
 
+  const getCurrentUser = () => {
+    return subAdminUser ? { ...subAdminUser, type: 'sub_admin', label: 'Sub Admin' } : null;
+  };
+
+  const checkRefillAccess = async (user: any) => {
+    try {
+      const res = await axios.get('https://napi.bharatmedicalhallplus.com/settings');
+      if (res.data && res.data.success && res.data.settings) {
+        let access = res.data.settings.stationary_refill_access || {};
+        if (typeof access === 'string') {
+          try { access = JSON.parse(access); } catch (e){}
+        }
+        const stringId = `SA-${user.id}`;
+        setHasRefillAccess(!!access[stringId]);
+      }
+    } catch (e) {
+      console.log('Error checking access:', e);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
+      if (subAdminUser) {
+        await checkRefillAccess(subAdminUser);
+      }
+
       if (activeTab === 'inventory') {
         const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
         if (res.data.success) setItems(res.data.data);
@@ -96,22 +146,46 @@ export default function SubAdminStationaryScreen() {
         const res = await axios.get(url);
         if (res.data.success) setRequests(res.data.data);
       } else if (activeTab === 'my_requests') {
-        // Fetch active items
         const itemsRes = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
         if (itemsRes.data.success) {
           const activeItems = itemsRes.data.data.filter((i: StationaryItem) => i.status !== 'hold');
           setItems(activeItems);
         }
-        // Fetch sub-admin's own request history
         if (subAdminUser) {
           const reqRes = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/requests?requester_id=${subAdminUser.id}&requester_type=department_admin`);
           if (reqRes.data.success) setMyRequests(reqRes.data.data);
+        }
+      } else if (activeTab === 'task_assigning' || activeTab === 'fillups') {
+        const res = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/refills');
+        if (res.data.success) setRefills(res.data.data);
+      } else if (activeTab === 'my_tasks') {
+        if (subAdminUser) {
+          const res = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/refills?assigned_to_id=${subAdminUser.id}&assigned_to_type=sub_admin`);
+          if (res.data.success) setMyTasks(res.data.data);
         }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsersForAssignment = async () => {
+    try {
+      const [empRes, subAdminRes] = await Promise.all([
+        axios.get('https://napi.bharatmedicalhallplus.com/employees'),
+        axios.get('https://napi.bharatmedicalhallplus.com/admin/department-admins')
+      ]);
+      const emps = empRes.data.data || empRes.data || [];
+      const subAdmins = subAdminRes.data.data || subAdminRes.data || [];
+      const combined = [
+        ...emps.map((e: any) => ({ id: e.id.toString(), name: e.full_name, type: 'employee', label: `${e.full_name} (Employee)` })),
+        ...subAdmins.map((s: any) => ({ id: s.id.toString(), name: s.full_name, type: 'sub_admin', label: `${s.full_name} (Sub Admin)` }))
+      ];
+      setEmployeesAndSubAdmins(combined);
+    } catch (err) {
+      console.log('Error fetching users:', err);
     }
   };
 
@@ -352,21 +426,24 @@ export default function SubAdminStationaryScreen() {
       }));
 
       let adminStr = 'Sub Admin';
-      let userStr = null;
-      if (Platform.OS === 'web') {
-        userStr = localStorage.getItem('subAdminUser');
-      } else {
-        userStr = await AsyncStorage.getItem('subAdminUser');
-      }
-      if (userStr) {
-        const u = JSON.parse(userStr);
-        adminStr = `Sub Admin: ${u.full_name} (${u.email}, ID: ${u.id})`;
+      let adminName = 'Sub Admin';
+      let adminRole = 'Sub Admin';
+      let adminDept = 'N/A';
+      
+      if (subAdminUser) {
+        adminName = subAdminUser.full_name;
+        adminRole = 'Sub Admin';
+        adminDept = subAdminUser.department_name || 'N/A';
+        adminStr = `Sub Admin: ${subAdminUser.full_name} (${subAdminUser.email}, ID: ${subAdminUser.id})`;
       }
 
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/requests/${selectedRequest.id}/approve`, {
         status,
         approved_items,
-        approved_by: adminStr
+        approved_by: adminStr,
+        approved_by_name: adminName,
+        approved_by_role: adminRole,
+        approved_by_dept: adminDept
       });
 
       if (res.data.success) {
@@ -377,6 +454,183 @@ export default function SubAdminStationaryScreen() {
       Alert.alert('Error', error.response?.data?.message || 'Failed to process request');
     } finally {
       setReviewing(false);
+    }
+  };
+
+  const handleRequestRefill = async (item: StationaryItem) => {
+    if (!item) return;
+    
+    const executeRequest = async (refillNotes: string) => {
+      try {
+        const res = await axios.post('https://napi.bharatmedicalhallplus.com/stationary/refills', {
+          item_id: item.id,
+          notes: refillNotes,
+          requester_type: 'department_admin',
+          requester_id: subAdminUser?.id
+        });
+        if (res.data.success) {
+          Alert.alert('Success', 'Refill request submitted successfully!');
+          setEditItemModalVisible(false);
+          fetchData();
+        }
+      } catch (err) {
+        Alert.alert('Error', 'Failed to submit refill request');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const notesInput = window.prompt("Enter notes/remarks for this stock refill request (optional):");
+      if (notesInput !== null) {
+        executeRequest(notesInput);
+      }
+    } else {
+      Alert.prompt(
+        "Request Refill",
+        "Enter notes/remarks for this stock refill request:",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Submit", onPress: (text?: string) => executeRequest(text || "") }
+        ]
+      );
+    }
+  };
+
+  const openAssignModal = (refill: any) => {
+    setSelectedRefill(refill);
+    setSelectedAssignee('');
+    setTaskNotes('');
+    setShopName('');
+    setShopAddress('');
+    setQtyToBuy(refill.qty_to_buy ? refill.qty_to_buy.toString() : '');
+    setAssignModalVisible(true);
+    fetchUsersForAssignment();
+  };
+
+  const handleAssignTask = async () => {
+    if (!selectedRefill || !selectedAssignee || !shopName || !qtyToBuy) {
+      Alert.alert('Error', 'Please fill in assignee, shop name, and quantity to buy.');
+      return;
+    }
+    const assigneeObj = employeesAndSubAdmins.find(e => e.id === selectedAssignee);
+    if (!assigneeObj) return;
+
+    setAssigningTask(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/refills/${selectedRefill.id}/assign`, {
+        assigned_to_id: parseInt(assigneeObj.id),
+        assigned_to_type: assigneeObj.type,
+        task_notes: taskNotes,
+        shop_name: shopName,
+        shop_address: shopAddress,
+        qty_to_buy: parseInt(qtyToBuy) || 0
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Refill task assigned successfully!');
+        setAssignModalVisible(false);
+        fetchData();
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to assign refill task.');
+    } finally {
+      setAssigningTask(false);
+    }
+  };
+
+  const handleFillupSubmit = async (refillId: string, initialQty: number) => {
+    const executeFillup = async (qty: string) => {
+      const parsedQty = parseInt(qty, 10);
+      if (isNaN(parsedQty) || parsedQty <= 0) {
+        Alert.alert('Error', 'Please enter a valid stock count.');
+        return;
+      }
+      try {
+        const u = getCurrentUser();
+        const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/refills/${refillId}/fillup`, {
+          quantity: parsedQty,
+          approved_by_name: u ? u.full_name : 'Sub Admin',
+          approved_by_role: u ? u.role || u.label : 'Sub Admin',
+          approved_by_dept: u ? u.department || 'N/A' : 'N/A'
+        });
+        if (res.data.success) {
+          Alert.alert('Success', 'Stock filled up successfully!');
+          fetchData();
+        }
+      } catch (err: any) {
+        Alert.alert('Error', err.response?.data?.message || 'Failed to fill up stock.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const qty = window.prompt("Enter the number of stock to fill up:", initialQty.toString());
+      if (qty !== null) {
+        executeFillup(qty);
+      }
+    } else {
+      Alert.prompt(
+        "Fillup Stock",
+        "Enter the number of stock to fill up:",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Fillup", onPress: (text?: string) => executeFillup(text || "") }
+        ],
+        "plain-text",
+        initialQty.toString()
+      );
+    }
+  };
+
+  const openCompleteTaskModal = (refillId: string) => {
+    setCompletingRefillId(refillId);
+    setBillAmount('');
+    setBillImage('');
+    setCompleteModalVisible(true);
+  };
+
+  const handlePickBillImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.2,
+        base64: true,
+      });
+      if (!result.canceled && result.assets[0].base64) {
+        setBillImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCompleteTaskSubmit = async () => {
+    if (!completingRefillId || !billAmount) {
+      Alert.alert('Error', 'Please enter the bill amount.');
+      return;
+    }
+    const amt = parseFloat(billAmount);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Error', 'Please enter a valid bill amount.');
+      return;
+    }
+
+    setCompletingTask(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/refills/${completingRefillId}/complete`, {
+        bill_amount: amt,
+        bill_image: billImage || null
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Refill task completed and submitted for review!');
+        setCompleteModalVisible(false);
+        setCompletingRefillId(null);
+        setBillAmount('');
+        setBillImage('');
+        fetchData();
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to complete refill task.');
+    } finally {
+      setCompletingTask(false);
     }
   };
 
@@ -399,73 +653,138 @@ export default function SubAdminStationaryScreen() {
     </Pressable>
   );
 
-  const renderItemCard = ({ item }: { item: StationaryItem }) => {
-    const qtyInCart = cart[item.id] || 0;
-    const parts = item.name.split(' | ');
-    const baseName = parts[0];
-    const details = parts.slice(1);
-
+  const renderRefillItem = ({ item }: { item: any }) => {
+    const statusColor = item.status === 'Filled' ? '#10b981' : item.status === 'Completed' ? '#3b82f6' : item.status === 'Assigned' ? '#f59e0b' : '#64748b';
     return (
-      <View style={[styles.availableItemCard, !isDesktop && styles.availableItemCardMobile]}>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.itemImage, { backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }]}>
-            <Package size={32} color={Colors.light.icon} />
+      <View style={[styles.requestRow, { flexDirection: 'column', alignItems: 'stretch', gap: 12, marginBottom: 16 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {item.item_image ? (
+              <Image source={{ uri: item.item_image }} style={{ width: 44, height: 44, borderRadius: 8 }} />
+            ) : (
+              <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }}>
+                <Package size={20} color="#94a3b8" />
+              </View>
+            )}
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#1e293b' }}>{item.item_name?.split(' | ')[0]}</Text>
+              <Text style={{ fontSize: 12, color: '#64748b' }}>Current Stock: {item.current_stock}</Text>
+            </View>
           </View>
-        )}
-        <View style={styles.itemInfo}>
-          <Text style={[styles.itemName, { textAlign: 'left' }]} numberOfLines={1}>{baseName}</Text>
-          {details.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, marginBottom: 4 }}>
-              {details.map((d, i) => (
-                <View key={i} style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                  <Text style={{ fontSize: 10, color: Colors.light.icon, fontWeight: '600' }}>{d}</Text>
-                </View>
-              ))}
+          <View style={{ backgroundColor: statusColor + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ color: statusColor, fontSize: 12, fontWeight: 'bold' }}>{item.status}</Text>
+          </View>
+        </View>
+
+        <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          <View style={{ flex: 1, minWidth: 150 }}>
+            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold' }}>REQUEST DETAILS</Text>
+            <Text style={{ fontSize: 13, color: '#475569', marginTop: 2 }}>By: {item.requester_name || 'Sub Admin'}</Text>
+            <Text style={{ fontSize: 12, color: '#64748b' }}>Dept: {item.requested_by_dept || 'N/A'} • Role: {item.requested_by_role || 'N/A'}</Text>
+            <Text style={{ fontSize: 12, color: '#94a3b8' }}>On: {new Date(item.created_at).toLocaleString()}</Text>
+            {item.notes ? <Text style={{ fontSize: 13, color: '#475569', fontStyle: 'italic', marginTop: 4 }}>Notes: "{item.notes}"</Text> : null}
+          </View>
+
+          {item.status !== 'Requested' && (
+            <View style={{ flex: 1, minWidth: 180 }}>
+              <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold' }}>ASSIGNED TASK DETAILS</Text>
+              <Text style={{ fontSize: 13, color: '#475569', marginTop: 2 }}>To: {item.assignee_name || 'N/A'}</Text>
+              <Text style={{ fontSize: 12, color: '#64748b' }}>Role: {item.assigned_to_role || 'N/A'}</Text>
+              <Text style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>🏪 Shop: {item.shop_name || 'N/A'}</Text>
+              <Text style={{ fontSize: 12, color: '#64748b' }}>📍 Address: {item.shop_address || 'N/A'}</Text>
+              <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '600', marginTop: 4 }}>🛒 Buy Target: {item.qty_to_buy} items</Text>
             </View>
           )}
-          <Text style={styles.itemStock}>Available: {item.stock}</Text>
-          
-          <View style={styles.qtyContainer}>
-            <Pressable 
-              style={[styles.qtyBtn, qtyInCart === 0 && { opacity: 0.5 }]} 
-              onPress={() => updateCart(item.id, -1)}
-              disabled={qtyInCart === 0}
-            >
-              <Minus size={16} color={Colors.light.primary} />
-            </Pressable>
-            <Text style={styles.qtyText}>{qtyInCart}</Text>
-            <Pressable 
-              style={[styles.qtyBtn, (qtyInCart >= item.stock) && { opacity: 0.5 }]} 
-              onPress={() => updateCart(item.id, 1)}
-              disabled={qtyInCart >= item.stock}
-            >
-              <Plus size={16} color={Colors.light.primary} />
-            </Pressable>
+
+          {(item.status === 'Completed' || item.status === 'Filled') && (
+            <View style={{ flex: 1, minWidth: 150 }}>
+              <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold' }}>RECEIPT & BILL SPENT</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10b981', marginTop: 2 }}>Amount: ₹{item.bill_amount || '0.00'}</Text>
+              {item.bill_image ? (
+                <Pressable 
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, alignSelf: 'flex-start' }}
+                  onPress={() => setPreviewBillImage(item.bill_image)}
+                >
+                  <Eye size={14} color="#475569" />
+                  <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>View Receipt</Text>
+                </Pressable>
+              ) : (
+                <Text style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', marginTop: 4 }}>No receipt uploaded</Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {item.status === 'Filled' && (
+          <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10, backgroundColor: '#f8fafc', padding: 10, borderRadius: 8 }}>
+            <Text style={{ fontSize: 11, color: '#64748b', fontWeight: 'bold' }}>APPROVAL & AUDIT TRAIL</Text>
+            <Text style={{ fontSize: 13, color: '#1e293b', marginTop: 2 }}>Filled Qty: +{item.fillup_qty} items added to stock</Text>
+            <Text style={{ fontSize: 12, color: '#475569' }}>Approved By: {item.approved_by_name} ({item.approved_by_role})</Text>
+            {item.approved_at && <Text style={{ fontSize: 12, color: '#94a3b8' }}>Approved On: {new Date(item.approved_at).toLocaleString()}</Text>}
           </View>
+        )}
+
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }}>
+          {hasRefillAccess && item.status === 'Requested' && (
+            <Pressable style={styles.actionBtn} onPress={() => openAssignModal(item)}>
+              <Text style={{ color: Colors.light.primary, fontWeight: '700' }}>Approve & Assign Task</Text>
+            </Pressable>
+          )}
+          {hasRefillAccess && item.status === 'Completed' && (
+            <Pressable style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => handleFillupSubmit(item.id, item.qty_to_buy || 0)}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Approve & Fillup Stock</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
   };
 
+  const renderMyTasksItem = ({ item }: { item: any }) => (
+    <View style={[styles.requestRow, { flexDirection: 'column', alignItems: 'stretch', gap: 12, marginBottom: 16 }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: Colors.light.text }}>{item.item_name?.split(' | ')[0]}</Text>
+        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+          <Text style={{ color: '#D97706', fontSize: 12, fontWeight: 'bold' }}>{item.status}</Text>
+        </View>
+      </View>
+
+      <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, gap: 6 }}>
+        <Text style={{ fontSize: 13, color: '#475569' }}>🏪 <Text style={{ fontWeight: '700' }}>Shop Name:</Text> {item.shop_name}</Text>
+        <Text style={{ fontSize: 13, color: '#475569' }}>📍 <Text style={{ fontWeight: '700' }}>Address:</Text> {item.shop_address}</Text>
+        <Text style={{ fontSize: 13, color: '#1e293b' }}>🛒 <Text style={{ fontWeight: '700' }}>Target Quantity to Buy:</Text> {item.qty_to_buy} items</Text>
+        {item.task_notes ? <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic' }}>Instructions: "{item.task_notes}"</Text> : null}
+      </View>
+
+      {item.status === 'Assigned' && (
+        <View style={{ alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }}>
+          <Pressable style={[styles.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={() => openCompleteTaskModal(item.id)}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Complete & Submit Bill</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+
   const renderRequestItem = ({ item }: { item: RequestHistory }) => (
-    <View style={styles.requestRow}>
-      <View style={{ flex: 1 }}>
+    <View style={[styles.requestRow, { marginBottom: 16 }]}>
+      <View style={{ flex: 1.5 }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.light.text }}>{item.employee_name}</Text>
         <Text style={{ fontSize: 14, color: Colors.light.icon }}>Dept: {item.employee_department}</Text>
-        <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>Date: {new Date(item.created_at).toLocaleDateString()}</Text>
+        <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>Date: {new Date(item.created_at).toLocaleString()}</Text>
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1.5 }}>
         <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.text }}>{item.items?.length || 0} items requested</Text>
         {item.notes ? <Text style={{ fontSize: 13, color: Colors.light.icon, fontStyle: 'italic' }} numberOfLines={1}>"{item.notes}"</Text> : null}
       </View>
-      <View style={{ width: 120, alignItems: 'center' }}>
+      <View style={{ width: 150, alignItems: 'flex-start' }}>
         <View style={[styles.statusBadge, (styles as any)[`status_${item.status}`] || styles.status_pending]}>
           <Text style={[styles.statusText, (styles as any)[`text_${item.status}`] || styles.text_pending]}>{item.status.replace('_', ' ')}</Text>
         </View>
-        {item.approved_by && item.status !== 'pending' && (
-          <Text style={{ fontSize: 10, color: Colors.light.icon, marginTop: 4, textAlign: 'center' }}>By: {item.approved_by.split(':')[0]}</Text>
+        {item.approved_by_name && (
+          <Text style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+            Appr: {item.approved_by_name} ({item.approved_by_role})
+          </Text>
         )}
       </View>
       <Pressable style={styles.actionBtn} onPress={() => openReviewModal(item)}>
@@ -474,55 +793,36 @@ export default function SubAdminStationaryScreen() {
     </View>
   );
 
-  const filteredRequests = requests.filter(req => {
-    if (filterStatus !== 'All' && req.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
-    if (filterRole !== 'All') {
-      const isSuper = req.approved_by?.startsWith('Super Admin');
-      const isSub = req.approved_by?.startsWith('Sub Admin');
-      if (filterRole === 'Super Admin' && !isSuper) return false;
-      if (filterRole === 'Sub Admin' && !isSub) return false;
-    }
-    return true;
-  });
-
-  const handleExportHistoryCSV = () => {
-    if (Platform.OS === 'web') {
-      let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "ID,Date,Employee Name,Status,Approved By,Notes,Items\n";
-
-      filteredRequests.forEach(req => {
-        const date = new Date(req.created_at).toLocaleDateString();
-        const itemsStr = (req.items || []).map(i => `${i.name} (Req: ${i.requested_qty}, Appr: ${i.approved_qty})`).join('; ');
-        const row = [
-          req.id,
-          date,
-          `"${req.employee_name}"`,
-          req.status,
-          `"${req.approved_by || ''}"`,
-          `"${req.notes || ''}"`,
-          `"${itemsStr}"`
-        ];
-        csvContent += row.join(",") + "\n";
-      });
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `stationary_requests_export.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      Alert.alert('Notice', 'CSV Export is only supported on web right now.');
-    }
-  };
+  const renderMyRequestsItem = ({ item }: { item: RequestHistory }) => (
+    <View style={[styles.requestRow, { marginBottom: 16 }]}>
+      <View style={{ flex: 1.5 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text }}>Request ID: #{item.id}</Text>
+        <Text style={{ fontSize: 13, color: Colors.light.icon }}>Requested On: {new Date(item.created_at).toLocaleString()}</Text>
+        {item.notes ? <Text style={{ fontSize: 13, color: Colors.light.icon, marginTop: 4 }}>Note: "{item.notes}"</Text> : null}
+      </View>
+      <View style={{ flex: 1.5 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.light.text }}>Items Requested:</Text>
+        {item.items?.map((t, idx) => (
+          <Text key={idx} style={{ fontSize: 13, color: '#475569' }}>- {t.name} (Qty: {t.requested_qty})</Text>
+        ))}
+      </View>
+      <View style={{ width: 120, alignItems: 'center' }}>
+        <View style={[styles.statusBadge, (styles as any)[`status_${item.status}`] || styles.status_pending]}>
+          <Text style={[styles.statusText, (styles as any)[`text_${item.status}`] || styles.text_pending]}>{item.status.replace('_', ' ')}</Text>
+        </View>
+        {item.approved_by_name && (
+          <Text style={{ fontSize: 10, color: Colors.light.icon, marginTop: 4, textAlign: 'center' }}>By: {item.approved_by_name}</Text>
+        )}
+      </View>
+    </View>
+  );
 
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
         <View>
           <Text style={styles.title}>Stationary Management</Text>
-          <Text style={styles.subtitle}>Manage inventory and employee requests.</Text>
+          <Text style={styles.subtitle}>Manage inventory, approvals, and refill requests.</Text>
         </View>
         
         {activeTab === 'inventory' && (
@@ -554,30 +854,29 @@ export default function SubAdminStationaryScreen() {
       </View>
 
       <View style={{ borderBottomWidth: 1, borderBottomColor: Colors.light.border, marginBottom: 24 }}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.tabsContainer}
-          style={{ width: '100%' }}
-        >
-          <Pressable 
-            style={[styles.tab, activeTab === 'inventory' && styles.activeTab]} 
-            onPress={() => setActiveTab('inventory')}
-          >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContainer} style={{ width: '100%' }}>
+          <Pressable style={[styles.tab, activeTab === 'inventory' && styles.activeTab]} onPress={() => setActiveTab('inventory')}>
             <Text style={[styles.tabText, activeTab === 'inventory' && styles.activeTabText]}>Inventory</Text>
           </Pressable>
-          <Pressable 
-            style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
-            onPress={() => setActiveTab('requests')}
-          >
+          <Pressable style={[styles.tab, activeTab === 'requests' && styles.activeTab]} onPress={() => setActiveTab('requests')}>
             <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Requests Approval</Text>
           </Pressable>
-          <Pressable 
-            style={[styles.tab, activeTab === 'my_requests' && styles.activeTab]} 
-            onPress={() => setActiveTab('my_requests')}
-          >
+          <Pressable style={[styles.tab, activeTab === 'my_requests' && styles.activeTab]} onPress={() => setActiveTab('my_requests')}>
             <Text style={[styles.tabText, activeTab === 'my_requests' && styles.activeTabText]}>Request Stationary</Text>
           </Pressable>
+          <Pressable style={[styles.tab, activeTab === 'my_tasks' && styles.activeTab]} onPress={() => setActiveTab('my_tasks')}>
+            <Text style={[styles.tabText, activeTab === 'my_tasks' && styles.activeTabText]}>My Tasks</Text>
+          </Pressable>
+          {hasRefillAccess && (
+            <>
+              <Pressable style={[styles.tab, activeTab === 'task_assigning' && styles.activeTab]} onPress={() => setActiveTab('task_assigning')}>
+                <Text style={[styles.tabText, activeTab === 'task_assigning' && styles.activeTabText]}>Task Assigning</Text>
+              </Pressable>
+              <Pressable style={[styles.tab, activeTab === 'fillups' && styles.activeTab]} onPress={() => setActiveTab('fillups')}>
+                <Text style={[styles.tabText, activeTab === 'fillups' && styles.activeTabText]}>Fillups & History</Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       </View>
 
@@ -595,135 +894,80 @@ export default function SubAdminStationaryScreen() {
             ListEmptyComponent={<Text style={styles.emptyText}>No stationary items found.</Text>}
           />
         ) : activeTab === 'requests' ? (
-          <>
-            <View style={{ flexDirection: isDesktop ? 'row' : 'column', justifyContent: 'space-between', alignItems: isDesktop ? 'center' : 'flex-start', marginBottom: 16, gap: 12 }}>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                  <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Approver Role</Text>
-                  {Platform.OS === 'web' ? (
-                    <select 
-                      style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
-                      value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
-                    >
-                      <option value="All">All</option>
-                      <option value="Super Admin">Super Admin</option>
-                      <option value="Sub Admin">Sub Admin</option>
-                    </select>
-                  ) : (
-                    <Picker
-                      selectedValue={filterRole}
-                      onValueChange={(val: any) => setFilterRole(val)}
-                      style={{ height: 40, color: Colors.light.text }}
-                    >
-                      <Picker.Item label="All" value="All" />
-                      <Picker.Item label="Super Admin" value="Super Admin" />
-                      <Picker.Item label="Sub Admin" value="Sub Admin" />
-                    </Picker>
-                  )}
-                </View>
-
-                <View style={{ backgroundColor: '#FFF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E2E8F0', minWidth: 120 }}>
-                  <Text style={{ fontSize: 10, color: Colors.light.icon, marginBottom: 4 }}>Status</Text>
-                  {Platform.OS === 'web' ? (
-                    <select 
-                      style={{ border: 'none', backgroundColor: 'transparent', fontSize: 14, fontWeight: '600', color: Colors.light.text }}
-                      value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-                    >
-                      <option value="All">All</option>
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  ) : (
-                    <Picker
-                      selectedValue={filterStatus}
-                      onValueChange={(val: any) => setFilterStatus(val)}
-                      style={{ height: 40, color: Colors.light.text }}
-                    >
-                      <Picker.Item label="All" value="All" />
-                      <Picker.Item label="Pending" value="pending" />
-                      <Picker.Item label="Approved" value="approved" />
-                      <Picker.Item label="Rejected" value="rejected" />
-                    </Picker>
-                  )}
-                </View>
-              </View>
-
-              <Pressable onPress={handleExportHistoryCSV} style={{ backgroundColor: Colors.light.primary, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8 }}>
-                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Export CSV</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-              <View style={{ minWidth: 800, width: '100%' }}>
-                <FlatList
-                  data={filteredRequests}
-                  keyExtractor={item => item.id}
-                  renderItem={renderRequestItem}
-                  contentContainerStyle={{ gap: 12 }}
-                  ListEmptyComponent={<Text style={styles.emptyText}>No requests found.</Text>}
-                />
-              </View>
-            </ScrollView>
-          </>
-        ) : (
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 16 }}>Available Items</Text>
-            {items.length === 0 ? (
-              <View style={{ padding: 40, alignItems: 'center', backgroundColor: Colors.light.card, borderRadius: 16 }}>
-                <Text style={{ color: Colors.light.icon }}>No items available.</Text>
-              </View>
-            ) : (
-              <View style={[styles.gridContainer, { marginBottom: 32 }]}>
-                {items.map(item => <React.Fragment key={item.id}>{renderItemCard({item})}</React.Fragment>)}
-              </View>
-            )}
-
-            <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.light.text, marginBottom: 16 }}>Your Request History</Text>
-            {myRequests.length === 0 ? (
-              <View style={{ padding: 40, alignItems: 'center', backgroundColor: Colors.light.card, borderRadius: 16 }}>
-                <Text style={{ color: Colors.light.icon }}>You haven't made any requests yet.</Text>
-              </View>
-            ) : (
-              <View style={{ gap: 16 }}>
-                {myRequests.map(req => (
-                  <View key={req.id} style={{ backgroundColor: Colors.light.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: Colors.light.border }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Clock size={16} color={Colors.light.icon} />
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.icon }}>{new Date(req.created_at).toLocaleDateString()}</Text>
-                      </View>
-                      <View style={[styles.statusBadge, (styles as any)[`status_${req.status}`] || styles.status_pending]}>
-                        <Text style={[styles.statusText, (styles as any)[`text_${req.status}`] || styles.text_pending]}>{req.status.replace('_', ' ')}</Text>
+          <FlatList
+            data={requests}
+            keyExtractor={item => item.id}
+            renderItem={renderRequestItem}
+            ListEmptyComponent={<Text style={styles.emptyText}>No requests found.</Text>}
+          />
+        ) : activeTab === 'my_requests' ? (
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 16 }}>Available Items</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              <View style={styles.gridContainer}>
+                {items.map((item) => {
+                  const qtyInCart = cart[item.id] || 0;
+                  return (
+                    <View key={item.id} style={[styles.availableItemCard, !isDesktop && styles.availableItemCardMobile]}>
+                      {item.image ? (
+                        <Image source={{ uri: item.image }} style={{ width: '100%', height: 120, borderRadius: 12, marginBottom: 12 }} resizeMode="cover" />
+                      ) : (
+                        <View style={{ width: '100%', height: 120, borderRadius: 12, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                          <Package size={28} color="#94a3b8" />
+                        </View>
+                      )}
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#1e293b' }} numberOfLines={1}>{item.name.split(' | ')[0]}</Text>
+                      <Text style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Available: {item.stock}</Text>
+                      
+                      <View style={styles.qtyContainer}>
+                        <Pressable style={styles.qtyBtn} onPress={() => updateCart(item.id, -1)}>
+                          <Minus size={14} color={Colors.light.primary} />
+                        </Pressable>
+                        <Text style={styles.qtyText}>{qtyInCart}</Text>
+                        <Pressable 
+                          style={[styles.qtyBtn, qtyInCart >= item.stock && { opacity: 0.5 }]} 
+                          onPress={() => updateCart(item.id, 1)}
+                          disabled={qtyInCart >= item.stock}
+                        >
+                          <Plus size={14} color={Colors.light.primary} />
+                        </Pressable>
                       </View>
                     </View>
-                    
-                    {req.approved_by && req.status !== 'pending' && (
-                      <Text style={{ fontSize: 12, color: Colors.light.icon, marginBottom: 8, fontWeight: '600' }}>Processed By: {req.approved_by.split(':')[0]}</Text>
-                    )}
-                    {req.notes ? <Text style={{ fontSize: 14, color: Colors.light.text, marginBottom: 12, fontStyle: 'italic' }}>Notes: {req.notes}</Text> : null}
-                    
-                    {(!req.items || req.items.length === 0) ? (
-                      <Text style={{ fontStyle: 'italic', color: Colors.light.icon, fontSize: 13 }}>
-                        Items have been removed from inventory.
-                      </Text>
-                    ) : (
-                      <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 12, gap: 8 }}>
-                        {req.items.map(i => (
-                          <View key={i.id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.light.text }}>{i.name}</Text>
-                            <Text style={{ fontSize: 13, color: Colors.light.icon, fontWeight: '500' }}>
-                              Req: {i.requested_qty} {req.status !== 'pending' && req.status !== 'rejected' && `| Appr: ${i.approved_qty}`}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
-            )}
-          </ScrollView>
+
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', marginTop: 32, marginBottom: 16 }}>My Request History</Text>
+              <FlatList
+                data={myRequests}
+                keyExtractor={item => item.id}
+                renderItem={renderMyRequestsItem}
+                scrollEnabled={false}
+                ListEmptyComponent={<Text style={styles.emptyText}>No requests submitted yet.</Text>}
+              />
+            </ScrollView>
+          </View>
+        ) : activeTab === 'task_assigning' ? (
+          <FlatList
+            data={refills.filter(r => r.status === 'Requested' || r.status === 'Assigned')}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderRefillItem}
+            ListEmptyComponent={<Text style={styles.emptyText}>No active refill tasks to assign.</Text>}
+          />
+        ) : activeTab === 'fillups' ? (
+          <FlatList
+            data={refills.filter(r => r.status === 'Completed' || r.status === 'Filled')}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderRefillItem}
+            ListEmptyComponent={<Text style={styles.emptyText}>No filled or completed refills.</Text>}
+          />
+        ) : (
+          <FlatList
+            data={myTasks}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderMyTasksItem}
+            ListEmptyComponent={<Text style={styles.emptyText}>No refill tasks assigned to you right now.</Text>}
+          />
         )}
       </View>
 
@@ -748,7 +992,7 @@ export default function SubAdminStationaryScreen() {
               </View>
 
               <Text style={styles.label}>Item Name</Text>
-              <TextInput style={styles.input} value={newItemName} onChangeText={setNewItemName} placeholder="e.g. A4 Paper Rim" />
+              <TextInput style={styles.input} placeholder="e.g. A4 Paper Bundle" value={newItemName} onChangeText={setNewItemName} />
               
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
                 <Text style={[styles.label, { marginBottom: 0 }]}>Extra Details (Optional)</Text>
@@ -772,28 +1016,28 @@ export default function SubAdminStationaryScreen() {
 
             <View style={[styles.modalActions, { marginTop: 16 }]}>
               <Pressable style={styles.cancelBtn} onPress={() => setAddItemModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleAddItem} disabled={adding}><Text style={styles.submitBtnText}>{adding ? 'Adding...' : 'Add'}</Text></Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleAddItem} disabled={adding}><Text style={styles.submitBtnText}>{adding ? 'Adding...' : 'Add Item'}</Text></Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Bulk Add Modal */}
+      {/* Bulk CSV Add Modal */}
       <Modal visible={bulkModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDesktop && { width: 500 }]}>
-            <Text style={styles.modalTitle}>Bulk Add Items (CSV Paste)</Text>
-            <Text style={{ fontSize: 13, color: Colors.light.icon, marginBottom: 12 }}>Format: ItemName, Stock {"\n"}Example:{"\n"}Pens, 100{"\n"}Notebooks, 50</Text>
-            <TextInput 
-              style={[styles.input, { height: 150, textAlignVertical: 'top' }]} 
-              multiline 
-              value={csvText} 
-              onChangeText={setCsvText} 
-              placeholder="Paste your CSV text here..." 
+            <Text style={styles.modalTitle}>Bulk CSV Add Items</Text>
+            <Text style={{ color: Colors.light.icon, fontSize: 13, marginBottom: 16 }}>Paste comma-separated rows. Format: Name,Stock (one item per line)</Text>
+            <TextInput
+              style={[styles.input, { height: 150, textAlignVertical: 'top' }]}
+              multiline
+              placeholder="e.g. A4 Paper,10&#10;Ball Pen Blue,50"
+              value={csvText}
+              onChangeText={setCsvText}
             />
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelBtn} onPress={() => setBulkModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleBulkAdd} disabled={adding}><Text style={styles.submitBtnText}>{adding ? 'Adding...' : 'Upload'}</Text></Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleBulkAdd} disabled={adding}><Text style={styles.submitBtnText}>{adding ? 'Processing...' : 'Bulk Add'}</Text></Pressable>
             </View>
           </View>
         </View>
@@ -848,24 +1092,23 @@ export default function SubAdminStationaryScreen() {
 
               <Text style={styles.label}>Status</Text>
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-                <Pressable 
-                  style={[styles.statusToggleBtn, editItemStatus === 'active' && styles.statusToggleActive]}
-                  onPress={() => setEditItemStatus('active')}
-                >
+                <Pressable style={[styles.statusToggleBtn, editItemStatus === 'active' && styles.statusToggleActive]} onPress={() => setEditItemStatus('active')}>
                   <Text style={[styles.statusToggleText, editItemStatus === 'active' && styles.statusToggleActiveText]}>Active</Text>
                 </Pressable>
-                <Pressable 
-                  style={[styles.statusToggleBtn, editItemStatus === 'hold' && styles.statusToggleActiveHold]}
-                  onPress={() => setEditItemStatus('hold')}
-                >
+                <Pressable style={[styles.statusToggleBtn, editItemStatus === 'hold' && styles.statusToggleActiveHold]} onPress={() => setEditItemStatus('hold')}>
                   <Text style={[styles.statusToggleText, editItemStatus === 'hold' && styles.statusToggleActiveHoldText]}>Hold</Text>
                 </Pressable>
               </View>
             </ScrollView>
 
-            <View style={[styles.modalActions, { marginTop: 16 }]}>
-              <Pressable style={styles.cancelBtn} onPress={() => setEditItemModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleSaveEditItem} disabled={savingEdit}><Text style={styles.submitBtnText}>{savingEdit ? 'Saving...' : 'Save Changes'}</Text></Pressable>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+              <Pressable style={[styles.submitBtn, { backgroundColor: '#f59e0b', flex: 1, marginRight: 8 }]} onPress={() => handleRequestRefill(editingItem!)}>
+                <Text style={styles.submitBtnText}>Request Refill</Text>
+              </Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleSaveEditItem} disabled={savingEdit}><Text style={styles.submitBtnText}>{savingEdit ? 'Saving...' : 'Save'}</Text></Pressable>
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <Pressable style={[styles.cancelBtn, { width: '100%', alignItems: 'center' }]} onPress={() => setEditItemModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
             </View>
           </View>
         </View>
@@ -881,9 +1124,6 @@ export default function SubAdminStationaryScreen() {
                 <View style={{ marginBottom: 20 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.light.text }}>{selectedRequest.employee_name} ({selectedRequest.employee_department})</Text>
                   {selectedRequest.notes ? <Text style={{ fontSize: 14, color: Colors.light.icon, marginTop: 4, fontStyle: 'italic' }}>Notes: "{selectedRequest.notes}"</Text> : null}
-                  {selectedRequest.approved_by && selectedRequest.status !== 'pending' && (
-                    <Text style={{ fontSize: 13, color: Colors.light.primary, marginTop: 4, fontWeight: '600' }}>Processed by: {selectedRequest.approved_by}</Text>
-                  )}
                 </View>
 
                 <View style={[styles.tableHeader, { flexDirection: 'row', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border }]}>
@@ -892,30 +1132,24 @@ export default function SubAdminStationaryScreen() {
                   <Text style={{ flex: 1, fontWeight: '700', color: Colors.light.icon, textAlign: 'center' }}>Approve Qty</Text>
                 </View>
 
-                {(!selectedRequest.items || selectedRequest.items.length === 0) ? (
-                  <Text style={{ textAlign: 'center', color: Colors.light.icon, marginTop: 20, fontStyle: 'italic', fontSize: 13 }}>
-                    The items in this request have been removed from the inventory system.
-                  </Text>
-                ) : (
-                  selectedRequest.items.map(item => (
-                    <View key={item.item_id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                      <Text style={{ flex: 2, fontSize: 15, fontWeight: '600', color: Colors.light.text }}>{item.name}</Text>
-                      <Text style={{ flex: 1, fontSize: 15, color: Colors.light.text, textAlign: 'center' }}>{item.requested_qty}</Text>
-                      <View style={{ flex: 1, alignItems: 'center' }}>
-                        {selectedRequest.status === 'pending' ? (
-                          <TextInput 
-                            style={[styles.input, { marginBottom: 0, paddingVertical: 6, textAlign: 'center', width: 60 }]}
-                            value={approvalQuantities[item.item_id] || ''}
-                            onChangeText={(val) => setApprovalQuantities(prev => ({ ...prev, [item.item_id]: val }))}
-                            keyboardType="numeric"
-                          />
-                        ) : (
-                          <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '700' }}>{item.approved_qty}</Text>
-                        )}
-                      </View>
+                {selectedRequest.items?.map(item => (
+                  <View key={item.item_id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                    <Text style={{ flex: 2, fontSize: 15, fontWeight: '600', color: Colors.light.text }}>{item.name}</Text>
+                    <Text style={{ flex: 1, fontSize: 15, color: Colors.light.text, textAlign: 'center' }}>{item.requested_qty}</Text>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      {selectedRequest.status === 'pending' ? (
+                        <TextInput 
+                          style={[styles.input, { marginBottom: 0, paddingVertical: 6, textAlign: 'center', width: 60 }]}
+                          value={approvalQuantities[item.item_id] || ''}
+                          onChangeText={(val) => setApprovalQuantities(prev => ({ ...prev, [item.item_id]: val }))}
+                          keyboardType="numeric"
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 15, color: Colors.light.text, fontWeight: '700' }}>{item.approved_qty}</Text>
+                      )}
                     </View>
-                  ))
-                )}
+                  </View>
+                ))}
 
                 {selectedRequest.status === 'pending' && (
                   <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 32 }}>
@@ -960,10 +1194,7 @@ export default function SubAdminStationaryScreen() {
                     <View key={itemId} style={styles.cartItemRow}>
                       <Text style={styles.cartItemName}>{item.name.split(' | ')[0]}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <Pressable 
-                          style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }} 
-                          onPress={() => updateCart(item.id, -1)}
-                        >
+                        <Pressable style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }} onPress={() => updateCart(item.id, -1)}>
                           <Minus size={14} color={Colors.light.primary} />
                         </Pressable>
                         <Text style={styles.cartItemQty}>{cart[itemId]}</Text>
@@ -982,13 +1213,7 @@ export default function SubAdminStationaryScreen() {
             </ScrollView>
 
             <Text style={styles.label}>Notes (Optional)</Text>
-            <TextInput 
-              style={[styles.input, { height: 80 }]} 
-              placeholder="Why do you need these items?" 
-              multiline 
-              value={notes} 
-              onChangeText={setNotes} 
-            />
+            <TextInput style={[styles.input, { height: 80 }]} placeholder="Why do you need these items?" multiline value={notes} onChangeText={setNotes} />
 
             <View style={styles.modalActions}>
               <Pressable style={[styles.cancelBtn, { backgroundColor: '#F1F5F9' }]} onPress={() => setCartModalVisible(false)}>
@@ -1003,6 +1228,102 @@ export default function SubAdminStationaryScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Refill Task Assign Modal */}
+      <Modal visible={assignModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 450 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={styles.modalTitle}>Assign Refill Task</Text>
+              <Pressable onPress={() => setAssignModalVisible(false)}><X size={24} color={Colors.light.icon}/></Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Select Assignee (Employee / Sub Admin)</Text>
+              <View style={{ borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, marginBottom: 16 }}>
+                {Platform.OS === 'web' ? (
+                  <select 
+                    style={{ width: '100%', height: 40, border: 'none', backgroundColor: 'transparent', paddingLeft: 8, paddingRight: 8 }}
+                    value={selectedAssignee} onChange={(e) => setSelectedAssignee(e.target.value)}
+                  >
+                    <option value="">-- Choose User --</option>
+                    {employeesAndSubAdmins.map(u => <option key={u.id} value={u.id}>{u.label}</option>)}
+                  </select>
+                ) : (
+                  <Picker selectedValue={selectedAssignee} onValueChange={(v) => setSelectedAssignee(v)}>
+                    <Picker.Item label="-- Choose User --" value="" />
+                    {employeesAndSubAdmins.map(u => <Picker.Item key={u.id} label={u.label} value={u.id} />)}
+                  </Picker>
+                )}
+              </View>
+
+              <Text style={styles.label}>Vendor Shop Name</Text>
+              <TextInput style={styles.input} placeholder="e.g. Starlight Stationeries" value={shopName} onChangeText={setShopName} />
+
+              <Text style={styles.label}>Vendor Shop Address</Text>
+              <TextInput style={styles.input} placeholder="e.g. 5th Cross, Gandhi Bazar" value={shopAddress} onChangeText={setShopAddress} />
+
+              <Text style={styles.label}>Number of Items to Buy</Text>
+              <TextInput style={styles.input} placeholder="e.g. 50" value={qtyToBuy} onChangeText={setQtyToBuy} keyboardType="numeric" />
+
+              <Text style={styles.label}>Task Instructions / Notes</Text>
+              <TextInput style={styles.input} placeholder="e.g. Buy high quality A4 papers" value={taskNotes} onChangeText={setTaskNotes} />
+
+              <View style={styles.modalActions}>
+                <Pressable style={styles.cancelBtn} onPress={() => setAssignModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+                <Pressable style={styles.submitBtn} onPress={handleAssignTask} disabled={assigningTask}><Text style={styles.submitBtnText}>{assigningTask ? 'Assigning...' : 'Assign Task'}</Text></Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Complete Task Modal */}
+      <Modal visible={completeModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 400 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={styles.modalTitle}>Complete Refill Task</Text>
+              <Pressable onPress={() => setCompleteModalVisible(false)}><X size={24} color={Colors.light.icon}/></Pressable>
+            </View>
+
+            <Text style={styles.label}>Enter Bill Amount Spent (₹)</Text>
+            <TextInput style={styles.input} placeholder="e.g. 1250" value={billAmount} onChangeText={setBillAmount} keyboardType="numeric" />
+
+            <Text style={styles.label}>Upload Bill Image (Optional)</Text>
+            <Pressable style={[styles.imagePicker, { width: '100%', height: 150, borderRadius: 8, marginBottom: 20 }]} onPress={handlePickBillImage}>
+              {billImage ? (
+                <Image source={{ uri: billImage }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="contain" />
+              ) : (
+                <>
+                  <Upload size={24} color={Colors.light.icon} />
+                  <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Choose Photo</Text>
+                </>
+              )}
+            </Pressable>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setCompleteModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleCompleteTaskSubmit} disabled={completingTask}><Text style={styles.submitBtnText}>{completingTask ? 'Submitting...' : 'Complete Task'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bill Image Preview Modal */}
+      {previewBillImage && (
+        <Modal visible={!!previewBillImage} transparent animationType="fade">
+          <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+            <View style={{ width: '90%', height: '80%', justifyContent: 'center', alignItems: 'center' }}>
+              <Image source={{ uri: previewBillImage }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              <Pressable style={{ position: 'absolute', top: -40, right: 10, padding: 10 }} onPress={() => setPreviewBillImage(null)}>
+                <X size={32} color="#FFF" />
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
+
     </View>
   );
 }
@@ -1020,7 +1341,7 @@ const styles = StyleSheet.create({
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE' },
   secondaryBtnText: { color: Colors.light.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 },
   
-  tabsContainer: { flexDirection: 'row' },
+  tabsContainer: { flexDirection: 'row', gap: 8 },
   tab: { paddingVertical: 12, paddingHorizontal: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: Colors.light.primary },
   tabText: { fontSize: 16, fontWeight: '600', color: Colors.light.icon },
@@ -1034,8 +1355,8 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 15, fontWeight: '700', color: Colors.light.text, textAlign: 'center' },
   itemStock: { fontSize: 13, color: Colors.light.icon, marginTop: 4 },
 
-  requestRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.light.card, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border },
-  actionBtn: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#EFF6FF', borderRadius: 8 },
+  requestRow: { backgroundColor: Colors.light.card, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.light.border, marginBottom: 16, flexDirection: 'row', alignItems: 'center' },
+  actionBtn: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#EFF6FF', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   statusText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
@@ -1048,7 +1369,7 @@ const styles = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: '#FFF', borderRadius: 24, padding: 32, width: '100%', ...Platform.select({ web: { boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' } }) },
-  modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.light.text, marginBottom: 24 },
+  modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.light.text, marginBottom: 12 },
   imagePicker: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#F8FAFC', borderWidth: 2, borderColor: Colors.light.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   imagePreview: { width: '100%', height: '100%' },
   label: { fontSize: 13, fontWeight: '700', color: Colors.light.text, marginBottom: 8 },

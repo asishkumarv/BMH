@@ -362,6 +362,65 @@ app.listen(PORT, () => {
     `);
   }).catch(e => console.error(e.message));
 
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS stationary_refills (
+      id SERIAL PRIMARY KEY,
+      item_id INTEGER REFERENCES stationary_items(id) ON DELETE CASCADE,
+      requested_by_type VARCHAR(50) DEFAULT 'sub_admin',
+      requested_by_id INTEGER,
+      requested_by_name VARCHAR(255),
+      requested_by_role VARCHAR(100),
+      requested_by_dept VARCHAR(100),
+      notes TEXT,
+      status VARCHAR(50) DEFAULT 'Requested',
+      assigned_to_type VARCHAR(50),
+      assigned_to_id INTEGER,
+      assigned_to_name VARCHAR(255),
+      assigned_to_role VARCHAR(100),
+      assigned_to_dept VARCHAR(100),
+      task_notes TEXT,
+      shop_name VARCHAR(255),
+      shop_address TEXT,
+      qty_to_buy INTEGER,
+      bill_amount NUMERIC(10,2),
+      bill_image TEXT,
+      fillup_qty INTEGER DEFAULT 0,
+      approved_by_name VARCHAR(255),
+      approved_by_role VARCHAR(100),
+      approved_by_dept VARCHAR(100),
+      approved_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS requested_by_name VARCHAR(255);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS requested_by_role VARCHAR(100);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS requested_by_dept VARCHAR(100);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS assigned_to_name VARCHAR(255);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS assigned_to_role VARCHAR(100);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS assigned_to_dept VARCHAR(100);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS shop_name VARCHAR(255);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS shop_address TEXT;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS qty_to_buy INTEGER;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS bill_amount NUMERIC(10,2);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS bill_image TEXT;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(255);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS approved_by_role VARCHAR(100);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS approved_by_dept VARCHAR(100);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
+  `).catch(e => console.error(e.message));
+
+  pool.query(`
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_name VARCHAR(255);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_role VARCHAR(100);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_dept VARCHAR(100);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(255);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_by_role VARCHAR(100);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_by_dept VARCHAR(100);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
+  `).catch(e => console.error(e.message));
+
   pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS reminder_date VARCHAR(255)").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS reminder_date VARCHAR(255)").catch(e => console.error(e.message));
 
