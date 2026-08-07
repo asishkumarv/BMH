@@ -443,7 +443,10 @@ exports.assignRefillTask = async (req, res) => {
     `).catch(() => {});
 
     // Resolve refill item details
-    const refillQuery = await pool.query('SELECT item_name FROM stationary_refills WHERE id = $1', [id]);
+    const refillQuery = await pool.query(
+      'SELECT i.name as item_name FROM stationary_refills r JOIN stationary_items i ON r.item_id = i.id WHERE r.id = $1',
+      [id]
+    );
     if (refillQuery.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Refill request not found' });
     }

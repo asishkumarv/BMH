@@ -1098,13 +1098,13 @@ export default function AdminStationaryScreen() {
       {/* Refill Task Assign Modal */}
       <Modal visible={assignModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDesktop && { width: 450 }]}>
+          <View style={[styles.modalContent, isDesktop && { width: 450 }, { maxHeight: '90%' }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={styles.modalTitle}>Assign Refill Task</Text>
               <Pressable onPress={() => setAssignModalVisible(false)}><X size={24} color={Colors.light.icon}/></Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
               <Text style={styles.label}>Select Assignee (Employee / Sub Admin)</Text>
               <View style={{ position: 'relative', zIndex: 9999, marginBottom: 16 }}>
                 <Pressable 
