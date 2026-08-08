@@ -428,12 +428,10 @@ exports.getAdminPerformanceStats = async (req, res) => {
 
       allFilteredOrders.push(...filteredOrders);
 
-      // Filter out scheduled, rescheduled, and bus deliveries for rider KPI metrics
+      // Filter out rescheduled deliveries for rider KPI metrics (keep scheduled, bus, and purchase orders)
       const activeRiderOrders = filteredOrders.filter(o => {
-        const isSched = o.isScheduled === true || o.isScheduled === 'true' || o.modeOfDelivery === 'Schedule Delivery';
-        const isBus = String(o.modeOfDelivery || o.displayType || '').toLowerCase() === 'bus';
         const isResched = String(o.status || '').toLowerCase() === 'rescheduled';
-        return !isSched && !isBus && !isResched;
+        return !isResched;
       });
 
       // Counters
