@@ -264,20 +264,34 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   };
 
   const handleSelectOrderForView = async (order) => {
-    setSelectedOrder(order);
+    let initialLocationLink = '';
+    if (order.patient_address && typeof order.patient_address === 'object') {
+      initialLocationLink = order.patient_address.location_link || '';
+    }
+    setSelectedOrder({ ...order, location_link: initialLocationLink });
     setEditAddress(typeof order.patient_address === 'object' ? order.patient_address?.address || order.patient_address?.locality || '' : order.patient_address || '');
     setPatientAddresses([]);
 
     const phone = order.patient_contact_no || order.mobile_no || '';
     if (phone) {
       try {
-        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patients/by-mobile/${phone}`);
+        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patient/by-mobile/${phone}`);
         if (res.data && res.data.success && res.data.patient) {
           let addrs = res.data.patient.addresses || [];
           if (typeof addrs === 'string') {
             try { addrs = JSON.parse(addrs); } catch (e) { addrs = []; }
           }
           setPatientAddresses(addrs);
+          
+          if (!initialLocationLink) {
+            const currentAddrStr = typeof order.patient_address === 'object' 
+              ? order.patient_address?.address || order.patient_address?.locality || '' 
+              : order.patient_address || '';
+            const matched = addrs.find(a => a.address === currentAddrStr);
+            if (matched && matched.location_link) {
+              setSelectedOrder(prev => ({ ...prev, location_link: matched.location_link }));
+            }
+          }
         }
       } catch (e) {
         console.log('Error fetching patient addresses:', e);
@@ -368,7 +382,18 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
       }
 
       const res = await axios.put(`https://napi.bharatmedicalhallplus.com/ecogreen/sales-orders/details/${selectedOrder.id}`, {
-        patient_address: editAddress,
+        patient_address: {
+          deliver_name: selectedOrder.patient_name || '',
+          address: editAddress,
+          locality: '',
+          pincode: '',
+          landmark: '',
+          state: '',
+          city: '',
+          country: 'India',
+          type: 'Home',
+          location_link: selectedOrder.location_link || ''
+        },
         patient_name: selectedOrder.patient_name,
         patient_contact_no: selectedOrder.patient_contact_no,
         delivery_type: selectedOrder.delivery_type || 'Local',
@@ -1123,6 +1148,33 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                     keyboardType="phone-pad"
                   />
 
+                  <Text style={styles.label}>Select Address</Text>
+                  <View style={[styles.dropdownWrapper, { marginBottom: 8, width: '100%' }]}>
+                    <Picker
+                      selectedValue={patientAddresses.some(a => a.address === editAddress) ? editAddress : 'new'}
+                      onValueChange={(val) => {
+                        if (val === 'new') {
+                          setEditAddress('');
+                          setSelectedOrder(prev => ({ ...prev, location_link: '' }));
+                        } else {
+                          const selected = patientAddresses.find(a => a.address === val);
+                          setEditAddress(val);
+                          if (selected && selected.location_link) {
+                            setSelectedOrder(prev => ({ ...prev, location_link: selected.location_link }));
+                          } else {
+                            setSelectedOrder(prev => ({ ...prev, location_link: '' }));
+                          }
+                        }
+                      }}
+                      style={styles.picker}
+                    >
+                      {patientAddresses.map((addr, idx) => (
+                        <Picker.Item key={idx} label={addr.address} value={addr.address} />
+                      ))}
+                      <Picker.Item label="(Enter New Address)" value="new" />
+                    </Picker>
+                  </View>
+
                   <Text style={styles.label}>Address Info</Text>
                   <TextInput 
                     style={styles.input} 
@@ -1130,28 +1182,6 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                     onChangeText={setEditAddress} 
                     multiline 
                   />
-                  {patientAddresses && patientAddresses.length > 0 && (
-                    <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 6 }}>
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#475569', marginBottom: 4 }}>Select Registered Address:</Text>
-                      {patientAddresses.map((addrObj, idx) => (
-                        <TouchableOpacity 
-                          key={idx} 
-                          style={{ padding: 6, backgroundColor: '#fff', borderRadius: 4, marginBottom: 4, borderWidth: 1, borderColor: '#cbd5e1' }}
-                          onPress={() => {
-                            setEditAddress(addrObj.address || '');
-                            if (addrObj.location_link) {
-                              setSelectedOrder(prev => ({ ...prev, location_link: addrObj.location_link }));
-                            }
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, color: '#334155' }}>{addrObj.address}</Text>
-                          {addrObj.location_link ? (
-                            <Text style={{ fontSize: 9, color: '#0284c7', marginTop: 2 }}>📍 Location Attached</Text>
-                          ) : null}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
                 </View>
 
                 {/* Delivery Mode & Location Link */}

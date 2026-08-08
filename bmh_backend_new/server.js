@@ -428,12 +428,27 @@ app.listen(PORT, () => {
       address TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
-  `).catch(e => console.error(e.message));
 
-  pool.query(`
+    CREATE TABLE IF NOT EXISTS stationary_vendor_products (
+      id SERIAL PRIMARY KEY,
+      vendor_id INTEGER REFERENCES stationary_vendors(id) ON DELETE CASCADE,
+      item_id INTEGER REFERENCES stationary_items(id) ON DELETE CASCADE,
+      price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+      package_qty INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(vendor_id, item_id)
+    );
+
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS is_new_vendor BOOLEAN DEFAULT FALSE;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS new_vendor_name VARCHAR(255);
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS new_vendor_address TEXT;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS qty_purchased INTEGER;
+    ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS price_per_piece NUMERIC(10,2);
     ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_name VARCHAR(255);
-    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_role VARCHAR(100);
     ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_dept VARCHAR(100);
+    ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS requester_role VARCHAR(100);
+
     ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_by_name VARCHAR(255);
     ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_by_role VARCHAR(100);
     ALTER TABLE stationary_requests ADD COLUMN IF NOT EXISTS approved_by_dept VARCHAR(100);

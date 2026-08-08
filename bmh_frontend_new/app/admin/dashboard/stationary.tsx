@@ -174,6 +174,17 @@ export default function AdminStationaryScreen() {
     }
   };
 
+  const handleUpdateVendor = async (vendorId: string, updatedData: any) => {
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/vendors/${vendorId}`, updatedData);
+      if (res.data.success) {
+        fetchVendors();
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to update vendor');
+    }
+  };
+
   const handleRejectRefill = async (refillId: string) => {
     const executeReject = async () => {
       try {
@@ -1320,24 +1331,39 @@ export default function AdminStationaryScreen() {
           </View>
         </Modal>
       )}
-      {customVendorModalMarkup(
-        vendors,
-        manageVendorsModalOpen,
-        () => setManageVendorsModalOpen(false),
-        newVendorName,
-        setNewVendorName,
-        newVendorAddress,
-        setNewVendorAddress,
-        handleAddVendor,
-        handleDeleteVendor,
-        isDesktop
-      )}
-
+      
+      <PredefinedVendorsModal
+        vendors={vendors}
+        open={manageVendorsModalOpen}
+        onClose={() => setManageVendorsModalOpen(false)}
+        name={newVendorName}
+        setName={setNewVendorName}
+        addr={newVendorAddress}
+        setAddr={setNewVendorAddress}
+        onAdd={handleAddVendor}
+        onDel={handleDeleteVendor}
+        isDesktop={isDesktop}
+        allItems={items}
+        onUpdateVendor={handleUpdateVendor}
+      />
     </View>
   );
 }
 
-const customVendorModalMarkup = (
+const PredefinedVendorsModal = ({
+  vendors,
+  open,
+  onClose,
+  name,
+  setName,
+  addr,
+  setAddr,
+  onAdd,
+  onDel,
+  isDesktop,
+  allItems,
+  onUpdateVendor
+}: {
   vendors: any[],
   open: boolean,
   onClose: () => void,
@@ -1347,45 +1373,175 @@ const customVendorModalMarkup = (
   setAddr: (v: string) => void,
   onAdd: () => void,
   onDel: (id: string) => void,
-  isDesktop: boolean
-) => (
-  <Modal visible={open} transparent animationType="fade">
-    <View style={styles.modalOverlay}>
-      <View style={[styles.modalContent, isDesktop && { width: 500 }, { maxHeight: '90%' }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Text style={styles.modalTitle}>Manage Predefined Vendors</Text>
-          <Pressable onPress={onClose}><X size={24} color={Colors.light.icon}/></Pressable>
-        </View>
+  isDesktop: boolean,
+  allItems: any[],
+  onUpdateVendor: (id: string, data: any) => Promise<void>
+}) => {
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const [productPrice, setProductPrice] = useState<string>('');
+  const [packageQty, setPackageQty] = useState<string>('1');
 
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-          <Text style={[styles.label, { fontSize: 15, marginBottom: 12 }]}>Add New Vendor</Text>
-          <TextInput style={styles.input} placeholder="Vendor Shop Name" value={name} onChangeText={setName} />
-          <TextInput style={styles.input} placeholder="Vendor Shop Address" value={addr} onChangeText={setAddr} />
-          <Pressable style={[styles.submitBtn, { marginBottom: 24, alignSelf: 'flex-start' }]} onPress={onAdd}>
-            <Text style={styles.submitBtnText}>Add Vendor</Text>
-          </Pressable>
+  const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editAddr, setEditAddr] = useState('');
 
-          <Text style={[styles.label, { fontSize: 15, marginBottom: 12 }]}>Predefined Vendors List</Text>
-          {vendors.length === 0 ? (
-            <Text style={styles.emptyText}>No predefined vendors added yet.</Text>
-          ) : (
-            vendors.map(v => (
-              <View key={v.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text }}>{v.name}</Text>
-                  <Text style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>📍 {v.address || 'No Address'}</Text>
+  return (
+    <Modal visible={open} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, isDesktop && { width: 500 }, { maxHeight: '90%' }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={styles.modalTitle}>Manage Predefined Vendors</Text>
+            <Pressable onPress={onClose}><X size={24} color={Colors.light.icon}/></Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            <Text style={[styles.label, { fontSize: 15, marginBottom: 12 }]}>Add New Vendor</Text>
+            <TextInput style={styles.input} placeholder="Vendor Shop Name" value={name} onChangeText={setName} />
+            <TextInput style={styles.input} placeholder="Vendor Shop Address" value={addr} onChangeText={setAddr} />
+            <Pressable style={[styles.submitBtn, { marginBottom: 24, alignSelf: 'flex-start' }]} onPress={onAdd}>
+              <Text style={styles.submitBtnText}>Add Vendor</Text>
+            </Pressable>
+
+            <Text style={[styles.label, { fontSize: 15, marginBottom: 12 }]}>Predefined Vendors List</Text>
+            {vendors.length === 0 ? (
+              <Text style={styles.emptyText}>No predefined vendors added yet.</Text>
+            ) : (
+              vendors.map(v => (
+                <View key={v.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  {editingVendorId === v.id ? (
+                    <View style={{ flex: 1, marginRight: 12, gap: 8 }}>
+                      <TextInput value={editName} onChangeText={setEditName} style={[styles.input, { marginBottom: 8 }]} placeholder="Edit Vendor Name" />
+                      <TextInput value={editAddr} onChangeText={setEditAddr} style={[styles.input, { marginBottom: 8 }]} placeholder="Edit Vendor Address" />
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Pressable style={styles.actionBtn} onPress={async () => {
+                          await onUpdateVendor(v.id, { name: editName, address: editAddr, products: v.products });
+                          setEditingVendorId(null);
+                        }}>
+                          <Text style={{ fontWeight: '700', color: Colors.light.primary }}>Save</Text>
+                        </Pressable>
+                        <Pressable style={styles.actionBtn} onPress={() => setEditingVendorId(null)}>
+                          <Text style={{ color: Colors.light.icon }}>Cancel</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.light.text }}>{v.name}</Text>
+                      <Text style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>📍 {v.address || 'No Address'}</Text>
+                      
+                      <View style={{ marginTop: 10, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Supplied Products:</Text>
+                        {(!v.products || v.products.length === 0) ? (
+                          <Text style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No products mapped yet</Text>
+                        ) : (
+                          v.products.map((p: any, idx: number) => (
+                            <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
+                              <Text style={{ fontSize: 13, color: '#334155', flex: 1 }} numberOfLines={1}>
+                                • {p.item_name}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: '#475569', marginHorizontal: 8 }}>
+                                ₹{p.price} / pack of {p.package_qty}
+                              </Text>
+                              <Pressable onPress={async () => {
+                                const updated = v.products.filter((item: any) => item.item_id !== p.item_id);
+                                await onUpdateVendor(v.id, { name: v.name, address: v.address, products: updated });
+                              }}>
+                                <X size={14} color="#ef4444" />
+                              </Pressable>
+                            </View>
+                          ))
+                        )}
+
+                        {selectedVendorId === v.id ? (
+                          <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 8, gap: 8 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b' }}>Add Product Supply:</Text>
+                            <View style={styles.dropdownWrapper}>
+                              <Picker
+                                selectedValue={selectedItemId}
+                                onValueChange={setSelectedItemId}
+                                style={styles.picker}
+                              >
+                                <Picker.Item label="Select Stationary Product" value="" />
+                                {allItems.map(item => (
+                                  <Picker.Item key={item.id} label={item.name.split(' | ')[0]} value={item.id} />
+                                ))}
+                              </Picker>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              <TextInput 
+                                placeholder="Price (₹)" 
+                                keyboardType="numeric" 
+                                value={productPrice} 
+                                onChangeText={setProductPrice} 
+                                style={[styles.input, { flex: 1, marginBottom: 0, paddingVertical: 8 }]} 
+                              />
+                              <TextInput 
+                                placeholder="Pkg Qty" 
+                                keyboardType="numeric" 
+                                value={packageQty} 
+                                onChangeText={setPackageQty} 
+                                style={[styles.input, { flex: 1, marginBottom: 0, paddingVertical: 8 }]} 
+                              />
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                              <Pressable style={styles.actionBtn} onPress={() => setSelectedVendorId(null)}>
+                                <Text style={{ color: Colors.light.icon }}>Cancel</Text>
+                              </Pressable>
+                              <Pressable style={[styles.actionBtn, { backgroundColor: Colors.light.primary }]} onPress={async () => {
+                                if (!selectedItemId || !productPrice) return Alert.alert('Error', 'Product and Price are required.');
+                                const updated = [...(v.products || []), { 
+                                  item_id: parseInt(selectedItemId), 
+                                  price: parseFloat(productPrice), 
+                                  package_qty: parseInt(packageQty) || 1 
+                                }];
+                                await onUpdateVendor(v.id, { name: v.name, address: v.address, products: updated });
+                                setSelectedVendorId(null);
+                                setSelectedItemId('');
+                                setProductPrice('');
+                                setPackageQty('1');
+                              }}>
+                                <Text style={{ color: '#fff', fontWeight: '700' }}>Save</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ) : (
+                          <Pressable 
+                            style={{ marginTop: 8, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#EFF6FF', borderRadius: 6 }} 
+                            onPress={() => {
+                              setSelectedVendorId(v.id);
+                              setSelectedItemId('');
+                              setProductPrice('');
+                              setPackageQty('1');
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: Colors.light.primary, fontWeight: '700' }}>+ Add Product Supply</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    </View>
+                  )}
+                  <View style={{ gap: 8, justifyContent: 'center' }}>
+                    <Pressable onPress={() => {
+                      setEditingVendorId(v.id);
+                      setEditName(v.name);
+                      setEditAddr(v.address || '');
+                    }} style={{ padding: 8, backgroundColor: '#e2e8f0', borderRadius: 6 }}>
+                      <Edit2 size={16} color="#475569" />
+                    </Pressable>
+                    <Pressable onPress={() => onDel(v.id)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                      <Trash2 size={16} color="#ef4444" />
+                    </Pressable>
+                  </View>
                 </View>
-                <Pressable onPress={() => onDel(v.id)} style={{ padding: 8, backgroundColor: '#fee2e2', borderRadius: 6 }}>
-                  <Trash2 size={16} color="#ef4444" />
-                </Pressable>
-              </View>
-            ))
-          )}
-        </ScrollView>
+              ))
+            )}
+          </ScrollView>
+        </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background, padding: 32 },

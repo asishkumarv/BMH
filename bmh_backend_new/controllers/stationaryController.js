@@ -555,13 +555,91 @@ exports.assignRefillTask = async (req, res) => {
 exports.completeRefillTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { bill_amount, bill_image } = req.body;
+    const { 
+      bill_amount, 
+      bill_image,
+      is_new_vendor,
+      new_vendor_name,
+      new_vendor_address,
+      qty_purchased,
+      price_per_piece
+    } = req.body;
+
+    // Self-healing database check
+    await pool.query(`
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS is_new_vendor BOOLEAN DEFAULT FALSE;
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS new_vendor_name VARCHAR(255);
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS new_vendor_address TEXT;
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS qty_purchased INTEGER;
+      ALTER TABLE stationary_refills ADD COLUMN IF NOT EXISTS price_per_piece NUMERIC(10,2);
+    `).catch(() => {});
+
+    // Update the refill task completion fields
     const result = await pool.query(
       `UPDATE stationary_refills 
-       SET status = 'Completed', bill_amount = $1, bill_image = $2, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $3 RETURNING *`,
-      [bill_amount || null, bill_image || null, id]
+       SET status = 'Completed', 
+           bill_amount = $1, 
+           bill_image = $2, 
+           is_new_vendor = $3, 
+           new_vendor_name = $4, 
+           new_vendor_address = $5, 
+           qty_purchased = $6, 
+           price_per_piece = $7,
+           completed_at = CURRENT_TIMESTAMP, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $8 RETURNING *`,
+      [
+        bill_amount || null, 
+        bill_image || null, 
+        is_new_vendor || false, 
+        new_vendor_name || null, 
+        new_vendor_address || null, 
+        qty_purchased || null, 
+        price_per_piece || null,
+        id
+      ]
     );
+
+    // Update normal task status if linked
+    if (result.rows.length > 0 && result.rows[0].task_id) {
+      await pool.query(
+        "UPDATE tasks SET status = 'Completed', completed_at = CURRENT_TIMESTAMP WHERE id = $1", 
+        [result.rows[0].task_id]
+      ).catch(e => console.error('Failed to complete linked normal task:', e));
+    }
+
+    // Proactive vendor & pricing registration
+    let finalVendorId = null;
+    if (is_new_vendor && new_vendor_name) {
+      // Create new predefined vendor
+      const vendorInsert = await pool.query(
+        'INSERT INTO stationary_vendors (name, address) VALUES ($1, $2) RETURNING id',
+        [new_vendor_name, new_vendor_address || '']
+      );
+      if (vendorInsert.rows.length > 0) {
+        finalVendorId = vendorInsert.rows[0].id;
+      }
+    } else if (result.rows.length > 0 && result.rows[0].shop_name) {
+      // Find matching predefined vendor by name
+      const vQuery = await pool.query('SELECT id FROM stationary_vendors WHERE name = $1', [result.rows[0].shop_name]);
+      if (vQuery.rows.length > 0) {
+        finalVendorId = vQuery.rows[0].id;
+      }
+    }
+
+    if (finalVendorId && result.rows.length > 0) {
+      const itemId = result.rows[0].item_id;
+      const pPiece = price_per_piece || (bill_amount && qty_purchased ? (bill_amount / qty_purchased) : 0);
+      
+      await pool.query(
+        `INSERT INTO stationary_vendor_products (vendor_id, item_id, price, package_qty) 
+         VALUES ($1, $2, $3, 1) 
+         ON CONFLICT (vendor_id, item_id) 
+         DO UPDATE SET price = EXCLUDED.price, updated_at = CURRENT_TIMESTAMP`,
+        [finalVendorId, itemId, pPiece]
+      ).catch(e => console.error('Failed to update vendor product price:', e));
+    }
+
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error completing refill task:', error);
@@ -647,8 +725,30 @@ exports.rejectRefillRequest = async (req, res) => {
 
 exports.getVendors = async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM stationary_vendors ORDER BY name ASC');
-    res.json({ success: true, data: result.rows });
+    const vendorsRes = await pool.query('SELECT * FROM stationary_vendors ORDER BY name ASC');
+    const productsRes = await pool.query(`
+      SELECT vp.*, i.name as item_name 
+      FROM stationary_vendor_products vp
+      JOIN stationary_items i ON vp.item_id = i.id
+    `);
+    
+    const productsByVendor = {};
+    productsRes.rows.forEach(p => {
+      if (!productsByVendor[p.vendor_id]) productsByVendor[p.vendor_id] = [];
+      productsByVendor[p.vendor_id].push({
+        item_id: p.item_id,
+        item_name: p.item_name,
+        price: parseFloat(p.price),
+        package_qty: p.package_qty
+      });
+    });
+
+    const vendors = vendorsRes.rows.map(v => ({
+      ...v,
+      products: productsByVendor[v.id] || []
+    }));
+
+    res.json({ success: true, data: vendors });
   } catch (error) {
     console.error('Error fetching vendors:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -657,15 +757,64 @@ exports.getVendors = async (req, res) => {
 
 exports.addVendor = async (req, res) => {
   try {
-    const { name, address } = req.body;
+    const { name, address, products } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Vendor name is required' });
+    
     const result = await pool.query(
       'INSERT INTO stationary_vendors (name, address) VALUES ($1, $2) RETURNING *',
       [name, address]
     );
-    res.json({ success: true, data: result.rows[0] });
+    const vendor = result.rows[0];
+
+    if (products && Array.isArray(products)) {
+      for (const p of products) {
+        await pool.query(
+          `INSERT INTO stationary_vendor_products (vendor_id, item_id, price, package_qty) 
+           VALUES ($1, $2, $3, $4) 
+           ON CONFLICT (vendor_id, item_id) 
+           DO UPDATE SET price = EXCLUDED.price, package_qty = EXCLUDED.package_qty`,
+          [vendor.id, p.item_id, p.price || 0, p.package_qty || 1]
+        );
+      }
+    }
+
+    res.json({ success: true, data: vendor });
   } catch (error) {
     console.error('Error adding vendor:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.updateVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, address, products } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Vendor name is required' });
+
+    await pool.query(
+      'UPDATE stationary_vendors SET name = $1, address = $2 WHERE id = $3',
+      [name, address, id]
+    );
+
+    // Delete old mappings
+    await pool.query('DELETE FROM stationary_vendor_products WHERE vendor_id = $1', [id]);
+
+    // Insert new mappings
+    if (products && Array.isArray(products)) {
+      for (const p of products) {
+        await pool.query(
+          `INSERT INTO stationary_vendor_products (vendor_id, item_id, price, package_qty) 
+           VALUES ($1, $2, $3, $4) 
+           ON CONFLICT (vendor_id, item_id) 
+           DO UPDATE SET price = EXCLUDED.price, package_qty = EXCLUDED.package_qty`,
+          [id, p.item_id, p.price || 0, p.package_qty || 1]
+        );
+      }
+    }
+
+    res.json({ success: true, message: 'Vendor updated successfully' });
+  } catch (error) {
+    console.error('Error updating vendor:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

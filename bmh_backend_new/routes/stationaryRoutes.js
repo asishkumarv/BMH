@@ -26,6 +26,7 @@ router.put('/refills/:id/reject', stationaryController.rejectRefillRequest);
 // Predefined Vendors
 router.get('/vendors', stationaryController.getVendors);
 router.post('/vendors', stationaryController.addVendor);
+router.put('/vendors/:id', stationaryController.updateVendor);
 router.delete('/vendors/:id', stationaryController.deleteVendor);
 
 module.exports = router;

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
-import { Package, Plus, Minus, ShoppingCart, Clock } from 'lucide-react-native';
+import { Package, Plus, Minus, ShoppingCart, Clock, Check, Upload, X } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useResponsive } from '../../../hooks/useResponsive';
+import * as ImagePicker from 'expo-image-picker';
 
 type StationaryItem = {
   id: string;
@@ -40,9 +41,24 @@ export default function EmployeeStationaryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
 
+  const [activeTab, setActiveTab] = useState<'inventory' | 'my_requests' | 'my_tasks'>('inventory');
+  const [myTasks, setMyTasks] = useState<any[]>([]);
+
+  // Task Completion Modal States
+  const [completeModalVisible, setCompleteModalVisible] = useState(false);
+  const [completingRefillId, setCompletingRefillId] = useState<string | null>(null);
+  const [billAmount, setBillAmount] = useState('');
+  const [billImage, setBillImage] = useState('');
+  const [completingTask, setCompletingTask] = useState(false);
+  const [isNewVendor, setIsNewVendor] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorAddress, setNewVendorAddress] = useState('');
+  const [qtyPurchased, setQtyPurchased] = useState('');
+  const [pricePerPiece, setPricePerPiece] = useState('');
+
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -60,16 +76,23 @@ export default function EmployeeStationaryScreen() {
         setEmployeeId(empId);
       }
 
-      const itemsRes = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
-      if (itemsRes.data.success) {
-        const activeItems = itemsRes.data.data.filter((i: StationaryItem) => i.status !== 'hold');
-        setItems(activeItems);
-      }
-
-      if (empId) {
-        const reqRes = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/requests?employee_id=${empId}`);
-        if (reqRes.data.success) {
-          setRequests(reqRes.data.data);
+      if (activeTab === 'inventory') {
+        const itemsRes = await axios.get('https://napi.bharatmedicalhallplus.com/stationary/items');
+        if (itemsRes.data.success) {
+          const activeItems = itemsRes.data.data.filter((i: StationaryItem) => i.status !== 'hold');
+          setItems(activeItems);
+        }
+      } else if (activeTab === 'my_requests') {
+        if (empId) {
+          const reqRes = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/requests?employee_id=${empId}`);
+          if (reqRes.data.success) {
+            setRequests(reqRes.data.data);
+          }
+        }
+      } else if (activeTab === 'my_tasks') {
+        if (empId) {
+          const res = await axios.get(`https://napi.bharatmedicalhallplus.com/stationary/refills?assigned_to_id=${empId}&assigned_to_type=employee`);
+          if (res.data.success) setMyTasks(res.data.data);
         }
       }
     } catch (error) {
@@ -123,6 +146,89 @@ export default function EmployeeStationaryScreen() {
       Alert.alert('Error', error.response?.data?.message || 'Failed to submit request');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openCompleteTaskModal = (refillId: string) => {
+    setCompletingRefillId(refillId);
+    setBillAmount('');
+    setBillImage('');
+    
+    const matched = myTasks.find(t => String(t.id) === String(refillId));
+    if (matched) {
+      setQtyPurchased(matched.qty_to_buy ? matched.qty_to_buy.toString() : '');
+    } else {
+      setQtyPurchased('');
+    }
+    
+    setIsNewVendor(false);
+    setNewVendorName('');
+    setNewVendorAddress('');
+    setPricePerPiece('');
+    setCompleteModalVisible(true);
+  };
+
+  const handlePickBillImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.2,
+        base64: true,
+      });
+      if (!result.canceled && result.assets[0].base64) {
+        setBillImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCompleteTaskSubmit = async () => {
+    if (!completingRefillId || !billAmount) {
+      Alert.alert('Error', 'Please enter the bill amount.');
+      return;
+    }
+    const amt = parseFloat(billAmount);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Error', 'Please enter a valid bill amount.');
+      return;
+    }
+
+    const qtyP = parseInt(qtyPurchased);
+    if (isNaN(qtyP) || qtyP <= 0) {
+      Alert.alert('Error', 'Please enter a valid purchased quantity.');
+      return;
+    }
+
+    if (isNewVendor && !newVendorName) {
+      Alert.alert('Error', 'Please enter the new vendor name.');
+      return;
+    }
+
+    setCompletingTask(true);
+    try {
+      const res = await axios.put(`https://napi.bharatmedicalhallplus.com/stationary/refills/${completingRefillId}/complete`, {
+        bill_amount: amt,
+        bill_image: billImage || null,
+        is_new_vendor: isNewVendor,
+        new_vendor_name: isNewVendor ? newVendorName : null,
+        new_vendor_address: isNewVendor ? newVendorAddress : null,
+        qty_purchased: qtyP,
+        price_per_piece: pricePerPiece ? parseFloat(pricePerPiece) : (amt / qtyP)
+      });
+      if (res.data.success) {
+        Alert.alert('Success', 'Refill task completed and submitted for review!');
+        setCompleteModalVisible(false);
+        setCompletingRefillId(null);
+        setBillAmount('');
+        setBillImage('');
+        fetchData();
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to complete refill task.');
+    } finally {
+      setCompletingTask(false);
     }
   };
 
@@ -209,6 +315,32 @@ export default function EmployeeStationaryScreen() {
     }
   };
 
+  const renderMyTasksItem = ({ item }: { item: any }) => (
+    <View style={[styles.historyCard, { gap: 12, marginBottom: 16 }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: Colors.light.text }}>{item.item_name?.split(' | ')[0]}</Text>
+        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+          <Text style={{ color: '#D97706', fontSize: 12, fontWeight: 'bold' }}>{item.status}</Text>
+        </View>
+      </View>
+
+      <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, gap: 6 }}>
+        <Text style={{ fontSize: 13, color: '#475569' }}>🏪 <Text style={{ fontWeight: '700' }}>Shop Name:</Text> {item.shop_name}</Text>
+        <Text style={{ fontSize: 13, color: '#475569' }}>📍 <Text style={{ fontWeight: '700' }}>Address:</Text> {item.shop_address}</Text>
+        <Text style={{ fontSize: 13, color: '#1e293b' }}>🛒 <Text style={{ fontWeight: '700' }}>Target Quantity to Buy:</Text> {item.qty_to_buy} items</Text>
+        {item.task_notes ? <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic' }}>Instructions: "{item.task_notes}"</Text> : null}
+      </View>
+
+      {item.status === 'Assigned' && (
+        <View style={{ alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }}>
+          <Pressable style={styles.submitBtn} onPress={() => openCompleteTaskModal(item.id)}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Complete & Submit Bill</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <View style={[styles.container, !isDesktop && styles.containerMobile]}>
       <View style={[styles.header, !isDesktop && styles.headerMobile]}>
@@ -229,9 +361,21 @@ export default function EmployeeStationaryScreen() {
         </Pressable>
       </View>
 
+      <View style={{ borderBottomWidth: 1, borderBottomColor: Colors.light.border, marginBottom: 24, flexDirection: 'row', gap: 16 }}>
+        <Pressable style={[styles.tab, activeTab === 'inventory' && styles.activeTab]} onPress={() => setActiveTab('inventory')}>
+          <Text style={[styles.tabText, activeTab === 'inventory' && styles.activeTabText]}>Catalog</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'my_requests' && styles.activeTab]} onPress={() => setActiveTab('my_requests')}>
+          <Text style={[styles.tabText, activeTab === 'my_requests' && styles.activeTabText]}>Requests</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'my_tasks' && styles.activeTab]} onPress={() => setActiveTab('my_tasks')}>
+          <Text style={[styles.tabText, activeTab === 'my_tasks' && styles.activeTabText]}>Assigned Tasks</Text>
+        </Pressable>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" color={Colors.light.primary} style={{ padding: 40 }} />
-      ) : (
+      ) : activeTab === 'inventory' ? (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           <Text style={styles.sectionTitle}>Available Items</Text>
           {items.length === 0 ? (
@@ -243,8 +387,10 @@ export default function EmployeeStationaryScreen() {
               {items.map(item => <React.Fragment key={item.id}>{renderItemCard({item})}</React.Fragment>)}
             </View>
           )}
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 40, marginBottom: 16 }}>
+        </ScrollView>
+      ) : activeTab === 'my_requests' ? (
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Text style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Your Request History</Text>
             {requests.length > 0 && (
               <Pressable onPress={handleExportHistoryCSV} style={{ backgroundColor: Colors.light.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
@@ -293,6 +439,19 @@ export default function EmployeeStationaryScreen() {
                   )}
                 </View>
               ))}
+            </View>
+          )}
+        </ScrollView>
+      ) : (
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionTitle}>My Assigned Refill Tasks</Text>
+          {myTasks.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyDesc}>No refill tasks assigned to you right now.</Text>
+            </View>
+          ) : (
+            <View style={{ gap: 16 }}>
+              {myTasks.map(task => <React.Fragment key={task.id}>{renderMyTasksItem({item: task})}</React.Fragment>)}
             </View>
           )}
         </ScrollView>
@@ -362,6 +521,65 @@ export default function EmployeeStationaryScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Complete Task Modal */}
+      <Modal visible={completeModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDesktop && { width: 400 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={styles.modalTitle}>Complete Refill Task</Text>
+              <Pressable onPress={() => setCompleteModalVisible(false)}><X size={24} color={Colors.light.icon}/></Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400, marginBottom: 15 }}>
+              <Pressable 
+                style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15, gap: 8 }} 
+                onPress={() => setIsNewVendor(!isNewVendor)}
+              >
+                <View style={{ width: 20, height: 20, borderWidth: 2, borderColor: Colors.light.primary, borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: isNewVendor ? Colors.light.primary : 'transparent' }}>
+                  {isNewVendor && <Check size={14} color="#FFF" />}
+                </View>
+                <Text style={{ fontSize: 14, color: Colors.light.text }}>Bought from a new vendor</Text>
+              </Pressable>
+
+              {isNewVendor && (
+                <View style={{ gap: 4 }}>
+                  <Text style={styles.label}>New Vendor Name</Text>
+                  <TextInput style={styles.input} placeholder="Vendor Shop Name" value={newVendorName} onChangeText={setNewVendorName} />
+                  <Text style={styles.label}>New Vendor Address (Optional)</Text>
+                  <TextInput style={styles.input} placeholder="Vendor Address" value={newVendorAddress} onChangeText={setNewVendorAddress} />
+                </View>
+              )}
+
+              <Text style={styles.label}>Actual Quantity Purchased</Text>
+              <TextInput style={styles.input} placeholder="e.g. 10" value={qtyPurchased} onChangeText={setQtyPurchased} keyboardType="numeric" />
+
+              <Text style={styles.label}>Price per piece (Optional)</Text>
+              <TextInput style={styles.input} placeholder="e.g. 12.5" value={pricePerPiece} onChangeText={setPricePerPiece} keyboardType="numeric" />
+
+              <Text style={styles.label}>Enter Bill Amount Spent (₹)</Text>
+              <TextInput style={styles.input} placeholder="e.g. 1250" value={billAmount} onChangeText={setBillAmount} keyboardType="numeric" />
+
+              <Text style={styles.label}>Upload Bill Image (Optional)</Text>
+              <Pressable style={[styles.imagePicker, { width: '100%', height: 150, borderRadius: 8, marginBottom: 10 }]} onPress={handlePickBillImage}>
+                {billImage ? (
+                  <Image source={{ uri: billImage }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="contain" />
+                ) : (
+                  <>
+                    <Upload size={24} color={Colors.light.icon} />
+                    <Text style={{ marginTop: 8, color: Colors.light.icon, fontSize: 13 }}>Choose Photo</Text>
+                  </>
+                )}
+              </Pressable>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setCompleteModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+              <Pressable style={styles.submitBtn} onPress={handleCompleteTaskSubmit} disabled={completingTask}><Text style={styles.submitBtnText}>{completingTask ? 'Submitting...' : 'Complete Task'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -425,4 +643,9 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: Colors.light.text, fontWeight: '700', fontSize: 15 },
   submitBtn: { backgroundColor: Colors.light.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   submitBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  tab: { paddingVertical: 8, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeTab: { borderBottomColor: Colors.light.primary },
+  tabText: { fontSize: 15, fontWeight: '700', color: Colors.light.icon },
+  activeTabText: { color: Colors.light.primary },
+  imagePicker: { borderWidth: 1, borderColor: '#cbd5e1', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
 });
