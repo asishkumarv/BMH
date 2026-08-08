@@ -3103,7 +3103,9 @@ router.put('/sales-orders/details/:id', async (req, res) => {
           credit_amount = COALESCE($16, credit_amount),
           paid_amount = COALESCE($17, paid_amount),
           delivered_at = CASE WHEN COALESCE($10, status) = 'DELIVERED' OR COALESCE($10, status) = 'Delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
-          payment_re_edited_by = CASE WHEN $18 = TRUE THEN COALESCE($19, payment_re_edited_by) ELSE payment_re_edited_by END
+          payment_re_edited_by = CASE WHEN $18 = TRUE THEN COALESCE($19, payment_re_edited_by) ELSE payment_re_edited_by END,
+          needs_review = FALSE,
+          remark = NULL
       WHERE id = $9
       RETURNING *
     `, [
@@ -3127,6 +3129,47 @@ router.put('/sales-orders/details/:id', async (req, res) => {
       wasDelivered,
       req.body.modified_by_name || 'System'
     ]);
+
+    if (result.rowCount > 0 && order_no) {
+      await pool.query(`
+        UPDATE ecogreen_sales_orders
+        SET patient_address = $1,
+            patient_name = $2,
+            mobile_no = $3,
+            delivery_type = $4,
+            bus_details = $5,
+            invoice_id = $6,
+            created_at = COALESCE($7::timestamp, created_at),
+            status = COALESCE($8, status),
+            payment_mode = COALESCE($9, payment_mode),
+            pod_payment_mode = COALESCE($10, pod_payment_mode),
+            payment_txn_id = COALESCE($11, payment_txn_id),
+            cash_amount = COALESCE($12, cash_amount),
+            online_amount = COALESCE($13, online_amount),
+            credit_amount = COALESCE($14, credit_amount),
+            paid_amount = COALESCE($15, paid_amount),
+            needs_review = FALSE,
+            remark = NULL
+        WHERE order_no = $16
+      `, [
+        typeof patient_address === 'string' ? patient_address : JSON.stringify(patient_address),
+        patient_name,
+        patient_contact_no,
+        delivery_type || 'Local',
+        typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details || null),
+        invoice_id,
+        created_at || null,
+        status || null,
+        payment_mode || null,
+        pod_payment_mode || null,
+        payment_txn_id || null,
+        cash_amount !== undefined ? parseFloat(cash_amount) : null,
+        online_amount !== undefined ? parseFloat(online_amount) : null,
+        credit_amount !== undefined ? parseFloat(credit_amount) : null,
+        paid_amount !== undefined ? parseFloat(paid_amount) : null,
+        order_no
+      ]);
+    }
 
     const updatedOrder = result.rows[0];
 

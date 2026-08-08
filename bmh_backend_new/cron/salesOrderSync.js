@@ -351,82 +351,143 @@ async function tryAutoAssign(db, order) {
                 LIMIT 1
             `);
 
-            if (riderRes.rows.length > 0) {
-                const assignedBoyId = riderRes.rows[0].id;
-                const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
-                
-                // Update ecogreensales_orders
+            const hasInvoiceId = order.invoice_id && order.invoice_id !== '';
+
+            if (hasInvoiceId) {
+                // Find active checked-in rider with the least workload
+                const riderRes = await db.query(`
+                    SELECT e.id, 
+                      (
+                        (SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = e.id AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available', 'delivered', 'completed', 'cancelled', 'returned', 'failed')) +
+                        (SELECT COUNT(*) FROM ecogreensales_orders WHERE delivery_boy_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed')) +
+                        (SELECT COUNT(*) FROM ecogreensales_invoices WHERE delivered_by_id = e.id AND status NOT IN ('Delivered', 'Completed', 'Cancelled', 'Returned', 'Failed', 'fail', 'not available', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'delivered', 'completed', 'cancelled', 'returned', 'failed'))
+                      ) as pending_count
+                    FROM employees e
+                    WHERE e.department = 'Delivery' 
+                      AND e.status = 'approved'
+                      AND e.id::text IN (SELECT employee_id::text FROM attendance WHERE date = CURRENT_DATE AND checkout_timestamp IS NULL)
+                    ORDER BY pending_count ASC
+                    LIMIT 1
+                `);
+
+                if (riderRes.rows.length > 0) {
+                    const assignedBoyId = riderRes.rows[0].id;
+                    const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+                    
+                    // Update ecogreensales_orders
+                    await db.query(`
+                        UPDATE ecogreensales_orders
+                        SET delivery_boy_id = $1,
+                            delivery_type = $2,
+                            bus_details = $3,
+                            location_lat = $4,
+                            location_lng = $5,
+                            patient_address = $6,
+                            delivery_otp = $7,
+                            status = 'Assigned',
+                            assigned_by = NULL,
+                            delivery_assigned_user_type = 'employee',
+                            needs_review = FALSE,
+                            remark = NULL
+                        WHERE id = $8
+                    `, [
+                        assignedBoyId,
+                        delType,
+                        busDetails ? (typeof busDetails === 'string' ? busDetails : JSON.stringify(busDetails)) : null,
+                        lat,
+                        lng,
+                        JSON.stringify(addressObj),
+                        deliveryOtp,
+                        order.id
+                    ]);
+
+                    // Update ecogreen_sales_orders
+                    await db.query(`
+                        UPDATE ecogreen_sales_orders
+                        SET delivery_boy_id = $1,
+                            delivery_type = $2,
+                            bus_details = $3,
+                            location_lat = $4,
+                            location_lng = $5,
+                            patient_address = $6,
+                            delivery_otp = $7,
+                            status = 'Assigned',
+                            assigned_by = NULL,
+                            delivery_assigned_user_type = 'employee',
+                            needs_review = FALSE,
+                            remark = NULL
+                        WHERE order_no = $8
+                    `, [
+                        assignedBoyId,
+                        delType,
+                        busDetails ? (typeof busDetails === 'string' ? busDetails : JSON.stringify(busDetails)) : null,
+                        lat,
+                        lng,
+                        JSON.stringify(addressObj),
+                        deliveryOtp,
+                        order.order_no
+                    ]);
+
+                    console.log(`🤖 [Auto-Assign] Assigned order ${order.order_no} to active workload-balanced rider ${assignedBoyId}`);
+
+                    // Push Notification
+                    try {
+                        const empRes = await db.query('SELECT push_token FROM employees WHERE id = $1', [assignedBoyId]);
+                        if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
+                            const { sendExpoPushNotification } = require('../utils/pushNotification');
+                            sendExpoPushNotification(
+                                empRes.rows[0].push_token, 
+                                'New Auto-Assigned Order', 
+                                `Order #${order.order_no} has been auto-assigned to you.`
+                            );
+                        }
+                    } catch (pe) {
+                        console.error('Push notification error in auto assignment:', pe.message);
+                    }
+                } else {
+                    console.log(`⚠️ [Auto-Assign] No active checked-in rider found for order ${order.order_no}`);
+                }
+            } else {
+                // Address found but NO invoice ID yet. Save address details only.
                 await db.query(`
                     UPDATE ecogreensales_orders
-                    SET delivery_boy_id = $1,
-                        delivery_type = $2,
-                        bus_details = $3,
-                        location_lat = $4,
-                        location_lng = $5,
-                        patient_address = $6,
-                        delivery_otp = $7,
-                        status = 'Assigned',
-                        assigned_by = NULL,
-                        delivery_assigned_user_type = 'employee',
+                    SET delivery_type = $1,
+                        bus_details = $2,
+                        location_lat = $3,
+                        location_lng = $4,
+                        patient_address = $5,
                         needs_review = FALSE,
                         remark = NULL
-                    WHERE id = $8
+                    WHERE id = $6
                 `, [
-                    assignedBoyId,
                     delType,
                     busDetails ? (typeof busDetails === 'string' ? busDetails : JSON.stringify(busDetails)) : null,
                     lat,
                     lng,
                     JSON.stringify(addressObj),
-                    deliveryOtp,
                     order.id
                 ]);
 
-                // Update ecogreen_sales_orders
                 await db.query(`
                     UPDATE ecogreen_sales_orders
-                    SET delivery_boy_id = $1,
-                        delivery_type = $2,
-                        bus_details = $3,
-                        location_lat = $4,
-                        location_lng = $5,
-                        patient_address = $6,
-                        delivery_otp = $7,
-                        status = 'Assigned',
-                        assigned_by = NULL,
-                        delivery_assigned_user_type = 'employee',
+                    SET delivery_type = $1,
+                        bus_details = $2,
+                        location_lat = $3,
+                        location_lng = $4,
+                        patient_address = $5,
                         needs_review = FALSE,
                         remark = NULL
-                    WHERE order_no = $8
+                    WHERE order_no = $6
                 `, [
-                    assignedBoyId,
                     delType,
                     busDetails ? (typeof busDetails === 'string' ? busDetails : JSON.stringify(busDetails)) : null,
                     lat,
                     lng,
                     JSON.stringify(addressObj),
-                    deliveryOtp,
                     order.order_no
                 ]);
 
-                console.log(`🤖 [Auto-Assign] Assigned order ${order.order_no} to active workload-balanced rider ${assignedBoyId}`);
-
-                // Push Notification
-                try {
-                    const empRes = await db.query('SELECT push_token FROM employees WHERE id = $1', [assignedBoyId]);
-                    if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
-                        const { sendExpoPushNotification } = require('../utils/pushNotification');
-                        sendExpoPushNotification(
-                            empRes.rows[0].push_token, 
-                            'New Auto-Assigned Order', 
-                            `Order #${order.order_no} has been auto-assigned to you.`
-                        );
-                    }
-                } catch (pe) {
-                    console.error('Push notification error in auto assignment:', pe.message);
-                }
-            } else {
-                console.log(`⚠️ [Auto-Assign] No active checked-in rider found for order ${order.order_no}`);
+                console.log(`🤖 [Auto-Assign] Pre-filled address for order ${order.order_no}. Waiting for invoice ID.`);
             }
         } else if (uniqueAddresses.length > 1) {
             // MULTIPLE ADDRESSES -> Needs Review
@@ -467,14 +528,11 @@ async function runAutoAssignmentJob() {
       return;
     }
 
-    // Query pending orders created since enabledAt that do have an invoice ID
+    // Query pending orders created since enabledAt that don't have a rider
     const pendingOrdersRes = await pool.query(
       `SELECT * FROM ecogreensales_orders 
        WHERE status = 'Pending' 
          AND delivery_boy_id IS NULL 
-         AND invoice_id IS NOT NULL 
-         AND invoice_id != '' 
-         AND needs_review IS NOT TRUE
          AND created_at >= $1
        ORDER BY created_at ASC`,
       [enabledAt]

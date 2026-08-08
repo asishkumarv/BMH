@@ -35,6 +35,7 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [editCreatedAtDate, setEditCreatedAtDate] = useState('');
   const [editCreatedAtTime, setEditCreatedAtTime] = useState('');
+  const [patientAddresses, setPatientAddresses] = useState([]);
 
   // Buses list and manage states
   const [buses, setBuses] = useState([]);
@@ -262,9 +263,26 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
     }
   };
 
-  const handleSelectOrderForView = (order) => {
+  const handleSelectOrderForView = async (order) => {
     setSelectedOrder(order);
     setEditAddress(typeof order.patient_address === 'object' ? order.patient_address?.address || order.patient_address?.locality || '' : order.patient_address || '');
+    setPatientAddresses([]);
+
+    const phone = order.patient_contact_no || order.mobile_no || '';
+    if (phone) {
+      try {
+        const res = await axios.get(`https://napi.bharatmedicalhallplus.com/patients/by-mobile/${phone}`);
+        if (res.data && res.data.success && res.data.patient) {
+          let addrs = res.data.patient.addresses || [];
+          if (typeof addrs === 'string') {
+            try { addrs = JSON.parse(addrs); } catch (e) { addrs = []; }
+          }
+          setPatientAddresses(addrs);
+        }
+      } catch (e) {
+        console.log('Error fetching patient addresses:', e);
+      }
+    }
     
     if (order.created_at) {
       try {
@@ -1112,6 +1130,28 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                     onChangeText={setEditAddress} 
                     multiline 
                   />
+                  {patientAddresses && patientAddresses.length > 0 && (
+                    <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#475569', marginBottom: 4 }}>Select Registered Address:</Text>
+                      {patientAddresses.map((addrObj, idx) => (
+                        <TouchableOpacity 
+                          key={idx} 
+                          style={{ padding: 6, backgroundColor: '#fff', borderRadius: 4, marginBottom: 4, borderWidth: 1, borderColor: '#cbd5e1' }}
+                          onPress={() => {
+                            setEditAddress(addrObj.address || '');
+                            if (addrObj.location_link) {
+                              setSelectedOrder(prev => ({ ...prev, location_link: addrObj.location_link }));
+                            }
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, color: '#334155' }}>{addrObj.address}</Text>
+                          {addrObj.location_link ? (
+                            <Text style={{ fontSize: 9, color: '#0284c7', marginTop: 2 }}>📍 Location Attached</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {/* Delivery Mode & Location Link */}
