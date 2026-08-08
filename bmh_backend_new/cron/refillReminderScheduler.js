@@ -288,6 +288,8 @@ async function checkAndSendRefillFollowups() {
 // Composite execution function to process both check types
 async function runRefillCronSequence() {
   if (isProcessing) return;
+  const isEnabled = await isAutoReminderEnabled();
+  if (!isEnabled) return;
   isProcessing = true;
   try {
     await checkAndSendRefillReminders();

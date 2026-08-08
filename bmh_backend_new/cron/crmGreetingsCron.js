@@ -1,10 +1,10 @@
 const pool = require('../db');
 const axios = require('axios');
 
-// Helper to check if automatic reminder crons are enabled
-const isAutoReminderEnabled = async () => {
+// Helper to check if automatic CRM greeting messages are enabled
+const isCrmGreetingsEnabled = async () => {
   try {
-    const result = await pool.query("SELECT value FROM settings WHERE key = 'auto_reminder_cron_enabled'");
+    const result = await pool.query("SELECT value FROM settings WHERE key = 'crm_greetings_cron_enabled'");
     if (result.rowCount === 0) return true;
     let val = result.rows[0].value;
     if (typeof val === 'string') {
@@ -12,7 +12,7 @@ const isAutoReminderEnabled = async () => {
     }
     return val !== false && val !== 'false';
   } catch (e) {
-    console.error('Error loading auto reminder setting:', e.message);
+    console.error('Error loading crm greetings setting:', e.message);
     return true;
   }
 };
@@ -280,6 +280,8 @@ async function processGreetings(order, tableType) {
 
 async function runGreetingsScan() {
   if (isProcessing) return;
+  const isEnabled = await isCrmGreetingsEnabled();
+  if (!isEnabled) return;
   isProcessing = true;
 
   try {
@@ -353,7 +355,7 @@ async function runGreetingsScan() {
 function startCrmGreetingsCron() {
   console.log('⏰ Starting CRM greetings message scanning interval (every 10 seconds)...');
   setInterval(async () => {
-    const isEnabled = await isAutoReminderEnabled();
+    const isEnabled = await isCrmGreetingsEnabled();
     if (!isEnabled) {
       return;
     }

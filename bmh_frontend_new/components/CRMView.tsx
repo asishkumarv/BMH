@@ -197,6 +197,7 @@ export default function CRMView({ userType }: CRMViewProps) {
   // DoubleTick Configuration Check
   const [dtConfig, setDtConfig] = useState<{ apiKey?: string; wabaNumber?: string } | null>(null);
   const [autoReminderEnabled, setAutoReminderEnabled] = useState(true);
+  const [crmGreetingsEnabled, setCrmGreetingsEnabled] = useState(true);
 
   // Load user data on mount
   useEffect(() => {
@@ -336,6 +337,13 @@ export default function CRMView({ userType }: CRMViewProps) {
           }
           setAutoReminderEnabled(autoRem !== false && autoRem !== 'false');
         }
+        let crmGreet = res.data.settings.crm_greetings_cron_enabled;
+        if (crmGreet !== undefined) {
+          if (typeof crmGreet === 'string') {
+            try { crmGreet = JSON.parse(crmGreet); } catch (e) {}
+          }
+          setCrmGreetingsEnabled(crmGreet !== false && crmGreet !== 'false');
+        }
       }
     } catch (err) {
       console.error('Failed to load DoubleTick config', err);
@@ -357,6 +365,24 @@ export default function CRMView({ userType }: CRMViewProps) {
       console.error('Failed to toggle Auto Reminder setting', err);
       Alert.alert('Error', 'Failed to update Auto Reminder setting');
       setAutoReminderEnabled(!value);
+    }
+  };
+
+  const toggleCrmGreetings = async (value: boolean) => {
+    try {
+      setCrmGreetingsEnabled(value);
+      const res = await axios.post(`${API_URL}/settings`, {
+        key: 'crm_greetings_cron_enabled',
+        value: value
+      });
+      if (!res.data.success) {
+        Alert.alert('Error', 'Failed to update Greetings setting');
+        setCrmGreetingsEnabled(!value);
+      }
+    } catch (err) {
+      console.error('Failed to toggle Greetings setting', err);
+      Alert.alert('Error', 'Failed to update Greetings setting');
+      setCrmGreetingsEnabled(!value);
     }
   };
 
@@ -908,6 +934,20 @@ export default function CRMView({ userType }: CRMViewProps) {
                 />
                 <Text style={{ fontSize: 11, fontWeight: 'bold', marginLeft: 2, color: autoReminderEnabled ? '#10b981' : '#64748b' }}>
                   {autoReminderEnabled ? 'ON' : 'OFF'}
+                </Text>
+              </View>
+              <Text style={styles.configDivider}>|</Text>
+              <Text style={styles.configLabelInline}>Greetings:</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
+                <Switch
+                  value={crmGreetingsEnabled}
+                  onValueChange={toggleCrmGreetings}
+                  trackColor={{ false: '#cbd5e1', true: '#86efac' }}
+                  thumbColor={crmGreetingsEnabled ? '#10b981' : '#64748b'}
+                  style={Platform.OS === 'web' ? { cursor: 'pointer', transform: [{ scale: 0.8 }] } : { transform: [{ scale: 0.8 }] }}
+                />
+                <Text style={{ fontSize: 11, fontWeight: 'bold', marginLeft: 2, color: crmGreetingsEnabled ? '#10b981' : '#64748b' }}>
+                  {crmGreetingsEnabled ? 'ON' : 'OFF'}
                 </Text>
               </View>
             </>
