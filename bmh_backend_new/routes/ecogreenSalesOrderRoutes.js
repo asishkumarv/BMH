@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
       drRegNo, drOfficeCode, dmanCode, orderTotal, orderDiscPer, refNo,
       orderId, remark, urgentFlag, ordConversionFlag, dcConversionFlag,
       ordRefNo, sysName, sysIp, sysUser,
-      'Delivered',
+      'Pending',
       rDate
     ];
 

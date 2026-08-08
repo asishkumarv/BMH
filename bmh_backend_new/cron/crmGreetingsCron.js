@@ -1,7 +1,6 @@
 const pool = require('../db');
 const axios = require('axios');
 
-// Helper to check if automatic CRM greeting messages are enabled
 const isCrmGreetingsEnabled = async () => {
   try {
     const result = await pool.query("SELECT value FROM settings WHERE key = 'crm_greetings_cron_enabled'");
@@ -10,7 +9,7 @@ const isCrmGreetingsEnabled = async () => {
     if (typeof val === 'string') {
       try { val = JSON.parse(val); } catch (e) {}
     }
-    return val !== false && val !== 'false';
+    return val !== false && val !== 'false' && val !== 'off' && val !== 0 && val !== '0';
   } catch (e) {
     console.error('Error loading crm greetings setting:', e.message);
     return true;
