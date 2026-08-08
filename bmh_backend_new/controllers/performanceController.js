@@ -172,6 +172,10 @@ exports.getAdminPerformanceStats = async (req, res) => {
     let totalAllScheduledOrdersCount = 0;
     let totalAllScheduledOrdersValue = 0;
     let totalAllPendingCashCollection = 0;
+    let totalAllLocalCount = 0;
+    let totalAllBusCount = 0;
+    let totalAllPurchaseCount = 0;
+    let totalAllCumulativeCount = 0;
 
     const allFilteredOrders = [];
 
@@ -248,6 +252,19 @@ exports.getAdminPerformanceStats = async (req, res) => {
         WHERE si.delivery_boy_id = $1
       ` + dateFilter.replace(/created_at/g, 'si.created_at');
       const invoiceRes = await pool.query(invoiceQuery, filterParams);
+
+      // Query purchase orders joining delivery addresses
+      let purchaseQuery = `
+        SELECT po.*, da.latitude as addr_lat, da.longitude as addr_lng
+        FROM ecogreenpurchase_orders po
+        LEFT JOIN (
+          SELECT mobile, MAX(latitude) as latitude, MAX(longitude) as longitude
+          FROM delivery_addresses
+          GROUP BY mobile
+        ) da ON (da.mobile = po.custcode)
+        WHERE po.delivery_boy_id = $1
+      ` + dateFilter.replace(/created_at/g, 'po.created_at');
+      const purchaseRes = await pool.query(purchaseQuery, filterParams);
 
       // Unified order aggregation with unified fields
       const allOrders = [
@@ -367,6 +384,36 @@ exports.getAdminPerformanceStats = async (req, res) => {
             modeOfDelivery: o.delivery_type || 'Local',
             isScheduled: o.is_scheduled
           };
+        }),
+        ...purchaseRes.rows.map(o => {
+          let coords = parseCoordinates(o.gps_location);
+          let lat = coords ? coords.lat : null;
+          let lng = coords ? coords.lng : null;
+          if ((lat == null || lng == null) && o.addr_lat != null && o.addr_lng != null) {
+            lat = parseFloat(o.addr_lat);
+            lng = parseFloat(o.addr_lng);
+          }
+          return {
+            id: o.id,
+            order_no: `PO-${o.id}`,
+            invoice_no: o.prefix ? `${o.prefix}-${o.srno}` : `PO-${o.id}`,
+            status: o.status,
+            type: 'purchase_order',
+            displayType: 'Purchase',
+            customer_name: o.custname || 'Supplier',
+            customer_phone: 'N/A',
+            amount: parseFloat(o.total || 0),
+            paymentMode: 'Cash',
+            lat,
+            lng,
+            created: o.created_at,
+            delivered: o.delivered_at,
+            picked: o.created_at,
+            deliveryCharge: 0,
+            address: o.address || 'N/A',
+            modeOfDelivery: o.delivery_type || 'Local',
+            isScheduled: false
+          };
         })
       ];
 
@@ -409,16 +456,26 @@ exports.getAdminPerformanceStats = async (req, res) => {
       let scheduledOrdersCount = 0;
       let scheduledOrdersValue = 0;
       let pendingCashCollection = 0;
+      let riderLocalCount = 0;
+      let riderBusCount = 0;
+      let riderPurchaseCount = 0;
 
       // System wide / Type counters
       filteredOrders.forEach(o => {
         // Sum Delivery Charges
         totalDeliveryCharges += o.deliveryCharge || 0;
 
-        // Bus Orders
-        if (o.modeOfDelivery === 'Bus' || o.modeOfDelivery?.toLowerCase() === 'bus') {
+        const isBus = o.modeOfDelivery === 'Bus' || o.modeOfDelivery?.toLowerCase() === 'bus' || String(o.displayType || '').toLowerCase() === 'bus';
+        const isPurchase = o.type === 'purchase_order' || String(o.displayType || '').toLowerCase() === 'purchase';
+
+        if (isBus) {
+          riderBusCount++;
           busOrdersCount++;
           busOrdersValue += o.amount;
+        } else if (isPurchase) {
+          riderPurchaseCount++;
+        } else {
+          riderLocalCount++;
         }
 
         // Scheduled Orders
@@ -534,7 +591,11 @@ exports.getAdminPerformanceStats = async (req, res) => {
         workingHours: parseFloat(workingHours.toFixed(1)),
         cashCollected,
         onlineCollected,
-        rating: ratingClean
+        rating: ratingClean,
+        localCount: riderLocalCount,
+        busCount: riderBusCount,
+        purchaseCount: riderPurchaseCount,
+        cumulativeCount: riderLocalCount + riderBusCount + riderPurchaseCount
       });
 
       totalAllAssigned += assigned;
@@ -555,6 +616,10 @@ exports.getAdminPerformanceStats = async (req, res) => {
       totalAllScheduledOrdersCount += scheduledOrdersCount;
       totalAllScheduledOrdersValue += scheduledOrdersValue;
       totalAllPendingCashCollection += pendingCashCollection;
+      totalAllLocalCount += riderLocalCount;
+      totalAllBusCount += riderBusCount;
+      totalAllPurchaseCount += riderPurchaseCount;
+      totalAllCumulativeCount += (riderLocalCount + riderBusCount + riderPurchaseCount);
     }
 
     const totalRidersCount = riders.length;
@@ -692,6 +757,10 @@ exports.getAdminPerformanceStats = async (req, res) => {
         busOrdersValue: totalAllBusOrdersValue,
         scheduledOrdersCount: totalAllScheduledOrdersCount,
         scheduledOrdersValue: totalAllScheduledOrdersValue,
+        totalLocalCount: totalAllLocalCount,
+        totalBusCount: totalAllBusCount,
+        totalPurchaseCount: totalAllPurchaseCount,
+        totalCumulativeCount: totalAllCumulativeCount,
 
         topExecutives,
         bottomExecutives,

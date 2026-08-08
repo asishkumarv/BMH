@@ -893,6 +893,50 @@ export default function AdminPerformance() {
           </View>
 
           <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <TrendingUp size={20} color="#4F46E5" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Cumulative Deliveries</Text>
+              <Text style={styles.kpiValue}>{executive.totalCumulativeCount || 0}</Text>
+              <Text style={styles.kpiSub}>Local + Bus + Purchase</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <User size={20} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Local (Inc. Scheduled)</Text>
+              <Text style={styles.kpiValue}>{executive.totalLocalCount || 0}</Text>
+              <Text style={styles.kpiSub}>Standard local riders load</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Clock size={20} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Bus Deliveries</Text>
+              <Text style={styles.kpiValue}>{executive.totalBusCount || 0}</Text>
+              <Text style={styles.kpiSub}>Bus shipments dispatched</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
+            <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
+              <ShieldCheck size={20} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.kpiLabel}>Purchase Orders</Text>
+              <Text style={styles.kpiValue}>{executive.totalPurchaseCount || 0}</Text>
+              <Text style={styles.kpiSub}>Supplier pick up load</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiCard}>
             <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
               <Clock size={20} color="#D97706" />
             </View>
@@ -1392,6 +1436,9 @@ export default function AdminPerformance() {
                   <Text style={[styles.th, { width: 100 }]}>Shift</Text>
                   <Text style={[styles.th, { width: 80 }]}>Assigned</Text>
                   <Text style={[styles.th, { width: 80 }]}>Delivered</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Local</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Bus</Text>
+                  <Text style={[styles.th, { width: 80 }]}>Purchase</Text>
                   <Text style={[styles.th, { width: 80 }]}>Success %</Text>
                   <Text style={[styles.th, { width: 100 }]}>Avg Time</Text>
                   <Text style={[styles.th, { width: 100 }]}>Distance</Text>
@@ -1408,6 +1455,9 @@ export default function AdminPerformance() {
                     <Text style={[styles.td, { width: 100 }]}>{r.shift}</Text>
                     <Text style={[styles.td, { width: 80 }]}>{r.assigned}</Text>
                     <Text style={[styles.td, { width: 80 }]}>{r.delivered}</Text>
+                    <Text style={[styles.td, { width: 80 }]}>{r.localCount || 0}</Text>
+                    <Text style={[styles.td, { width: 80 }]}>{r.busCount || 0}</Text>
+                    <Text style={[styles.td, { width: 80 }]}>{r.purchaseCount || 0}</Text>
                     <View style={[styles.td, { width: 80 }]}>
                       <Text style={[styles.badge, { backgroundColor: getStatusColor(r.successRate, 'success') + '15', color: getStatusColor(r.successRate, 'success') }]}>
                         {r.successRate}%
@@ -1787,6 +1837,8 @@ export default function AdminPerformance() {
               resolvedType = 'local';
             } else if (resolvedType === 'sales_invoice' || resolvedType === 'sales_order') {
               resolvedType = 'counter';
+            } else if (resolvedType === 'purchase_order') {
+              resolvedType = 'purchase';
             }
             
             const matchesType = tableType === '' || resolvedType === tableType.toLowerCase();
@@ -1825,6 +1877,7 @@ export default function AdminPerformance() {
                       <option value="Bus">Bus</option>
                       <option value="Scheduled">Scheduled</option>
                       <option value="Counter">Counter</option>
+                      <option value="Purchase">Purchase</option>
                     </select>
 
                     <select
@@ -1887,6 +1940,8 @@ export default function AdminPerformance() {
                               ? 'Local'
                               : (String(order.type).toLowerCase() === 'sales_invoice' || String(order.type).toLowerCase() === 'sales_order')
                               ? 'Counter'
+                              : String(order.type).toLowerCase() === 'purchase_order'
+                              ? 'Purchase'
                               : order.type}
                           </Text>
                           <View style={{ width: 150, paddingVertical: 6 }}>

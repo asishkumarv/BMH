@@ -51,8 +51,8 @@ export default function EmployeeStationaryScreen() {
   const [billImage, setBillImage] = useState('');
   const [completingTask, setCompletingTask] = useState(false);
   const [isNewVendor, setIsNewVendor] = useState(false);
-  const [newVendorName, setNewVendorName] = useState('');
-  const [newVendorAddress, setNewVendorAddress] = useState('');
+  const [completeNewVendorName, setCompleteNewVendorName] = useState('');
+  const [completeNewVendorAddress, setCompleteNewVendorAddress] = useState('');
   const [qtyPurchased, setQtyPurchased] = useState('');
   const [pricePerPiece, setPricePerPiece] = useState('');
 
@@ -162,8 +162,8 @@ export default function EmployeeStationaryScreen() {
     }
     
     setIsNewVendor(false);
-    setNewVendorName('');
-    setNewVendorAddress('');
+    setCompleteNewVendorName('');
+    setCompleteNewVendorAddress('');
     setPricePerPiece('');
     setCompleteModalVisible(true);
   };
@@ -201,7 +201,7 @@ export default function EmployeeStationaryScreen() {
       return;
     }
 
-    if (isNewVendor && !newVendorName) {
+    if (isNewVendor && !completeNewVendorName) {
       Alert.alert('Error', 'Please enter the new vendor name.');
       return;
     }
@@ -212,8 +212,8 @@ export default function EmployeeStationaryScreen() {
         bill_amount: amt,
         bill_image: billImage || null,
         is_new_vendor: isNewVendor,
-        new_vendor_name: isNewVendor ? newVendorName : null,
-        new_vendor_address: isNewVendor ? newVendorAddress : null,
+        new_vendor_name: isNewVendor ? completeNewVendorName : null,
+        new_vendor_address: isNewVendor ? completeNewVendorAddress : null,
         qty_purchased: qtyP,
         price_per_piece: pricePerPiece ? parseFloat(pricePerPiece) : (amt / qtyP)
       });
@@ -545,9 +545,9 @@ export default function EmployeeStationaryScreen() {
               {isNewVendor && (
                 <View style={{ gap: 4 }}>
                   <Text style={styles.label}>New Vendor Name</Text>
-                  <TextInput style={styles.input} placeholder="Vendor Shop Name" value={newVendorName} onChangeText={setNewVendorName} />
+                  <TextInput style={styles.input} placeholder="Vendor Shop Name" value={completeNewVendorName} onChangeText={setCompleteNewVendorName} />
                   <Text style={styles.label}>New Vendor Address (Optional)</Text>
-                  <TextInput style={styles.input} placeholder="Vendor Address" value={newVendorAddress} onChangeText={setNewVendorAddress} />
+                  <TextInput style={styles.input} placeholder="Vendor Address" value={completeNewVendorAddress} onChangeText={setCompleteNewVendorAddress} />
                 </View>
               )}
 

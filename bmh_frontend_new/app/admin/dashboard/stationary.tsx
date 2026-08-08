@@ -650,6 +650,22 @@ export default function AdminStationaryScreen() {
             <View style={{ flex: 1, minWidth: 150 }}>
               <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold' }}>RECEIPT & BILL SPENT</Text>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#10b981', marginTop: 2 }}>Amount: ₹{item.bill_amount || '0.00'}</Text>
+              
+              {item.qty_purchased !== undefined && item.qty_purchased !== null ? (
+                <Text style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>Bought Qty: <Text style={{ fontWeight: '700' }}>{item.qty_purchased} items</Text></Text>
+              ) : null}
+              {item.price_per_piece ? (
+                <Text style={{ fontSize: 12, color: '#64748b' }}>Price/pc: ₹{parseFloat(item.price_per_piece).toFixed(2)}</Text>
+              ) : null}
+
+              {item.is_new_vendor && (
+                <View style={{ marginTop: 6, padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }}>
+                  <Text style={{ fontSize: 10, color: '#1e3a8a', fontWeight: 'bold' }}>NEW VENDOR INFO</Text>
+                  <Text style={{ fontSize: 11, color: '#1e40af' }}>Name: {item.new_vendor_name}</Text>
+                  {item.new_vendor_address ? <Text style={{ fontSize: 10, color: '#3b82f6' }}>Addr: {item.new_vendor_address}</Text> : null}
+                </View>
+              )}
+
               {item.bill_image ? (
                 <Pressable 
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, alignSelf: 'flex-start' }}
@@ -671,7 +687,7 @@ export default function AdminStationaryScreen() {
           </View>
         )}
         </View>
-
+ 
         {item.status === 'Filled' && (
           <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10, backgroundColor: '#f8fafc', padding: 10, borderRadius: 8 }}>
             <Text style={{ fontSize: 11, color: '#64748b', fontWeight: 'bold' }}>APPROVAL & AUDIT TRAIL</Text>
@@ -680,7 +696,7 @@ export default function AdminStationaryScreen() {
             {item.approved_at && <Text style={{ fontSize: 12, color: '#94a3b8' }}>Approved On: {formatDate(item.approved_at)}</Text>}
           </View>
         )}
-
+ 
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }}>
           {item.status === 'Requested' && (
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -693,7 +709,7 @@ export default function AdminStationaryScreen() {
             </View>
           )}
           {item.status === 'Completed' && (
-            <Pressable style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => handleFillupSubmit(item.id, item.qty_to_buy || 0)}>
+            <Pressable style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => handleFillupSubmit(item.id, item.qty_purchased || item.qty_to_buy || 0)}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>Approve & Fillup Stock</Text>
             </Pressable>
           )}
@@ -1600,5 +1616,7 @@ const styles = StyleSheet.create({
   statusToggleActive: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   statusToggleActiveText: { color: Colors.light.primary },
   statusToggleActiveHold: { backgroundColor: '#FEF08A', borderColor: '#FDE047' },
-  statusToggleActiveHoldText: { color: '#854D0E' }
+  statusToggleActiveHoldText: { color: '#854D0E' },
+  dropdownWrapper: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, overflow: 'hidden', backgroundColor: '#FFF', marginBottom: 20 },
+  picker: { width: '100%', height: 50, color: Colors.light.text },
 });

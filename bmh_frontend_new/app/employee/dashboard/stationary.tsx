@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, Platform, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
-import { Package, Plus, Minus, ShoppingCart, Clock, Eye, Upload, X, Calendar, DollarSign, Trash2, Check } from 'lucide-react-native';
+import { Package, Plus, Minus, ShoppingCart, Clock, Eye, Upload, X, Calendar, DollarSign, Trash2, Check, Edit2 } from 'lucide-react-native';
 import axios from 'axios';
 import { Colors } from '../../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -70,8 +70,8 @@ export default function EmployeeStationaryScreen() {
   const [completingTask, setCompletingTask] = useState(false);
 
   const [isNewVendor, setIsNewVendor] = useState(false);
-  const [newVendorName, setNewVendorName] = useState('');
-  const [newVendorAddress, setNewVendorAddress] = useState('');
+  const [completeNewVendorName, setCompleteNewVendorName] = useState('');
+  const [completeNewVendorAddress, setCompleteNewVendorAddress] = useState('');
   const [qtyPurchased, setQtyPurchased] = useState('');
   const [pricePerPiece, setPricePerPiece] = useState('');
 
@@ -437,8 +437,8 @@ export default function EmployeeStationaryScreen() {
     }
     
     setIsNewVendor(false);
-    setNewVendorName('');
-    setNewVendorAddress('');
+    setCompleteNewVendorName('');
+    setCompleteNewVendorAddress('');
     setPricePerPiece('');
     setCompleteModalVisible(true);
   };
@@ -476,7 +476,7 @@ export default function EmployeeStationaryScreen() {
       return;
     }
 
-    if (isNewVendor && !newVendorName) {
+    if (isNewVendor && !completeNewVendorName) {
       Alert.alert('Error', 'Please enter the new vendor name.');
       return;
     }
@@ -487,8 +487,8 @@ export default function EmployeeStationaryScreen() {
         bill_amount: amt,
         bill_image: billImage || null,
         is_new_vendor: isNewVendor,
-        new_vendor_name: isNewVendor ? newVendorName : null,
-        new_vendor_address: isNewVendor ? newVendorAddress : null,
+        new_vendor_name: isNewVendor ? completeNewVendorName : null,
+        new_vendor_address: isNewVendor ? completeNewVendorAddress : null,
         qty_purchased: qtyP,
         price_per_piece: pricePerPiece ? parseFloat(pricePerPiece) : (amt / qtyP)
       });
@@ -629,6 +629,22 @@ export default function EmployeeStationaryScreen() {
             <View style={{ flex: 1, minWidth: 150 }}>
               <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'bold' }}>RECEIPT & BILL SPENT</Text>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#10b981', marginTop: 2 }}>Amount: ₹{item.bill_amount || '0.00'}</Text>
+              
+              {item.qty_purchased !== undefined && item.qty_purchased !== null ? (
+                <Text style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>Bought Qty: <Text style={{ fontWeight: '700' }}>{item.qty_purchased} items</Text></Text>
+              ) : null}
+              {item.price_per_piece ? (
+                <Text style={{ fontSize: 12, color: '#64748b' }}>Price/pc: ₹{parseFloat(item.price_per_piece).toFixed(2)}</Text>
+              ) : null}
+
+              {item.is_new_vendor && (
+                <View style={{ marginTop: 6, padding: 6, backgroundColor: '#EFF6FF', borderRadius: 4 }}>
+                  <Text style={{ fontSize: 10, color: '#1e3a8a', fontWeight: 'bold' }}>NEW VENDOR INFO</Text>
+                  <Text style={{ fontSize: 11, color: '#1e40af' }}>Name: {item.new_vendor_name}</Text>
+                  {item.new_vendor_address ? <Text style={{ fontSize: 10, color: '#3b82f6' }}>Addr: {item.new_vendor_address}</Text> : null}
+                </View>
+              )}
+
               {item.bill_image ? (
                 <Pressable 
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, alignSelf: 'flex-start' }}
@@ -672,7 +688,7 @@ export default function EmployeeStationaryScreen() {
             </View>
           )}
           {hasRefillAccess && item.status === 'Completed' && (
-            <Pressable style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => handleFillupSubmit(item.id, item.qty_to_buy || 0)}>
+            <Pressable style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => handleFillupSubmit(item.id, item.qty_purchased || item.qty_to_buy || 0)}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>Approve & Fillup Stock</Text>
             </Pressable>
           )}
@@ -1077,9 +1093,9 @@ export default function EmployeeStationaryScreen() {
               {isNewVendor && (
                 <View style={{ gap: 4 }}>
                   <Text style={styles.label}>New Vendor Name</Text>
-                  <TextInput style={styles.input} placeholder="Vendor Shop Name" value={newVendorName} onChangeText={setNewVendorName} />
+                  <TextInput style={styles.input} placeholder="Vendor Shop Name" value={completeNewVendorName} onChangeText={setCompleteNewVendorName} />
                   <Text style={styles.label}>New Vendor Address (Optional)</Text>
-                  <TextInput style={styles.input} placeholder="Vendor Address" value={newVendorAddress} onChangeText={setNewVendorAddress} />
+                  <TextInput style={styles.input} placeholder="Vendor Address" value={completeNewVendorAddress} onChangeText={setCompleteNewVendorAddress} />
                 </View>
               )}
 
@@ -1411,5 +1427,7 @@ const styles = StyleSheet.create({
   cartItemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
   cartItemName: { fontSize: 16, fontWeight: '600', color: Colors.light.text },
   cartItemQty: { fontSize: 16, fontWeight: '700', color: Colors.light.primary },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 }
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  dropdownWrapper: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 8, overflow: 'hidden', backgroundColor: '#FFF', marginBottom: 20 },
+  picker: { width: '100%', height: 50, color: Colors.light.text },
 });
