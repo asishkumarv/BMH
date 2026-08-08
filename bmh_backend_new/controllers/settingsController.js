@@ -21,6 +21,14 @@ exports.updateSetting = async (req, res) => {
       'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP',
       [key, JSON.stringify(value)]
     );
+
+    if (key === 'sales_order_auto_assign_toggle' && (value === true || value === 'true')) {
+      await pool.query(
+        "INSERT INTO settings (key, value) VALUES ('sales_order_auto_assign_enabled_at', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP",
+        [JSON.stringify(new Date())]
+      );
+    }
+
     res.json({ success: true, message: 'Setting updated successfully' });
   } catch (error) {
     console.error('Update Setting Error:', error);

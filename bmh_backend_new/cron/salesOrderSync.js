@@ -204,33 +204,21 @@ async function syncSalesOrders() {
     }
 }
 
-async function tryAutoAssign(client, order) {
-    if (!order.invoice_id) {
-        return; // No invoice ID -> do not assign
+async function tryAutoAssign(db, order) {
+    const phone = order.patient_contact_no || order.mobile_no || '';
+    if (!phone) {
+        await db.query(`UPDATE ecogreensales_orders SET needs_review = TRUE, remark = 'No Phone' WHERE id = $1`, [order.id]);
+        await db.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE, remark = 'No Phone' WHERE order_no = $1`, [order.order_no]);
+        return;
     }
 
-    const phone = order.patient_contact_no;
-    if (!phone) {
-        return; // No phone number -> cannot look up history
+    // Clean phone number (get 10 digits)
+    let cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+      cleanPhone = cleanPhone.substring(2);
     }
 
     try {
-        // Query historical orders for this customer phone
-        const historyRes = await client.query(
-            `SELECT patient_address, delivery_type, bus_details, location_lat, location_lng, created_at 
-             FROM ecogreensales_orders 
-             WHERE patient_contact_no = $1 
-               AND patient_address IS NOT NULL 
-               AND status IN ('Delivered', 'Completed', 'Assigned')
-             ORDER BY created_at DESC`,
-            [phone]
-        );
-
-        if (historyRes.rows.length === 0) {
-            return; // No history -> cannot auto assign
-        }
-
-        // Extract unique normalized addresses
         const uniqueAddresses = [];
         const normAddresses = new Set();
         
@@ -240,15 +228,103 @@ async function tryAutoAssign(client, order) {
             return `${obj.address || ''}|${obj.locality || ''}|${obj.pincode || ''}`.toLowerCase().replace(/\s+/g, '');
         };
 
-        for (const row of historyRes.rows) {
-            const norm = getNormAddress(row.patient_address);
+        const addCandidate = (addressObj, delType, busDetails, lat, lng) => {
+            const norm = getNormAddress(addressObj);
             if (norm && !normAddresses.has(norm)) {
                 normAddresses.add(norm);
-                uniqueAddresses.push(row);
+                uniqueAddresses.push({
+                    patient_address: addressObj,
+                    delivery_type: delType || 'Local',
+                    bus_details: busDetails || null,
+                    location_lat: lat || null,
+                    location_lng: lng || null
+                });
+            }
+        };
+
+        // 1. Check Sales Orders History (ecogreensales_orders)
+        const salesHistory = await db.query(
+            `SELECT patient_address, delivery_type, bus_details, location_lat, location_lng 
+             FROM ecogreensales_orders 
+             WHERE (patient_contact_no = $1 OR patient_contact_no = $2)
+               AND patient_address IS NOT NULL 
+               AND status IN ('Delivered', 'Completed', 'Assigned')
+             ORDER BY created_at DESC`,
+            [cleanPhone, '91' + cleanPhone]
+        );
+        for (const row of salesHistory.rows) {
+            addCandidate(row.patient_address, row.delivery_type, row.bus_details, row.location_lat, row.location_lng);
+        }
+
+        // 2. Check Manual Orders History (manual_orders)
+        const manualHistory = await db.query(
+            `SELECT address, mode_of_delivery, location_link, bus_travels_name, bus_driver_name, bus_driver_number, bus_number
+             FROM manual_orders
+             WHERE (customer_phone = $1 OR customer_phone = $2 OR ship_to_phone = $1 OR ship_to_phone = $2)
+               AND address IS NOT NULL
+               AND status IN ('Delivered', 'Completed', 'Assigned')
+             ORDER BY created_at DESC`,
+            [cleanPhone, '91' + cleanPhone]
+        );
+        for (const row of manualHistory.rows) {
+            let lat = null, lng = null;
+            const addressObj = {
+                deliver_name: order.patient_name || '',
+                address: row.address,
+                locality: '',
+                pincode: '',
+                landmark: '',
+                state: '',
+                city: '',
+                country: 'India',
+                type: 'Home'
+            };
+            const busDetails = row.mode_of_delivery === 'Bus' ? {
+                travels_name: row.bus_travels_name || '',
+                driver_name: row.bus_driver_name || '',
+                driver_number: row.bus_driver_number || '',
+                bus_number: row.bus_number || ''
+            } : null;
+            addCandidate(addressObj, row.mode_of_delivery, busDetails, lat, lng);
+        }
+
+        // 3. Check Patients Table
+        const patientData = await db.query(
+            `SELECT name, addresses FROM patients 
+             WHERE mobile = $1 OR mobile = $2 OR mobile = $3`,
+            [cleanPhone, '91' + cleanPhone, cleanPhone.length === 10 ? cleanPhone.substring(2) : cleanPhone]
+        );
+        for (const row of patientData.rows) {
+            let addrs = row.addresses;
+            if (typeof addrs === 'string') {
+                try { addrs = JSON.parse(addrs); } catch (e) { addrs = []; }
+            }
+            if (Array.isArray(addrs)) {
+                for (const addr of addrs) {
+                    if (addr && addr.address) {
+                        const addressObj = {
+                            deliver_name: order.patient_name || row.name || '',
+                            address: addr.address,
+                            locality: '',
+                            pincode: '',
+                            landmark: '',
+                            state: '',
+                            city: '',
+                            country: 'India',
+                            type: 'Home'
+                        };
+                        addCandidate(addressObj, 'Local', null, null, null);
+                    }
+                }
             }
         }
 
-        if (uniqueAddresses.length === 1) {
+        if (uniqueAddresses.length === 0) {
+            // NO ADDRESS FOUND -> Needs Review
+            await db.query(`UPDATE ecogreensales_orders SET needs_review = TRUE, remark = 'New Customer' WHERE id = $1`, [order.id]);
+            await db.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE, remark = 'New Customer' WHERE order_no = $1`, [order.order_no]);
+            console.log(`⚠️ [Auto-Assign] Order ${order.order_no} has no previous address. Flagged needs_review = TRUE & remark = 'New Customer'`);
+        } else if (uniqueAddresses.length === 1) {
             // SINGLE ADDRESS -> Auto fill & assign using workload balancing
             const matchedOrder = uniqueAddresses[0];
             const delType = matchedOrder.delivery_type || 'Local';
@@ -260,7 +336,7 @@ async function tryAutoAssign(client, order) {
                 : matchedOrder.patient_address;
 
             // Find active checked-in rider with the least workload
-            const riderRes = await client.query(`
+            const riderRes = await db.query(`
                 SELECT e.id, 
                   (
                     (SELECT COUNT(*) FROM online_orders WHERE delivery_boy_id = e.id AND status NOT IN ('DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED', 'FAILED', 'fail', 'not available', 'delivered', 'completed', 'cancelled', 'returned', 'failed')) +
@@ -280,7 +356,7 @@ async function tryAutoAssign(client, order) {
                 const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
                 
                 // Update ecogreensales_orders
-                await client.query(`
+                await db.query(`
                     UPDATE ecogreensales_orders
                     SET delivery_boy_id = $1,
                         delivery_type = $2,
@@ -292,8 +368,9 @@ async function tryAutoAssign(client, order) {
                         status = 'Assigned',
                         assigned_by = NULL,
                         delivery_assigned_user_type = 'employee',
-                        needs_review = FALSE
-                    WHERE order_no = $8
+                        needs_review = FALSE,
+                        remark = NULL
+                    WHERE id = $8
                 `, [
                     assignedBoyId,
                     delType,
@@ -302,11 +379,11 @@ async function tryAutoAssign(client, order) {
                     lng,
                     JSON.stringify(addressObj),
                     deliveryOtp,
-                    order.order_no
+                    order.id
                 ]);
 
                 // Update ecogreen_sales_orders
-                await client.query(`
+                await db.query(`
                     UPDATE ecogreen_sales_orders
                     SET delivery_boy_id = $1,
                         delivery_type = $2,
@@ -318,7 +395,8 @@ async function tryAutoAssign(client, order) {
                         status = 'Assigned',
                         assigned_by = NULL,
                         delivery_assigned_user_type = 'employee',
-                        needs_review = FALSE
+                        needs_review = FALSE,
+                        remark = NULL
                     WHERE order_no = $8
                 `, [
                     assignedBoyId,
@@ -335,7 +413,7 @@ async function tryAutoAssign(client, order) {
 
                 // Push Notification
                 try {
-                    const empRes = await client.query('SELECT push_token FROM employees WHERE id = $1', [assignedBoyId]);
+                    const empRes = await db.query('SELECT push_token FROM employees WHERE id = $1', [assignedBoyId]);
                     if (empRes.rowCount > 0 && empRes.rows[0].push_token) {
                         const { sendExpoPushNotification } = require('../utils/pushNotification');
                         sendExpoPushNotification(
@@ -352,13 +430,73 @@ async function tryAutoAssign(client, order) {
             }
         } else if (uniqueAddresses.length > 1) {
             // MULTIPLE ADDRESSES -> Needs Review
-            await client.query(`UPDATE ecogreensales_orders SET needs_review = TRUE, remark = 'Multiple Address' WHERE order_no = $1`, [order.order_no]);
-            await client.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE, remark = 'Multiple Address' WHERE order_no = $1`, [order.order_no]);
+            await db.query(`UPDATE ecogreensales_orders SET needs_review = TRUE, remark = 'Multiple Address' WHERE id = $1`, [order.id]);
+            await db.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE, remark = 'Multiple Address' WHERE order_no = $1`, [order.order_no]);
             console.log(`⚠️ [Auto-Assign] Order ${order.order_no} has multiple addresses. Flagged needs_review = TRUE and remark = 'Multiple Address'`);
         }
     } catch (err) {
         console.error(`❌ [Auto-Assign] Failed to auto assign order ${order.order_no}:`, err.message);
     }
+}
+
+const getAutoAssignEnabledAt = async () => {
+  try {
+    const res = await pool.query("SELECT value FROM settings WHERE key = 'sales_order_auto_assign_enabled_at'");
+    if (res.rowCount === 0) return null;
+    let val = res.rows[0].value;
+    if (typeof val === 'string') {
+      try { val = JSON.parse(val); } catch (e) {}
+    }
+    return val ? new Date(val) : null;
+  } catch (e) {
+    console.error('Error loading sales_order_auto_assign_enabled_at:', e.message);
+    return null;
+  }
+};
+
+async function runAutoAssignmentJob() {
+  try {
+    const toggleRes = await pool.query("SELECT value FROM settings WHERE key = 'sales_order_auto_assign_toggle'");
+    const autoAssignToggleOn = toggleRes.rows.length > 0 ? (typeof toggleRes.rows[0].value === 'string' ? JSON.parse(toggleRes.rows[0].value) : toggleRes.rows[0].value) : false;
+
+    if (!autoAssignToggleOn) return;
+
+    const enabledAt = await getAutoAssignEnabledAt();
+    if (!enabledAt) {
+      console.log('[Auto-Assign Job] No enable timestamp found. Skipping.');
+      return;
+    }
+
+    // Query pending orders created since enabledAt that do have an invoice ID
+    const pendingOrdersRes = await pool.query(
+      `SELECT * FROM ecogreensales_orders 
+       WHERE status = 'Pending' 
+         AND delivery_boy_id IS NULL 
+         AND invoice_id IS NOT NULL 
+         AND invoice_id != '' 
+         AND needs_review IS NOT TRUE
+         AND created_at >= $1
+       ORDER BY created_at ASC`,
+      [enabledAt]
+    );
+
+    if (pendingOrdersRes.rowCount === 0) {
+      return;
+    }
+
+    console.log(`[Auto-Assign Job] Found ${pendingOrdersRes.rowCount} pending orders to auto-assign.`);
+
+    const client = await pool.connect();
+    try {
+      for (const order of pendingOrdersRes.rows) {
+        await tryAutoAssign(client, order);
+      }
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Error running Auto-Assign Job:', err.message);
+  }
 }
 
 function startSalesOrderCron() {
@@ -367,9 +505,16 @@ function startSalesOrderCron() {
     syncSalesOrders();
     // Schedule every 30 seconds
     setInterval(syncSalesOrders, 30000);
+
+    console.log("⏰ Starting 1-minute interval Sales Order Auto-Assignment cron...");
+    // Run immediately on start
+    runAutoAssignmentJob();
+    // Schedule every 1 minute
+    setInterval(runAutoAssignmentJob, 60000);
 }
 
 module.exports = {
     startSalesOrderCron,
-    syncSalesOrders
+    syncSalesOrders,
+    runAutoAssignmentJob
 };
