@@ -352,9 +352,9 @@ async function tryAutoAssign(client, order) {
             }
         } else if (uniqueAddresses.length > 1) {
             // MULTIPLE ADDRESSES -> Needs Review
-            await client.query(`UPDATE ecogreensales_orders SET needs_review = TRUE WHERE order_no = $1`, [order.order_no]);
-            await client.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE WHERE order_no = $1`, [order.order_no]);
-            console.log(`⚠️ [Auto-Assign] Order ${order.order_no} has multiple addresses. Flagged needs_review = TRUE`);
+            await client.query(`UPDATE ecogreensales_orders SET needs_review = TRUE, remark = 'Multiple Address' WHERE order_no = $1`, [order.order_no]);
+            await client.query(`UPDATE ecogreen_sales_orders SET needs_review = TRUE, remark = 'Multiple Address' WHERE order_no = $1`, [order.order_no]);
+            console.log(`⚠️ [Auto-Assign] Order ${order.order_no} has multiple addresses. Flagged needs_review = TRUE and remark = 'Multiple Address'`);
         }
     } catch (err) {
         console.error(`❌ [Auto-Assign] Failed to auto assign order ${order.order_no}:`, err.message);

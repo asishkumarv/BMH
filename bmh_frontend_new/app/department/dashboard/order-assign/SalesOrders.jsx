@@ -532,11 +532,15 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                 <Text style={{fontSize: 9, color: '#ef4444', fontWeight: 'bold'}}>⚠️ NO INVOICE ID</Text>
               </View>
             )}
-            {item.needs_review && (
+            {item.remark ? (
+              <View style={{backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+                <Text style={{fontSize: 9, color: '#ef4444', fontWeight: 'bold'}}>⚠️ {item.remark.toUpperCase()}</Text>
+              </View>
+            ) : (item.needs_review ? (
               <View style={{backgroundColor: '#ffedd5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
                 <Text style={{fontSize: 9, color: '#ea580c', fontWeight: 'bold'}}>⚠️ NEEDS REVIEW</Text>
               </View>
-            )}
+            ) : null)}
           </View>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }}>
@@ -641,11 +645,15 @@ export default function SalesOrders({ deliveryBoys, onStartAssignment }) {
                 <Text style={{fontSize: 9, color: '#ef4444', fontWeight: 'bold'}}>⚠️ NO INVOICE ID</Text>
               </View>
             )}
-            {item.needs_review && (
+            {item.remark ? (
+              <View style={{backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
+                <Text style={{fontSize: 9, color: '#ef4444', fontWeight: 'bold'}}>⚠️ {item.remark.toUpperCase()}</Text>
+              </View>
+            ) : (item.needs_review ? (
               <View style={{backgroundColor: '#ffedd5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start'}}>
                 <Text style={{fontSize: 9, color: '#ea580c', fontWeight: 'bold'}}>⚠️ NEEDS REVIEW</Text>
               </View>
-            )}
+            ) : null)}
           </View>
         </View>
 

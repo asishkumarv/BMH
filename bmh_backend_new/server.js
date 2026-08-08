@@ -280,6 +280,7 @@ app.listen(PORT, () => {
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS notes JSONB DEFAULT '[]'::jsonb").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS location_lat VARCHAR(50)").catch(e => console.error(e.message));
   pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS location_lng VARCHAR(50)").catch(e => console.error(e.message));
+  pool.query("ALTER TABLE ecogreensales_orders ADD COLUMN IF NOT EXISTS remark TEXT").catch(e => console.error(e.message));
 
   // pod_payment_mode and payment_txn_id for sales orders / invoices / online orders
   pool.query("ALTER TABLE ecogreen_sales_orders ADD COLUMN IF NOT EXISTS pod_payment_mode VARCHAR(50) DEFAULT NULL").catch(e => console.error(e.message));

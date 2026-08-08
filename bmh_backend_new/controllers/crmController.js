@@ -505,7 +505,7 @@ exports.handleDoubleTickWebhook = async (req, res) => {
     const event = req.body.event;
     const data = req.body.data;
     
-    if (event === 'incoming_message' && data && data.message) {
+    if ((event === 'incoming_message' || event === 'MESSAGE_RECEIVED') && data && data.message) {
       const fromPhone = data.from; // e.g. "919439085126"
       let textBody = '';
       if (data.message.text?.body) {
@@ -518,8 +518,12 @@ exports.handleDoubleTickWebhook = async (req, res) => {
         textBody = data.message.button_reply.title.trim();
       } else if (data.message.button_reply?.text) {
         textBody = data.message.button_reply.text.trim();
+      } else if (data.message.button_reply?.id) {
+        textBody = data.message.button_reply.id.trim();
       } else if (data.message.interactive?.button_reply?.title) {
         textBody = data.message.interactive.button_reply.title.trim();
+      } else if (data.message.interactive?.button_reply?.id) {
+        textBody = data.message.interactive.button_reply.id.trim();
       }
       
       if (fromPhone && textBody) {
