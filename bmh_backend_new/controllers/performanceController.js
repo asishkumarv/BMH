@@ -491,7 +491,7 @@ exports.getAdminPerformanceStats = async (req, res) => {
         const pMode = o.paymentMode?.toLowerCase() || '';
         const isPending = !statusClean.includes('delivered') && !statusClean.includes('completed') && 
                           !statusClean.includes('cancel') && !statusClean.includes('return') && !statusClean.includes('fail');
-        if (isPending && !(pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card'))) {
+        if (isPending && !(pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card')) && !isBus && !isPurchase) {
           pendingCashCollection += o.amount;
         }
       });      let localAssigned = 0;
@@ -524,10 +524,12 @@ exports.getAdminPerformanceStats = async (req, res) => {
             localDelivered++;
           }
 
-          if (pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card')) {
-            onlineCollected += o.amount;
-          } else {
-            cashCollected += o.amount;
+          if (!isBus && !isPurchase) {
+            if (pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card')) {
+              onlineCollected += o.amount;
+            } else {
+              cashCollected += o.amount;
+            }
           }
 
           if (o.delivered && o.picked) {
