@@ -16,6 +16,21 @@ const getDoubleTickConfig = async () => {
   }
 };
 
+const isAutoReminderEnabled = async () => {
+  try {
+    const result = await pool.query("SELECT value FROM settings WHERE key = 'auto_reminder_cron_enabled'");
+    if (result.rowCount === 0) return true;
+    let val = result.rows[0].value;
+    if (typeof val === 'string') {
+      try { val = JSON.parse(val); } catch (e) {}
+    }
+    return val !== false && val !== 'false';
+  } catch (e) {
+    console.error('Error loading auto reminder setting:', e.message);
+    return true;
+  }
+};
+
 exports.getPatients = async (req, res) => {
   try {
     const { search, city, gender, bloodGroup, doctorId, visitYear, visitMonth, page = 1, limit = 50 } = req.query;
@@ -680,6 +695,13 @@ exports.handleDoubleTickWebhook = async (req, res) => {
 
 exports.triggerRefillReminders = async (req, res) => {
   try {
+    const isEnabled = await isAutoReminderEnabled();
+    if (!isEnabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'Manual triggering is disabled because automatic reminders are turned off by the Super Admin.'
+      });
+    }
     const { checkAndSendRefillReminders } = require('../cron/refillReminderScheduler');
     await checkAndSendRefillReminders();
     res.json({ success: true, message: 'Refill reminders cron triggered and executed successfully.' });

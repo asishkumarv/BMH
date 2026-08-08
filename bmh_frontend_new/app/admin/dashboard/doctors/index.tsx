@@ -152,8 +152,8 @@ export default function DoctorManagement() {
   const [filterPeonName, setFilterPeonName] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [filterShowStartPicker, setFilterShowStartPicker] = useState(false);
+  const [filterShowEndPicker, setFilterShowEndPicker] = useState(false);
 
   const getFilteredSlots = () => {
     return slots.filter((s: any) => {
@@ -1397,17 +1397,17 @@ const fetchData = async () => {
                               style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, fontSize: 12, width: '100%' } as any}
                             />
                           ) : (
-                            <TouchableOpacity onPress={() => setShowStartPicker(true)} style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: '#FFF' }}>
+                            <TouchableOpacity onPress={() => setFilterShowStartPicker(true)} style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: '#FFF' }}>
                               <Text style={{ fontSize: 12 }}>{filterStartDate ? formatDateDDMMYYYY(filterStartDate) : 'Select Start'}</Text>
                             </TouchableOpacity>
                           )}
-                          {!Platform.OS === 'web' && showStartPicker && (
+                          {Platform.OS !== 'web' && filterShowStartPicker && (
                             <DateTimePicker
                               value={filterStartDate ? new Date(filterStartDate) : new Date()}
                               mode="date"
                               display="default"
                               onChange={(event, selectedDate) => {
-                                setShowStartPicker(false);
+                                setFilterShowStartPicker(false);
                                 if (selectedDate) setFilterStartDate(selectedDate.toISOString().split('T')[0]);
                               }}
                             />
@@ -1424,17 +1424,17 @@ const fetchData = async () => {
                               style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, fontSize: 12, width: '100%' } as any}
                             />
                           ) : (
-                            <TouchableOpacity onPress={() => setShowEndPicker(true)} style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: '#FFF' }}>
+                            <TouchableOpacity onPress={() => setFilterShowEndPicker(true)} style={{ height: 35, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 8, justifyContent: 'center', backgroundColor: '#FFF' }}>
                               <Text style={{ fontSize: 12 }}>{filterEndDate ? formatDateDDMMYYYY(filterEndDate) : 'Select End'}</Text>
                             </TouchableOpacity>
                           )}
-                          {!Platform.OS === 'web' && showEndPicker && (
+                          {Platform.OS !== 'web' && filterShowEndPicker && (
                             <DateTimePicker
                               value={filterEndDate ? new Date(filterEndDate) : new Date()}
                               mode="date"
                               display="default"
                               onChange={(event, selectedDate) => {
-                                setShowEndPicker(false);
+                                setFilterShowEndPicker(false);
                                 if (selectedDate) setFilterEndDate(selectedDate.toISOString().split('T')[0]);
                               }}
                             />

@@ -197,6 +197,7 @@ export default function DoctorSchedulesEditor() {
           { text: 'Delete', onPress: proceed, style: 'destructive' },
         ]
       );
+    }
   };
 
   const handleToggleTv = async (id: number, currentVal: boolean) => {

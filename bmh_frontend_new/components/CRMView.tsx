@@ -196,6 +196,7 @@ export default function CRMView({ userType }: CRMViewProps) {
 
   // DoubleTick Configuration Check
   const [dtConfig, setDtConfig] = useState<{ apiKey?: string; wabaNumber?: string } | null>(null);
+  const [autoReminderEnabled, setAutoReminderEnabled] = useState(true);
 
   // Load user data on mount
   useEffect(() => {
@@ -322,13 +323,40 @@ export default function CRMView({ userType }: CRMViewProps) {
   const fetchDoubleTickConfig = async () => {
     try {
       const res = await axios.get(`${API_URL}/settings`);
-      if (res.data.success && res.data.settings.doubletick_config) {
-        let value = res.data.settings.doubletick_config;
-        if (typeof value === 'string') value = JSON.parse(value);
-        setDtConfig(value);
+      if (res.data.success) {
+        if (res.data.settings.doubletick_config) {
+          let value = res.data.settings.doubletick_config;
+          if (typeof value === 'string') value = JSON.parse(value);
+          setDtConfig(value);
+        }
+        let autoRem = res.data.settings.auto_reminder_cron_enabled;
+        if (autoRem !== undefined) {
+          if (typeof autoRem === 'string') {
+            try { autoRem = JSON.parse(autoRem); } catch (e) {}
+          }
+          setAutoReminderEnabled(autoRem !== false && autoRem !== 'false');
+        }
       }
     } catch (err) {
       console.error('Failed to load DoubleTick config', err);
+    }
+  };
+
+  const toggleAutoReminder = async (value: boolean) => {
+    try {
+      setAutoReminderEnabled(value);
+      const res = await axios.post(`${API_URL}/settings`, {
+        key: 'auto_reminder_cron_enabled',
+        value: value
+      });
+      if (!res.data.success) {
+        Alert.alert('Error', 'Failed to update Auto Reminder setting');
+        setAutoReminderEnabled(!value);
+      }
+    } catch (err) {
+      console.error('Failed to toggle Auto Reminder setting', err);
+      Alert.alert('Error', 'Failed to update Auto Reminder setting');
+      setAutoReminderEnabled(!value);
     }
   };
 
@@ -866,6 +894,24 @@ export default function CRMView({ userType }: CRMViewProps) {
           <Text style={[styles.configValInline, dtConfig?.apiKey ? styles.configValActive : styles.configValInactive]}>
             {dtConfig?.apiKey ? ' Connected' : ' Disconnected'}
           </Text>
+          {userType === 'super_admin' && (
+            <>
+              <Text style={styles.configDivider}>|</Text>
+              <Text style={styles.configLabelInline}>Auto Reminders:</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 6 }}>
+                <Switch
+                  value={autoReminderEnabled}
+                  onValueChange={toggleAutoReminder}
+                  trackColor={{ false: '#cbd5e1', true: '#86efac' }}
+                  thumbColor={autoReminderEnabled ? '#10b981' : '#64748b'}
+                  style={Platform.OS === 'web' ? { cursor: 'pointer', transform: [{ scale: 0.8 }] } : { transform: [{ scale: 0.8 }] }}
+                />
+                <Text style={{ fontSize: 11, fontWeight: 'bold', marginLeft: 2, color: autoReminderEnabled ? '#10b981' : '#64748b' }}>
+                  {autoReminderEnabled ? 'ON' : 'OFF'}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
 

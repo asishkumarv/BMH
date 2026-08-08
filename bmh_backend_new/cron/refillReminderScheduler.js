@@ -2,6 +2,22 @@ const cron = require('node-cron');
 const pool = require('../db');
 const axios = require('axios');
 
+// Helper to check if automatic reminder crons are enabled
+const isAutoReminderEnabled = async () => {
+  try {
+    const result = await pool.query("SELECT value FROM settings WHERE key = 'auto_reminder_cron_enabled'");
+    if (result.rowCount === 0) return true;
+    let val = result.rows[0].value;
+    if (typeof val === 'string') {
+      try { val = JSON.parse(val); } catch (e) {}
+    }
+    return val !== false && val !== 'false';
+  } catch (e) {
+    console.error('Error loading auto reminder setting:', e.message);
+    return true;
+  }
+};
+
 let isProcessing = false;
 
 // Helper to retrieve DoubleTick Configuration
@@ -288,7 +304,12 @@ function startRefillReminderCron() {
   console.log('⏰ Starting Medicine Refill Reminder scanning cron (scheduled daily at 10:30 AM Asia/Kolkata)...');
   
   // Daily at 10:30 AM
-  cron.schedule('30 10 * * *', () => {
+  cron.schedule('30 10 * * *', async () => {
+    const isEnabled = await isAutoReminderEnabled();
+    if (!isEnabled) {
+      console.log('[Refill Reminder Scheduler] Scheduled run skipped: Automatic reminders are disabled.');
+      return;
+    }
     runRefillCronSequence();
   }, {
     scheduled: true,

@@ -1,6 +1,22 @@
 const pool = require('../db');
 const axios = require('axios');
 
+// Helper to check if automatic reminder crons are enabled
+const isAutoReminderEnabled = async () => {
+  try {
+    const result = await pool.query("SELECT value FROM settings WHERE key = 'auto_reminder_cron_enabled'");
+    if (result.rowCount === 0) return true;
+    let val = result.rows[0].value;
+    if (typeof val === 'string') {
+      try { val = JSON.parse(val); } catch (e) {}
+    }
+    return val !== false && val !== 'false';
+  } catch (e) {
+    console.error('Error loading auto reminder setting:', e.message);
+    return true;
+  }
+};
+
 let isProcessing = false;
 // Capture server/cron start time so we do not send to old historical orders
 const serviceStartTime = new Date();
@@ -336,7 +352,13 @@ async function runGreetingsScan() {
 
 function startCrmGreetingsCron() {
   console.log('⏰ Starting CRM greetings message scanning interval (every 10 seconds)...');
-  setInterval(runGreetingsScan, 10000);
+  setInterval(async () => {
+    const isEnabled = await isAutoReminderEnabled();
+    if (!isEnabled) {
+      return;
+    }
+    runGreetingsScan();
+  }, 10000);
 }
 
 module.exports = {
