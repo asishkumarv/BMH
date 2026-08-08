@@ -172,10 +172,15 @@ exports.getAdminPerformanceStats = async (req, res) => {
     let totalAllScheduledOrdersCount = 0;
     let totalAllScheduledOrdersValue = 0;
     let totalAllPendingCashCollection = 0;
-    let totalAllLocalCount = 0;
-    let totalAllBusCount = 0;
-    let totalAllPurchaseCount = 0;
-    let totalAllCumulativeCount = 0;
+    let totalAllLocalAssigned = 0;
+    let totalAllLocalDelivered = 0;
+    let totalAllLocalPending = 0;
+    let totalAllBusAssigned = 0;
+    let totalAllBusDelivered = 0;
+    let totalAllBusPending = 0;
+    let totalAllPurchaseAssigned = 0;
+    let totalAllPurchaseDelivered = 0;
+    let totalAllPurchasePending = 0;
 
     const allFilteredOrders = [];
 
@@ -489,15 +494,36 @@ exports.getAdminPerformanceStats = async (req, res) => {
         if (isPending && !(pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card'))) {
           pendingCashCollection += o.amount;
         }
-      });
+      });      let localAssigned = 0;
+      let localDelivered = 0;
+      let localPending = 0;
+      let busAssigned = 0;
+      let busDelivered = 0;
+      let busPending = 0;
+      let purchaseAssigned = 0;
+      let purchaseDelivered = 0;
+      let purchasePending = 0;
 
       // Active rider KPI calculations
       activeRiderOrders.forEach(o => {
         const statusClean = o.status?.toLowerCase() || '';
         const pMode = o.paymentMode?.toLowerCase() || '';
+        const isBus = o.modeOfDelivery === 'Bus' || o.modeOfDelivery?.toLowerCase() === 'bus' || String(o.displayType || '').toLowerCase() === 'bus';
+        const isPurchase = o.type === 'purchase_order' || String(o.displayType || '').toLowerCase() === 'purchase';
 
         if (statusClean.includes('delivered') || statusClean.includes('completed')) {
           delivered++;
+          if (isBus) {
+            busAssigned++;
+            busDelivered++;
+          } else if (isPurchase) {
+            purchaseAssigned++;
+            purchaseDelivered++;
+          } else {
+            localAssigned++;
+            localDelivered++;
+          }
+
           if (pMode.includes('online') || pMode.includes('digital') || pMode.includes('upi') || pMode.includes('card')) {
             onlineCollected += o.amount;
           } else {
@@ -527,15 +553,33 @@ exports.getAdminPerformanceStats = async (req, res) => {
 
         } else if (statusClean.includes('cancel')) {
           cancelled++;
+          if (isBus) busAssigned++;
+          else if (isPurchase) purchaseAssigned++;
+          else localAssigned++;
         } else if (statusClean.includes('return')) {
           returned++;
+          if (isBus) busAssigned++;
+          else if (isPurchase) purchaseAssigned++;
+          else localAssigned++;
         } else if (statusClean.includes('fail') || statusClean.includes('not available')) {
           failed++;
+          if (isBus) busAssigned++;
+          else if (isPurchase) purchaseAssigned++;
+          else localAssigned++;
         } else {
           pending++;
+          if (isBus) {
+            busAssigned++;
+            busPending++;
+          } else if (isPurchase) {
+            purchaseAssigned++;
+            purchasePending++;
+          } else {
+            localAssigned++;
+            localPending++;
+          }
         }
       });
-
       // Working days & hours from attendance logs
       let attQuery = `SELECT * FROM attendance WHERE employee_id = $1` + dateFilter.replace('created_at', 'date');
       const attRes = await pool.query(attQuery, filterParams);
@@ -590,10 +634,19 @@ exports.getAdminPerformanceStats = async (req, res) => {
         cashCollected,
         onlineCollected,
         rating: ratingClean,
-        localCount: riderLocalCount,
-        busCount: riderBusCount,
-        purchaseCount: riderPurchaseCount,
-        cumulativeCount: riderLocalCount + riderBusCount + riderPurchaseCount
+        localAssigned,
+        localDelivered,
+        localPending,
+        busAssigned,
+        busDelivered,
+        busPending,
+        purchaseAssigned,
+        purchaseDelivered,
+        purchasePending,
+        localCount: localAssigned,
+        busCount: busAssigned,
+        purchaseCount: purchaseAssigned,
+        cumulativeCount: localAssigned + busAssigned + purchaseAssigned
       });
 
       totalAllAssigned += assigned;
@@ -614,10 +667,16 @@ exports.getAdminPerformanceStats = async (req, res) => {
       totalAllScheduledOrdersCount += scheduledOrdersCount;
       totalAllScheduledOrdersValue += scheduledOrdersValue;
       totalAllPendingCashCollection += pendingCashCollection;
-      totalAllLocalCount += riderLocalCount;
-      totalAllBusCount += riderBusCount;
-      totalAllPurchaseCount += riderPurchaseCount;
-      totalAllCumulativeCount += (riderLocalCount + riderBusCount + riderPurchaseCount);
+
+      totalAllLocalAssigned += localAssigned;
+      totalAllLocalDelivered += localDelivered;
+      totalAllLocalPending += localPending;
+      totalAllBusAssigned += busAssigned;
+      totalAllBusDelivered += busDelivered;
+      totalAllBusPending += busPending;
+      totalAllPurchaseAssigned += purchaseAssigned;
+      totalAllPurchaseDelivered += purchaseDelivered;
+      totalAllPurchasePending += purchasePending;
     }
 
     const totalRidersCount = riders.length;
@@ -755,10 +814,15 @@ exports.getAdminPerformanceStats = async (req, res) => {
         busOrdersValue: totalAllBusOrdersValue,
         scheduledOrdersCount: totalAllScheduledOrdersCount,
         scheduledOrdersValue: totalAllScheduledOrdersValue,
-        totalLocalCount: totalAllLocalCount,
-        totalBusCount: totalAllBusCount,
-        totalPurchaseCount: totalAllPurchaseCount,
-        totalCumulativeCount: totalAllCumulativeCount,
+        totalLocalAssigned: totalAllLocalAssigned,
+        totalLocalDelivered: totalAllLocalDelivered,
+        totalLocalPending: totalAllLocalPending,
+        totalBusAssigned: totalAllBusAssigned,
+        totalBusDelivered: totalAllBusDelivered,
+        totalBusPending: totalAllBusPending,
+        totalPurchaseAssigned: totalAllPurchaseAssigned,
+        totalPurchaseDelivered: totalAllPurchaseDelivered,
+        totalPurchasePending: totalAllPurchasePending,
 
         topExecutives,
         bottomExecutives,

@@ -893,13 +893,15 @@ export default function AdminPerformance() {
           </View>
 
           <View style={styles.kpiCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
-              <TrendingUp size={20} color="#4F46E5" />
+            <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Clock size={20} color="#D97706" />
             </View>
             <View>
-              <Text style={styles.kpiLabel}>Cumulative Deliveries</Text>
-              <Text style={styles.kpiValue}>{executive.totalCumulativeCount || 0}</Text>
-              <Text style={styles.kpiSub}>Local + Bus + Purchase</Text>
+              <Text style={styles.kpiLabel}>Cumulative Pending</Text>
+              <Text style={[styles.kpiValue, { color: '#D97706' }]}>
+                {(executive.totalLocalPending || 0) + (executive.totalBusPending || 0) + (executive.totalPurchasePending || 0)}
+              </Text>
+              <Text style={styles.kpiSub}>Total pending in transit</Text>
             </View>
           </View>
 
@@ -907,10 +909,22 @@ export default function AdminPerformance() {
             <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
               <User size={20} color="#0284C7" />
             </View>
-            <View>
-              <Text style={styles.kpiLabel}>Local (Inc. Scheduled)</Text>
-              <Text style={styles.kpiValue}>{executive.totalLocalCount || 0}</Text>
-              <Text style={styles.kpiSub}>Standard local riders load</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.kpiLabel, { marginBottom: 6 }]}>Local (Inc. Scheduled)</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 6 }}>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600' }}>ASSIGNED</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginTop: 1 }}>{executive.totalLocalAssigned || 0}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '600' }}>DELIVERED</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981', marginTop: 1 }}>{executive.totalLocalDelivered || 0}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#D97706', fontWeight: '600' }}>PENDING</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#D97706', marginTop: 1 }}>{executive.totalLocalPending || 0}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -918,10 +932,22 @@ export default function AdminPerformance() {
             <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
               <Clock size={20} color="#D97706" />
             </View>
-            <View>
-              <Text style={styles.kpiLabel}>Bus Deliveries</Text>
-              <Text style={styles.kpiValue}>{executive.totalBusCount || 0}</Text>
-              <Text style={styles.kpiSub}>Bus shipments dispatched</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.kpiLabel, { marginBottom: 6 }]}>Bus Deliveries</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 6 }}>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600' }}>ASSIGNED</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginTop: 1 }}>{executive.totalBusAssigned || 0}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '600' }}>DELIVERED</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981', marginTop: 1 }}>{executive.totalBusDelivered || 0}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#D97706', fontWeight: '600' }}>PENDING</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#D97706', marginTop: 1 }}>{executive.totalBusPending || 0}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -929,21 +955,22 @@ export default function AdminPerformance() {
             <View style={[styles.iconContainer, { backgroundColor: '#ECFDF5' }]}>
               <ShieldCheck size={20} color="#10B981" />
             </View>
-            <View>
-              <Text style={styles.kpiLabel}>Purchase Orders</Text>
-              <Text style={styles.kpiValue}>{executive.totalPurchaseCount || 0}</Text>
-              <Text style={styles.kpiSub}>Supplier pick up load</Text>
-            </View>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-              <Clock size={20} color="#D97706" />
-            </View>
-            <View>
-              <Text style={styles.kpiLabel}>Pending Deliveries</Text>
-              <Text style={styles.kpiValue}>{executive.pendingDeliveries || 0}</Text>
-              <Text style={styles.kpiSub}>Currently in transit</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.kpiLabel, { marginBottom: 6 }]}>Purchase Orders</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 6 }}>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600' }}>ASSIGNED</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginTop: 1 }}>{executive.totalPurchaseAssigned || 0}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '600' }}>DELIVERED</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981', marginTop: 1 }}>{executive.totalPurchaseDelivered || 0}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 9, color: '#D97706', fontWeight: '600' }}>PENDING</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#D97706', marginTop: 1 }}>{executive.totalPurchasePending || 0}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
