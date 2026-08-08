@@ -2926,6 +2926,8 @@ router.put('/sales-orders/assign/:id', async (req, res) => {
     const checkRes = await pool.query('SELECT * FROM ecogreensales_orders WHERE id = $1', [id]);
     if (checkRes.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
     
+    const finalStatus = delivery_boy_id ? 'Assigned' : 'Pending';
+
     const result = await pool.query(`
       UPDATE ecogreensales_orders
       SET delivery_boy_id = $1,
@@ -2933,8 +2935,8 @@ router.put('/sales-orders/assign/:id', async (req, res) => {
           bus_details = $3,
           delivery_otp = $4,
           assigned_by = COALESCE($5::integer, assigned_by),
-          status = 'Assigned'
-      WHERE id = $6
+          status = $6
+      WHERE id = $7
       RETURNING *
     `, [
       delivery_boy_id,
@@ -2942,6 +2944,7 @@ router.put('/sales-orders/assign/:id', async (req, res) => {
       bus_details ? (typeof bus_details === 'string' ? bus_details : JSON.stringify(bus_details)) : null,
       delivery_otp,
       assigned_by || null,
+      finalStatus,
       id
     ]);
     

@@ -50,23 +50,26 @@ router.post('/assign/:id', async (req, res) => {
         }
         const boyIdInt = boyId ? parseInt(boyId, 10) : null;
 
+        const finalStatus = boyIdInt ? 'Assigned' : 'Pending';
+
         const query = `
             UPDATE ecogreenpurchase_orders 
             SET 
-                status = 'Assigned',
-                delivery_type = $1,
-                delivery_boy_id = $2,
-                bus_details = $3,
-                gps_location = $4,
-                address = $5,
-                delivery_otp = $6,
-                delivery_assigned_user_type = $7,
-                assigned_by = COALESCE($8::integer, assigned_by)
-            WHERE id = $9
+                status = $1,
+                delivery_type = $2,
+                delivery_boy_id = $3,
+                bus_details = $4,
+                gps_location = $5,
+                address = $6,
+                delivery_otp = $7,
+                delivery_assigned_user_type = $8,
+                assigned_by = COALESCE($9::integer, assigned_by)
+            WHERE id = $10
             RETURNING *
         `;
         
         const values = [
+            finalStatus,
             delivery_type,
             boyIdInt,
             bus_details ? JSON.stringify(bus_details) : null,
