@@ -19,6 +19,7 @@ export default function AdminSettings() {
   const [todaysBillingAccess, setTodaysBillingAccess] = useState<Record<string, boolean>>({});
   const [clinicOverviewAccess, setClinicOverviewAccess] = useState<Record<string, boolean>>({});
   const [stationaryRefillAccess, setStationaryRefillAccess] = useState<Record<string, boolean>>({});
+  const [salesInvoiceRackListAccess, setSalesInvoiceRackListAccess] = useState<Record<string, boolean>>({});
   
   const [doubleTickApiKey, setDoubleTickApiKey] = useState('');
   const [doubleTickWaba, setDoubleTickWaba] = useState('');
@@ -77,6 +78,7 @@ export default function AdminSettings() {
       setTodaysBillingAccess(parseSetting('todays_billing_access'));
       setClinicOverviewAccess(parseSetting('clinic_overview_access'));
       setStationaryRefillAccess(parseSetting('stationary_refill_access'));
+      setSalesInvoiceRackListAccess(parseSetting('sales_invoice_rack_list_access'));
       
       const configVal = parseSetting('doubletick_config');
       setDoubleTickApiKey(configVal.apiKey || '');
@@ -218,6 +220,7 @@ export default function AdminSettings() {
         {renderCard('Purchase Order Access', 'Control which employees have access to view and assign EcoGreen Purchase Orders.', 'Purchase Order Access')}
         {renderCard('Order Assign Access', 'Control which employees have access to view and assign deliveries for all orders on the Order Assign page.', 'Order Assign Access')}
         {renderCard('Granular CRM & Bulk Messaging Access', 'Control which Employees and Sub-Admins can access the WhatsApp CRM and send customer notifications.', 'CRM Access')}
+        {renderCard('Sales Invoice Rack List Access', 'Control which Employees and Sub-Admins have access to view the Sales Invoice list with Rack numbers.', 'Sales Invoice Rack List Access')}
         {renderCard('Store Delivery Access', 'Control which Employees and Sub-Admins can pick up and deliver store orders on the Store Delivery page.', 'Store Delivery Access')}
         {renderCard('Item Master Access', 'Control which Employees and Sub-Admins can view and edit the database Item Master medicines list.', 'Item Master Access')}
         {renderCard('Rack Checker Access', 'Control which Employees and Sub-Admins can verify racks, check stock, and report discrepancies.', 'Rack Checker Access')}
@@ -287,6 +290,7 @@ export default function AdminSettings() {
       {renderAccessList('Clinic Operations Access', 'clinic_overview_access', clinicOverviewAccess, setClinicOverviewAccess)}
       {renderAccessList('Today\'s Billing Access', 'todays_billing_access', todaysBillingAccess, setTodaysBillingAccess)}
       {renderAccessList('Stationary Refill Access', 'stationary_refill_access', stationaryRefillAccess, setStationaryRefillAccess)}
+      {renderAccessList('Sales Invoice Rack List Access', 'sales_invoice_rack_list_access', salesInvoiceRackListAccess, setSalesInvoiceRackListAccess)}
     </View>
   );
 }

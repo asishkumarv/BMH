@@ -191,7 +191,17 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
-    const itemsResult = await pool.query('SELECT * FROM ecogreen_sales_invoice_items WHERE sales_invoice_id = $1 ORDER BY item_seq', [invoiceId]);
+    const itemsResult = await pool.query(`
+      SELECT items.*, med.rack 
+      FROM ecogreen_sales_invoice_items items
+      LEFT JOIN (
+        SELECT DISTINCT ON (c_item_code) c_item_code, rack 
+        FROM ecogreen_medicines 
+        WHERE rack IS NOT NULL AND rack != '' AND rack != '-'
+      ) med ON items.itemcode = med.c_item_code
+      WHERE items.sales_invoice_id = $1 
+      ORDER BY items.item_seq
+    `, [invoiceId]);
 
     const invoice = invoiceResult.rows[0];
     const transformedInvoice = {
@@ -257,7 +267,8 @@ router.get('/:id', async (req, res) => {
         discount: item.discount,
         maxmrp: item.maxmrp,
         selling_price: item.selling_price,
-        sub_total: item.sub_total
+        sub_total: item.sub_total,
+        rack: item.rack || 'N/A'
       }))
     };
 

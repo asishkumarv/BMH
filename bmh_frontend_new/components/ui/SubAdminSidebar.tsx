@@ -120,6 +120,15 @@ export const SubAdminSidebar = ({ onClose }: { onClose?: () => void }) => {
             }
           }
           
+          if (res.data.success && res.data.settings.sales_invoice_rack_list_access) {
+            let value = res.data.settings.sales_invoice_rack_list_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const saId = `SA-${userId}`;
+            if (userId && value[saId] === true) {
+              dynamicNavItems.push({ name: 'Sales Invoice Rack List', icon: FileText, route: '/department/dashboard/pharmacy/sales-invoice-rack-list' });
+            }
+          }
+          
           if (res.data.success && res.data.settings.item_master_access) {
             let value = res.data.settings.item_master_access;
             if (typeof value === 'string') value = JSON.parse(value);

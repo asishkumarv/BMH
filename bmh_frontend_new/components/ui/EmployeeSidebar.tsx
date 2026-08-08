@@ -129,6 +129,15 @@ export const EmployeeSidebar = ({ onClose }: { onClose?: () => void }) => {
             }
           }
           
+          if (res.data.success && res.data.settings.sales_invoice_rack_list_access) {
+            let value = res.data.settings.sales_invoice_rack_list_access;
+            if (typeof value === 'string') value = JSON.parse(value);
+            const empId = u.id?.toString();
+            if (empId && value[empId] === true) {
+              dynamicNavItems.push({ name: 'Sales Invoice Rack List', icon: FileText, route: '/employee/dashboard/pharmacy/sales-invoice-rack-list' });
+            }
+          }
+          
           if (res.data.success && res.data.settings.item_master_access) {
             let value = res.data.settings.item_master_access;
             if (typeof value === 'string') value = JSON.parse(value);
